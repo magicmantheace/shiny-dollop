@@ -48,8 +48,9 @@ export default function AddGameDialog({ onClose, onAdded }: Props) {
       } catch (e) {
         throw new Error((e as Error).message);
       }
-      const input: { path: string; workingDir?: string; args: string[] } = {
+      const input: { path: string; title: string; workingDir?: string; args: string[] } = {
         path: exePath,
+        title: title.trim(),
         args,
       };
       const wd = workingDir.trim();

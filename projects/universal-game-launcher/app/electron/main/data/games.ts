@@ -115,6 +115,8 @@ export function getGame(db: DatabaseSync, id: string): Game | null {
 
 export interface AddManualInput {
   path: string;
+  /** Optional custom title; empty/whitespace falls back to the exe filename. */
+  title?: string;
   workingDir?: string;
   args?: string[];
 }
@@ -150,10 +152,12 @@ export async function addManualGame(db: DatabaseSync, input: AddManualInput): Pr
   }
   const now = new Date().toISOString();
   const id = randomUUID();
+  const customTitle = input.title?.trim();
+  const title = customTitle ? customTitle : defaultTitleFor(exePath);
   db.prepare(
     `INSERT INTO games (id, source, title, exe_path, canonical_path, working_dir, args_json, added_at, updated_at)
      VALUES (?, 'manual', ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, defaultTitleFor(exePath), exePath, key, workingDir, JSON.stringify(args), now, now);
+  ).run(id, title, exePath, key, workingDir, JSON.stringify(args), now, now);
   const created = getGame(db, id);
   if (!created) throw new Error('Failed to read back inserted game.');
   return created;

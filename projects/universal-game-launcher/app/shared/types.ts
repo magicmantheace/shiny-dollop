@@ -86,6 +86,7 @@ export interface GameLauncherApi {
     }): Promise<ApiResult<Game[]>>;
     addManual(input: {
       path: string;
+      title?: string;
       workingDir?: string;
       args?: string[];
     }): Promise<ApiResult<Game>>;

@@ -17,6 +17,8 @@ export const libraryListSchema = z
 export const libraryAddManualSchema = z
   .object({
     path: nonEmptyString.max(32767),
+    /** Optional custom title. Empty/whitespace falls back to the exe filename. */
+    title: z.string().max(256).optional(),
     workingDir: z.string().max(32767).optional(),
     args: z.array(z.string().max(4096)).max(64).optional(),
   })
