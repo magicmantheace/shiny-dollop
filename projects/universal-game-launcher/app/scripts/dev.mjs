@@ -51,11 +51,15 @@ function startElectron() {
     }
   }
   console.log('[dev] starting Electron…');
-  electron = run(
-    electronBin,
-    ['--no-sandbox', 'dist/electron/main/index.js'],
-    { env: { ...process.env, UGL_DEV_SERVER: 'http://localhost:5173' } },
-  );
+  // Headless Linux (no X server): wrap in xvfb so the window can initialize.
+  const needsXvfb = process.platform === 'linux' && !process.env.DISPLAY;
+  const cmd = needsXvfb ? 'xvfb-run' : electronBin;
+  const args = needsXvfb
+    ? ['-a', electronBin, '--no-sandbox', 'dist/electron/main/index.js']
+    : ['--no-sandbox', 'dist/electron/main/index.js'];
+  electron = run(cmd, args, {
+    env: { ...process.env, UGL_DEV_SERVER: 'http://localhost:5173' },
+  });
 }
 
 vite.on('spawn', () => {
