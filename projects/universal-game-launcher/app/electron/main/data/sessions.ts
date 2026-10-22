@@ -125,7 +125,25 @@ export function listSessions(
   return rows.map(rowToSession);
 }
 
-/** Clear session history. Touches only the app's own records, never game files. */
-export function clearSessions(db: DatabaseSync): void {
-  db.exec('DELETE FROM sessions');
+/**
+ * Clear ALL play history in a single transaction: every session row is
+ * deleted and every game's derived aggregates (accumulated playtime,
+ * last-played timestamp) are reset. Recently Played views derive from
+ * these columns, so they reflect the cleared state too. Only the app's
+ * own records are touched — never installed games, saves, or storefronts.
+ */
+export function clearPlayHistory(db: DatabaseSync): void {
+  db.exec('BEGIN');
+  try {
+    db.exec('DELETE FROM sessions');
+    db.exec('UPDATE games SET total_play_ms = 0, last_played_at = NULL');
+    db.exec('COMMIT');
+  } catch (err) {
+    try {
+      db.exec('ROLLBACK');
+    } catch {
+      // ROLLBACK itself failed; surface the original error.
+    }
+    throw err;
+  }
 }

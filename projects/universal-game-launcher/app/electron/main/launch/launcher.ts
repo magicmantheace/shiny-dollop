@@ -154,9 +154,12 @@ export class GameLauncher {
     const finalize = (state: 'completed' | 'interrupted', notes: string | null = null) => {
       if (!this.running.has(gameId)) return; // already finalized
       this.running.delete(gameId);
-      if (sessionId) {
+      // Read the CURRENT session id from the entry: it may have been
+      // re-keyed by onPlayHistoryCleared() while this game was running.
+      const sid = entry.sessionId;
+      if (sid) {
         const endedAt = new Date().toISOString();
-        const session = finalizeSession(this.db, sessionId, { state, notes });
+        const session = finalizeSession(this.db, sid, { state, notes });
         recordPlaytime(this.db, gameId, endedAt, session.durationMs ?? 0);
       }
     };
@@ -327,6 +330,29 @@ export class GameLauncher {
         'LAUNCH_REQUEST_FAILED',
         `Could not open Battle.net: ${(err as Error).message}`,
       );
+    }
+  }
+
+  /**
+   * React to play history being cleared while games are running.
+   *
+   * Semantics (documented choice): a live game keeps running and its
+   * tracking continues — but from the clear moment forward. The old
+   * session row was deleted by the clear, so each still-running entry
+   * gets a FRESH session row starting now. Nothing is backfilled: the
+   * minutes between the old session's start and the clear are gone,
+   * which is exactly what "clear history" means. When the process
+   * exits, only the post-clear duration is recorded.
+   *
+   * Must be called synchronously right after the history-clearing
+   * transaction commits, with no awaits in between — 'close' event
+   * handlers cannot interleave with synchronous code, so no exit can
+   * slip in while an entry has a stale session id.
+   */
+  onPlayHistoryCleared(): void {
+    for (const entry of this.running.values()) {
+      if (!entry.sessionId) continue; // tracking disabled; nothing recorded
+      entry.sessionId = createSession(this.db, entry.gameId, 'observed').id;
     }
   }
 

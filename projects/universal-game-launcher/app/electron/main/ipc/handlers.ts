@@ -20,7 +20,7 @@ import {
   type ListQuery,
   type UpdateGameInput,
 } from '../data/games';
-import { clearSessions, listSessions } from '../data/sessions';
+import { clearPlayHistory, listSessions } from '../data/sessions';
 import { getSettings, updateSettings } from '../data/settings';
 import { ValidationError } from '../launch/validation';
 import type { GameLauncher } from '../launch/launcher';
@@ -281,7 +281,11 @@ export function createHandlers(): HandlerDef[] {
       channel: IpcChannels.sessionsClear,
       schema: z.object({}).strict().optional(),
       run: (_payload, deps) => {
-        clearSessions(deps.db);
+        // One transaction clears sessions AND the derived per-game
+        // aggregates; then live sessions are re-keyed to fresh rows
+        // starting now (see GameLauncher.onPlayHistoryCleared).
+        clearPlayHistory(deps.db);
+        deps.launcher.onPlayHistoryCleared();
         return Promise.resolve(null);
       },
     },
