@@ -19,6 +19,7 @@
 import type { LaunchCapability } from '../../../../shared/types';
 import { EpicFsError, joinFor, manifestDirFor, type EpicOs } from './os';
 import { parseEpicManifest } from './manifest';
+import { yieldToEventLoop } from '../scan-yield';
 
 export type ProbeStatus = 'installed' | 'unavailable';
 
@@ -87,11 +88,11 @@ export class EpicAdapter {
   /**
    * Locate Epic's manifest directory. Read-only; never writes anything.
    */
-  probe(): ProbeResult {
+  async probe(): Promise<ProbeResult> {
     const os = this.os;
     const dir = manifestDirFor(os);
     const label = '%ProgramData%\\Epic\\EpicGamesLauncher\\Data\\Manifests';
-    if (dir && os.isDirectory(dir)) {
+    if (dir && (await os.isDirectory(dir))) {
       return {
         status: 'installed',
         reason: `Epic manifest directory found at ${dir} (via ${label}).`,
@@ -115,11 +116,18 @@ export class EpicAdapter {
    * Discover installed Epic items from local `.item` manifests.
    * Side-effect-free local reads only. Bounded (manifest count + file size)
    * and cancellable via token.
+   *
+   * Async by design: every filesystem call awaits, and the loop yields to
+   * the event loop between manifests, so a long scan never blocks the
+   * Electron main thread and cancellation is honored promptly.
    */
-  scan(token?: { cancelled: boolean }): ScanResult {
+  async scan(
+    token?: { cancelled: boolean },
+    onProgress?: (scanned: number, total: number) => void,
+  ): Promise<ScanResult> {
     const os = this.os;
     const scannedAt = new Date().toISOString();
-    const probe = this.probe();
+    const probe = await this.probe();
     if (probe.status !== 'installed' || !probe.manifestDir) {
       return { status: 'failed', games: [], warnings: [], error: probe.reason, scannedAt };
     }
@@ -130,7 +138,7 @@ export class EpicAdapter {
 
     let names: string[];
     try {
-      names = os.listDirNames(manifestDir);
+      names = await os.listDirNames(manifestDir);
     } catch (err) {
       return {
         status: 'failed',
@@ -141,21 +149,26 @@ export class EpicAdapter {
       };
     }
 
+    const manifestNames = names.filter((n) => MANIFEST_RE.test(n));
+    const total = Math.min(manifestNames.length, MAX_MANIFESTS);
+
     let manifestCount = 0;
-    for (const name of names) {
+    for (const name of manifestNames) {
+      // Cancellation point + event-loop yield on every manifest.
       if (token?.cancelled) {
         return { status: 'cancelled', games, warnings, error: null, scannedAt };
       }
-      if (!MANIFEST_RE.test(name)) continue;
+      await yieldToEventLoop();
       if (seenAppNames.has(name.toLowerCase())) continue;
       if (++manifestCount > MAX_MANIFESTS) {
         warnings.push(`More than ${MAX_MANIFESTS} manifests; remaining ones skipped.`);
         return { status: 'completed', games, warnings, error: null, scannedAt };
       }
+      onProgress?.(manifestCount, total);
       const itemPath = joinFor(os.platform, manifestDir, name);
       let text: string;
       try {
-        text = os.readTextFile(itemPath, MAX_MANIFEST_BYTES);
+        text = await os.readTextFile(itemPath, MAX_MANIFEST_BYTES);
       } catch (err) {
         warnings.push(
           `Skipped unreadable manifest ${name} (${err instanceof EpicFsError ? err.code : 'error'}).`,
@@ -179,7 +192,7 @@ export class EpicAdapter {
         appName: m.appName,
         title: m.displayName,
         installLocation: m.installLocation,
-        present: os.isDirectory(m.installLocation),
+        present: await os.isDirectory(m.installLocation),
       });
     }
     return { status: 'completed', games, warnings, error: null, scannedAt };

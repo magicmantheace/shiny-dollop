@@ -34,15 +34,15 @@ export class FakeEpicOs implements EpicOs {
     return this.envVars.get(name.toLowerCase());
   }
 
-  isDirectory(p: string): boolean {
+  async isDirectory(p: string): Promise<boolean> {
     return this.dirs.has(norm(p));
   }
 
-  isFile(p: string): boolean {
+  async isFile(p: string): Promise<boolean> {
     return this.files.has(norm(p));
   }
 
-  readTextFile(p: string, maxBytes: number): string {
+  async readTextFile(p: string, maxBytes: number): Promise<string> {
     const key = norm(p);
     const content = this.files.get(key);
     if (content === undefined) throw new EpicFsError('NOT_FOUND', `File not found: ${p}`);
@@ -50,7 +50,7 @@ export class FakeEpicOs implements EpicOs {
     return content;
   }
 
-  listDirNames(p: string): string[] {
+  async listDirNames(p: string): Promise<string[]> {
     const prefix = norm(p).replace(/\/$/, '') + '/';
     if (!this.dirs.has(norm(p))) {
       throw new EpicFsError('LIST_FAILED', `Could not list directory ${p}`);

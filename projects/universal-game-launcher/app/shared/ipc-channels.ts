@@ -16,6 +16,8 @@ export const IpcChannels = {
   sourcesStatus: 'sources.status',
   sourcesScan: 'sources.scan',
   sourcesCancelScan: 'sources.cancelScan',
+  /** Main → renderer event: { source, scanned, total } during a store scan. */
+  sourcesScanProgress: 'sources.scanProgress',
   sourcesOpenClient: 'sources.openClient',
 } as const;
 

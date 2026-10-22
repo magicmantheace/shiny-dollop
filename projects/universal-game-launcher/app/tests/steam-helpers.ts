@@ -41,15 +41,15 @@ export class FakeSteamOs implements SteamOs {
     return this.envVars.get(name.toLowerCase());
   }
 
-  isDirectory(p: string): boolean {
+  async isDirectory(p: string): Promise<boolean> {
     return this.dirs.has(norm(p));
   }
 
-  isFile(p: string): boolean {
+  async isFile(p: string): Promise<boolean> {
     return this.files.has(norm(p));
   }
 
-  readTextFile(p: string, maxBytes: number): string {
+  async readTextFile(p: string, maxBytes: number): Promise<string> {
     const key = norm(p);
     const content = this.files.get(key);
     if (content === undefined) throw new SteamFsError('NOT_FOUND', `File not found: ${p}`);
@@ -57,7 +57,7 @@ export class FakeSteamOs implements SteamOs {
     return content;
   }
 
-  listDirNames(p: string): string[] {
+  async listDirNames(p: string): Promise<string[]> {
     const prefix = norm(p).replace(/\/$/, '') + '/';
     if (!this.dirs.has(norm(p))) {
       throw new SteamFsError('LIST_FAILED', `Could not list directory ${p}`);
@@ -78,7 +78,11 @@ export class FakeSteamOs implements SteamOs {
     return [...names];
   }
 
-  queryRegistryString(hive: 'HKCU' | 'HKLM', keyPath: string, valueName: string): string | null {
+  async queryRegistryString(
+    hive: 'HKCU' | 'HKLM',
+    keyPath: string,
+    valueName: string,
+  ): Promise<string | null> {
     if (this.platform !== 'win32') return null;
     return this.registry.get(`${hive}\\${keyPath}\\${valueName}`.toLowerCase()) ?? null;
   }

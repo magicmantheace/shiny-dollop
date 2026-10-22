@@ -124,7 +124,17 @@ export interface GameLauncherApi {
     scan(input: { source: GameSource }): Promise<ApiResult<{ scannedAt: string; gamesFound: number }>>;
     cancelScan(): Promise<ApiResult<{ cancelled: boolean }>>;
     openClient(input: { source: 'epic' | 'battlenet' }): Promise<ApiResult<{ opened: boolean }>>;
+    /** Subscribe to store-scan progress events; returns an unsubscribe function. */
+    onScanProgress(cb: (progress: ScanProgress) => void): () => void;
   };
+}
+
+/** Emitted by the main process on the sourcesScanProgress channel during a scan. */
+export interface ScanProgress {
+  source: GameSource;
+  scanned: number;
+  /** Total manifests to examine (capped like the scan itself). */
+  total: number;
 }
 
 declare global {

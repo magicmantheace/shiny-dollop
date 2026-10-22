@@ -5,8 +5,11 @@
  * fully testable with a fake on any platform. The real implementation
  * degrades honestly off Windows: the ProgramData candidate path simply
  * won't exist there.
+ *
+ * Filesystem methods are async so scans never block the Electron main
+ * thread (see the Steam adapter for the same rationale).
  */
-import fs from 'node:fs';
+import fsp from 'node:fs/promises';
 import path from 'node:path';
 
 export class EpicFsError extends Error {
@@ -22,12 +25,12 @@ export interface EpicOs {
   readonly platform: NodeJS.Platform;
   /** Read an environment variable. */
   env(name: string): string | undefined;
-  isDirectory(p: string): boolean;
-  isFile(p: string): boolean;
+  isDirectory(p: string): Promise<boolean>;
+  isFile(p: string): Promise<boolean>;
   /** Read a text file, bounded by maxBytes. Throws EpicFsError on any failure. */
-  readTextFile(p: string, maxBytes: number): string;
+  readTextFile(p: string, maxBytes: number): Promise<string>;
   /** Bare entry names of a directory. Throws EpicFsError on any failure. */
-  listDirNames(p: string): string[];
+  listDirNames(p: string): Promise<string[]>;
 }
 
 export class RealEpicOs implements EpicOs {
@@ -44,26 +47,24 @@ export class RealEpicOs implements EpicOs {
     return process.env[name];
   }
 
-  isDirectory(p: string): boolean {
-    try {
-      return fs.statSync(p).isDirectory();
-    } catch {
-      return false;
-    }
+  isDirectory(p: string): Promise<boolean> {
+    return fsp
+      .stat(p)
+      .then((s) => s.isDirectory())
+      .catch(() => false);
   }
 
-  isFile(p: string): boolean {
-    try {
-      return fs.statSync(p).isFile();
-    } catch {
-      return false;
-    }
+  isFile(p: string): Promise<boolean> {
+    return fsp
+      .stat(p)
+      .then((s) => s.isFile())
+      .catch(() => false);
   }
 
-  readTextFile(p: string, maxBytes: number): string {
-    let stat: fs.Stats;
+  async readTextFile(p: string, maxBytes: number): Promise<string> {
+    let stat: { isFile(): boolean; size: number };
     try {
-      stat = fs.statSync(p);
+      stat = await fsp.stat(p);
     } catch {
       throw new EpicFsError('NOT_FOUND', `File not found: ${p}`);
     }
@@ -73,15 +74,15 @@ export class RealEpicOs implements EpicOs {
     }
     try {
       // Epic writes manifests as UTF-8 (sometimes with BOM); strip the BOM.
-      return fs.readFileSync(p, 'utf8').replace(/^﻿/, '');
+      return (await fsp.readFile(p, 'utf8')).replace(/^﻿/, '');
     } catch (err) {
       throw new EpicFsError('READ_FAILED', `Could not read ${p}: ${(err as Error).message}`);
     }
   }
 
-  listDirNames(p: string): string[] {
+  async listDirNames(p: string): Promise<string[]> {
     try {
-      return fs.readdirSync(p);
+      return await fsp.readdir(p);
     } catch (err) {
       throw new EpicFsError(
         'LIST_FAILED',

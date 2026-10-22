@@ -121,9 +121,9 @@ function battleNetStatus(db: DatabaseSync, os: BattleNetOs): SourceStatus {
   };
 }
 
-function steamStatus(db: DatabaseSync, os: SteamOs): SourceStatus {
+async function steamStatus(db: DatabaseSync, os: SteamOs): Promise<SourceStatus> {
   const adapter = new SteamAdapter(os);
-  const probe = adapter.probe();
+  const probe = await adapter.probe();
   const scan = lastScan(db, 'steam');
   const gamesFound = listGames(db, { source: 'steam', includeHidden: true }).length;
   const parts = [probe.reason];
@@ -141,9 +141,9 @@ function steamStatus(db: DatabaseSync, os: SteamOs): SourceStatus {
   };
 }
 
-function epicStatus(db: DatabaseSync, os: EpicOs): SourceStatus {
+async function epicStatus(db: DatabaseSync, os: EpicOs): Promise<SourceStatus> {
   const adapter = new EpicAdapter(os);
-  const probe = adapter.probe();
+  const probe = await adapter.probe();
   const scan = epicLastScan(db, 'epic');
   const gamesFound = listGames(db, { source: 'epic', includeHidden: true }).length;
   const parts = [probe.reason];
@@ -163,23 +163,40 @@ function epicStatus(db: DatabaseSync, os: EpicOs): SourceStatus {
 
 /**
  * Run a store library scan: probe, discover, merge idempotently, log.
+ *
  * Only one scan per source runs at a time; a second call while one is in
- * flight fails explicitly instead of interleaving. A source's failure is
- * isolated — it never touches another source's rows.
+ * flight fails explicitly instead of interleaving. The guard is set
+ * synchronously before the first await, so two racing IPC calls cannot
+ * both slip through. A source's failure is isolated — it never touches
+ * another source's rows.
+ *
+ * The scan itself is async and yields to the event loop between manifests,
+ * so the main thread stays responsive and cancellation requests are
+ * honored promptly. Progress is forwarded to the renderer window.
  */
-function runStoreScan(
+async function runStoreScan(
   deps: HandlerDeps,
   source: 'steam' | 'epic',
-): { scannedAt: string; gamesFound: number } {
+): Promise<{ scannedAt: string; gamesFound: number }> {
   if (activeScans.has(source)) {
     throw new ValidationError('SCAN_IN_PROGRESS', `A ${source} scan is already running.`);
   }
-  if (source === 'steam') {
-    const controller = createScanController();
-    activeScans.set(source, controller);
+  const controller = source === 'steam' ? createScanController() : createEpicScanController();
+  activeScans.set(source, controller);
+  const win = deps.getMainWindow();
+  const onProgress = (scanned: number, total: number): void => {
+    // Fire-and-forget: progress must never break the scan if the window
+    // is gone or the renderer isn't listening.
     try {
+      win?.webContents.send(IpcChannels.sourcesScanProgress, { source, scanned, total });
+    } catch {
+      /* ignore */
+    }
+  };
+  try {
+    if (source === 'steam') {
       const adapter = new SteamAdapter(steamOsFor(deps));
-      const result = adapter.scan(controller.token);
+      const result = await adapter.scan(controller.token, onProgress);
       if (result.status === 'cancelled') {
         recordScan(deps.db, 'steam', 'cancelled', 0, 'Cancelled by the user.');
         return { scannedAt: result.scannedAt, gamesFound: 0 };
@@ -196,15 +213,9 @@ function runStoreScan(
           : `Imported/updated ${syncResult.added + syncResult.updated} Steam game(s).`;
       recordScan(deps.db, 'steam', 'ok', gamesFound, result.warnings.length > 0 ? note : null);
       return { scannedAt: result.scannedAt, gamesFound };
-    } finally {
-      activeScans.delete(source);
     }
-  }
-  const controller = createEpicScanController();
-  activeScans.set(source, controller);
-  try {
     const adapter = new EpicAdapter(epicOsFor(deps));
-    const result = adapter.scan(controller.token);
+    const result = await adapter.scan(controller.token, onProgress);
     if (result.status === 'cancelled') {
       epicRecordScan(deps.db, 'epic', 'cancelled', 0, 'Cancelled by the user.');
       return { scannedAt: result.scannedAt, gamesFound: 0 };
@@ -324,7 +335,7 @@ export function createHandlers(): HandlerDef[] {
     {
       channel: IpcChannels.sourcesStatus,
       schema: z.object({}).strict().optional(),
-      run: (_payload, deps) => {
+      run: async (_payload, deps) => {
         const manual: SourceStatus = {
           source: 'manual',
           available: true,
@@ -332,25 +343,25 @@ export function createHandlers(): HandlerDef[] {
           lastScanAt: null,
           gamesFound: listGames(deps.db, { source: 'manual', includeHidden: true }).length,
         };
-        const steam = steamStatus(deps.db, steamOsFor(deps));
-        const epic = epicStatus(deps.db, epicOsFor(deps));
+        const steam = await steamStatus(deps.db, steamOsFor(deps));
+        const epic = await epicStatus(deps.db, epicOsFor(deps));
         const battlenet = battleNetStatus(deps.db, battleNetOsFor(deps));
-        return Promise.resolve([manual, steam, epic, battlenet]);
+        return [manual, steam, epic, battlenet];
       },
     },
     {
       channel: IpcChannels.sourcesScan,
       schema: schemas.sourcesScanSchema,
-      run: (payload, deps) => {
+      run: async (payload, deps) => {
         const p = payload as { source: GameSource };
         if (p.source === 'manual') {
-          return Promise.resolve({
+          return {
             scannedAt: new Date().toISOString(),
             gamesFound: listGames(deps.db, { source: 'manual', includeHidden: true }).length,
-          });
+          };
         }
         if (p.source === 'steam' || p.source === 'epic') {
-          return Promise.resolve(runStoreScan(deps, p.source));
+          return runStoreScan(deps, p.source);
         }
         if (p.source === 'battlenet') {
           const adapter = new BattleNetAdapter(battleNetOsFor(deps));

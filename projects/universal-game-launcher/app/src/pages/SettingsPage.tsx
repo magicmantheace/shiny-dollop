@@ -19,6 +19,7 @@ export default function SettingsPage({ settings, onRefresh }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [scanning, setScanning] = useState<GameSource | null>(null);
+  const [scanProgress, setScanProgress] = useState<{ scanned: number; total: number } | null>(null);
   const [scanNote, setScanNote] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
 
@@ -36,8 +37,15 @@ export default function SettingsPage({ settings, onRefresh }: Props) {
 
   async function scan(source: GameSource) {
     setScanning(source);
+    setScanProgress(null);
     setScanNote(null);
     setError(null);
+    // Live scan progress from the main process; only relevant while scanning.
+    const unsubscribe = getApi().sources.onScanProgress((progress) => {
+      if (progress.source === source) {
+        setScanProgress({ scanned: progress.scanned, total: progress.total });
+      }
+    });
     try {
       const result = await unwrap(getApi().sources.scan({ source }));
       setScanNote(
@@ -48,7 +56,9 @@ export default function SettingsPage({ settings, onRefresh }: Props) {
     } catch (err) {
       setError(err instanceof ApiCallError ? err.message : String(err));
     } finally {
+      unsubscribe();
       setScanning(null);
+      setScanProgress(null);
     }
   }
 
@@ -189,9 +199,17 @@ export default function SettingsPage({ settings, onRefresh }: Props) {
             </span>
             {(s.source === 'steam' || s.source === 'epic') &&
               (scanning === s.source ? (
-                <button className="btn" onClick={cancelScan}>
-                  Cancel scan
-                </button>
+                <span className="scan-status">
+                  <button className="btn" onClick={cancelScan}>
+                    Cancel scan
+                  </button>
+                  {scanProgress && (
+                    <span className="scan-progress" aria-live="polite">
+                      {' '}
+                      Scanning {scanProgress.scanned} of {scanProgress.total}…
+                    </span>
+                  )}
+                </span>
               ) : (
                 <button className="btn" onClick={() => scan(s.source)} disabled={scanning !== null}>
                   Scan now

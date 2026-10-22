@@ -5,7 +5,7 @@
  */
 import { contextBridge, ipcRenderer } from 'electron';
 import { IpcChannels } from '../../shared/ipc-channels';
-import type { GameLauncherApi } from '../../shared/types';
+import type { GameLauncherApi, ScanProgress } from '../../shared/types';
 
 function invoke<T>(channel: string, payload?: unknown): Promise<T> {
   return ipcRenderer.invoke(channel, payload) as Promise<T>;
@@ -40,6 +40,11 @@ const api: GameLauncherApi = {
     scan: (input) => invoke(IpcChannels.sourcesScan, input),
     cancelScan: () => invoke(IpcChannels.sourcesCancelScan, {}),
     openClient: (input) => invoke(IpcChannels.sourcesOpenClient, input),
+    onScanProgress: (cb) => {
+      const listener = (_event: unknown, progress: ScanProgress) => cb(progress);
+      ipcRenderer.on(IpcChannels.sourcesScanProgress, listener);
+      return () => ipcRenderer.removeListener(IpcChannels.sourcesScanProgress, listener);
+    },
   },
 };
 
