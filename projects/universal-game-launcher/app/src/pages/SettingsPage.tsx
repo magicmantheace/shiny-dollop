@@ -125,20 +125,26 @@ export default function SettingsPage({ settings, onRefresh }: Props) {
           <div key={s.source} className="source-row">
             <span className="source-name">{SOURCE_LABELS[s.source]}</span>
             <span className={`badge ${s.available ? '' : 'warn'}`}>
-              {s.source === 'steam' ? (s.available ? 'Detected' : 'Not found') : s.available ? 'Ready' : 'Not yet available'}
+              {s.source === 'steam' || s.source === 'epic'
+                ? s.available
+                  ? 'Detected'
+                  : 'Not found'
+                : s.available
+                  ? 'Ready'
+                  : 'Not yet available'}
             </span>
             <span className="muted">{s.reason}</span>
             <span className="muted">
               {s.gamesFound} in library
               {s.lastScanAt ? ` · last scan ${formatDateTime(s.lastScanAt)}` : ''}
             </span>
-            {s.source === 'steam' &&
-              (scanning === 'steam' ? (
+            {(s.source === 'steam' || s.source === 'epic') &&
+              (scanning === s.source ? (
                 <button className="btn" onClick={cancelScan}>
                   Cancel scan
                 </button>
               ) : (
-                <button className="btn" onClick={() => scan('steam')} disabled={scanning !== null}>
+                <button className="btn" onClick={() => scan(s.source)} disabled={scanning !== null}>
                   Scan now
                 </button>
               ))}

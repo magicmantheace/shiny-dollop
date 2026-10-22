@@ -34,6 +34,15 @@ import {
   type ScanController,
   type SteamOs,
 } from '../sources/steam';
+import {
+  EpicAdapter,
+  RealEpicOs,
+  createEpicScanController,
+  lastScan as epicLastScan,
+  recordScan as epicRecordScan,
+  syncEpicGames,
+  type EpicOs,
+} from '../sources/epic';
 
 export interface HandlerDeps {
   db: DatabaseSync;
@@ -42,6 +51,8 @@ export interface HandlerDeps {
   getMainWindow: () => BrowserWindow | null;
   /** Override for tests. Defaults to the real OS layer. */
   steamOs?: SteamOs;
+  /** Override for tests. Defaults to the real OS layer. */
+  epicOs?: EpicOs;
 }
 
 function toApiError(err: unknown): ApiError {
@@ -68,11 +79,15 @@ interface HandlerDef {
 
 const STORE_SOURCES: GameSource[] = ['steam', 'epic', 'battlenet'];
 
-/** In-flight Steam scan, if any — used to honor cancellation requests. */
-let steamScan: ScanController | null = null;
+/** In-flight store scans by source — used to honor cancellation requests. */
+const activeScans = new Map<GameSource, ScanController>();
 
 function steamOsFor(deps: HandlerDeps): SteamOs {
   return deps.steamOs ?? new RealSteamOs();
+}
+
+function epicOsFor(deps: HandlerDeps): EpicOs {
+  return deps.epicOs ?? new RealEpicOs();
 }
 
 function steamStatus(db: DatabaseSync, os: SteamOs): SourceStatus {
@@ -95,6 +110,26 @@ function steamStatus(db: DatabaseSync, os: SteamOs): SourceStatus {
   };
 }
 
+function epicStatus(db: DatabaseSync, os: EpicOs): SourceStatus {
+  const adapter = new EpicAdapter(os);
+  const probe = adapter.probe();
+  const scan = epicLastScan(db, 'epic');
+  const gamesFound = listGames(db, { source: 'epic', includeHidden: true }).length;
+  const parts = [probe.reason];
+  if (scan.scannedAt) {
+    parts.push(
+      `Last scan ${scan.scannedAt}${scan.status !== 'ok' ? ` (${scan.status}${scan.error ? `: ${scan.error}` : ''})` : ''}.`,
+    );
+  }
+  return {
+    source: 'epic',
+    available: probe.status === 'installed',
+    reason: parts.join(' '),
+    lastScanAt: scan.scannedAt,
+    gamesFound,
+  };
+}
+
 function storeStatus(db: DatabaseSync, source: GameSource): SourceStatus {
   return {
     source,
@@ -106,37 +141,67 @@ function storeStatus(db: DatabaseSync, source: GameSource): SourceStatus {
 }
 
 /**
- * Run a Steam library scan: probe, discover, merge idempotently, log.
- * Only one scan runs at a time; a second call while one is in flight fails
- * explicitly instead of interleaving.
+ * Run a store library scan: probe, discover, merge idempotently, log.
+ * Only one scan per source runs at a time; a second call while one is in
+ * flight fails explicitly instead of interleaving. A source's failure is
+ * isolated — it never touches another source's rows.
  */
-function runSteamScan(deps: HandlerDeps): { scannedAt: string; gamesFound: number } {
-  if (steamScan) {
-    throw new ValidationError('SCAN_IN_PROGRESS', 'A Steam scan is already running.');
+function runStoreScan(
+  deps: HandlerDeps,
+  source: 'steam' | 'epic',
+): { scannedAt: string; gamesFound: number } {
+  if (activeScans.has(source)) {
+    throw new ValidationError('SCAN_IN_PROGRESS', `A ${source} scan is already running.`);
   }
-  const controller = createScanController();
-  steamScan = controller;
+  if (source === 'steam') {
+    const controller = createScanController();
+    activeScans.set(source, controller);
+    try {
+      const adapter = new SteamAdapter(steamOsFor(deps));
+      const result = adapter.scan(controller.token);
+      if (result.status === 'cancelled') {
+        recordScan(deps.db, 'steam', 'cancelled', 0, 'Cancelled by the user.');
+        return { scannedAt: result.scannedAt, gamesFound: 0 };
+      }
+      if (result.status === 'failed') {
+        recordScan(deps.db, 'steam', 'failed', 0, result.error);
+        throw new ValidationError('SCAN_FAILED', result.error ?? 'Steam scan failed.');
+      }
+      const syncResult = syncSteamGames(deps.db, result.games);
+      const gamesFound = listGames(deps.db, { source: 'steam', includeHidden: true }).length;
+      const note =
+        result.warnings.length > 0
+          ? `${result.warnings.length} warning(s), e.g.: ${result.warnings[0]}`
+          : `Imported/updated ${syncResult.added + syncResult.updated} Steam game(s).`;
+      recordScan(deps.db, 'steam', 'ok', gamesFound, result.warnings.length > 0 ? note : null);
+      return { scannedAt: result.scannedAt, gamesFound };
+    } finally {
+      activeScans.delete(source);
+    }
+  }
+  const controller = createEpicScanController();
+  activeScans.set(source, controller);
   try {
-    const adapter = new SteamAdapter(steamOsFor(deps));
+    const adapter = new EpicAdapter(epicOsFor(deps));
     const result = adapter.scan(controller.token);
     if (result.status === 'cancelled') {
-      recordScan(deps.db, 'steam', 'cancelled', 0, 'Cancelled by the user.');
+      epicRecordScan(deps.db, 'epic', 'cancelled', 0, 'Cancelled by the user.');
       return { scannedAt: result.scannedAt, gamesFound: 0 };
     }
     if (result.status === 'failed') {
-      recordScan(deps.db, 'steam', 'failed', 0, result.error);
-      throw new ValidationError('SCAN_FAILED', result.error ?? 'Steam scan failed.');
+      epicRecordScan(deps.db, 'epic', 'failed', 0, result.error);
+      throw new ValidationError('SCAN_FAILED', result.error ?? 'Epic scan failed.');
     }
-    const syncResult = syncSteamGames(deps.db, result.games);
-    const gamesFound = listGames(deps.db, { source: 'steam', includeHidden: true }).length;
+    const syncResult = syncEpicGames(deps.db, result.games);
+    const gamesFound = listGames(deps.db, { source: 'epic', includeHidden: true }).length;
     const note =
       result.warnings.length > 0
         ? `${result.warnings.length} warning(s), e.g.: ${result.warnings[0]}`
-        : `Imported/updated ${syncResult.added + syncResult.updated} Steam game(s).`;
-    recordScan(deps.db, 'steam', 'ok', gamesFound, result.warnings.length > 0 ? note : null);
+        : `Imported/updated ${syncResult.added + syncResult.updated} Epic game(s).`;
+    epicRecordScan(deps.db, 'epic', 'ok', gamesFound, result.warnings.length > 0 ? note : null);
     return { scannedAt: result.scannedAt, gamesFound };
   } finally {
-    if (steamScan === controller) steamScan = null;
+    activeScans.delete(source);
   }
 }
 
@@ -226,10 +291,11 @@ export function createHandlers(): HandlerDef[] {
           gamesFound: listGames(deps.db, { source: 'manual', includeHidden: true }).length,
         };
         const steam = steamStatus(deps.db, steamOsFor(deps));
-        const rest = STORE_SOURCES.filter((s) => s !== 'steam').map((s) =>
+        const epic = epicStatus(deps.db, epicOsFor(deps));
+        const rest = STORE_SOURCES.filter((s) => s !== 'steam' && s !== 'epic').map((s) =>
           storeStatus(deps.db, s),
         );
-        return Promise.resolve([manual, steam, ...rest]);
+        return Promise.resolve([manual, steam, epic, ...rest]);
       },
     },
     {
@@ -243,8 +309,8 @@ export function createHandlers(): HandlerDef[] {
             gamesFound: listGames(deps.db, { source: 'manual', includeHidden: true }).length,
           });
         }
-        if (p.source === 'steam') {
-          return Promise.resolve(runSteamScan(deps));
+        if (p.source === 'steam' || p.source === 'epic') {
+          return Promise.resolve(runStoreScan(deps, p.source));
         }
         throw new ValidationError(
           'NOT_IMPLEMENTED',
@@ -256,10 +322,13 @@ export function createHandlers(): HandlerDef[] {
       channel: IpcChannels.sourcesCancelScan,
       schema: z.object({}).strict().optional(),
       run: () => {
-        const wasRunning = steamScan !== null;
-        steamScan?.cancel();
-        steamScan = null;
-        return Promise.resolve({ cancelled: wasRunning });
+        let cancelledAny = false;
+        for (const [, controller] of activeScans) {
+          controller.cancel();
+          cancelledAny = true;
+        }
+        activeScans.clear();
+        return Promise.resolve({ cancelled: cancelledAny });
       },
     },
   ];

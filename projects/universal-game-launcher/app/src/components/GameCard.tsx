@@ -38,6 +38,10 @@ export default function GameCard({ game, onChanged, onSelect }: Props) {
         setNotice(
           'Launch requested — handed to the Steam client. Playtime can\u2019t be tracked for store launches.',
         );
+      } else if (game.source === 'epic') {
+        setNotice(
+          'Launch requested — Epic Games Launcher is opening. Pick your game there; playtime can\u2019t be tracked for store launches.',
+        );
       }
       onChanged();
     } catch (err) {
@@ -48,7 +52,13 @@ export default function GameCard({ game, onChanged, onSelect }: Props) {
   }
 
   const canPlay = !game.missing && game.launchCapability !== 'unavailable';
-  const playLabel = busy ? 'Launching…' : game.source === 'steam' ? 'Play via Steam' : 'Play';
+  const playLabel = busy
+    ? 'Launching…'
+    : game.source === 'steam'
+      ? 'Play via Steam'
+      : game.source === 'epic'
+        ? 'Open Epic Games Launcher'
+        : 'Play';
 
   return (
     <article
@@ -102,7 +112,9 @@ export default function GameCard({ game, onChanged, onSelect }: Props) {
         <div className="card-error" role="alert">
           {game.source === 'steam'
             ? 'Install folder not found — the game may have been moved or uninstalled via Steam.'
-            : 'File not found — it may have been moved, renamed or uninstalled.'}
+            : game.source === 'epic'
+              ? 'Install folder not found — the game may have been moved or uninstalled via the Epic Games Launcher.'
+              : 'File not found — it may have been moved, renamed or uninstalled.'}
         </div>
       )}
       {notice && (

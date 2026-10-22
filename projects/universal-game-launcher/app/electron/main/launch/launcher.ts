@@ -21,6 +21,7 @@ import {
 } from '../data/sessions';
 import { getSettings } from '../data/settings';
 import { buildRunGameUri, isValidAppId } from '../sources/steam/adapter';
+import { EPIC_LAUNCHER_URI } from '../sources/epic/adapter';
 import {
   ValidationError,
   assertDirectoryUsable,
@@ -86,6 +87,9 @@ export class GameLauncher {
     }
     if (game.source === 'steam') {
       return this.launchSteam(gameId);
+    }
+    if (game.source === 'epic') {
+      return this.launchEpic(gameId);
     }
     if (game.source !== 'manual') {
       throw new ValidationError(
@@ -165,13 +169,53 @@ export class GameLauncher {
   }
 
   /**
-   * Steam launch: hand a validated steam:// URI to the OS. The URI handoff is
-   * reported as "launch requested" — never as "running", because the OS gives
-   * us no handle on the resulting game process. A session row with
-   * trackingMethod 'unavailable' records the request honestly; no playtime is
-   * invented (last_played_at / total_play_ms are untouched).
+   * Shared OS URI handoff for store sources (Steam per-game URIs, Epic's
+   * launcher URI). The handoff is reported as "launch requested" — never as
+   * "running", because the OS gives us no handle on the resulting process.
+   * A session row with trackingMethod 'unavailable' records the request
+   * honestly; no playtime is invented (last_played_at / total_play_ms are
+   * untouched).
    */
-  private async launchSteam(gameId: string): Promise<{ sessionId: string | null; alreadyRunning: boolean }> {
+  private async handoffStoreUri(
+    gameId: string,
+    expectedSource: 'steam' | 'epic',
+    uri: string,
+    sessionNotes: string,
+  ): Promise<{ sessionId: string | null; alreadyRunning: boolean }> {
+    const game = getGame(this.db, gameId);
+    if (!game || game.source !== expectedSource) {
+      throw new ValidationError('NOT_FOUND', 'Game not found in the library.');
+    }
+    if (!this.openExternalImpl) {
+      throw new ValidationError(
+        'NO_OS_HANDOFF',
+        'OS URI handoff is unavailable in this environment.',
+      );
+    }
+    try {
+      await this.openExternalImpl(uri);
+    } catch (err) {
+      throw new ValidationError(
+        'LAUNCH_REQUEST_FAILED',
+        `Could not hand "${game.title}" to the ${expectedSource === 'steam' ? 'Steam' : 'Epic Games'} client: ${(err as Error).message}`,
+      );
+    }
+    let sessionId: string | null = null;
+    if (getSettings(this.db).trackingEnabled) {
+      const session = createSession(this.db, gameId, 'unavailable');
+      finalizeSession(this.db, session.id, { state: 'completed', notes: sessionNotes });
+      sessionId = session.id;
+    }
+    this.onLaunched?.(gameId);
+    return { sessionId, alreadyRunning: false };
+  }
+
+  /**
+   * Steam launch: hand a validated steam:// URI to the OS.
+   */
+  private async launchSteam(
+    gameId: string,
+  ): Promise<{ sessionId: string | null; alreadyRunning: boolean }> {
     const game = getGame(this.db, gameId);
     if (!game || game.source !== 'steam') {
       throw new ValidationError('NOT_FOUND', 'Game not found in the library.');
@@ -182,32 +226,38 @@ export class GameLauncher {
         `"${game.title}" has no valid Steam AppID; refusing to build a launch URI.`,
       );
     }
-    if (!this.openExternalImpl) {
+    return this.handoffStoreUri(
+      gameId,
+      'steam',
+      buildRunGameUri(game.externalId),
+      'Launch requested — handed to the Steam client. Playtime cannot be tracked for store launches.',
+    );
+  }
+
+  /**
+   * Epic launch: per-game deep links are unverified, so hand the documented
+   * Epic Games Launcher URI to the OS. The stored launch URI must be exactly
+   * the known launcher scheme — never anything derived from a manifest.
+   */
+  private async launchEpic(
+    gameId: string,
+  ): Promise<{ sessionId: string | null; alreadyRunning: boolean }> {
+    const game = getGame(this.db, gameId);
+    if (!game || game.source !== 'epic') {
+      throw new ValidationError('NOT_FOUND', 'Game not found in the library.');
+    }
+    if (game.launchUri !== EPIC_LAUNCHER_URI) {
       throw new ValidationError(
-        'NO_OS_HANDOFF',
-        'OS URI handoff is unavailable in this environment.',
+        'INVALID_LAUNCH_URI',
+        `"${game.title}" does not carry the verified Epic launcher URI; refusing to hand off.`,
       );
     }
-    const uri = buildRunGameUri(game.externalId);
-    try {
-      await this.openExternalImpl(uri);
-    } catch (err) {
-      throw new ValidationError(
-        'LAUNCH_REQUEST_FAILED',
-        `Could not hand "${game.title}" to Steam: ${(err as Error).message}`,
-      );
-    }
-    let sessionId: string | null = null;
-    if (getSettings(this.db).trackingEnabled) {
-      const session = createSession(this.db, gameId, 'unavailable');
-      finalizeSession(this.db, session.id, {
-        state: 'completed',
-        notes: 'Launch requested — handed to the Steam client. Playtime cannot be tracked for store launches.',
-      });
-      sessionId = session.id;
-    }
-    this.onLaunched?.(gameId);
-    return { sessionId, alreadyRunning: false };
+    return this.handoffStoreUri(
+      gameId,
+      'epic',
+      EPIC_LAUNCHER_URI,
+      'Launch requested — Epic Games Launcher is opening. Playtime cannot be tracked for store launches.',
+    );
   }
 
   private ensureCheckpointTimer(): void {
