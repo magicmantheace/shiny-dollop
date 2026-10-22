@@ -18,35 +18,48 @@ export interface SpawnStub {
   calls: SpawnCall[];
   procs: EventEmitter[];
   spawnImpl: SpawnFn;
+  /**
+   * When true (default), each spawned proc emits 'spawn' on the next tick,
+   * mirroring Node: a successful spawn always emits 'spawn'; a failed spawn
+   * emits only 'error'. Set false to simulate failures deterministically.
+   */
+  autoSpawn: boolean;
   /** Emit 'close' on the most recent spawned process. */
   closeLast: (code?: number) => void;
   /** Emit 'error' on the most recent spawned process. */
-  errorLast: (message: string) => void;
+  errorLast: (message: string, code?: string) => void;
 }
 
 export function makeSpawnStub(): SpawnStub {
   const calls: SpawnCall[] = [];
   const procs: EventEmitter[] = [];
-  const spawnImpl: SpawnFn = (exe, args, opts) => {
-    calls.push({ exe, args, opts: { ...(opts as object) } });
-    const proc = new EventEmitter() as EventEmitter & { kill: () => void };
-    proc.kill = () => undefined;
-    procs.push(proc);
-    return proc as unknown as ReturnType<SpawnFn>;
-  };
-  return {
+  const stub: SpawnStub = {
     calls,
     procs,
-    spawnImpl,
+    autoSpawn: true,
+    spawnImpl: undefined as unknown as SpawnFn,
     closeLast: (code = 0) => {
       const last = procs[procs.length - 1];
       if (last) last.emit('close', code);
     },
-    errorLast: (message: string) => {
+    errorLast: (message: string, code?: string) => {
       const last = procs[procs.length - 1];
-      if (last) last.emit('error', new Error(message));
+      if (last) {
+        const err = new Error(message) as NodeJS.ErrnoException;
+        if (code) err.code = code;
+        last.emit('error', err);
+      }
     },
   };
+  stub.spawnImpl = ((exe, args, opts) => {
+    calls.push({ exe, args, opts: { ...(opts as object) } });
+    const proc = new EventEmitter() as EventEmitter & { kill: () => void };
+    proc.kill = () => undefined;
+    procs.push(proc);
+    if (stub.autoSpawn) setImmediate(() => proc.emit('spawn'));
+    return proc as unknown as ReturnType<SpawnFn>;
+  }) as SpawnFn;
+  return stub;
 }
 
 export interface TestContext {

@@ -60,6 +60,27 @@ export interface LauncherDeps {
 
 const CHECKPOINT_INTERVAL_MS = 30_000;
 
+/**
+ * Turn a raw spawn failure into an actionable message. The raw errno is
+ * translated; the raw system path is not echoed back to the renderer.
+ */
+function describeSpawnFailure(clientName: string, err: Error): string {
+  const code = (err as NodeJS.ErrnoException).code;
+  if (code === 'ENOENT') {
+    return (
+      `${clientName} could not be started: the executable was not found. ` +
+      'It may have been moved or uninstalled — try scanning for it again.'
+    );
+  }
+  if (code === 'EACCES' || code === 'EPERM') {
+    return (
+      `${clientName} could not be started: permission denied. ` +
+      'Check that the file is executable and not blocked by security software.'
+    );
+  }
+  return `${clientName} could not be started: ${err.message}`;
+}
+
 export class GameLauncher {
   private readonly db: DatabaseSync;
   private readonly spawnImpl: SpawnFn;
@@ -323,13 +344,35 @@ export class GameLauncher {
         'Refusing to open an unexpected Battle.net client path.',
       );
     }
+    if (!this.battleNetOs.isFile(exe)) {
+      throw new ValidationError(
+        'CLIENT_NOT_FOUND',
+        'Battle.net was detected earlier, but its executable is no longer there. ' +
+          'It may have been moved or uninstalled — try scanning again.',
+      );
+    }
+    let child: ChildProcess;
     try {
-      this.spawnImpl(exe, [], { shell: false, windowsHide: true, detached: false });
+      child = this.spawnImpl(exe, [], { shell: false, windowsHide: true, detached: false });
     } catch (err) {
       throw new ValidationError(
         'LAUNCH_REQUEST_FAILED',
         `Could not open Battle.net: ${(err as Error).message}`,
       );
+    }
+    // Confirm the OS actually started the process. A synchronous throw
+    // covers immediate failures; failures discovered after spawn returns
+    // (missing binary, access denied) surface as an async 'error' event.
+    // Without this listener an async failure would be an unhandled error
+    // and could take the whole app down — and we would have already
+    // reported success for a launch that failed.
+    try {
+      await new Promise<void>((resolve, reject) => {
+        child.once('spawn', () => resolve());
+        child.once('error', (err: Error) => reject(err));
+      });
+    } catch (err) {
+      throw new ValidationError('LAUNCH_FAILED', describeSpawnFailure('Battle.net', err as Error));
     }
   }
 
