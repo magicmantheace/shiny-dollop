@@ -3,7 +3,8 @@ import type { DatabaseSync } from 'node:sqlite';
 import { EventEmitter } from 'node:events';
 import { openDatabase } from '../../electron/main/data/database';
 import { createHandlers, type HandlerDeps } from '../../electron/main/ipc/handlers';
-import { GameLauncher, type SpawnFn } from '../../electron/main/launch/launcher';
+import { GameLauncher, type OpenExternalFn, type SpawnFn } from '../../electron/main/launch/launcher';
+import type { SteamOs } from '../../electron/main/sources/steam/os';
 
 export interface SpawnCall {
   exe: string;
@@ -56,16 +57,24 @@ export interface TestContext {
   close: () => void;
 }
 
-export function createTestContext(): TestContext {
+export function createTestContext(overrides?: {
+  steamOs?: SteamOs;
+  openExternalImpl?: OpenExternalFn;
+}): TestContext {
   const db = openDatabase(':memory:');
   const stub = makeSpawnStub();
-  const launcher = new GameLauncher({ db, spawnImpl: stub.spawnImpl });
+  const launcher = new GameLauncher({
+    db,
+    spawnImpl: stub.spawnImpl,
+    openExternalImpl: overrides?.openExternalImpl,
+  });
   const handlers = createHandlers();
   const deps: HandlerDeps = {
     db,
     launcher,
     chooseExecutable: async () => ({ canceled: true }),
     getMainWindow: () => null,
+    steamOs: overrides?.steamOs,
   };
   const call = async (channel: string, payload?: unknown) => {
     const def = handlers.find((h) => h.channel === channel);

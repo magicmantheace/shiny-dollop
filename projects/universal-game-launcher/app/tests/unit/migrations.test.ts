@@ -3,10 +3,10 @@ import { openDatabase } from '../../electron/main/data/database';
 import { getAppliedVersions, runMigrations } from '../../electron/main/data/migrations';
 
 describe('migrations', () => {
-  it('applies v1 to a fresh database', () => {
+  it('applies all migrations to a fresh database', () => {
     const db = openDatabase(':memory:');
     try {
-      expect(getAppliedVersions(db)).toEqual([1]);
+      expect(getAppliedVersions(db)).toEqual([1, 2]);
       const tables = db
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
         .all() as { name: string }[];
@@ -15,6 +15,16 @@ describe('migrations', () => {
       expect(names).toContain('sessions');
       expect(names).toContain('settings');
       expect(names).toContain('scan_log');
+      // v2: steam source columns + dedup index.
+      const cols = db.prepare('PRAGMA table_info(games)').all() as { name: string }[];
+      const colNames = cols.map((c) => c.name);
+      for (const c of ['install_dir', 'launch_uri', 'launch_capability', 'launch_reason']) {
+        expect(colNames).toContain(c);
+      }
+      const indexes = db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'games'")
+        .all() as { name: string }[];
+      expect(indexes.map((i) => i.name)).toContain('idx_games_source_external');
     } finally {
       db.close();
     }
