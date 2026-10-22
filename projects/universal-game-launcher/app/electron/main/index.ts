@@ -3,7 +3,7 @@
  * spawning and all native OS access. The renderer is untrusted and may only
  * call the narrow typed API exposed through the preload script.
  */
-import { app, BrowserWindow, session } from 'electron';
+import { app, BrowserWindow, session, shell } from 'electron';
 import path from 'node:path';
 import { openDatabase } from './data/database';
 import { recoverInterruptedSessions } from './data/sessions';
@@ -75,7 +75,10 @@ async function init(): Promise<void> {
     console.log(`[main] recovered ${recovered} interrupted session(s) from previous run`);
   }
 
-  launcher = new GameLauncher({ db });
+  launcher = new GameLauncher({
+    db,
+    openExternalImpl: (uri) => shell.openExternal(uri).then(() => undefined),
+  });
   registerIpcHandlers({
     db,
     launcher,

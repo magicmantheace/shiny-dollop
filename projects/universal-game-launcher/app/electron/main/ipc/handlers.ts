@@ -24,12 +24,24 @@ import { getSettings, updateSettings } from '../data/settings';
 import { ValidationError } from '../launch/validation';
 import type { GameLauncher } from '../launch/launcher';
 import type { PickResult } from '../files/picker';
+import {
+  RealSteamOs,
+  SteamAdapter,
+  createScanController,
+  lastScan,
+  recordScan,
+  syncSteamGames,
+  type ScanController,
+  type SteamOs,
+} from '../sources/steam';
 
 export interface HandlerDeps {
   db: DatabaseSync;
   launcher: GameLauncher;
   chooseExecutable: () => Promise<PickResult>;
   getMainWindow: () => BrowserWindow | null;
+  /** Override for tests. Defaults to the real OS layer. */
+  steamOs?: SteamOs;
 }
 
 function toApiError(err: unknown): ApiError {
@@ -56,6 +68,33 @@ interface HandlerDef {
 
 const STORE_SOURCES: GameSource[] = ['steam', 'epic', 'battlenet'];
 
+/** In-flight Steam scan, if any — used to honor cancellation requests. */
+let steamScan: ScanController | null = null;
+
+function steamOsFor(deps: HandlerDeps): SteamOs {
+  return deps.steamOs ?? new RealSteamOs();
+}
+
+function steamStatus(db: DatabaseSync, os: SteamOs): SourceStatus {
+  const adapter = new SteamAdapter(os);
+  const probe = adapter.probe();
+  const scan = lastScan(db, 'steam');
+  const gamesFound = listGames(db, { source: 'steam', includeHidden: true }).length;
+  const parts = [probe.reason];
+  if (scan.scannedAt) {
+    parts.push(
+      `Last scan ${scan.scannedAt}${scan.status !== 'ok' ? ` (${scan.status}${scan.error ? `: ${scan.error}` : ''})` : ''}.`,
+    );
+  }
+  return {
+    source: 'steam',
+    available: probe.status === 'installed',
+    reason: parts.join(' '),
+    lastScanAt: scan.scannedAt,
+    gamesFound,
+  };
+}
+
 function storeStatus(db: DatabaseSync, source: GameSource): SourceStatus {
   return {
     source,
@@ -64,6 +103,41 @@ function storeStatus(db: DatabaseSync, source: GameSource): SourceStatus {
     lastScanAt: null,
     gamesFound: listGames(db, { source, includeHidden: true }).length,
   };
+}
+
+/**
+ * Run a Steam library scan: probe, discover, merge idempotently, log.
+ * Only one scan runs at a time; a second call while one is in flight fails
+ * explicitly instead of interleaving.
+ */
+function runSteamScan(deps: HandlerDeps): { scannedAt: string; gamesFound: number } {
+  if (steamScan) {
+    throw new ValidationError('SCAN_IN_PROGRESS', 'A Steam scan is already running.');
+  }
+  const controller = createScanController();
+  steamScan = controller;
+  try {
+    const adapter = new SteamAdapter(steamOsFor(deps));
+    const result = adapter.scan(controller.token);
+    if (result.status === 'cancelled') {
+      recordScan(deps.db, 'steam', 'cancelled', 0, 'Cancelled by the user.');
+      return { scannedAt: result.scannedAt, gamesFound: 0 };
+    }
+    if (result.status === 'failed') {
+      recordScan(deps.db, 'steam', 'failed', 0, result.error);
+      throw new ValidationError('SCAN_FAILED', result.error ?? 'Steam scan failed.');
+    }
+    const syncResult = syncSteamGames(deps.db, result.games);
+    const gamesFound = listGames(deps.db, { source: 'steam', includeHidden: true }).length;
+    const note =
+      result.warnings.length > 0
+        ? `${result.warnings.length} warning(s), e.g.: ${result.warnings[0]}`
+        : `Imported/updated ${syncResult.added + syncResult.updated} Steam game(s).`;
+    recordScan(deps.db, 'steam', 'ok', gamesFound, result.warnings.length > 0 ? note : null);
+    return { scannedAt: result.scannedAt, gamesFound };
+  } finally {
+    if (steamScan === controller) steamScan = null;
+  }
 }
 
 export function createHandlers(): HandlerDef[] {
@@ -151,7 +225,11 @@ export function createHandlers(): HandlerDef[] {
           lastScanAt: null,
           gamesFound: listGames(deps.db, { source: 'manual', includeHidden: true }).length,
         };
-        return Promise.resolve([manual, ...STORE_SOURCES.map((s) => storeStatus(deps.db, s))]);
+        const steam = steamStatus(deps.db, steamOsFor(deps));
+        const rest = STORE_SOURCES.filter((s) => s !== 'steam').map((s) =>
+          storeStatus(deps.db, s),
+        );
+        return Promise.resolve([manual, steam, ...rest]);
       },
     },
     {
@@ -165,10 +243,23 @@ export function createHandlers(): HandlerDef[] {
             gamesFound: listGames(deps.db, { source: 'manual', includeHidden: true }).length,
           });
         }
+        if (p.source === 'steam') {
+          return Promise.resolve(runSteamScan(deps));
+        }
         throw new ValidationError(
           'NOT_IMPLEMENTED',
           'Store scanning is not implemented yet. Manual entries are fully supported.',
         );
+      },
+    },
+    {
+      channel: IpcChannels.sourcesCancelScan,
+      schema: z.object({}).strict().optional(),
+      run: () => {
+        const wasRunning = steamScan !== null;
+        steamScan?.cancel();
+        steamScan = null;
+        return Promise.resolve({ cancelled: wasRunning });
       },
     },
   ];

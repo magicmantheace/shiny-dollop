@@ -13,6 +13,7 @@ export const IpcChannels = {
   filesChooseExecutable: 'files.chooseExecutable',
   sourcesStatus: 'sources.status',
   sourcesScan: 'sources.scan',
+  sourcesCancelScan: 'sources.cancelScan',
 } as const;
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels];
