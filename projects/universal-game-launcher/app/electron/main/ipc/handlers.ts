@@ -44,7 +44,6 @@ function toApiError(err: unknown): ApiError {
   if (err instanceof ValidationError) {
     return { code: err.code, message: err.message };
   }
-  // eslint-disable-next-line no-console
   console.error('[ipc] unexpected handler error:', err);
   return { code: 'INTERNAL', message: 'Something went wrong. Please try again.' };
 }

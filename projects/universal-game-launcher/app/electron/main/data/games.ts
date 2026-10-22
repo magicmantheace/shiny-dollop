@@ -1,5 +1,5 @@
 /** Game library persistence. All SQL lives here; callers work with typed Games. */
-import type { DatabaseSync } from 'node:sqlite';
+import type { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
@@ -69,7 +69,7 @@ const SORT_SQL: Record<SortKey, string> = {
 
 export function listGames(db: DatabaseSync, query: ListQuery = {}): Game[] {
   const where: string[] = [];
-  const params: unknown[] = [];
+  const params: SQLInputValue[] = [];
   if (!query.includeHidden) {
     where.push('hidden = 0');
   }
@@ -87,12 +87,12 @@ export function listGames(db: DatabaseSync, query: ListQuery = {}): Game[] {
   }
   const sort = SORT_SQL[query.sort ?? 'title'];
   const sql = `SELECT * FROM games${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY ${sort}`;
-  const rows = db.prepare(sql).all(...params) as GameRow[];
+  const rows = db.prepare(sql).all(...params) as unknown as GameRow[];
   return rows.map(rowToGame);
 }
 
 export function getGame(db: DatabaseSync, id: string): Game | null {
-  const row = db.prepare('SELECT * FROM games WHERE id = ?').get(id) as GameRow | undefined;
+  const row = db.prepare('SELECT * FROM games WHERE id = ?').get(id) as unknown as GameRow | undefined;
   return row ? rowToGame(row) : null;
 }
 
@@ -158,7 +158,7 @@ export async function updateGame(db: DatabaseSync, input: UpdateGameInput): Prom
     throw new ValidationError('NOT_FOUND', 'Game not found in the library.');
   }
   const sets: string[] = ['updated_at = ?'];
-  const params: unknown[] = [new Date().toISOString()];
+  const params: SQLInputValue[] = [new Date().toISOString()];
   if (input.title !== undefined) {
     const title = input.title.trim();
     if (!title) throw new ValidationError('INVALID_TITLE', 'Title must not be empty.');

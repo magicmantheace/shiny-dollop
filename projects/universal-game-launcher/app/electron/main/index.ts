@@ -72,7 +72,6 @@ async function init(): Promise<void> {
   // Conservative crash recovery: sessions left 'running' end at last checkpoint.
   const recovered = recoverInterruptedSessions(db);
   if (recovered > 0) {
-    // eslint-disable-next-line no-console
     console.log(`[main] recovered ${recovered} interrupted session(s) from previous run`);
   }
 
@@ -91,7 +90,6 @@ async function init(): Promise<void> {
   // window, then exits with a marker instead of running forever.
   if (process.env.UGL_SMOKE) {
     await new Promise((resolve) => setTimeout(resolve, 2500));
-    // eslint-disable-next-line no-console
     console.log('SMOKE_OK window opened');
     app.quit();
   }

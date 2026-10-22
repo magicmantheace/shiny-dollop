@@ -1,5 +1,5 @@
 /** Play-session persistence and crash recovery. */
-import type { DatabaseSync } from 'node:sqlite';
+import type { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 import type { Session, SessionState, TrackingMethod } from '../../../shared/types';
 
@@ -52,7 +52,7 @@ export function createSession(
     .prepare(
       `SELECT s.*, g.title AS game_title FROM sessions s JOIN games g ON g.id = s.game_id WHERE s.id = ?`,
     )
-    .get(id) as SessionRow;
+    .get(id) as unknown as SessionRow;
   return rowToSession(row);
 }
 
@@ -82,7 +82,7 @@ export function finalizeSession(db: DatabaseSync, sessionId: string, input: Fina
     .prepare(
       `SELECT s.*, g.title AS game_title FROM sessions s JOIN games g ON g.id = s.game_id WHERE s.id = ?`,
     )
-    .get(sessionId) as SessionRow;
+    .get(sessionId) as unknown as SessionRow;
   return rowToSession(updated);
 }
 
@@ -93,7 +93,7 @@ export function finalizeSession(db: DatabaseSync, sessionId: string, input: Fina
  * Returns the number of sessions recovered.
  */
 export function recoverInterruptedSessions(db: DatabaseSync): number {
-  const running = db.prepare(`SELECT * FROM sessions WHERE state = 'running'`).all() as SessionRow[];
+  const running = db.prepare(`SELECT * FROM sessions WHERE state = 'running'`).all() as unknown as SessionRow[];
   for (const row of running) {
     const end = row.last_checkpoint_at ?? row.started_at;
     const durationMs = computeDurationMs(row.started_at, end);
@@ -111,7 +111,7 @@ export function listSessions(
   query: { gameId?: string; limit?: number } = {},
 ): Session[] {
   const where: string[] = [];
-  const params: unknown[] = [];
+  const params: SQLInputValue[] = [];
   if (query.gameId) {
     where.push('s.game_id = ?');
     params.push(query.gameId);
@@ -121,7 +121,7 @@ export function listSessions(
     JOIN games g ON g.id = s.game_id
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
     ORDER BY s.started_at DESC LIMIT ${limit}`;
-  const rows = db.prepare(sql).all(...params) as SessionRow[];
+  const rows = db.prepare(sql).all(...params) as unknown as SessionRow[];
   return rows.map(rowToSession);
 }
 

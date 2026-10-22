@@ -51,7 +51,7 @@ const CHECKPOINT_INTERVAL_MS = 30_000;
 export class GameLauncher {
   private readonly db: DatabaseSync;
   private readonly spawnImpl: SpawnFn;
-  private readonly onLaunched?: (gameId: string) => void;
+  private readonly onLaunched: ((gameId: string) => void) | undefined;
   private readonly running = new Map<string, RunningEntry>();
   private checkpointTimer: NodeJS.Timeout | null = null;
 
@@ -123,7 +123,7 @@ export class GameLauncher {
     }
 
     const entry: RunningEntry = { child, sessionId, gameId };
-    const finalize = (state: 'completed' | 'interrupted', notes?: string) => {
+    const finalize = (state: 'completed' | 'interrupted', notes: string | null = null) => {
       if (!this.running.has(gameId)) return; // already finalized
       this.running.delete(gameId);
       if (sessionId) {

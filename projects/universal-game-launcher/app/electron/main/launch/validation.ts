@@ -17,7 +17,7 @@ export class ValidationError extends Error {
 /** Reject null bytes and other control characters that have no business in a path or argument. */
 function assertNoControlChars(value: string, what: string): void {
   // eslint-disable-next-line no-control-regex
-  if (/[\0-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(value)) {
+  if (/[\0-\x1F\x7F]/.test(value)) {
     throw new ValidationError('INVALID_CHARACTERS', `${what} contains invalid control characters.`);
   }
 }
