@@ -1,56 +1,21 @@
-# GitHub Development Command Center
+# GitHub Development Command Center — PARKED
 
-**Working name:** GitHub Development Command Center (GDCC)  
-**Repository:** `magicmantheace/shiny-dollop`  
-**Project root:** `projects/github-development-command-center/`  
-**Status:** Requirements defined; application not yet implemented.  
-**Initial target:** Windows 11 desktop app, local-first, single-user, GitHub.com.
+**Status:** BACK BURNER. **Do not implement or expand this project** until the owner explicitly reactivates it. The current priority of this shared Meta Muse repository is [Universal PC Game Launcher](../universal-game-launcher/README.md).
 
-## Product purpose
+## Original idea (retained for later)
 
-Build a genuinely usable desktop application that gathers **repository activity, branches, commits, pull requests, issues and CI/check status** into one fast, understandable control center. Let the owner select and monitor multiple GitHub repositories without altering them. Real data, local persistence and an installable release are essential.
+A Windows-first GitHub desktop control center to monitor selected repositories, commits, branches, pull requests, issues and CI statuses. It was planned as a real usable local-first application, initially read-only for GitHub.
 
-This is **a standalone product inside a multi-project workspace** — not a module of any other software in this repository.
+## Retained material
 
-## Specification and build instructions
+- [Product specification](docs/PRODUCT_SPEC.md)
+- [Architecture and security plan](docs/ARCHITECTURE.md)
+- [Project-specific agent guidelines](AGENTS.md)
 
-Read in this order:
+These are **partial preparation notes**, not a delivered application. More planning was interrupted when the owner reprioritized to the game launcher on October 22, 2026. Do not treat the original "ready to implement" language within older documents as an active task.
 
-1. [Repository-wide agent rules](../../AGENTS.md)
-2. [Project agent rules](AGENTS.md)
-3. [Muse start instructions](docs/MUSE_HANDOFF.md)
-4. [Product requirements](docs/PRODUCT_SPEC.md)
-5. [Architecture and security](docs/ARCHITECTURE.md)
-6. [Delivery milestones](docs/IMPLEMENTATION_PLAN.md)
-7. [Test and acceptance plan](docs/TEST_PLAN.md)
+## When explicitly reactivated
 
-## Intended application layout
+Review the existing notes for current API compatibility, write missing handoff / test plan / implementation steps, then build in this folder only. Never intermix it with the Universal Game Launcher.
 
-```text
-projects/github-development-command-center/
-  README.md
-  AGENTS.md
-  docs/
-    MUSE_HANDOFF.md
-    PRODUCT_SPEC.md
-    ARCHITECTURE.md
-    IMPLEMENTATION_PLAN.md
-    TEST_PLAN.md
-  app/               # Muse creates application source and its own package/build configs here
-  scripts/           # optional project-local helper scripts
-```
-
-If an implementation-specific tool works better when the application package is directly at this project root, Muse may do so **within this project folder**, keeping all build metadata scoped here. Do not move it to the repository root.
-
-## Initial workflows
-
-1. Start the installed application and connect to GitHub with a user-provided, read-only credential.
-2. Select several repositories from accessible GitHub repositories.
-3. See a summary of recent activity, active/open PRs, issues, default branches and workflow/check state.
-4. Inspect a repository, open items in a browser, filter and refresh, without modifying any GitHub data.
-5. Quit and reopen the app: selected repos, preferences and nonsecret cached data remain.
-6. Disconnect/revoke locally stored credentials and use the app's safe offline mode.
-
-## Current truth
-
-**No code or tests have been delivered yet.** The present commit supplies a complete implementation brief for Muse. Implementation status must be updated with evidence as work proceeds.
+**No implementation code, installer or runtime tests have been delivered here.**
