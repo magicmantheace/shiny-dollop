@@ -1,26 +1,66 @@
 import { useEffect, useState } from 'react';
-import type { Settings, SourceStatus } from '../../shared/types';
-import { ApiCallError, getApi, unwrap } from '../api';
+import type { GameSource, Settings, SourceStatus } from '../../shared/types';
+import { ApiCallError, formatDateTime, getApi, unwrap } from '../api';
 
 interface Props {
   settings: Settings;
   onRefresh: () => void;
 }
 
+const SOURCE_LABELS: Record<GameSource, string> = {
+  manual: 'Manual entries',
+  steam: 'Steam',
+  epic: 'Epic Games',
+  battlenet: 'Battle.net',
+};
+
 export default function SettingsPage({ settings, onRefresh }: Props) {
   const [sources, setSources] = useState<SourceStatus[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [scanning, setScanning] = useState<GameSource | null>(null);
+  const [scanNote, setScanNote] = useState<string | null>(null);
+
+  async function loadSources() {
+    try {
+      setSources(await unwrap(getApi().sources.status()));
+    } catch (err: unknown) {
+      setError(err instanceof ApiCallError ? err.message : String(err));
+    }
+  }
 
   useEffect(() => {
-    (async () => {
-      try {
-        setSources(await unwrap(getApi().sources.status()));
-      } catch (err: unknown) {
-        setError(err instanceof ApiCallError ? err.message : String(err));
-      }
-    })();
+    void loadSources();
   }, []);
+
+  async function scan(source: GameSource) {
+    setScanning(source);
+    setScanNote(null);
+    setError(null);
+    try {
+      const result = await unwrap(getApi().sources.scan({ source }));
+      setScanNote(
+        `Scanned ${new Date(result.scannedAt).toLocaleString()} — ${result.gamesFound} game(s) in the library.`,
+      );
+      await loadSources();
+      onRefresh();
+    } catch (err) {
+      setError(err instanceof ApiCallError ? err.message : String(err));
+    } finally {
+      setScanning(null);
+    }
+  }
+
+  async function cancelScan() {
+    try {
+      await unwrap(getApi().sources.cancelScan());
+      setScanNote('Cancellation requested.');
+    } catch (err) {
+      setError(err instanceof ApiCallError ? err.message : String(err));
+    } finally {
+      setScanning(null);
+    }
+  }
 
   async function update(patch: Partial<Settings>) {
     setBusy(true);
@@ -83,13 +123,32 @@ export default function SettingsPage({ settings, onRefresh }: Props) {
         <h2>Game sources</h2>
         {sources.map((s) => (
           <div key={s.source} className="source-row">
-            <span className="source-name">{s.source}</span>
+            <span className="source-name">{SOURCE_LABELS[s.source]}</span>
             <span className={`badge ${s.available ? '' : 'warn'}`}>
-              {s.available ? 'Ready' : 'Not yet available'}
+              {s.source === 'steam' ? (s.available ? 'Detected' : 'Not found') : s.available ? 'Ready' : 'Not yet available'}
             </span>
             <span className="muted">{s.reason}</span>
+            <span className="muted">
+              {s.gamesFound} in library
+              {s.lastScanAt ? ` · last scan ${formatDateTime(s.lastScanAt)}` : ''}
+            </span>
+            {s.source === 'steam' &&
+              (scanning === 'steam' ? (
+                <button className="btn" onClick={cancelScan}>
+                  Cancel scan
+                </button>
+              ) : (
+                <button className="btn" onClick={() => scan('steam')} disabled={scanning !== null}>
+                  Scan now
+                </button>
+              ))}
           </div>
         ))}
+        {scanNote && (
+          <p className="card-notice" role="status">
+            {scanNote}
+          </p>
+        )}
       </div>
       <div className="settings-group">
         <h2>About</h2>

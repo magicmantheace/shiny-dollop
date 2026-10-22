@@ -11,6 +11,7 @@ interface Props {
 export default function GameCard({ game, onChanged, onSelect }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function toggleFavorite(e: React.MouseEvent) {
     e.stopPropagation();
@@ -28,10 +29,15 @@ export default function GameCard({ game, onChanged, onSelect }: Props) {
     if (busy) return;
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       const result = await unwrap(getApi().games.launch({ id: game.id }));
       if (result.alreadyRunning) {
         setError('Already running — showing the existing session.');
+      } else if (game.source === 'steam') {
+        setNotice(
+          'Launch requested — handed to the Steam client. Playtime can\u2019t be tracked for store launches.',
+        );
       }
       onChanged();
     } catch (err) {
@@ -40,6 +46,9 @@ export default function GameCard({ game, onChanged, onSelect }: Props) {
       setBusy(false);
     }
   }
+
+  const canPlay = !game.missing && game.launchCapability !== 'unavailable';
+  const playLabel = busy ? 'Launching…' : game.source === 'steam' ? 'Play via Steam' : 'Play';
 
   return (
     <article
@@ -75,13 +84,30 @@ export default function GameCard({ game, onChanged, onSelect }: Props) {
         {game.totalPlayMs > 0 && ` · ${formatDuration(game.totalPlayMs)} tracked`}
       </div>
       <div className="card-actions">
-        <button className="btn primary" onClick={play} disabled={busy || game.missing}>
-          {busy ? 'Launching…' : 'Play'}
+        <button
+          className="btn primary"
+          onClick={play}
+          disabled={busy || !canPlay}
+          title={!canPlay && game.launchReason ? game.launchReason : undefined}
+        >
+          {playLabel}
         </button>
       </div>
+      {game.launchCapability === 'unavailable' && game.launchReason && (
+        <div className="card-error" role="alert">
+          {game.launchReason}
+        </div>
+      )}
       {game.missing && (
         <div className="card-error" role="alert">
-          File not found — it may have been moved, renamed or uninstalled.
+          {game.source === 'steam'
+            ? 'Install folder not found — the game may have been moved or uninstalled via Steam.'
+            : 'File not found — it may have been moved, renamed or uninstalled.'}
+        </div>
+      )}
+      {notice && (
+        <div className="card-notice" role="status">
+          {notice}
         </div>
       )}
       {error && (

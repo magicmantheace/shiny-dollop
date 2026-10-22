@@ -266,6 +266,11 @@ input:disabled {
   font-size: 12px;
 }
 
+.card-notice {
+  color: var(--accent, #7aa2f7);
+  font-size: 12px;
+}
+
 .muted {
   color: var(--muted);
 }

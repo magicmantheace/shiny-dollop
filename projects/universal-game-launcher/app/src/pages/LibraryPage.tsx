@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { Game, SortKey } from '../../shared/types';
+import type { Game, GameSource, SortKey } from '../../shared/types';
 import EmptyState from '../components/EmptyState';
 import GameCard from '../components/GameCard';
 import GameDetails from '../components/GameDetails';
@@ -17,24 +17,33 @@ const SORT_LABELS: Record<SortKey, string> = {
   playtime: 'Most played',
 };
 
+const SOURCE_FILTERS: Array<{ value: '' | GameSource; label: string }> = [
+  { value: '', label: 'All sources' },
+  { value: 'manual', label: 'Manual' },
+  { value: 'steam', label: 'Steam' },
+  { value: 'epic', label: 'Epic Games' },
+  { value: 'battlenet', label: 'Battle.net' },
+];
+
 export default function LibraryPage({ games, onRefresh, onAdd }: Props) {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortKey>('title');
+  const [sourceFilter, setSourceFilter] = useState<'' | GameSource>('');
   const [selected, setSelected] = useState<Game | null>(null);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const filtered = q
-      ? games.filter((g) => g.title.toLowerCase().includes(q))
-      : games.slice();
+    let filtered = games;
+    if (sourceFilter) filtered = filtered.filter((g) => g.source === sourceFilter);
+    if (q) filtered = filtered.filter((g) => g.title.toLowerCase().includes(q));
     const by: Record<SortKey, (a: Game, b: Game) => number> = {
       title: (a, b) => a.title.localeCompare(b.title),
       added: (a, b) => b.addedAt.localeCompare(a.addedAt),
       lastPlayed: (a, b) => (b.lastPlayedAt ?? '').localeCompare(a.lastPlayedAt ?? ''),
       playtime: (a, b) => b.totalPlayMs - a.totalPlayMs,
     };
-    return filtered.sort(by[sort]);
-  }, [games, search, sort]);
+    return filtered.slice().sort(by[sort]);
+  }, [games, search, sort, sourceFilter]);
 
   return (
     <section aria-label="Library">
@@ -57,6 +66,17 @@ export default function LibraryPage({ games, onRefresh, onAdd }: Props) {
             {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
               <option key={k} value={k}>
                 {SORT_LABELS[k]}
+              </option>
+            ))}
+          </select>
+          <select
+            value={sourceFilter}
+            onChange={(e) => setSourceFilter(e.target.value as '' | GameSource)}
+            aria-label="Filter by source"
+          >
+            {SOURCE_FILTERS.map((f) => (
+              <option key={f.label} value={f.value}>
+                {f.label}
               </option>
             ))}
           </select>
