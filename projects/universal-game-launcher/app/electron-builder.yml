@@ -1,0 +1,22 @@
+appId: com.magicmantheace.universal-game-launcher
+productName: Universal Game Launcher
+directories:
+  app: dist
+  output: release
+files:
+  - dist/**/*
+  - package.json
+asar: true
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-${version}-win-x64.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Universal Game Launcher
+# NOTE: installer build is configured but not yet run (M6). Code signing is
+# intentionally not configured — no release without owner approval.
