@@ -82,7 +82,7 @@ describe('clear play history', () => {
 
   it('clearing with no history is a harmless no-op', async () => {
     ctx = createTestContext();
-    const g = await addGame(makeExe(), 'Quiet Game');
+    await addGame(makeExe(), 'Quiet Game');
     const res = await ctx.call('sessions.clear', {});
     expect(res.ok).toBe(true);
     const games = (await ctx.call('library.list', {})) as { ok: boolean; data: Game[] };

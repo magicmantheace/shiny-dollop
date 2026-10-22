@@ -3,9 +3,11 @@
 Real Electron + React + TypeScript desktop app. All source, tests, configs and the
 lockfile live in this directory; nothing is installed at the workspace root.
 
-**Status (2026-10-22):** M0 + M1 implemented and verified on Linux. Windows-only
-behaviors (real `.exe` launch, installer) are implemented per spec and marked
-unverified below.
+**Status (2026-10-22):** M0–M5 implemented and verified on Linux, plus the
+defect-correction phase (custom Add Game titles; async cancellable scans with
+progress IPC; transactional history clear; Battle.net async spawn errors).
+Windows-only behaviors (real `.exe` launch, installer, client discovery) are
+implemented per spec and marked unverified below.
 
 ## Toolchain (pinned)
 
@@ -75,7 +77,9 @@ Tables: `games`, `sessions`, `settings`, `scan_log`.
 
 **Verified here:**
 - `npm ci`, `npm run dev` wiring, `npm run build` (production compile), `npm run lint`,
-  `npm run typecheck`, `npm test` (**182/182**), `npm run smoke` (real window under xvfb).
+  `npm run typecheck`, `npm test` (**212/212**), `npm run smoke` (real window under xvfb).
+- Defect-correction regression suites: 9 custom-title, 6 clear-history, 7 spawn-error, 8 scan-cancellation tests.
+- Windows portable zip target: `npx electron-builder --win --x64 -c.win.target=zip` produces a verified portable app zip (the NSIS installer still needs Wine or a Windows machine — see `docs/WINDOWS_INSTALL.md`).
 - M1 vertical slice end-to-end with a real spawned process: add executable →
   launch → observed session on natural exit → favorite → close/reopen →
   everything persisted.

@@ -92,6 +92,10 @@ Failure cases: missing executable, invalid shortcut, bad working directory, targ
 
 **Evidence (2026-10-22, Linux, M5 commit):** per-source scan controllers isolate failures (Epic/Battle.net/Steam integration tests assert one source's failure leaves others intact); cancellation + idempotent re-scan covered by scan tests; scanners read only their known manifest locations (no disk recursion); error rows carry actionable reasons; migration idempotency tested (v1→v3 re-runs change nothing); corrupted-DB path covered by database tests from M0.
 
+**Evidence (2026-10-22, Linux, defect-corrections branch):** scans are now async — `SteamAdapter.scan`/`EpicAdapter.scan` await every FS call and yield to the event loop via `setImmediate` between manifests (`electron/main/sources/scan-yield.ts`), so the main thread stays responsive and cancel IPC is honored promptly. New `tests/integration/scan-cancellation.test.ts` (8 tests): mid-scan cancel over 300 fixture manifests, immediate cancel, two simultaneous scans of one source → `SCAN_IN_PROGRESS` on the second, malformed/inaccessible manifests → warnings + completed status, library byte-identical after cancelled re-scans, progress callback monotonic with real totals. Real `sources.scanProgress` IPC events feed a "Scanning N of M…" indicator in Settings.
+
+- [x] Defect corrections (2026-10-22): custom Add Game titles persist (schema-validated, 256-char cap, filename fallback); clear history resets session rows AND per-game aggregates in one transaction with documented live-session semantics; Battle.net client spawn awaits process confirmation with async `'error'` handling and actionable messages (manual-game path already had it — verified).
+
 ## Evidence Muse must produce
 
 For each milestone: date, OS/tool versions, commit ref, command executed, pass/fail summary, one or more **real** workflow observations (e.g. a game spawned and exited), known gaps and next step. Automated unit/integration tests use fixture manifests and stubbed process-launch operations (do NOT start arbitrary real executables inside CI). Store-client runtime tests require a Windows environment with the respective clients and games installed and must remain clearly labeled pending until performed.
@@ -100,13 +104,17 @@ For each milestone: date, OS/tool versions, commit ref, command executed, pass/f
 
 MVP accepted only when **real manual launch, Steam integration, best-effort Epic and Battle.net support with truthful fallbacks, favorites/search/persistence, honest sessions, Windows install path and critical security tests** all meet these criteria. An app window with demo game cards is not an MVP.
 
-**Release-gate status (2026-10-22, Linux):** everything verifiable on Linux is green —
-`npm ci` clean, typecheck clean, lint 0 errors, 182/182 tests pass, production
-build green, real-window smoke test passes, `node:sqlite` verified working
-unflagged in Electron 45's Node (v24.22.0). Windows NSIS installer: staged app
-(`release/win-unpacked/`) builds successfully; final installer assembly needs
-Wine (absent on this VM) or a real Windows machine — see the M6 packaging
-evidence in `IMPLEMENTATION_PLAN.md`. The following remain **explicitly pending
-on Adam's Windows 11 PC**: real `.exe` launch, Steam/Epic/Battle.net client
+**Release-gate status (2026-10-22, Linux, defect-corrections branch):** everything verifiable on Linux is green —
+`npm ci` clean, typecheck clean (3 projects), lint 0 errors (1 pre-existing
+warning), 212/212 tests pass (182 baseline + 30 new regression tests: 9 custom
+titles, 6 clear-history, 7 spawn errors, 8 scan cancellation), production
+build green, real-window smoke test passes. Windows packaging: the `zip`
+(portable) target completes on Linux — `release/Universal Game
+Launcher-0.1.0-win-x64.zip` (154 MB, 74 files, real 250 MB exe inside) was
+produced and its contents verified; it is a **portable app, not an
+installer**. The NSIS installer still fails at assembly with `spawn wine
+ENOENT` — Wine is absent and not installable on this VM, so `npm run
+package:win` must run on Windows (or under Wine). The following remain
+**explicitly pending on Adam's Windows 11 PC**: real `.exe` launch, Steam/Epic/Battle.net client
 discovery, `steam://` / `com.epicgames.launcher://` handoffs, installer
 install/uninstall flow, first-run per source, packaged-app startup.

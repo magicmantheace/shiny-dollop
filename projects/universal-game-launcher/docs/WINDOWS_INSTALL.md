@@ -1,21 +1,48 @@
 # Installing Universal Game Launcher on Windows 11
 
-> Status: the installer is built with electron-builder (NSIS, x64). It is
-> **unsigned** — Windows SmartScreen will show a warning on first install.
-> Only install a build you made yourself from this source tree.
+> **Status 2026-10-22:** the app packages successfully for Windows, but the
+> **NSIS installer cannot be assembled on Linux** — `npm run package:win`
+> fails at the final step with `spawn wine ENOENT` (Wine is absent on the
+> build VM and cannot be installed there). A **portable zip** target was
+> verified instead: `release/Universal Game Launcher-0.1.0-win-x64.zip`
+> (154 MB) contains the complete Windows app — unzip it anywhere and run
+> `Universal Game Launcher.exe`. It is a portable app, **not an installer**
+> (no Start Menu/Desktop shortcuts, no uninstaller entry).
+>
+> For the real installer, build on Windows (or under Wine) — instructions
+> below. The app itself is **unsigned** in every case: Windows SmartScreen
+> will show a warning on first run. Only install a build you made yourself
+> from this source tree.
 
-## Install steps
+## Option A — portable zip (works today, no Windows build machine needed)
 
-1. On the machine that will run the launcher, build the installer:
-   - Install Node.js 22+ and open a terminal in `projects/universal-game-launcher/app`.
-   - `npm ci`
-   - `npm run package:win`
-   - The installer lands at `release/Universal Game Launcher-0.1.0-win-x64.exe`.
-2. Copy that `.exe` to the Windows 11 machine and double-click it.
-3. If SmartScreen warns "Windows protected your PC": click **More info** →
-   **Run anyway**. (Expected: the app is unsigned. See "Why unsigned?" below.)
-4. Choose an install folder (default is fine) and whether to create desktop /
-   Start Menu shortcuts. No administrator rights are needed.
+1. Take `release/Universal Game Launcher-0.1.0-win-x64.zip` (built 2026-10-22
+   from the `universal-game-launcher/defect-corrections` branch).
+2. Copy it to the Windows 11 PC, right-click → **Extract All**.
+3. Open the extracted folder and double-click **`Universal Game Launcher.exe`**.
+4. If SmartScreen warns "Windows protected your PC": click **More info** →
+   **Run anyway** (expected: the app is unsigned).
+5. To "uninstall": delete the extracted folder. App data lives in
+   `%APPDATA%\Universal Game Launcher\` — delete that too for a full wipe.
+
+## Option B — build the NSIS installer on Windows (reproducible steps)
+
+On a Windows 10/11 machine with Node.js 22+ installed:
+
+1. Clone the repo and check out the branch you want to ship:
+   `git clone <repo-url> && cd shiny-dollop && git checkout universal-game-launcher/defect-corrections`
+2. `cd projects/universal-game-launcher/app`
+3. `npm ci`
+4. `npm run package:win`
+5. Expected output: the last lines show
+   `building target=nsis file=release/Universal Game Launcher-0.1.0-win-x64.exe archs=x64`
+   with no `⨯` errors. The installer lands at
+   `release\Universal Game Launcher-0.1.0-win-x64.exe`.
+6. Double-click the installer, choose an install folder (no admin rights
+   needed), and pick whether to create desktop / Start Menu shortcuts.
+   SmartScreen will warn (unsigned build) — More info → Run anyway.
+
+## Install steps (installer build)
 
 ## First run — what to expect per source
 
