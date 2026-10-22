@@ -1,11 +1,13 @@
 appId: com.magicmantheace.universal-game-launcher
 productName: Universal Game Launcher
 directories:
-  app: dist
   output: release
 files:
+  # Compiled app. The main process requires('zod') at runtime, so it ships too.
+  # node:sqlite is provided by the Electron runtime itself.
   - dist/**/*
   - package.json
+  - node_modules/zod/**/*
 asar: true
 win:
   target:

@@ -1,6 +1,6 @@
 # Universal PC Game Launcher
 
-**Project status:** ACTIVE — M0 (scaffold), M1 (manual launcher vertical slice) and M2 (Steam integration) implemented and verified on Linux 2026-10-22. Windows-only behaviors (real `.exe` launch, Steam client discovery, `steam://` handoff, installer) implemented per spec, unverified pending Windows.
+**Project status:** ACTIVE — M0 (scaffold), M1 (manual launcher), M2 (Steam), M3 (Epic), M4 (Battle.net) and M5 (polish: cover art, filters/a11y, tracking toggle, clear history, perf gate) implemented and verified on Linux 2026-10-22 (182/182 tests). M6 (Windows packaging) in progress — installer build attempted, install guide written. Windows-only behaviors (real `.exe` launch, client discovery, URI handoffs, installer run) implemented per spec, unverified pending Windows.
 **Project home:** `projects/universal-game-launcher/` in `magicmantheace/shiny-dollop`.
 **Mission:** Deliver a genuine Windows 11 desktop application that finds installed PC games, combines them into one useful library, launches them safely, and preserves local preferences and play history.
 
@@ -50,4 +50,4 @@ No root-level package manager configs. Keep application code, tests, assets, scr
 
 ## Truthful progress
 
-M0 and M1 are implemented in `app/` (branch `universal-game-launcher/m0-m1-foundation`) and verified on Linux 2026-10-22: 56/56 tests pass, production build + real-window smoke test pass, and the M1 vertical slice (add executable → launch → observed session → favorite → restart persistence) was proven end-to-end with a real spawned process. Windows `.exe` launching and the installer are implemented per spec but unverified — see `app/README.md` for the full verified-vs-unverified ledger and `docs/IMPLEMENTATION_PLAN.md` for the milestone checklist with evidence.
+M0 and M1 are implemented in `app/` (branch `universal-game-launcher/m0-m1-foundation`) and verified on Linux 2026-10-22: 56/56 tests pass, production build + real-window smoke test pass, and the M1 vertical slice (add executable → launch → observed session → favorite → restart persistence) was proven end-to-end with a real spawned process. M2 (Steam), M3 (Epic), M4 (Battle.net) and M5 (polish) followed on branch `universal-game-launcher/m3-m6-complete`: 182/182 tests pass, typecheck + lint clean, production build green. Windows `.exe` launching, real client discovery, URI handoffs and the installer run are implemented per spec but unverified — see `app/README.md` for the full verified-vs-unverified ledger and `docs/IMPLEMENTATION_PLAN.md` for the milestone checklist with evidence.

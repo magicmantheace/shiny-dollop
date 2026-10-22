@@ -75,23 +75,38 @@ Tables: `games`, `sessions`, `settings`, `scan_log`.
 
 **Verified here:**
 - `npm ci`, `npm run dev` wiring, `npm run build` (production compile), `npm run lint`,
-  `npm run typecheck`, `npm test` (56/56), `npm run smoke` (real window under xvfb).
+  `npm run typecheck`, `npm test` (**182/182**), `npm run smoke` (real window under xvfb).
 - M1 vertical slice end-to-end with a real spawned process: add executable →
-  launch → observed 2010 ms session on natural exit → favorite → close/reopen →
-  everything persisted (game, favorite, total playtime, last played, session).
+  launch → observed session on natural exit → favorite → close/reopen →
+  everything persisted.
 - Crash recovery: interrupted sessions finalize at the last checkpoint (no invented time).
 - AT-07 headless security checks: strict IPC schemas reject smuggled paths, spawn
   always `shell:false` with structured argv, hostile titles/args stay inert, IPC
   errors carry no stack traces.
+- M2 Steam: VDF/library parsing, per-game `steam://` handoff, idempotent re-scan
+  (fixture trees incl. malformed manifests, hostile paths, cancellation).
+- M3 Epic: `.item` manifest parsing with strict whitelist (well-formed / missing /
+  malformed / hostile: traversal, absurd sizes, wrong types), idempotent re-scan
+  preserving user edits; honest "Open Epic Games Launcher" fallback.
+- M4 Battle.net: client detection + manual registration path, "Open Battle.net"
+  spawning the validated exe; `docs/BATTLENET_INVESTIGATION.md` records rejected routes.
+- M5: cover-art store (validation, scaling, 100 MB eviction, forged-filename
+  rejection at IPC boundary), 500-entry perf gate (<1 s list/filter), per-source
+  scan isolation + cancellation, tracking toggle (no sessions/timers when off),
+  clear-history (app records only).
+- `node:sqlite` works unflagged in the packaged runtime's Node (Electron 45 =
+  Node v24.22.0, verified via `ELECTRON_RUN_AS_NODE`).
 
 **Implemented but unverified (needs Windows):**
-- Launching a real Windows `.exe` (implemented per spec; exercised here only with
-  Linux executables).
-- OS file-picker `.exe` filter path (Windows-only branch).
-- `electron-builder` Windows x64 installer build, install/uninstall flow.
+- Launching a real Windows `.exe` (exercised here only with Linux executables).
+- Steam/Epic/Battle.net client discovery against real installs;
+  `steam://` and `com.epicgames.launcher://` handoffs opening real clients.
+- Windows x64 installer build, install/uninstall flow, first-run per source.
 - Packaged-app startup (asar, sandbox, CSP in packaged mode).
 
-## Not yet built
+## Installer
 
-M2 Steam, M3 Epic, M4 Battle.net integrations; cover art; export/import;
-Windows installer (M6).
+`npm run package:win` builds the NSIS x64 installer into `release/` (see
+`electron-builder.yml`). The app is unsigned — SmartScreen will warn once on
+first install. Full install/uninstall/data-removal instructions:
+`../docs/WINDOWS_INSTALL.md`.

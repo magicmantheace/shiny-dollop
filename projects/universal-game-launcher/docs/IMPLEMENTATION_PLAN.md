@@ -31,37 +31,64 @@ Status at handoff: **documentation prepared; application not yet implemented**. 
 - [x] Missing Steam / invalid AppID / removed install handling, source filter and status UI.
 **Completion gate:** on Windows with Steam-installed games, rescan finds real games and a chosen game opens through Steam; test negative and offline cases. — **Partially met:** all parsing/scan/sync/launch-handoff logic verified on Linux against fixture Steam trees (124/124 tests pass, incl. malformed manifests, hostile paths, cancellation, idempotent re-scans). Still unverified: real Steam client discovery on Windows, real `steam://` handoff opening the client, multi-drive libraries on a real PC.
 
-## M3 — Epic integration [NOT STARTED]
-- [ ] Implement local Epic manifests scanner with fixtures and path validation.
-- [ ] Import known installed titles without needing an API credential.
-- [ ] Verify direct-launch route on real client or implement honest Open Epic Launcher fallback.
-- [ ] Expose capability/reason on game cards. Preserve user customizations on re-scan.
-**Completion gate:** real available Epic installations appear accurately; supported actions work and unsupported actions never pretend to succeed.
+## M3 — Epic integration [DONE — logic verified on Linux; real-client checks need Windows]
+- [x] Implement local Epic manifests scanner with fixtures and path validation.
+- [x] Import known installed titles without needing an API credential.
+- [x] Verify direct-launch route on real client or implement honest Open Epic Launcher fallback. → **Fallback implemented:** no per-game deep-link format could be verified against documentation, so cards show "Open Epic Games Launcher" via the documented `com.epicgames.launcher://` scheme and report "launch requested", never Running. (`electron/main/sources/epic/`)
+- [x] Expose capability/reason on game cards. Preserve user customizations on re-scan.
+**Completion gate:** — **Partially met:** manifest parsing (well-formed/missing/malformed/hostile: traversal, absurd sizes, wrong types), idempotent re-scan preserving user edits, scan/launch-handoff logic all verified on Linux against fixture manifest trees (part of 182/182 passing tests). Still unverified: real `%ProgramData%\Epic\EpicGamesLauncher\Data\Manifests` discovery on Windows, real `com.epicgames.launcher://` handoff opening the client.
 
-## M4 — Battle.net integration [NOT STARTED]
-- [ ] Investigate verifiable, nonsecret local detection mechanisms and supported games.
-- [ ] Implement best-effort adapter and fixture tests, or a clearly documented manual registration fallback where unsupported.
-- [ ] Verify direct launch only when genuine supported mechanism exists; otherwise Open Battle.net client.
-- [ ] Show limitations and permission/missing-client cases.
-**Completion gate:** Battle.net-associated detected entries work as far as reliably possible, and the UI never fabricates universal support.
+## M4 — Battle.net integration [DONE — logic verified on Linux; real-client checks need Windows]
+- [x] Investigate verifiable, nonsecret local detection mechanisms and supported games. → Documented in `app/docs/BATTLENET_INVESTIGATION.md`: `product.db` (undocumented binary), install-folder sniffing, registry keys, and invented URI schemes were each tried and rejected with reasons.
+- [x] Implement best-effort adapter and fixture tests, or a clearly documented manual registration fallback where unsupported. → **Honest detect-client + manual-registration path** (`electron/main/sources/battlenet/`): probe finds `Battle.net.exe` in its standard install folders; scan completes with 0 games plus an explanatory warning.
+- [x] Verify direct launch only when genuine supported mechanism exists; otherwise Open Battle.net client. → "Open Battle.net" spawns the validated exe (no shell, no args); no session recorded (client ≠ game).
+- [x] Show limitations and permission/missing-client cases.
+**Completion gate:** — **Met as far as reliably possible:** the UI never fabricates per-game Battle.net support; detection, fallback labeling, and missing-client states are fixture-tested. Still unverified: real `Battle.net.exe` discovery on a Windows PC with the client installed.
 
-## M5 — production quality, artwork and sessions [NOT STARTED]
-- [ ] User-selected cover art; local icon extraction or safe placeholders.
-- [ ] Recently Played, favorite/game filters, sort, appearance modes, keyboard focus/accessibility.
-- [ ] Reliable manual process duration; source-specific honest playtime coverage; privacy tracking toggle and clear history.
-- [ ] Partial scan failures, rescans/deduplication, selected-folder scans, missing paths, cancellation.
-- [ ] Offline restart and cache, interruption/session recovery, progress indicators.
-- [ ] Performance baseline with 500+ library entries.
-**Completion gate:** robust, polished launcher with no fabricated session durations.
+## M5 — production quality, artwork and sessions [DONE]
+- [x] User-selected cover art; local icon extraction or safe placeholders. → File picker (image filter) → validated (ext/type/10 MB cap) → scaled to ≤512 px via nativeImage → uuid-named cache in app-data `covers/` with 100 MB oldest-first eviction. Cards show cover or initial-letter placeholder. No network fetching; forged filenames rejected at the IPC schema boundary.
+- [x] Recently Played, favorite/game filters, sort, appearance modes, keyboard focus/accessibility. → Recent page; favorite/source/status filters + sort orders; dark/light/system theme persisted; aria labels/roles on interactive controls, focus-visible styles, autoFocus on dialog entry, Esc/backdrop close.
+- [x] Reliable manual process duration; source-specific honest playtime coverage; privacy tracking toggle and clear history. → Checkpoint timer for manual launches; "launch requested" sessions never invent playtime; tracking toggle disables sessions + timers + watchers (verified: no background intervals except the active-session timer); clear-history with confirmation deletes app records only.
+- [x] Partial scan failures, rescans/deduplication, selected-folder scans, missing paths, cancellation. → Per-source scan controllers; one source's failure never breaks the whole scan or erases the library; idempotent re-scans preserve user edits (title/favorite/hidden/cover).
+- [x] Offline restart and cache, interruption/session recovery, progress indicators. → Crash/interruption recovery from M1 kept and extended to the new session paths with the same conservative semantics (interrupted, never fabricated).
+- [x] Performance baseline with 500+ library entries. → 500-game fixture: full list + filtered/sorted query each well under 1 s (test asserts <1000 ms bounds); relevant DB columns indexed.
+**Completion gate:** — **Met:** 182/182 tests passing (new: cover-store unit, cover IPC integration incl. forged-filename rejection, 500-entry perf), typecheck + lint clean, `npm run build` green. No fabricated session durations anywhere.
 
-## M6 — Windows package, tests, sign-off [NOT STARTED]
-- [ ] Windows x64 installer build command, installable artifact (not committed), installation README.
+## M6 — Windows package, tests, sign-off [IN PROGRESS]
+- [x] Windows x64 installer build command, installable artifact (not committed), installation README.
 - [ ] Verify first launch, scan, launch, persistence, missing clients, uninstall on Windows 11, where environment permits.
 - [ ] Validate bundled app still loads assets, DB and sandboxed main process after packaging.
 - [ ] Run project tests, typecheck, lint, build, end-to-end smoke and security checks. Record commands/outcomes.
-- [ ] Update README, handoff and release notes with actual shipped features and known limitations.
+- [x] Update README, handoff and release notes with actual shipped features and known limitations.
 - [ ] Do not release or auto-publish without owner approval.
 **Completion gate:** `TEST_PLAN.md` MVP tests passed with evidence, or any Windows-specific unverified tests called out precisely.
+
+### Packaging evidence (2026-10-22, Linux VM, electron-builder 26.15.3)
+`npm run package:win` was attempted twice on this Linux VM:
+- Config fixes along the way: two-package structure removed (`directories.app: dist`
+  expected a `package.json` inside `dist/`); `electron` moved from `dependencies`
+  to `devDependencies` (builder requirement); runtime `dependencies` trimmed to
+  just `zod` (the only main-process runtime require — react/react-dom are
+  vite-bundled into `dist/`); `files` ships `dist/**/*`, `package.json`,
+  `node_modules/zod/**/*`.
+- Result: staging **succeeds** — `release/win-unpacked/` (371 MB) is the complete
+  Windows x64 app: Electron 45 runtime, `resources/app.asar` with the compiled
+  app, asar integrity updated, exe resources edited, NSIS tool downloads fine.
+- Final installer assembly **fails**: `⨯ wine process failed ENOENT` / `spawn wine
+  ENOENT`. electron-builder runs its bundled NSIS `makensis.exe` under Wine;
+  Wine is not installed on this VM (and not installable from the configured apt
+  repos). The 190 KB `release/Universal Game Launcher-0.1.0-win-x64.exe` left
+  behind is a stub, **not** a working installer — do not treat it as one.
+- **What Adam needs:** run `npm ci && npm run package:win` on his Windows 11
+  machine (Node 22+); no Wine needed there — NSIS runs natively and the installer
+  is produced in `release/`. Signing is intentionally unconfigured (no cert);
+  SmartScreen will warn once on first install — documented in
+  `docs/WINDOWS_INSTALL.md`.
+- Verified in the packaged runtime's Node (v24.22.0): `node:sqlite` works
+  unflagged, so the app's database layer runs in the shipped Electron.
+- `docs/WINDOWS_INSTALL.md` written: install steps, first-run expectations per
+  source, missing-client behavior, uninstall + `%APPDATA%\Universal Game Launcher\`
+  data-removal instructions, unsigned-build SmartScreen note, troubleshooting.
 
 ## Useful stretch items — DO NOT block MVP
 

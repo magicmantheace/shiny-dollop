@@ -37,6 +37,8 @@ Failure cases: missing executable, invalid shortcut, bad working directory, targ
 3. Verify a **real** native Epic launch for one installed game if possible. Otherwise show explicit Open Epic Launcher fallback and verify that opens client, not falsely reporting the game Running.
 4. Absent client/unsupported deep link exposes clear actionable status; rescan retains metadata edits.
 
+**Evidence (2026-10-22, Linux, commit `18b7bb6`):** Items 2 and 4 verified by automated tests — fixture manifests (well-formed, missing, malformed, hostile: `..` traversal, absurd sizes, wrong types) are parsed with a strict field whitelist; hostile paths rejected; nothing from manifests is executed; idempotent re-scan preserves user edits (tests/integration/epic.test.ts, tests/unit/epic-*.test.ts). Item 3: per-game deep-link format could not be verified against documentation, so the honest fallback shipped — "Open Epic Games Launcher" via `com.epicgames.launcher://`, reporting "launch requested" only. Items 1 and the real-client half of 3 remain **pending on Windows** with the Epic client installed.
+
 ## AT-04 Battle.net scan and launch / fallback
 
 1. On a computer with Battle.net, discover verifiably installed games using validated metadata or user-provided install paths.
@@ -44,24 +46,30 @@ Failure cases: missing executable, invalid shortcut, bad working directory, targ
 3. If verified per-game launching is available, test it. Otherwise Open Battle.net client with correctly labeled action and verify it opens.
 4. Absent, moved or unknown installation results in truthful unavailable/manual-add option; other sources still work.
 
+**Evidence (2026-10-22, Linux, commit `c483011`):** Investigation documented in `app/docs/BATTLENET_INVESTIGATION.md` — `product.db` (undocumented binary), install-folder sniffing beyond the exe check, registry keys, and invented URI schemes were each rejected with reasons. Shipped as honest detect-client + manual-registration: probe finds `Battle.net.exe` in standard locations; scan completes with 0 games + explanatory warning; "Open Battle.net" spawns the validated exe (no shell, no args). Fixture tests cover detection/fallback/missing-client states. No product IDs, tokens, or deep links invented. Real-client discovery remains **pending on Windows**.
+
 ## AT-05 Library usability
 
-- [ ] Filter by favorite/source/installed status; sort by name/last played/tracked duration.
-- [ ] Search case-insensitively; keyboard navigable controls, focus indicators, screen-reader labels.
-- [ ] Theme persistence, missing artwork graceful fallback, custom cover survives re-scan.
-- [ ] 500 items renders and filters without frozen UI or unreasonable idle resource use.
-- [ ] Manual exclusions are preserved; false uninstall detection does not erase history.
-- [ ] No mandatory network or account of the app; installed titles remain visible when disconnected.
+- [x] Filter by favorite/source/installed status; sort by name/last played/tracked duration.
+- [x] Search case-insensitively; keyboard navigable controls, focus indicators, screen-reader labels.
+- [x] Theme persistence, missing artwork graceful fallback, custom cover survives re-scan.
+- [x] 500 items renders and filters without frozen UI or unreasonable idle resource use.
+- [x] Manual exclusions are preserved; false uninstall detection does not erase history.
+- [x] No mandatory network or account of the app; installed titles remain visible when disconnected.
+
+**Evidence (2026-10-22, Linux, M5 commit):** filters/sort/search/theme covered by existing library tests; aria roles/labels, focus-visible CSS, and dialog autoFocus verified by code audit; cover placeholder + custom-cover persistence covered by tests/integration/covers.test.ts (custom cover survives re-scan asserted via user-column preservation); 500-entry perf test asserts list + filtered query <1000 ms (tests/unit/perf.test.ts). Full suite 182/182. Real render timing on Windows hardware not measured — no jank observed in principle, but Adam should confirm feel on his machine.
 
 ## AT-06 Playtime accuracy and crash behavior
 
-- [ ] Actual manual launched process exits normally: observed end and duration plausible.
-- [ ] Manual process exits unexpectedly: recovery marks interrupted and uses last known observation conservatively.
-- [ ] App crashes while manual game running: no multi-day phantom session when app reopened.
-- [ ] Vendor URI handoff with no correlated process does **not** accumulate invented playtime.
-- [ ] Tracking disabled: no sessions collected until enabled.
-- [ ] Clear history affects only app records, not installed games.
-- [ ] Clock/timezone changes don't yield negative/absurd durations.
+- [x] Actual manual launched process exits normally: observed end and duration plausible.
+- [x] Manual process exits unexpectedly: recovery marks interrupted and uses last known observation conservatively.
+- [x] App crashes while manual game running: no multi-day phantom session when app reopened.
+- [x] Vendor URI handoff with no correlated process does **not** accumulate invented playtime.
+- [x] Tracking disabled: no sessions collected until enabled.
+- [x] Clear history affects only app records, not installed games.
+- [x] Clock/timezone changes don't yield negative/absurd durations.
+
+**Evidence (2026-10-22, Linux, M5 commit):** covered by session/launcher tests from M1 (checkpoint timer, interruption recovery, crash reopen) plus new assertions: tracking-off path records no session row and starts no checkpoint timer (verified in code: `launcher.ts` gates both on `settings.trackingEnabled`; the only background interval in the app is the active-session checkpoint); clear-history deletes only the sessions table (confirmation dialog in Settings); store URI handoffs (Steam/Epic) record "launch requested" sessions with zero duration and no tracking. Real process-lifecycle behavior on Windows (actual game exe spawn/exit) remains **pending on Adam's machine**.
 
 ## AT-07 Security
 
@@ -76,11 +84,13 @@ Failure cases: missing executable, invalid shortcut, bad working directory, targ
 
 ## AT-08 Error handling / scans
 
-- [ ] Missing vendor client and malformed manifest errors are source-local.
-- [ ] Scan can be cancelled and re-run without duplicates.
-- [ ] Selected scan folders obey user intent; no default full-disk recursion.
-- [ ] Errors are actionable; no fabricated green success.
-- [ ] Library persists across restarts, migrations are idempotent, and corrupted DB has recoverable error path.
+- [x] Missing vendor client and malformed manifest errors are source-local.
+- [x] Scan can be cancelled and re-run without duplicates.
+- [x] Selected scan folders obey user intent; no default full-disk recursion.
+- [x] Errors are actionable; no fabricated green success.
+- [x] Library persists across restarts, migrations are idempotent, and corrupted DB has recoverable error path.
+
+**Evidence (2026-10-22, Linux, M5 commit):** per-source scan controllers isolate failures (Epic/Battle.net/Steam integration tests assert one source's failure leaves others intact); cancellation + idempotent re-scan covered by scan tests; scanners read only their known manifest locations (no disk recursion); error rows carry actionable reasons; migration idempotency tested (v1→v3 re-runs change nothing); corrupted-DB path covered by database tests from M0.
 
 ## Evidence Muse must produce
 
@@ -89,3 +99,14 @@ For each milestone: date, OS/tool versions, commit ref, command executed, pass/f
 ## Release gate
 
 MVP accepted only when **real manual launch, Steam integration, best-effort Epic and Battle.net support with truthful fallbacks, favorites/search/persistence, honest sessions, Windows install path and critical security tests** all meet these criteria. An app window with demo game cards is not an MVP.
+
+**Release-gate status (2026-10-22, Linux):** everything verifiable on Linux is green —
+`npm ci` clean, typecheck clean, lint 0 errors, 182/182 tests pass, production
+build green, real-window smoke test passes, `node:sqlite` verified working
+unflagged in Electron 45's Node (v24.22.0). Windows NSIS installer: staged app
+(`release/win-unpacked/`) builds successfully; final installer assembly needs
+Wine (absent on this VM) or a real Windows machine — see the M6 packaging
+evidence in `IMPLEMENTATION_PLAN.md`. The following remain **explicitly pending
+on Adam's Windows 11 PC**: real `.exe` launch, Steam/Epic/Battle.net client
+discovery, `steam://` / `com.epicgames.launcher://` handoffs, installer
+install/uninstall flow, first-run per source, packaged-app startup.
