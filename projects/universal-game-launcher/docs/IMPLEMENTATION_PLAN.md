@@ -23,13 +23,13 @@ Status at handoff: **documentation prepared; application not yet implemented**. 
 - [x] Save/reload data after closing and reopening app; unit/integration/Electron smoke tests.
 **Completion gate:** add a real local game, launch it, see actual session, favorite it, restart and see all changes persisted. **Met on Linux** with a real spawned process: 2010 ms observed session on natural exit, favorite + totals + session all survived DB reopen. Windows `.exe` launch and installer are implemented per spec but unverified (need Windows).
 
-## M2 — Steam integration [NOT STARTED]
-- [ ] Steam presence discovery and local multi-library file parsing.
-- [ ] Parse VDF libraryfolders and ACF manifests with fixture tests and malformed-input resilience.
-- [ ] Import installed AppIDs/titles, preserve user edits after re-scan.
-- [ ] Launch via validated Steam native URI with accurate launch-request state.
-- [ ] Missing Steam / invalid AppID / removed install handling, source filter and status UI.
-**Completion gate:** on Windows with Steam-installed games, rescan finds real games and a chosen game opens through Steam; test negative and offline cases.
+## M2 — Steam integration [DONE on Linux 2026-10-22; Windows client verification pending]
+- [x] Steam presence discovery and local multi-library file parsing.
+- [x] Parse VDF libraryfolders and ACF manifests with fixture tests and malformed-input resilience.
+- [x] Import installed AppIDs/titles, preserve user edits after re-scan.
+- [x] Launch via validated Steam native URI with accurate launch-request state.
+- [x] Missing Steam / invalid AppID / removed install handling, source filter and status UI.
+**Completion gate:** on Windows with Steam-installed games, rescan finds real games and a chosen game opens through Steam; test negative and offline cases. — **Partially met:** all parsing/scan/sync/launch-handoff logic verified on Linux against fixture Steam trees (124/124 tests pass, incl. malformed manifests, hostile paths, cancellation, idempotent re-scans). Still unverified: real Steam client discovery on Windows, real `steam://` handoff opening the client, multi-drive libraries on a real PC.
 
 ## M3 — Epic integration [NOT STARTED]
 - [ ] Implement local Epic manifests scanner with fixtures and path validation.
@@ -94,3 +94,7 @@ Status at handoff: **documentation prepared; application not yet implemented**. 
   Evidence: `npm ci` ok; `npm run typecheck` clean (3 projects); `npm run lint` clean; `npm test` 56/56 pass (unit: args/validation/migrations/sessions/IPC schemas; integration: library CRUD + launch lifecycle with stubbed spawn; AT-07 headless security); `npm run build` ok; `npm run smoke` PASS (real window under xvfb); `npm run dev` verified (tsc watch + Vite :5173 + Electron under xvfb).
   M1 e2e (real process, /tmp script): add -> launch -> 2010 ms observed session on exit -> favorite -> DB reopen: game, favorite, totalPlayMs, lastPlayedAt, session all persisted.
   Windows-only (implemented, unverified): real .exe launch, .exe picker filter branch, electron-builder installer, packaged-app startup.
+2026-10-22: M2 Steam integration implemented and verified on Linux (branch `universal-game-launcher/m2-steam`, local commits only, not pushed).
+  New: `electron/main/sources/steam/` (vdf.ts pure parser, os.ts injectable OS layer, adapter.ts probe/scan/validateLaunch, sync.ts idempotent merge); DB migration v2 (install_dir, launch_uri, launch_capability, launch_reason + unique index on source/external_id); steam:// URI handoff in launcher with 'unavailable' tracking sessions (no invented playtime); IPC sources.scan/sources.status/sources.cancelScan; UI source filter + Steam scan controls in Settings + capability-aware Play buttons.
+  Evidence: `npm run typecheck` clean; `npm run lint` 0 errors (1 pre-existing warning); `npm test` 124/124 pass (new: 22 VDF, 30 adapter, 6 sync, 10 IPC integration); `npm run build` ok.
+  Windows-only (implemented, unverified): real Steam client discovery, real steam:// handoff opening the client, multi-drive libraries on a real PC.

@@ -1,6 +1,6 @@
 # Universal PC Game Launcher
 
-**Project status:** ACTIVE — M0 (scaffold) and M1 (manual launcher vertical slice) implemented and verified on Linux 2026-10-22. Windows-only behaviors (real `.exe` launch, installer) implemented per spec, unverified pending Windows.
+**Project status:** ACTIVE — M0 (scaffold), M1 (manual launcher vertical slice) and M2 (Steam integration) implemented and verified on Linux 2026-10-22. Windows-only behaviors (real `.exe` launch, Steam client discovery, `steam://` handoff, installer) implemented per spec, unverified pending Windows.
 **Project home:** `projects/universal-game-launcher/` in `magicmantheace/shiny-dollop`.
 **Mission:** Deliver a genuine Windows 11 desktop application that finds installed PC games, combines them into one useful library, launches them safely, and preserves local preferences and play history.
 
