@@ -43,6 +43,7 @@ import {
   syncEpicGames,
   type EpicOs,
 } from '../sources/epic';
+import { BattleNetAdapter, RealBattleNetOs, type BattleNetOs } from '../sources/battlenet';
 
 export interface HandlerDeps {
   db: DatabaseSync;
@@ -53,6 +54,8 @@ export interface HandlerDeps {
   steamOs?: SteamOs;
   /** Override for tests. Defaults to the real OS layer. */
   epicOs?: EpicOs;
+  /** Override for tests. Defaults to the real OS layer. */
+  battleNetOs?: BattleNetOs;
 }
 
 function toApiError(err: unknown): ApiError {
@@ -77,8 +80,6 @@ interface HandlerDef {
   run: (payload: never, deps: HandlerDeps) => Promise<unknown>;
 }
 
-const STORE_SOURCES: GameSource[] = ['steam', 'epic', 'battlenet'];
-
 /** In-flight store scans by source — used to honor cancellation requests. */
 const activeScans = new Map<GameSource, ScanController>();
 
@@ -88,6 +89,30 @@ function steamOsFor(deps: HandlerDeps): SteamOs {
 
 function epicOsFor(deps: HandlerDeps): EpicOs {
   return deps.epicOs ?? new RealEpicOs();
+}
+
+function battleNetOsFor(deps: HandlerDeps): BattleNetOs {
+  return deps.battleNetOs ?? new RealBattleNetOs();
+}
+
+function battleNetStatus(db: DatabaseSync, os: BattleNetOs): SourceStatus {
+  const adapter = new BattleNetAdapter(os);
+  const probe = adapter.probe();
+  const scan = lastScan(db, 'battlenet');
+  const gamesFound = listGames(db, { source: 'battlenet', includeHidden: true }).length;
+  const parts = [probe.reason];
+  if (scan.scannedAt) {
+    parts.push(
+      `Last scan ${scan.scannedAt}${scan.status !== 'ok' ? ` (${scan.status}${scan.error ? `: ${scan.error}` : ''})` : ''}.`,
+    );
+  }
+  return {
+    source: 'battlenet',
+    available: probe.status === 'installed',
+    reason: parts.join(' '),
+    lastScanAt: scan.scannedAt,
+    gamesFound,
+  };
 }
 
 function steamStatus(db: DatabaseSync, os: SteamOs): SourceStatus {
@@ -127,16 +152,6 @@ function epicStatus(db: DatabaseSync, os: EpicOs): SourceStatus {
     reason: parts.join(' '),
     lastScanAt: scan.scannedAt,
     gamesFound,
-  };
-}
-
-function storeStatus(db: DatabaseSync, source: GameSource): SourceStatus {
-  return {
-    source,
-    available: false,
-    reason: 'Store scanning arrives in a later milestone. Add games manually for now.',
-    lastScanAt: null,
-    gamesFound: listGames(db, { source, includeHidden: true }).length,
   };
 }
 
@@ -292,10 +307,8 @@ export function createHandlers(): HandlerDef[] {
         };
         const steam = steamStatus(deps.db, steamOsFor(deps));
         const epic = epicStatus(deps.db, epicOsFor(deps));
-        const rest = STORE_SOURCES.filter((s) => s !== 'steam' && s !== 'epic').map((s) =>
-          storeStatus(deps.db, s),
-        );
-        return Promise.resolve([manual, steam, epic, ...rest]);
+        const battlenet = battleNetStatus(deps.db, battleNetOsFor(deps));
+        return Promise.resolve([manual, steam, epic, battlenet]);
       },
     },
     {
@@ -311,6 +324,17 @@ export function createHandlers(): HandlerDef[] {
         }
         if (p.source === 'steam' || p.source === 'epic') {
           return Promise.resolve(runStoreScan(deps, p.source));
+        }
+        if (p.source === 'battlenet') {
+          const adapter = new BattleNetAdapter(battleNetOsFor(deps));
+          const result = adapter.scan();
+          const note =
+            result.warnings.length > 0 ? result.warnings[0]! : 'No per-game discovery for Battle.net.';
+          recordScan(deps.db, 'battlenet', 'ok', 0, note);
+          return Promise.resolve({
+            scannedAt: result.scannedAt,
+            gamesFound: listGames(deps.db, { source: 'battlenet', includeHidden: true }).length,
+          });
         }
         throw new ValidationError(
           'NOT_IMPLEMENTED',
@@ -329,6 +353,15 @@ export function createHandlers(): HandlerDef[] {
         }
         activeScans.clear();
         return Promise.resolve({ cancelled: cancelledAny });
+      },
+    },
+    {
+      channel: IpcChannels.sourcesOpenClient,
+      schema: schemas.sourcesOpenClientSchema,
+      run: async (payload, deps) => {
+        const p = payload as { source: 'epic' | 'battlenet' };
+        await deps.launcher.openClient(p.source);
+        return { opened: true };
       },
     },
   ];

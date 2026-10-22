@@ -6,6 +6,7 @@ import { createHandlers, type HandlerDeps } from '../../electron/main/ipc/handle
 import { GameLauncher, type OpenExternalFn, type SpawnFn } from '../../electron/main/launch/launcher';
 import type { SteamOs } from '../../electron/main/sources/steam/os';
 import type { EpicOs } from '../../electron/main/sources/epic/os';
+import type { BattleNetOs } from '../../electron/main/sources/battlenet/os';
 
 export interface SpawnCall {
   exe: string;
@@ -61,6 +62,7 @@ export interface TestContext {
 export function createTestContext(overrides?: {
   steamOs?: SteamOs;
   epicOs?: EpicOs;
+  battleNetOs?: BattleNetOs;
   openExternalImpl?: OpenExternalFn;
 }): TestContext {
   const db = openDatabase(':memory:');
@@ -69,6 +71,7 @@ export function createTestContext(overrides?: {
     db,
     spawnImpl: stub.spawnImpl,
     openExternalImpl: overrides?.openExternalImpl,
+    battleNetOs: overrides?.battleNetOs,
   });
   const handlers = createHandlers();
   const deps: HandlerDeps = {
@@ -78,6 +81,7 @@ export function createTestContext(overrides?: {
     getMainWindow: () => null,
     steamOs: overrides?.steamOs,
     epicOs: overrides?.epicOs,
+    battleNetOs: overrides?.battleNetOs,
   };
   const call = async (channel: string, payload?: unknown) => {
     const def = handlers.find((h) => h.channel === channel);

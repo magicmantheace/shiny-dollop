@@ -59,3 +59,7 @@ export const settingsUpdateSchema = z
 export const sourcesScanSchema = z
   .object({ source: z.enum(['manual', 'steam', 'epic', 'battlenet']) })
   .strict();
+
+export const sourcesOpenClientSchema = z
+  .object({ source: z.enum(['epic', 'battlenet']) })
+  .strict();

@@ -117,6 +117,7 @@ export interface GameLauncherApi {
     status(): Promise<ApiResult<SourceStatus[]>>;
     scan(input: { source: GameSource }): Promise<ApiResult<{ scannedAt: string; gamesFound: number }>>;
     cancelScan(): Promise<ApiResult<{ cancelled: boolean }>>;
+    openClient(input: { source: 'epic' | 'battlenet' }): Promise<ApiResult<{ opened: boolean }>>;
   };
 }
 

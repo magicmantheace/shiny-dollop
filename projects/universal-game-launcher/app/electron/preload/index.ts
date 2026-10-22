@@ -37,6 +37,7 @@ const api: GameLauncherApi = {
     status: () => invoke(IpcChannels.sourcesStatus, {}),
     scan: (input) => invoke(IpcChannels.sourcesScan, input),
     cancelScan: () => invoke(IpcChannels.sourcesCancelScan, {}),
+    openClient: (input) => invoke(IpcChannels.sourcesOpenClient, input),
   },
 };
 

@@ -22,6 +22,8 @@ import {
 import { getSettings } from '../data/settings';
 import { buildRunGameUri, isValidAppId } from '../sources/steam/adapter';
 import { EPIC_LAUNCHER_URI } from '../sources/epic/adapter';
+import { BattleNetAdapter } from '../sources/battlenet/adapter';
+import { RealBattleNetOs, type BattleNetOs } from '../sources/battlenet/os';
 import {
   ValidationError,
   assertDirectoryUsable,
@@ -50,6 +52,8 @@ export interface LauncherDeps {
   spawnImpl?: SpawnFn;
   /** Override for tests. Defaults to Electron's shell.openExternal. */
   openExternalImpl?: OpenExternalFn;
+  /** Override for tests. Defaults to the real Battle.net OS layer. */
+  battleNetOs?: BattleNetOs;
   /** Called after a successful spawn (e.g. to minimize the window). */
   onLaunched?: (gameId: string) => void;
 }
@@ -60,6 +64,7 @@ export class GameLauncher {
   private readonly db: DatabaseSync;
   private readonly spawnImpl: SpawnFn;
   private readonly openExternalImpl: OpenExternalFn | undefined;
+  private readonly battleNetOs: BattleNetOs;
   private readonly onLaunched: ((gameId: string) => void) | undefined;
   private readonly running = new Map<string, RunningEntry>();
   private checkpointTimer: NodeJS.Timeout | null = null;
@@ -68,6 +73,7 @@ export class GameLauncher {
     this.db = deps.db;
     this.spawnImpl = deps.spawnImpl ?? spawn;
     this.openExternalImpl = deps.openExternalImpl;
+    this.battleNetOs = deps.battleNetOs ?? new RealBattleNetOs();
     this.onLaunched = deps.onLaunched;
   }
 
@@ -274,6 +280,54 @@ export class GameLauncher {
       }
     }, CHECKPOINT_INTERVAL_MS);
     this.checkpointTimer.unref?.();
+  }
+
+  /**
+   * Open a store client itself (not a game). Used for sources without
+   * verified per-game launching — currently Epic (documented launcher URI)
+   * and Battle.net (validated client executable). Reports success/failure
+   * honestly; never claims a game is running. No session is recorded: the
+   * client is not a game.
+   */
+  async openClient(source: 'epic' | 'battlenet'): Promise<void> {
+    if (source === 'epic') {
+      if (!this.openExternalImpl) {
+        throw new ValidationError(
+          'NO_OS_HANDOFF',
+          'OS URI handoff is unavailable in this environment.',
+        );
+      }
+      try {
+        await this.openExternalImpl(EPIC_LAUNCHER_URI);
+      } catch (err) {
+        throw new ValidationError(
+          'LAUNCH_REQUEST_FAILED',
+          `Could not open the Epic Games Launcher: ${(err as Error).message}`,
+        );
+      }
+      return;
+    }
+    const probe = new BattleNetAdapter(this.battleNetOs).probe();
+    if (probe.status !== 'installed' || !probe.clientExe) {
+      throw new ValidationError('CLIENT_NOT_FOUND', probe.reason);
+    }
+    // Defense in depth: the path came from our own probe, but re-validate
+    // the shape before spawning anything.
+    const exe = probe.clientExe;
+    if (!/Battle\.net\.exe$/i.test(exe)) {
+      throw new ValidationError(
+        'INVALID_CLIENT_PATH',
+        'Refusing to open an unexpected Battle.net client path.',
+      );
+    }
+    try {
+      this.spawnImpl(exe, [], { shell: false, windowsHide: true, detached: false });
+    } catch (err) {
+      throw new ValidationError(
+        'LAUNCH_REQUEST_FAILED',
+        `Could not open Battle.net: ${(err as Error).message}`,
+      );
+    }
   }
 
   /**

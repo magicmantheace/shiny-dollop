@@ -62,6 +62,19 @@ export default function SettingsPage({ settings, onRefresh }: Props) {
     }
   }
 
+  async function openClient(source: 'epic' | 'battlenet') {
+    setError(null);
+    setScanNote(null);
+    try {
+      await unwrap(getApi().sources.openClient({ source }));
+      setScanNote(
+        source === 'epic' ? 'Epic Games Launcher is opening.' : 'Battle.net is opening.',
+      );
+    } catch (err) {
+      setError(err instanceof ApiCallError ? err.message : String(err));
+    }
+  }
+
   async function update(patch: Partial<Settings>) {
     setBusy(true);
     setError(null);
@@ -125,13 +138,13 @@ export default function SettingsPage({ settings, onRefresh }: Props) {
           <div key={s.source} className="source-row">
             <span className="source-name">{SOURCE_LABELS[s.source]}</span>
             <span className={`badge ${s.available ? '' : 'warn'}`}>
-              {s.source === 'steam' || s.source === 'epic'
+              {s.source === 'manual'
                 ? s.available
-                  ? 'Detected'
-                  : 'Not found'
-                : s.available
                   ? 'Ready'
-                  : 'Not yet available'}
+                  : 'Not yet available'
+                : s.available
+                  ? 'Detected'
+                  : 'Not found'}
             </span>
             <span className="muted">{s.reason}</span>
             <span className="muted">
@@ -148,6 +161,20 @@ export default function SettingsPage({ settings, onRefresh }: Props) {
                   Scan now
                 </button>
               ))}
+            {(s.source === 'epic' || s.source === 'battlenet') && s.available && (
+              <button
+                className="btn"
+                onClick={() => openClient(s.source === 'epic' ? 'epic' : 'battlenet')}
+                disabled={scanning !== null}
+              >
+                {s.source === 'epic' ? 'Open Epic Games Launcher' : 'Open Battle.net'}
+              </button>
+            )}
+            {s.source === 'battlenet' && (
+              <button className="btn" onClick={() => scan('battlenet')} disabled={scanning !== null}>
+                Check again
+              </button>
+            )}
           </div>
         ))}
         {scanNote && (
