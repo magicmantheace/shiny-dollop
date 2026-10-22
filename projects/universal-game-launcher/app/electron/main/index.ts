@@ -10,6 +10,7 @@ import { recoverInterruptedSessions } from './data/sessions';
 import { GameLauncher } from './launch/launcher';
 import { registerIpcHandlers } from './ipc/handlers';
 import { chooseExecutable } from './files/picker';
+import { chooseCover, getCoversDir } from './files/covers';
 
 const isDev = !!process.env.UGL_DEV_SERVER;
 let mainWindow: BrowserWindow | null = null;
@@ -83,6 +84,8 @@ async function init(): Promise<void> {
     db,
     launcher,
     chooseExecutable,
+    chooseCover,
+    getCoversDir,
     getMainWindow,
   });
 

@@ -12,6 +12,7 @@ import type { ApiError, GameSource, Settings, SourceStatus } from '../../../shar
 import {
   listGames,
   addManualGame,
+  getGame,
   removeGame,
   setFavorite,
   updateGame,
@@ -24,6 +25,7 @@ import { getSettings, updateSettings } from '../data/settings';
 import { ValidationError } from '../launch/validation';
 import type { GameLauncher } from '../launch/launcher';
 import type { PickResult } from '../files/picker';
+import { coverDataUrl } from '../files/cover-store';
 import {
   RealSteamOs,
   SteamAdapter,
@@ -49,6 +51,10 @@ export interface HandlerDeps {
   db: DatabaseSync;
   launcher: GameLauncher;
   chooseExecutable: () => Promise<PickResult>;
+  /** Override for tests. Imports a user-picked image into the covers dir. */
+  chooseCover: () => Promise<{ canceled: true } | { coverPath: string }>;
+  /** Covers directory (app-data). Override for tests. */
+  getCoversDir: () => string;
   getMainWindow: () => BrowserWindow | null;
   /** Override for tests. Defaults to the real OS layer. */
   steamOs?: SteamOs;
@@ -293,6 +299,23 @@ export function createHandlers(): HandlerDef[] {
       channel: IpcChannels.filesChooseExecutable,
       schema: z.object({}).strict().optional(),
       run: (_payload, deps) => deps.chooseExecutable(),
+    },
+    {
+      channel: IpcChannels.filesChooseCover,
+      schema: z.object({}).strict().optional(),
+      run: (_payload, deps) => deps.chooseCover(),
+    },
+    {
+      channel: IpcChannels.filesCoverData,
+      schema: schemas.filesCoverDataSchema,
+      run: (payload, deps) => {
+        const p = payload as { id: string };
+        const game = getGame(deps.db, p.id);
+        if (!game || !game.coverPath) return Promise.resolve({ dataUrl: null });
+        return Promise.resolve({
+          dataUrl: coverDataUrl(deps.getCoversDir(), game.coverPath),
+        });
+      },
     },
     {
       channel: IpcChannels.sourcesStatus,

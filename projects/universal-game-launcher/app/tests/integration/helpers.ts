@@ -78,6 +78,8 @@ export function createTestContext(overrides?: {
     db,
     launcher,
     chooseExecutable: async () => ({ canceled: true }),
+    chooseCover: async () => ({ canceled: true }),
+    getCoversDir: () => '/tmp/ugl-test-covers',
     getMainWindow: () => null,
     steamOs: overrides?.steamOs,
     epicOs: overrides?.epicOs,

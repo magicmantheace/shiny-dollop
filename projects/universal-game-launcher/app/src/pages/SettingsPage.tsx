@@ -20,6 +20,7 @@ export default function SettingsPage({ settings, onRefresh }: Props) {
   const [busy, setBusy] = useState(false);
   const [scanning, setScanning] = useState<GameSource | null>(null);
   const [scanNote, setScanNote] = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   async function loadSources() {
     try {
@@ -59,6 +60,21 @@ export default function SettingsPage({ settings, onRefresh }: Props) {
       setError(err instanceof ApiCallError ? err.message : String(err));
     } finally {
       setScanning(null);
+    }
+  }
+
+  async function clearHistory() {
+    setBusy(true);
+    setError(null);
+    try {
+      await unwrap(getApi().sessions.clear());
+      setConfirmClear(false);
+      setScanNote('Play history cleared. Game files were not touched.');
+      onRefresh();
+    } catch (err) {
+      setError(err instanceof ApiCallError ? err.message : String(err));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -131,6 +147,26 @@ export default function SettingsPage({ settings, onRefresh }: Props) {
             <option value="system">System</option>
           </select>
         </label>
+        {!confirmClear ? (
+          <button className="btn" onClick={() => setConfirmClear(true)} disabled={busy}>
+            Clear play history…
+          </button>
+        ) : (
+          <div className="confirm-box" role="alert">
+            <p>
+              Clear all recorded play sessions? This only deletes the launcher's own
+              records — <strong>game files are never touched</strong>.
+            </p>
+            <div className="modal-actions">
+              <button className="btn danger" onClick={clearHistory} disabled={busy}>
+                {busy ? 'Clearing…' : 'Yes, clear history'}
+              </button>
+              <button className="btn" onClick={() => setConfirmClear(false)}>
+                Keep it
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       <div className="settings-group">
         <h2>Game sources</h2>

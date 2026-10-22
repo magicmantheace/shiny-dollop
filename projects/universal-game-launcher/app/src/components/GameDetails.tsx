@@ -17,6 +17,37 @@ export default function GameDetails({ game, onClose, onChanged }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [coverPath, setCoverPath] = useState<string | null>(game.coverPath);
+
+  async function chooseCover() {
+    setBusy(true);
+    setError(null);
+    try {
+      const picked = await unwrap(getApi().files.chooseCover());
+      if ('canceled' in picked) return;
+      await unwrap(getApi().library.update({ id: game.id, coverPath: picked.coverPath }));
+      setCoverPath(picked.coverPath);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiCallError ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function clearCover() {
+    setBusy(true);
+    setError(null);
+    try {
+      await unwrap(getApi().library.update({ id: game.id, coverPath: null }));
+      setCoverPath(null);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiCallError ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function save() {
     setBusy(true);
@@ -71,7 +102,7 @@ export default function GameDetails({ game, onClose, onChanged }: Props) {
         <h2>Game details</h2>
         <label>
           Title
-          <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={256} />
+          <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={256} autoFocus />
         </label>
         <label>
           Executable <span className="muted">(read-only)</span>
@@ -93,6 +124,24 @@ export default function GameDetails({ game, onClose, onChanged }: Props) {
             placeholder='e.g. --fullscreen --level 3'
           />
         </label>
+        <div className="cover-row">
+          <span>
+            Cover art{' '}
+            <span className="muted">
+              {coverPath ? '(custom)' : '(placeholder)'}
+            </span>
+          </span>
+          <span className="cover-actions">
+            <button className="btn" onClick={chooseCover} disabled={busy}>
+              Choose image…
+            </button>
+            {coverPath && (
+              <button className="btn" onClick={clearCover} disabled={busy}>
+                Remove
+              </button>
+            )}
+          </span>
+        </div>
         <div className="detail-stats muted">
           <span>Added {formatDateTime(game.addedAt)}</span>
           <span>Last played {formatDateTime(game.lastPlayedAt)}</span>

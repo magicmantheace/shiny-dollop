@@ -22,6 +22,12 @@ export const libraryAddManualSchema = z
   })
   .strict();
 
+export const coverPathSchema = z
+  .string()
+  .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(png|jpg|jpeg|webp|gif|bmp)$/);
+
+export const filesCoverDataSchema = z.object({ id: uuidLike }).strict();
+
 export const libraryUpdateSchema = z
   .object({
     id: uuidLike,
@@ -29,6 +35,7 @@ export const libraryUpdateSchema = z
     workingDir: z.string().max(32767).nullable().optional(),
     args: z.array(z.string().max(4096)).max(64).optional(),
     hidden: z.boolean().optional(),
+    coverPath: coverPathSchema.nullable().optional(),
   })
   .strict();
 
@@ -63,3 +70,4 @@ export const sourcesScanSchema = z
 export const sourcesOpenClientSchema = z
   .object({ source: z.enum(['epic', 'battlenet']) })
   .strict();
+

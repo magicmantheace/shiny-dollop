@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Game } from '../../shared/types';
 import { ApiCallError, formatDateTime, formatDuration, getApi, unwrap } from '../api';
 
@@ -12,6 +12,7 @@ export default function GameCard({ game, onChanged, onSelect }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
 
   async function toggleFavorite(e: React.MouseEvent) {
     e.stopPropagation();
@@ -60,6 +61,27 @@ export default function GameCard({ game, onChanged, onSelect }: Props) {
         ? 'Open Epic Games Launcher'
         : 'Play';
 
+  // Lazy cover art: fetched per card only when the game has a cover.
+  useEffect(() => {
+    if (!game.coverPath) {
+      setCoverUrl(null);
+      return;
+    }
+    let alive = true;
+    getApi()
+      .files.coverData({ id: game.id })
+      .then((res) => {
+        if (!alive) return;
+        if (res.ok) setCoverUrl(res.data.dataUrl);
+      })
+      .catch(() => {
+        if (alive) setCoverUrl(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [game.id, game.coverPath]);
+
   return (
     <article
       className="card"
@@ -71,6 +93,13 @@ export default function GameCard({ game, onChanged, onSelect }: Props) {
       role="button"
       aria-label={`${game.title} details`}
     >
+      {coverUrl ? (
+        <img src={coverUrl} alt="" className="card-cover" aria-hidden="true" />
+      ) : (
+        <div className="card-cover card-cover-placeholder" aria-hidden="true">
+          {game.title.charAt(0).toUpperCase()}
+        </div>
+      )}
       <div className="card-top">
         <span className="card-title" title={game.title}>
           {game.title}

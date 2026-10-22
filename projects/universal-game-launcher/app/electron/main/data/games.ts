@@ -13,6 +13,7 @@ import {
   defaultTitleFor,
   validateArgsArray,
 } from '../launch/validation';
+import { isValidCoverFilename } from '../files/cover-store';
 
 interface GameRow {
   id: string;
@@ -25,6 +26,7 @@ interface GameRow {
   launch_uri: string | null;
   launch_capability: string | null;
   launch_reason: string | null;
+  cover_path: string | null;
   working_dir: string | null;
   args_json: string;
   favorite: number;
@@ -58,6 +60,7 @@ function rowToGame(row: GameRow): Game {
     args: JSON.parse(row.args_json) as string[],
     favorite: row.favorite === 1,
     hidden: row.hidden === 1,
+    coverPath: row.cover_path,
     missing,
     addedAt: row.added_at,
     updatedAt: row.updated_at,
@@ -162,6 +165,8 @@ export interface UpdateGameInput {
   workingDir?: string | null;
   args?: string[];
   hidden?: boolean;
+  /** Validated cover filename, or null to clear. */
+  coverPath?: string | null;
 }
 
 export async function updateGame(db: DatabaseSync, input: UpdateGameInput): Promise<Game> {
@@ -195,6 +200,19 @@ export async function updateGame(db: DatabaseSync, input: UpdateGameInput): Prom
   if (input.hidden !== undefined) {
     sets.push('hidden = ?');
     params.push(input.hidden ? 1 : 0);
+  }
+  if (input.coverPath !== undefined) {
+    if (input.coverPath === null) {
+      sets.push('cover_path = NULL');
+    } else {
+      // The filename must be exactly one this app wrote (uuid + image ext);
+      // anything else is rejected rather than trusted.
+      if (!isValidCoverFilename(input.coverPath)) {
+        throw new ValidationError('INVALID_COVER', 'Cover filename is not from this app.');
+      }
+      sets.push('cover_path = ?');
+      params.push(input.coverPath);
+    }
   }
   params.push(input.id);
   db.prepare(`UPDATE games SET ${sets.join(', ')} WHERE id = ?`).run(...params);

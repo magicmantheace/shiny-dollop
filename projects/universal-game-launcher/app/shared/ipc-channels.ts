@@ -11,6 +11,8 @@ export const IpcChannels = {
   settingsGet: 'settings.get',
   settingsUpdate: 'settings.update',
   filesChooseExecutable: 'files.chooseExecutable',
+  filesChooseCover: 'files.chooseCover',
+  filesCoverData: 'files.coverData',
   sourcesStatus: 'sources.status',
   sourcesScan: 'sources.scan',
   sourcesCancelScan: 'sources.cancelScan',

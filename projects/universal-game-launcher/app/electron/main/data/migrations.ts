@@ -69,6 +69,13 @@ const MIGRATIONS: Migration[] = [
       CREATE UNIQUE INDEX idx_games_source_external ON games(source, external_id);
     `,
   },
+  {
+    version: 3,
+    name: 'user cover art',
+    sql: `
+      ALTER TABLE games ADD COLUMN cover_path TEXT;
+    `,
+  },
 ];
 
 export function getAppliedVersions(db: DatabaseSync): number[] {

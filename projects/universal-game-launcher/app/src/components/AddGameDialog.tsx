@@ -81,7 +81,7 @@ export default function AddGameDialog({ onClose, onAdded }: Props) {
         </p>
         <div className="field-row">
           <input value={exePath ?? ''} readOnly placeholder="No file chosen yet" aria-label="Chosen executable" />
-          <button className="btn" onClick={choose}>
+          <button className="btn" onClick={choose} autoFocus>
             Choose…
           </button>
         </div>

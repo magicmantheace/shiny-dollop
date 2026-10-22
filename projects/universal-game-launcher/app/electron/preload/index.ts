@@ -32,6 +32,8 @@ const api: GameLauncherApi = {
   },
   files: {
     chooseExecutable: () => invoke(IpcChannels.filesChooseExecutable, {}),
+    chooseCover: () => invoke(IpcChannels.filesChooseCover, {}),
+    coverData: (input) => invoke(IpcChannels.filesCoverData, input),
   },
   sources: {
     status: () => invoke(IpcChannels.sourcesStatus, {}),

@@ -27,6 +27,8 @@ export interface Game {
   args: string[];
   favorite: boolean;
   hidden: boolean;
+  /** Stored cover-art filename (validated, app-data covers dir). Null when none. */
+  coverPath: string | null;
   /** True when the stored executable/install dir is currently missing from disk. */
   missing: boolean;
   addedAt: string; // ISO UTC
@@ -93,6 +95,7 @@ export interface GameLauncherApi {
       workingDir?: string | null;
       args?: string[];
       hidden?: boolean;
+      coverPath?: string | null;
     }): Promise<ApiResult<Game>>;
     remove(input: { id: string }): Promise<ApiResult<null>>;
     setFavorite(input: { id: string; favorite: boolean }): Promise<ApiResult<Game>>;
@@ -112,6 +115,8 @@ export interface GameLauncherApi {
   };
   files: {
     chooseExecutable(): Promise<ApiResult<{ path: string } | { canceled: true }>>;
+    chooseCover(): Promise<ApiResult<{ coverPath: string } | { canceled: true }>>;
+    coverData(input: { id: string }): Promise<ApiResult<{ dataUrl: string | null }>>;
   };
   sources: {
     status(): Promise<ApiResult<SourceStatus[]>>;
