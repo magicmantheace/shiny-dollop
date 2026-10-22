@@ -58,6 +58,17 @@ const MIGRATIONS: Migration[] = [
       );
     `,
   },
+  {
+    version: 2,
+    name: 'steam source columns',
+    sql: `
+      ALTER TABLE games ADD COLUMN install_dir TEXT;
+      ALTER TABLE games ADD COLUMN launch_uri TEXT;
+      ALTER TABLE games ADD COLUMN launch_capability TEXT;
+      ALTER TABLE games ADD COLUMN launch_reason TEXT;
+      CREATE UNIQUE INDEX idx_games_source_external ON games(source, external_id);
+    `,
+  },
 ];
 
 export function getAppliedVersions(db: DatabaseSync): number[] {

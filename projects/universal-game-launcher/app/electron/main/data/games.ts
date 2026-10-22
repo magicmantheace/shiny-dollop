@@ -3,7 +3,7 @@ import type { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import type { Game, GameSource, SortKey } from '../../../shared/types';
+import type { Game, GameSource, LaunchCapability, SortKey } from '../../../shared/types';
 import {
   ValidationError,
   assertDirectoryUsable,
@@ -21,6 +21,10 @@ interface GameRow {
   title: string;
   exe_path: string | null;
   canonical_path: string | null;
+  install_dir: string | null;
+  launch_uri: string | null;
+  launch_capability: string | null;
+  launch_reason: string | null;
   working_dir: string | null;
   args_json: string;
   favorite: number;
@@ -33,6 +37,12 @@ interface GameRow {
 
 function rowToGame(row: GameRow): Game {
   const exePath = row.exe_path;
+  const installDir = row.install_dir;
+  // Missing-ness is computed at read time: manual games check the exe,
+  // store games check the install dir. Removed installs flip to missing
+  // instead of losing their rows and history.
+  const missing =
+    exePath !== null ? !existsSync(exePath) : installDir !== null ? !existsSync(installDir) : false;
   return {
     id: row.id,
     source: row.source as GameSource,
@@ -40,11 +50,15 @@ function rowToGame(row: GameRow): Game {
     title: row.title,
     exePath,
     canonicalPath: row.canonical_path,
+    installDir,
+    launchUri: row.launch_uri,
+    launchCapability: (row.launch_capability as LaunchCapability | null) ?? 'direct',
+    launchReason: row.launch_reason,
     workingDir: row.working_dir,
     args: JSON.parse(row.args_json) as string[],
     favorite: row.favorite === 1,
     hidden: row.hidden === 1,
-    missing: exePath !== null && !existsSync(exePath),
+    missing,
     addedAt: row.added_at,
     updatedAt: row.updated_at,
     lastPlayedAt: row.last_played_at,

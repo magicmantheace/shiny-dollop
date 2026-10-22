@@ -4,6 +4,9 @@ export type GameSource = 'manual' | 'steam' | 'epic' | 'battlenet';
 
 export type SortKey = 'title' | 'added' | 'lastPlayed' | 'playtime';
 
+/** How a library entry can be started. */
+export type LaunchCapability = 'direct' | 'native-uri' | 'open-client' | 'unavailable';
+
 export interface Game {
   id: string;
   source: GameSource;
@@ -13,11 +16,18 @@ export interface Game {
   exePath: string | null;
   /** Normalized absolute path used for duplicate detection. Null when not applicable. */
   canonicalPath: string | null;
+  /** Absolute install directory for store games (e.g. .../steamapps/common/<dir>). */
+  installDir: string | null;
+  /** Validated launch URI for store games (e.g. steam://rungameid/730). */
+  launchUri: string | null;
+  launchCapability: LaunchCapability;
+  /** Human-readable reason for the capability (especially when unavailable). */
+  launchReason: string | null;
   workingDir: string | null;
   args: string[];
   favorite: boolean;
   hidden: boolean;
-  /** True when the stored executable is currently missing from disk. */
+  /** True when the stored executable/install dir is currently missing from disk. */
   missing: boolean;
   addedAt: string; // ISO UTC
   updatedAt: string; // ISO UTC
@@ -106,6 +116,7 @@ export interface GameLauncherApi {
   sources: {
     status(): Promise<ApiResult<SourceStatus[]>>;
     scan(input: { source: GameSource }): Promise<ApiResult<{ scannedAt: string; gamesFound: number }>>;
+    cancelScan(): Promise<ApiResult<{ cancelled: boolean }>>;
   };
 }
 
