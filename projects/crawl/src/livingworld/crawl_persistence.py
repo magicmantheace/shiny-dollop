@@ -4,11 +4,90 @@ from datetime import datetime, timezone
 from threading import RLock
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Integer, String, create_engine, delete, select
+from sqlalchemy import JSON, DateTime, Integer, String, create_engine, delete, func, or_, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 from sqlalchemy.pool import StaticPool
 
 from .crawl_domain import Crawl, CrawlEvent
+
+
+STATE_PROTOCOL = "underreach.crawl-state.v1"
+EVENT_PROTOCOL = "underreach.crawl-event.v1"
+STATE_SCHEMA_VERSION = 1
+EVENT_SCHEMA_VERSION = 1
+
+
+class PersistenceVersionError(RuntimeError):
+    """Raised when a persisted blob carries an unknown protocol or schema version."""
+
+
+def _encode_state(crawl: Crawl) -> dict[str, Any]:
+    """Wrap canonical Crawl state in a versioned envelope."""
+    return {
+        "protocol": STATE_PROTOCOL,
+        "schema_version": STATE_SCHEMA_VERSION,
+        "state": crawl.model_dump(mode="json"),
+    }
+
+
+def _encode_event(event: CrawlEvent) -> dict[str, Any]:
+    """Wrap a canonical Ledger event in a versioned envelope."""
+    return {
+        "protocol": EVENT_PROTOCOL,
+        "schema_version": EVENT_SCHEMA_VERSION,
+        "event": event.model_dump(mode="json"),
+    }
+
+
+def _decode_state(payload: Any) -> Crawl:
+    """Validate a persisted Crawl-state blob, rejecting unknown versions.
+
+    Blobs written before envelopes existed carry no ``protocol`` field and are
+    treated as schema v1 for backwards compatibility.
+    """
+    if isinstance(payload, dict) and isinstance(payload.get("protocol"), str):
+        protocol = payload.get("protocol")
+        if protocol != STATE_PROTOCOL:
+            raise PersistenceVersionError(f"unsupported crawl-state protocol: {protocol!r}")
+        version = payload.get("schema_version")
+        if version != STATE_SCHEMA_VERSION:
+            raise PersistenceVersionError(
+                f"unsupported crawl-state schema version: {version!r} "
+                f"(expected {STATE_SCHEMA_VERSION})"
+            )
+        state = payload.get("state")
+        if not isinstance(state, dict):
+            raise PersistenceVersionError("crawl-state envelope is missing its state payload")
+        return Crawl.model_validate(state)
+    return Crawl.model_validate(payload)
+
+
+def _decode_event(payload: Any) -> CrawlEvent:
+    """Validate a persisted Ledger-event blob, rejecting unknown versions.
+
+    Blobs written before envelopes existed carry no ``protocol`` field and are
+    treated as schema v1 for backwards compatibility.
+    """
+    if isinstance(payload, dict) and isinstance(payload.get("protocol"), str):
+        protocol = payload.get("protocol")
+        if protocol != EVENT_PROTOCOL:
+            raise PersistenceVersionError(f"unsupported crawl-event protocol: {protocol!r}")
+        version = payload.get("schema_version")
+        if version != EVENT_SCHEMA_VERSION:
+            raise PersistenceVersionError(
+                f"unsupported crawl-event schema version: {version!r} "
+                f"(expected {EVENT_SCHEMA_VERSION})"
+            )
+        event = payload.get("event")
+        if not isinstance(event, dict):
+            raise PersistenceVersionError("crawl-event envelope is missing its event payload")
+        return CrawlEvent.model_validate(event)
+    return CrawlEvent.model_validate(payload)
+
+
+def _escape_like(value: str) -> str:
+    """Escape SQL LIKE wildcards so a search needle is matched literally."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 class CrawlBase(DeclarativeBase):
@@ -75,7 +154,7 @@ class CrawlPersistence:
                 session.commit()
 
     def save_crawl(self, crawl: Crawl) -> None:
-        payload = crawl.model_dump(mode="json")
+        payload = _encode_state(crawl)
         now = datetime.now(timezone.utc)
         with self._session_lock:
             with Session(self.engine) as session:
@@ -101,7 +180,7 @@ class CrawlPersistence:
         with self._session_lock:
             with Session(self.engine) as session:
                 row = session.get(CrawlRow, crawl_id)
-                return Crawl.model_validate(row.state) if row else None
+                return _decode_state(row.state) if row else None
 
     def list_crawls(self, limit: int = 100, status: str | None = None) -> list[Crawl]:
         limit = max(1, min(500, limit))
@@ -111,7 +190,7 @@ class CrawlPersistence:
         stmt = stmt.order_by(CrawlRow.updated_at.desc(), CrawlRow.id).limit(limit)
         with self._session_lock:
             with Session(self.engine) as session:
-                return [Crawl.model_validate(row.state) for row in session.scalars(stmt).all()]
+                return [_decode_state(row.state) for row in session.scalars(stmt).all()]
 
     def append_event(self, event: CrawlEvent) -> None:
         with self._session_lock:
@@ -125,7 +204,7 @@ class CrawlPersistence:
                         floor_number=event.floor_number,
                         tick=event.tick,
                         event_type=event.event_type,
-                        event=event.model_dump(mode="json"),
+                        event=_encode_event(event),
                         created_at=datetime.now(timezone.utc),
                     )
                 )
@@ -146,7 +225,58 @@ class CrawlPersistence:
         stmt = stmt.order_by(CrawlEventRow.tick.desc(), CrawlEventRow.id.desc()).limit(limit)
         with self._session_lock:
             with Session(self.engine) as session:
-                return [CrawlEvent.model_validate(row.event) for row in session.scalars(stmt).all()]
+                return [_decode_event(row.event) for row in session.scalars(stmt).all()]
+
+    def search_events(
+        self,
+        crawl_id: str,
+        needle: str,
+        *,
+        event_type: str | None = None,
+        limit: int = 100,
+    ) -> list[CrawlEvent]:
+        """Substring search over the complete canonical Ledger, filtered in SQL.
+
+        Unlike ``list_events``, the match is applied at the database level with
+        no premature row limit, so queries matching only old events are still
+        found.  The needle is matched case-insensitively against the event
+        type, the event summary, and the actor-id list.  SQL LIKE wildcards in
+        the needle are escaped so they match literally.  Results are
+        deterministic: ascending ``(tick, id)``, truncated to ``limit``.
+        """
+        needle = needle.strip().lower()
+        if not needle:
+            return []
+        limit = max(1, min(1000, limit))
+        pattern = f"%{_escape_like(needle)}%"
+        # Enveloped blobs nest the event under "event"; pre-envelope legacy
+        # rows hold it at the top level.  json_extract returns NULL for the
+        # path that does not exist, which never matches.
+        conditions = [
+            func.lower(CrawlEventRow.event_type).like(pattern, escape="\\"),
+        ]
+        for path in (
+            "$.event.summary",
+            "$.summary",
+            "$.event.actor_ids",
+            "$.actor_ids",
+        ):
+            conditions.append(
+                func.lower(func.json_extract(CrawlEventRow.event, path)).like(
+                    pattern, escape="\\"
+                )
+            )
+        stmt = (
+            select(CrawlEventRow)
+            .where(CrawlEventRow.crawl_id == crawl_id)
+            .where(or_(*conditions))
+        )
+        if event_type is not None:
+            stmt = stmt.where(CrawlEventRow.event_type == event_type)
+        stmt = stmt.order_by(CrawlEventRow.tick, CrawlEventRow.id).limit(limit)
+        with self._session_lock:
+            with Session(self.engine) as session:
+                return [_decode_event(row.event) for row in session.scalars(stmt).all()]
 
     def events_by_ids(self, event_ids: list[str]) -> list[CrawlEvent]:
         """Load a small ordered event slice without replaying the whole Ledger."""
@@ -158,7 +288,7 @@ class CrawlPersistence:
         stmt = select(CrawlEventRow).where(CrawlEventRow.id.in_(event_ids))
         with self._session_lock:
             with Session(self.engine) as session:
-                values = [CrawlEvent.model_validate(row.event) for row in session.scalars(stmt).all()]
+                values = [_decode_event(row.event) for row in session.scalars(stmt).all()]
         values.sort(key=lambda item: wanted[item.id])
         if [item.id for item in values] != event_ids:
             missing = [event_id for event_id in event_ids if event_id not in {item.id for item in values}]
@@ -174,7 +304,7 @@ class CrawlPersistence:
         )
         with self._session_lock:
             with Session(self.engine) as session:
-                return [CrawlEvent.model_validate(row.event) for row in session.scalars(stmt).all()]
+                return [_decode_event(row.event) for row in session.scalars(stmt).all()]
 
     def restore_checkpoint_state(self, crawl: Crawl) -> int:
         """Restore one proven canonical state and discard only post-checkpoint rows.
@@ -202,7 +332,7 @@ class CrawlPersistence:
                     if row.id not in keep:
                         session.delete(row)
                         removed += 1
-                state = crawl.model_dump(mode="json")
+                state = _encode_state(crawl)
                 existing = session.get(CrawlRow, crawl.id)
                 now = datetime.now(timezone.utc)
                 if existing is None:

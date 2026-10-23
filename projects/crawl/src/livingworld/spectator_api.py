@@ -45,6 +45,13 @@ class SpectatorRepository:
         crawl = self.crawl()
         return self.persistence.list_events(crawl.id, limit=limit, event_type=event_type)
 
+    def search_events(self, needle: str, *, event_type: str | None = None, limit: int = 25):
+        """DB-level substring search over the complete canonical Ledger."""
+        crawl = self.crawl()
+        return self.persistence.search_events(
+            crawl.id, needle, event_type=event_type, limit=limit
+        )
+
     def replay(self) -> ReplayArchive:
         crawl = self.crawl()
         return ReplayArchive(crawl, self.persistence.list_events(crawl.id, limit=10000))

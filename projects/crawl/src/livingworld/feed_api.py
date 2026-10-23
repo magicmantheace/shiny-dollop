@@ -200,18 +200,19 @@ def create_feed_app(
         """
         descent = current()
         needle = q.strip().lower()
+        if not needle:
+            raise HTTPException(
+                status_code=422, detail="query must contain non-whitespace characters"
+            )
         descender_hits = [
             public_descender(descent, descender_id)
             for descender_id in sorted(descent.participants)
             if needle in descender_id.lower()
         ][:limit]
-        event_hits: list[dict[str, Any]] = []
-        for event in repository.events(limit=1000):
-            haystack = " ".join(
-                [event.event_type, event.summary, *event.actor_ids]
-            ).lower()
-            if needle in haystack:
-                event_hits.append(public_ledger_event(event))
+        event_hits = [
+            public_ledger_event(event)
+            for event in repository.search_events(needle, limit=limit)
+        ]
         event_hits.sort(key=lambda payload: (payload.get("tick", 0), payload.get("id", "")))
         return {
             "query": q,
