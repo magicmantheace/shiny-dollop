@@ -31,6 +31,9 @@ def test_population_digest_is_stable_across_python_processes() -> None:
         "print(DescenderPopulationGenerator().generate(ids).population_digest)"
     )
     environment = dict(os.environ)
+    src_dir = str(repo / "src")
+    existing = environment.get("PYTHONPATH")
+    environment["PYTHONPATH"] = src_dir + (os.pathsep + existing if existing else "")
     first = subprocess.check_output([sys.executable, "-c", code], cwd=repo, env=environment, text=True).strip()
     second = subprocess.check_output([sys.executable, "-c", code], cwd=repo, env=environment, text=True).strip()
     assert first == second
