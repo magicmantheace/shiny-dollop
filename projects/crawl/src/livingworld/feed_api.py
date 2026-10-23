@@ -214,12 +214,18 @@ def create_feed_app(
         """Read-only live channel directory over one authoritative Descent."""
         return channels().directory(current(), viewer_id=viewer_id)
 
-    @app.get("/api/feed/channels/{channel_id:path}")
-    def feed_channel(
+    def _feed_channel_payload(
         channel_id: str,
-        viewer_id: str = "default_viewer",
-        recent_event_limit: int = Query(default=12, ge=1, le=100),
+        viewer_id: str,
+        recent_event_limit: int,
     ) -> dict[str, Any]:
+        """Shared feed-channel resolution; takes a plain int limit.
+
+        The FastAPI routes delegate here so a direct call never receives a
+        ``Query`` descriptor as ``recent_event_limit`` (which previously
+        raised ``TypeError`` when the app ran without a feed-channel
+        registry).
+        """
         descent = current()
         # Preserve the original per-Descender path while accepting the new
         # deterministic ``feed:descender:<id>`` channel contract.
@@ -239,12 +245,20 @@ def create_feed_app(
             recent_event_limit=recent_event_limit,
         )
 
+    @app.get("/api/feed/channels/{channel_id:path}")
+    def feed_channel(
+        channel_id: str,
+        viewer_id: str = "default_viewer",
+        recent_event_limit: int = Query(default=12, ge=1, le=100),
+    ) -> dict[str, Any]:
+        return _feed_channel_payload(channel_id, viewer_id, recent_event_limit)
+
     @app.get("/api/feed/descenders/{descender_id}/channel")
     def descender_live_channel(descender_id: str, viewer_id: str = "default_viewer") -> dict[str, Any]:
         descent = current()
         if descender_id not in descent.participants:
             raise HTTPException(status_code=404, detail="descender not found")
-        return feed_channel(descender_channel_id(descender_id), viewer_id=viewer_id)
+        return _feed_channel_payload(descender_channel_id(descender_id), viewer_id, 12)
 
     @app.get("/api/feed/live/focus")
     def live_focus(viewer_id: str = "default_viewer") -> dict[str, Any]:
