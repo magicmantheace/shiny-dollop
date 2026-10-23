@@ -70,7 +70,7 @@ executed here. File presence alone is never counted as evidence.
 | Deterministic replay | complete+verified | fingerprint-identical double runs at 12 and 100 crawlers; bitwise 30A.5 |
 | Replay contract (§37) | complete+verified | **NEW**: `ReplayManifest` carries checkpoint_id, window range, required entity ids; `ReplayArchive.select_window` returns sub-archive with window digest; 3 new tests pass. Re-simulation-from-checkpoint (re-execution over a range) remains unimplemented |
 | Continuous unattended runtime | complete+verified (headless) | profiles, per-second ticks, 30–60s checkpoints, supervision, lockfile, clean-stop; ran live |
-| Monitoring | implemented-not-fully-verified | health endpoint, metrics JSONL, viewer header exist; not end-to-end vs HTTP |
+| Monitoring | complete+verified | **NEW** `test_feed_runtime_health.py` 2/2: provider payload flows end-to-end via `/api/feed/runtime/health`; offline fallback shape verified |
 | Backup/restore | implemented (procedure) | **NEW** `docs/OPERATIONS_BACKUP_RESTORE.md`: stop, copy-state-dir, fingerprint record, resume-with-validation |
 | Migration strategy (§31) | implemented (policy) | versioned JSON envelopes, additive-free, migrator-with-test rule, nullable-column policy |
 | Admin intervention (§31) | not-implemented | no Crawl admin console; documented as not-implemented in ops doc |
@@ -105,7 +105,7 @@ executed here. File presence alone is never counted as evidence.
 | Headless local image/audio (30.5.7/8) | complete+verified | DeterministicLocalPngProvider (valid PNG), DeterministicLocalWavProvider (valid WAV); 26 tests |
 | Media worker (30.5.10) | complete+verified | `_production_ready` gating correct; 7/7 |
 | Production AI providers | blocked | Ollama qwen3, ComfyUI SDXL/Wan2.2, Kokoro not installed here (all connection-refused); need Windows media workstation + `install-underreach-media-pipeline.bat` |
-| Website/blog (30.5.11) | not verified | killed after 10.5 min (timeout, not failure) |
+| Website/blog (30.5.11) | complete+verified | 7/7 pass (the audit-window timeout was resource contention) |
 | Promotion soak (30.5.12) | not verified | long-running by design; killed after 10.5 min (timeout, not failure) |
 
 ## Priority E — Public product
