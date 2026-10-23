@@ -340,6 +340,52 @@ def create_feed_app(
             focus_transition_sink(result["transition"])
         return result
 
+    # Canonical event types worth surfacing to a viewer following a descender.
+    # Read-only: derived from the authoritative ledger, never written.
+    NOTABLE_FOLLOW_EVENT_TYPES = frozenset(
+        {
+            "CRAWLER_DIED",
+            "CRAWLER_ELIMINATED",
+            "FLOOR_DEADLINE_ELIMINATION",
+            "CRAWLER_INJURED",
+            "CRAWLER_DAMAGED",
+            "CRAWLER_ADVANCED",
+            "ENCOUNTER_TRIGGERED",
+            "ENCOUNTER_RESOLVED",
+            "PARTY_FORMED",
+            "PARTY_DISSOLVED",
+            "ALLIANCE_FORMED",
+            "ALLIANCE_BETRAYAL",
+            "SOCIAL_RELATIONSHIP_CHANGED",
+        }
+    )
+
+    @app.get("/api/feed/notifications")
+    def notifications(
+        viewer_id: str = "default_viewer",
+        limit: int = Query(default=25, ge=1, le=100),
+    ) -> dict[str, Any]:
+        """Notable canonical events for the descender this viewer follows.
+
+        Derived read-only from the authoritative event ledger; following is
+        session-scoped and never changes simulation outcomes.
+        """
+        focus = channels().active_focus(viewer_id)
+        followed = focus.get("manual_follow_descender_id") or focus.get("active_descender_id")
+        if not followed:
+            return {"viewer_id": viewer_id, "followed_descender_id": None, "items": []}
+        items = [
+            public_ledger_event(event)
+            for event in repository.events(limit=1000)
+            if followed in event.actor_ids and event.event_type in NOTABLE_FOLLOW_EVENT_TYPES
+        ]
+        items.sort(key=lambda payload: (payload.get("tick", 0), payload.get("id", "")))
+        return {
+            "viewer_id": viewer_id,
+            "followed_descender_id": followed,
+            "items": items[-limit:],
+        }
+
     @app.post("/api/feed/live/release")
     def release_live_feed(request: dict[str, Any] = Body(...)) -> dict[str, Any]:
         """Release manual focus back to deterministic automatic presentation."""
