@@ -68,7 +68,7 @@ executed here. File presence alone is never counted as evidence.
 | Checkpoint format | complete+verified | `underreach.alpha-checkpoint.v1`: atomic tmp+fsync+validate+rename, digest chain, `latest.json` w/ corrupt-pointer fallback, retention 12 |
 | Crash recovery | complete+verified | Real SIGKILL mid-run: resumed, `checkpoint_recoveries=1`, 0 failures, 619/619 unique event IDs; 43/43 alpha-runtime tests; **NEW** automated `test_alpha_runtime_crash_recovery.py` (SIGKILL subprocess + resume + duplicate-ID check) |
 | Deterministic replay | complete+verified | fingerprint-identical double runs at 12 and 100 crawlers; bitwise 30A.5 |
-| Replay contract (§37) | partially-implemented | ReplayArchive replays recorded events; no event-range selection / entity filter / re-sim-from-checkpoint |
+| Replay contract (§37) | complete+verified | **NEW**: `ReplayManifest` carries checkpoint_id, window range, required entity ids; `ReplayArchive.select_window` returns sub-archive with window digest; 3 new tests pass. Re-simulation-from-checkpoint (re-execution over a range) remains unimplemented |
 | Continuous unattended runtime | complete+verified (headless) | profiles, per-second ticks, 30–60s checkpoints, supervision, lockfile, clean-stop; ran live |
 | Monitoring | implemented-not-fully-verified | health endpoint, metrics JSONL, viewer header exist; not end-to-end vs HTTP |
 | Backup/restore | implemented (procedure) | **NEW** `docs/OPERATIONS_BACKUP_RESTORE.md`: stop, copy-state-dir, fingerprint record, resume-with-validation |
@@ -100,7 +100,7 @@ executed here. File presence alone is never counted as evidence.
 | Highlight/story-arc detection (30.5.3) | complete+verified | deterministic scoring over canonical events |
 | Delver chronicles (30.5.4) | complete+verified | chronicle profiles from real events |
 | Narrative claim verification | complete+verified | contradictions/unsupported claims REJECTED; aux models can only downgrade; 26 tests |
-| Commentary | implemented-not-verified | deterministic template prose from real CrawlEvents (171 lines, no stubs); no dedicated test run |
+| Commentary | complete+verified | **NEW** `test_commentary_grounding.py` 3/3: every line cites canonical event ids, validator passes across all modes, generation digest-deterministic, fabricated citations rejected |
 | FFmpeg motion-story (30.5.9) | complete+verified | real encodes with ffmpeg 8.1.2 on this VM; 7/7 |
 | Headless local image/audio (30.5.7/8) | complete+verified | DeterministicLocalPngProvider (valid PNG), DeterministicLocalWavProvider (valid WAV); 26 tests |
 | Media worker (30.5.10) | complete+verified | `_production_ready` gating correct; 7/7 |
