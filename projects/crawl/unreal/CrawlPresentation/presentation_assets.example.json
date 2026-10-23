@@ -1,0 +1,49 @@
+{
+  "protocol": "crawl.presentation-assets.v1",
+  "authoritative": false,
+  "notes": [
+    "Asset paths are presentation-only and may change without changing Crawl simulation truth.",
+    "Copy this file to presentation_assets.json when binding real Unreal assets locally.",
+    "presentation_assets.json is gitignored; do not commit licensed Marketplace/Fab binary assets unless their license and repository policy allow it.",
+    "Each slot may be a direct Unreal object path string or an object containing asset/path."
+  ],
+  "slots": {
+    "rig.humanoid.crawler": null,
+    "rig.enemy.biped": null,
+
+    "locomotion.humanoid.standard": null,
+    "locomotion.enemy.biped": null,
+    "idle.humanoid.combat_ready": null,
+    "idle.enemy.biped": null,
+
+    "humanoid.combat.attack.default": null,
+    "enemy.biped.combat.attack.default": null,
+    "humanoid.reaction.hit.default": null,
+    "enemy.biped.reaction.hit.default": null,
+    "humanoid.reaction.injury": null,
+    "enemy.biped.reaction.injury": null,
+    "humanoid.reaction.near_death": null,
+    "enemy.biped.reaction.near_death": null,
+    "humanoid.reaction.death": null,
+    "enemy.biped.reaction.death": null,
+    "humanoid.reaction.defeat": null,
+    "enemy.biped.reaction.defeat": null,
+
+    "humanoid.locomotion.move": null,
+    "enemy.biped.locomotion.move": null,
+    "humanoid.locomotion.run": null,
+    "enemy.biped.locomotion.run": null,
+
+    "humanoid.interaction.rescue": null,
+    "enemy.biped.interaction.rescue": null,
+    "humanoid.reaction.rescued": null,
+    "enemy.biped.reaction.rescued": null,
+
+    "humanoid.combat.ready": null,
+    "enemy.biped.combat.ready": null,
+    "humanoid.combat.disengage": null,
+    "enemy.biped.combat.disengage": null,
+    "humanoid.idle.observe": null,
+    "enemy.biped.idle.observe": null
+  }
+}

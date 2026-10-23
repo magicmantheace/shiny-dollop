@@ -1,0 +1,16 @@
+{
+  "FileVersion": 3,
+  "EngineAssociation": "5.8",
+  "Category": "Crawl",
+  "Description": "Presentation-only Unreal project for canonical Crawl replays.",
+  "Plugins": [
+    { "Name": "PythonScriptPlugin", "Enabled": true },
+    { "Name": "EditorScriptingUtilities", "Enabled": true },
+    { "Name": "SequencerScripting", "Enabled": true },
+    { "Name": "MovieRenderPipeline", "Enabled": true },
+    { "Name": "ControlRig", "Enabled": true },
+    { "Name": "PoseSearch", "Enabled": true },
+    { "Name": "MotionWarping", "Enabled": true },
+    { "Name": "Mutable", "Enabled": true }
+  ]
+}

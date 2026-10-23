@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# LivingWorld local state
+livingworld.db
+*.db-shm
+*.db-wal
+.env
+
+# Long-horizon simulation artifacts. Keep the small Markdown summary reviewable,
+# but never commit full checkpoints, JSON telemetry, or historical map dumps.
+validation/long-horizon/*
+!validation/long-horizon/BENCHMARK.md
+
+# Political calibration artifacts. Keep the Markdown summary reviewable while
+# leaving full event telemetry local.
+validation/politics-calibration/*
+!validation/politics-calibration/POLITICS_CALIBRATION.md
+
+# Dashboard
+node_modules/
+dashboard/dist/
+
+# Unreal local/generated state. Source Python and project configuration remain tracked.
+unreal/**/Binaries/
+unreal/**/DerivedDataCache/
+unreal/**/Intermediate/
+unreal/**/Saved/
+unreal/CrawlPresentation/Generated/
+unreal/CrawlPresentation/Content/CrawlGenerated/
+unreal/CrawlPresentation/presentation_assets.json
+# Epic template/Marketplace presentation binaries are migrated locally and are not source-controlled.
+unreal/CrawlPresentation/Content/Characters/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

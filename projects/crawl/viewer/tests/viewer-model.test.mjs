@@ -1,0 +1,23 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { canFollow, connectionLabel, eventMatchesSelection, healthLabel, isConfirmedFocus, panelState, requestBody, statusLabel } from '../src/viewer-model.mjs'
+const row = (overrides = {}) => ({ descender_id: 'live_descender_004', status: 'active', terminal: false, health: .72, in_active_encounter: false, camera_available: true, ...overrides })
+const state = (overrides = {}) => ({ descent: { id: 'descent_1' }, connection: { state: 'live' }, focus: { mode: 'automatic', active_descender_id: 'live_descender_004', presentation_tick: 7 }, ...overrides })
+test('loading state is explicit', () => assert.equal(panelState(null, '', 0, 0), 'loading'))
+test('no-Descent state is explicit', () => assert.equal(panelState({ descent: null }, '', 1, 1), 'no-descent'))
+test('Descender health renders as a bounded percent', () => { assert.equal(healthLabel(.72), '72%'); assert.equal(healthLabel(2), '100%') })
+test('alive state renders', () => assert.equal(statusLabel(row()), 'Alive'))
+test('combat state renders', () => assert.equal(statusLabel(row({ in_active_encounter: true })), 'Combat'))
+test('Fallen state is text, not color only', () => assert.equal(statusLabel(row({ terminal: true })), 'Fallen'))
+test('Auto indicator derives from confirmed focus', () => assert.equal(state().focus.mode, 'automatic'))
+test('confirmed manual focus is recognized', () => assert.equal(isConfirmedFocus(state({ focus: { mode: 'manual', active_descender_id: 'live_descender_004' } }), 'live_descender_004'), true))
+test('Follow request uses the current confirmed presentation tick', () => assert.deepEqual(requestBody('viewer_local_alpha', 'r1', 9, 'live_descender_005'), { viewer_id: 'viewer_local_alpha', request_id: 'r1', requested_at_presentation_tick: 9, descender_id: 'live_descender_005' }))
+test('Auto release omits a target', () => assert.deepEqual(requestBody('viewer_local_alpha', 'r2', 10), { viewer_id: 'viewer_local_alpha', request_id: 'r2', requested_at_presentation_tick: 10 }))
+test('double follow is disabled while pending', () => assert.equal(canFollow(state(), row({ descender_id: 'live_descender_005' }), 'live_descender_005'), false))
+test('already-confirmed follow is disabled', () => assert.equal(canFollow(state({ focus: { mode: 'manual', active_descender_id: 'live_descender_004' } }), row(), null), false))
+test('unavailable camera channel cannot be followed', () => assert.equal(canFollow(state(), row({ descender_id: 'x', camera_available: false }), null), false))
+test('automatic backend switch updates the displayed focus', () => assert.equal(state({ focus: { mode: 'automatic', active_descender_id: 'live_descender_005' } }).focus.active_descender_id, 'live_descender_005'))
+test('selected Descender Ledger entries highlight', () => assert.equal(eventMatchesSelection({ actor_ids: ['live_descender_004'] }, 'live_descender_004'), true))
+test('stale receipt overrides a formerly-live backend state', () => assert.equal(connectionLabel(state(), 0, 4000), 'Stale'))
+test('successful reconnect clears stale state', () => assert.equal(panelState(state(), '', 3500, 4000), 'ready'))
+test('backend errors produce a reconnecting state without discarding data', () => assert.equal(panelState(state(), 'offline', 3500, 4000), 'reconnecting'))

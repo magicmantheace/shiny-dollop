@@ -1,0 +1,59 @@
+{
+  "config_version": 1,
+  "enabled": true,
+  "project": "Crawl",
+  "repository": {
+    "url": "https://github.com/magicmantheace/Crawl.git",
+    "watch_branch": "away/2026-09-roadmap-integration",
+    "result_branch": "validation/sentinel-crawl-local"
+  },
+  "workspace": "D:\\Project-Sentinel\\data\\crawl-local-validator",
+  "poll_seconds": 300,
+  "git_executable": "git",
+  "profiles": {
+    "crawl-repository": {
+      "evidence_class": "repository",
+      "max_parallel_stages": 1,
+      "stages": [
+        {
+          "id": "compile",
+          "name": "compile",
+          "requires": [],
+          "command": [
+            "python",
+            "-m",
+            "compileall",
+            "-q",
+            "src",
+            "tests"
+          ],
+          "timeout_seconds": 900
+        },
+        {
+          "id": "pytest",
+          "name": "pytest",
+          "requires": [
+            "compile"
+          ],
+          "command": [
+            "python",
+            "-m",
+            "pytest",
+            "-q",
+            "-x",
+            "--tb=line"
+          ],
+          "timeout_seconds": 7200
+        }
+      ]
+    }
+  },
+  "publication": {
+    "enabled": true,
+    "git_user_name": "Project Sentinel Crawl Validator",
+    "git_user_email": "project-sentinel-crawl@local.invalid"
+  },
+  "completion": {
+    "enabled": false
+  }
+}

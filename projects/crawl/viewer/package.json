@@ -1,0 +1,13 @@
+{
+  "name": "underreach-spectator-viewer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5174",
+    "build": "tsc --noEmit && vite build",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": { "react": "latest", "react-dom": "latest" },
+  "devDependencies": { "@types/react": "latest", "@types/react-dom": "latest", "@vitejs/plugin-react": "latest", "typescript": "latest", "vite": "latest" }
+}
