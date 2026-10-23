@@ -187,6 +187,38 @@ def create_feed_app(
             ]
         return [public_descender(descent, descender_id) for descender_id in ids[:limit]]
 
+    @app.get("/api/feed/search")
+    def search(
+        q: str = Query(min_length=1, max_length=120),
+        limit: int = Query(default=25, ge=1, le=100),
+    ) -> dict[str, Any]:
+        """Read-only search over descenders and canonical events.
+
+        Substring match (case-insensitive) against descender ids and event
+        type/summary/actor ids. Deterministic ordering: descenders by id,
+        events by (tick, id).
+        """
+        descent = current()
+        needle = q.strip().lower()
+        descender_hits = [
+            public_descender(descent, descender_id)
+            for descender_id in sorted(descent.participants)
+            if needle in descender_id.lower()
+        ][:limit]
+        event_hits: list[dict[str, Any]] = []
+        for event in repository.events(limit=1000):
+            haystack = " ".join(
+                [event.event_type, event.summary, *event.actor_ids]
+            ).lower()
+            if needle in haystack:
+                event_hits.append(public_ledger_event(event))
+        event_hits.sort(key=lambda payload: (payload.get("tick", 0), payload.get("id", "")))
+        return {
+            "query": q,
+            "descenders": descender_hits,
+            "events": event_hits[:limit],
+        }
+
     @app.get("/api/feed/descenders/{descender_id}")
     def descender_profile(descender_id: str) -> dict[str, Any]:
         descent = current()
