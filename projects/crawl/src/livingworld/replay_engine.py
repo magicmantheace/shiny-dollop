@@ -27,6 +27,12 @@ class ReplayManifest:
     authoritative_event_digest: str
     final_state_fingerprint: str
     floors: int
+    # §37 replay contract: optional window selection metadata. A manifest
+    # without these fields describes the whole archive.
+    checkpoint_id: str | None = None
+    window_start_tick: int | None = None
+    window_end_tick: int | None = None
+    required_entity_ids: tuple[str, ...] = ()
 
     def as_dict(self) -> dict:
         return {
@@ -40,6 +46,10 @@ class ReplayManifest:
             "authoritative_event_digest": self.authoritative_event_digest,
             "final_state_fingerprint": self.final_state_fingerprint,
             "floors": self.floors,
+            "checkpoint_id": self.checkpoint_id,
+            "window_start_tick": self.window_start_tick,
+            "window_end_tick": self.window_end_tick,
+            "required_entity_ids": list(self.required_entity_ids),
         }
 
 
@@ -104,6 +114,54 @@ class ReplayArchive:
             "manifest": self.manifest.as_dict(),
             "events": [public_event(event) for event in events],
         }
+
+    def select_window(
+        self,
+        *,
+        start_tick: int | None = None,
+        end_tick: int | None = None,
+        actor_ids: tuple[str, ...] = (),
+        checkpoint_id: str | None = None,
+    ) -> "ReplayArchive":
+        """Return a sub-archive over the selected window (§37 replay contract).
+
+        The sub-archive carries its own manifest: the digest is computed over
+        the window's events only, and the manifest records the window range,
+        the required entity ids, and the checkpoint the window is anchored to
+        (when one is supplied). Selection is read-only; canonical state is
+        never re-executed here.
+        """
+        events = list(self.events)
+        if start_tick is not None:
+            events = [event for event in events if event.tick >= start_tick]
+        if end_tick is not None:
+            events = [event for event in events if event.tick <= end_tick]
+        if actor_ids:
+            wanted = set(actor_ids)
+            events = [
+                event for event in events if wanted.intersection(event.actor_ids)
+            ]
+        window = ReplayArchive.__new__(ReplayArchive)
+        window.crawl = self.crawl
+        window.events = tuple(sorted(events, key=lambda event: (event.tick, event.id)))
+        manifest = self.manifest
+        window.manifest = ReplayManifest(
+            crawl_id=manifest.crawl_id,
+            seed=manifest.seed,
+            ruleset_id=manifest.ruleset_id,
+            ruleset_version=manifest.ruleset_version,
+            first_tick=window.events[0].tick if window.events else manifest.first_tick,
+            last_tick=window.events[-1].tick if window.events else manifest.last_tick,
+            event_count=len(window.events),
+            authoritative_event_digest=_event_digest(window.events),
+            final_state_fingerprint=manifest.final_state_fingerprint,
+            floors=manifest.floors,
+            checkpoint_id=checkpoint_id,
+            window_start_tick=start_tick,
+            window_end_tick=end_tick,
+            required_entity_ids=tuple(actor_ids),
+        )
+        return window
 
     def cause_chain(self, event_id: str, *, max_depth: int = 12) -> list[CrawlEvent]:
         by_id = {event.id: event for event in self.events}

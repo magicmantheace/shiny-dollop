@@ -116,8 +116,8 @@ executed here. File presence alone is never counted as evidence.
 | Archives | complete+verified | `/api/feed/fallen`, `/api/feed/ledger/*`, `/api/spectator/replay*`; terminal-archive tests pass |
 | Follow | complete+verified | session-scoped follow/release w/ idempotent request IDs; verified live |
 | Trending | complete+verified | `/api/feed/trending` from semantic_score over real events |
-| Search | not-implemented | no search route in feed_api or spectator_api |
-| Notifications | not-implemented | no notification/subscription routes |
+| Search | complete+verified | **NEW** `GET /api/feed/search?q=...`: read-only substring search over descender ids + canonical events; 4 tests pass |
+| Notifications | complete+verified | **NEW** `GET /api/feed/notifications?viewer_id=...`: notable canonical events (death/injury/advancement/encounters/party/alliance changes) for the followed descender, derived from the ledger; 3 tests pass |
 
 ## Billable-provider safety
 
