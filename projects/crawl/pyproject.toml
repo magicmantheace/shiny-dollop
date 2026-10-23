@@ -37,3 +37,6 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-q"
+markers = [
+    "slow: long-running tests (subprocess runs, soaks); deselect with -m 'not slow'",
+]

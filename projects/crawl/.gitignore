@@ -27,6 +27,7 @@ validation/politics-calibration/*
 # Dashboard
 node_modules/
 dashboard/dist/
+viewer/dist/
 
 # Unreal local/generated state. Source Python and project configuration remain tracked.
 unreal/**/Binaries/
