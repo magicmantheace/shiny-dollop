@@ -27,7 +27,7 @@ This repository is a permanent, **multi-project** workspace. Its root is an inde
 | 10 | Small Business Website Generator | [`projects/business-website-generator/`](projects/business-website-generator/README.md) | Planned |
 | 11 | Personal Knowledge Vault | [`projects/personal-knowledge-vault/`](projects/personal-knowledge-vault/README.md) | Planned |
 | 12 | Desktop Automation Builder | [`projects/desktop-automation-builder/`](projects/desktop-automation-builder/README.md) | Planned |
-| 13 | Local AI Command Center | [`projects/local-ai-command-center/`](projects/local-ai-command-center/README.md) | Planned |
+| 13 | Local AI Command Center | [`projects/local-ai-command-center/`](projects/local-ai-command-center/README.md) | MVP functional / review ready |
 | 14 | Novel and Worldbuilding Manager | [`projects/worldbuilding-manager/`](projects/worldbuilding-manager/README.md) | Planned |
 | 15 | Procedural Dungeon Designer | [`projects/procedural-dungeon-designer/`](projects/procedural-dungeon-designer/README.md) | Planned |
 | 16 | AI Dungeon Master | [`projects/ai-dungeon-master/`](projects/ai-dungeon-master/README.md) | Planned |
