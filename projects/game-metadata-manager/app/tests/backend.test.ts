@@ -96,6 +96,79 @@ describe('Library', () => {
     }
   });
 
+  it('removeTag advances updatedAt only for games that had the tag, and a pre-deletion snapshot cannot restore it', () => {
+    const ctx = makeContext();
+    try {
+      const tag = ctx.library.addTag('rpg');
+      const old = '2025-01-01T00:00:00.000Z';
+      const assigned = makeGame({ id: 'g-tag-assigned', installPath: 'C:/Games/Assigned/game.exe', tagIds: [tag.id], createdAt: old, updatedAt: old });
+      const unassigned = makeGame({ id: 'g-tag-unassigned', installPath: 'C:/Games/Unassigned/game.exe', tagIds: [], createdAt: old, updatedAt: old });
+      ctx.library.insertGame(assigned);
+      ctx.library.insertGame(unassigned);
+
+      ctx.library.removeTag(tag.id);
+
+      const afterAssigned = ctx.library.get(assigned.id);
+      expect(afterAssigned?.tagIds).toEqual([]);
+      expect(afterAssigned!.updatedAt > old).toBe(true);
+      // Games whose assignments did not change are not modified.
+      expect(ctx.library.get(unassigned.id)?.updatedAt).toBe(old);
+
+      // A bundle snapshot taken before the deletion carries the older
+      // updatedAt, so its (still-assigned) tagIds must lose the merge.
+      const snapshot: MetadataBundle = {
+        formatVersion: '1.0.0',
+        exportedAt: old,
+        exporter: 'game-metadata-manager/1.0.0',
+        games: [{ ...assigned }],
+        artwork: [],
+      };
+      const res = ctx.bundles.importBundle(JSON.stringify(snapshot));
+      expect(res.updated).toBe(0);
+      expect(ctx.library.get(assigned.id)?.tagIds).toEqual([]);
+    } finally {
+      ctx.dispose();
+    }
+  });
+
+  it('removeCollection advances updatedAt only for games that had the collection, and a pre-deletion snapshot cannot restore it', () => {
+    const ctx = makeContext();
+    try {
+      const col = ctx.library.addCollection('favorites');
+      const old = '2025-01-01T00:00:00.000Z';
+      const assigned = makeGame({
+        id: 'g-col-assigned',
+        collectionIds: [col.id],
+        installPath: 'C:/Games/AssignedCol/game.exe',
+        createdAt: old,
+        updatedAt: old,
+      });
+      const unassigned = makeGame({ id: 'g-col-unassigned', installPath: 'C:/Games/UnassignedCol/game.exe', collectionIds: [], createdAt: old, updatedAt: old });
+      ctx.library.insertGame(assigned);
+      ctx.library.insertGame(unassigned);
+
+      ctx.library.removeCollection(col.id);
+
+      const afterAssigned = ctx.library.get(assigned.id);
+      expect(afterAssigned?.collectionIds).toEqual([]);
+      expect(afterAssigned!.updatedAt > old).toBe(true);
+      expect(ctx.library.get(unassigned.id)?.updatedAt).toBe(old);
+
+      const snapshot: MetadataBundle = {
+        formatVersion: '1.0.0',
+        exportedAt: old,
+        exporter: 'game-metadata-manager/1.0.0',
+        games: [{ ...assigned }],
+        artwork: [],
+      };
+      const res = ctx.bundles.importBundle(JSON.stringify(snapshot));
+      expect(res.updated).toBe(0);
+      expect(ctx.library.get(assigned.id)?.collectionIds).toEqual([]);
+    } finally {
+      ctx.dispose();
+    }
+  });
+
   it('addTag returns the existing tag on duplicate names', () => {
     const ctx = makeContext();
     try {

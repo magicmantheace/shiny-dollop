@@ -292,10 +292,15 @@ export class Library {
         id: string;
         tag_ids: string;
       }>;
-      const upd = this.db.prepare('UPDATE games SET tag_ids = ? WHERE id = ?');
+      const upd = this.db.prepare('UPDATE games SET tag_ids = ?, updated_at = ? WHERE id = ?');
+      const now = new Date().toISOString();
       for (const g of games) {
-        const ids = (JSON.parse(g.tag_ids) as string[]).filter((t) => t !== id);
-        upd.run(JSON.stringify(ids), g.id);
+        const original = JSON.parse(g.tag_ids) as string[];
+        const ids = original.filter((t) => t !== id);
+        // Only games whose assignments actually change count as modified:
+        // advancing updated_at is what stops a pre-deletion bundle snapshot
+        // (with an older updatedAt) from resurrecting the assignment on merge.
+        if (ids.length !== original.length) upd.run(JSON.stringify(ids), now, g.id);
       }
       this.db.exec('COMMIT;');
     } catch (err) {
@@ -341,10 +346,15 @@ export class Library {
         id: string;
         collection_ids: string;
       }>;
-      const upd = this.db.prepare('UPDATE games SET collection_ids = ? WHERE id = ?');
+      const upd = this.db.prepare('UPDATE games SET collection_ids = ?, updated_at = ? WHERE id = ?');
+      const now = new Date().toISOString();
       for (const g of games) {
-        const ids = (JSON.parse(g.collection_ids) as string[]).filter((c) => c !== id);
-        upd.run(JSON.stringify(ids), g.id);
+        const original = JSON.parse(g.collection_ids) as string[];
+        const ids = original.filter((c) => c !== id);
+        // As with removeTag: only actually-affected games are modified, and
+        // their updated_at must advance so older snapshots cannot restore
+        // the assignment on bundle merge.
+        if (ids.length !== original.length) upd.run(JSON.stringify(ids), now, g.id);
       }
       this.db.exec('COMMIT;');
     } catch (err) {

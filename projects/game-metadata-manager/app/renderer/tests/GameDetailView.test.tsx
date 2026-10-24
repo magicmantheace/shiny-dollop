@@ -138,6 +138,129 @@ describe('GameDetailView', () => {
     expect(mock.artwork.add).not.toHaveBeenCalled();
   });
 
+  it('syncs the draft when the persisted game is reverted by undo while staying in detail view', async () => {
+    const user = userEvent.setup();
+    const mock = installGmmMock();
+    const tags: never[] = [];
+    const collections: never[] = [];
+    const artworks: never[] = [];
+    const game = makeGame({
+      id: 'g1',
+      title: 'Original Title',
+      updatedAt: '2026-10-23T00:00:00.000Z',
+    });
+    const { rerender } = render(
+      <GameDetailView
+        game={game}
+        tags={tags}
+        collections={collections}
+        artworks={artworks}
+        onBack={() => undefined}
+        onChanged={() => undefined}
+      />,
+    );
+    // Save a new title and stay in the detail view.
+    await user.clear(screen.getByLabelText('Game title'));
+    await user.type(screen.getByLabelText('Game title'), 'Saved Title');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByText('Saved.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Game title')).toHaveValue('Saved Title');
+
+    // Header Undo reverts the persisted title; App refreshes with the same
+    // game-id key, so the mounted view receives the reverted game as a prop.
+    rerender(
+      <GameDetailView
+        game={{ ...game, title: 'Original Title', updatedAt: '2026-10-24T00:00:00.000Z' }}
+        tags={tags}
+        collections={collections}
+        artworks={artworks}
+        onBack={() => undefined}
+        onChanged={() => undefined}
+      />,
+    );
+    expect(screen.getByLabelText('Game title')).toHaveValue('Original Title');
+
+    // Saving again must write the reverted value, not resurrect the undone one.
+    mock.game.update.mockClear();
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(mock.game.update).toHaveBeenCalledWith(
+      'g1',
+      expect.objectContaining({ title: 'Original Title' }),
+    );
+  });
+
+  it('preserves unsaved edits during an artwork-only refresh', async () => {
+    const user = userEvent.setup();
+    installGmmMock();
+    const game = makeGame({ id: 'g1', title: 'Persisted Title' });
+    const a1 = makeArtwork({ id: 'a1', fileName: 'cover.png' });
+    const a2 = makeArtwork({ id: 'a2', fileName: 'new-cover.png' });
+    const { rerender } = render(
+      <GameDetailView
+        game={game}
+        tags={[]}
+        collections={[]}
+        artworks={[a1]}
+        onBack={() => undefined}
+        onChanged={() => undefined}
+      />,
+    );
+    await user.clear(screen.getByLabelText('Game title'));
+    await user.type(screen.getByLabelText('Game title'), 'Unsaved Title');
+
+    // A refresh that only brings new artwork (persisted game unchanged) must
+    // not discard the unsaved title, and the new artwork must appear.
+    rerender(
+      <GameDetailView
+        game={{ ...game }}
+        tags={[]}
+        collections={[]}
+        artworks={[a1, a2]}
+        onBack={() => undefined}
+        onChanged={() => undefined}
+      />,
+    );
+    expect(screen.getByLabelText('Game title')).toHaveValue('Unsaved Title');
+    expect(screen.getByRole('radio', { name: /new-cover\.png/ })).toBeInTheDocument();
+  });
+
+  it('preserves an unsaved field while syncing a reverted clean field', async () => {
+    const user = userEvent.setup();
+    installGmmMock();
+    const game = makeGame({
+      id: 'g1',
+      title: 'Saved Title',
+      description: 'Persisted description',
+      updatedAt: '2026-10-23T00:00:00.000Z',
+    });
+    const { rerender } = render(
+      <GameDetailView
+        game={game}
+        tags={[]}
+        collections={[]}
+        artworks={[]}
+        onBack={() => undefined}
+        onChanged={() => undefined}
+      />,
+    );
+    await user.clear(screen.getByLabelText('Game description'));
+    await user.type(screen.getByLabelText('Game description'), 'Unsaved description draft');
+
+    // Undo reverts only the (clean) title; the dirty description draft stays.
+    rerender(
+      <GameDetailView
+        game={{ ...game, title: 'Title Before Save', updatedAt: '2026-10-24T00:00:00.000Z' }}
+        tags={[]}
+        collections={[]}
+        artworks={[]}
+        onBack={() => undefined}
+        onChanged={() => undefined}
+      />,
+    );
+    expect(screen.getByLabelText('Game title')).toHaveValue('Title Before Save');
+    expect(screen.getByLabelText('Game description')).toHaveValue('Unsaved description draft');
+  });
+
   it('shows the change history for the game', async () => {
     const mock = installGmmMock();
     mock.changes.list.mockResolvedValue([
