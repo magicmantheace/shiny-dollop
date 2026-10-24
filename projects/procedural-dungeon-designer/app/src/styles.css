@@ -157,6 +157,9 @@ code { font-family: ui-monospace, monospace; }
 .print-view .room-hit { fill: transparent; }
 .print-view .no-print { display: none !important; }
 .print-view .budget-bar-fill { background: #000000; }
+/* The print-view toggle lives in the header (outside every no-print
+   panel) so it stays visible in the on-screen print preview as the exit
+   control; it is only hidden on actual paper output, below. */
 
 @media print {
   body { background: #ffffff; }
@@ -170,5 +173,6 @@ code { font-family: ui-monospace, monospace; }
   .room-selected { stroke: #000000 !important; }
   .room-hit { fill: transparent !important; }
   .no-print { display: none !important; }
+  .print-view-toggle { display: none !important; }
   .budget-bar-fill { background: #000000 !important; }
 }

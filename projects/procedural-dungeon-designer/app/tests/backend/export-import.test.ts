@@ -92,6 +92,38 @@ describe('export / import', () => {
     db.close();
   });
 
+  it('import rejects placement costs zeroed to defeat the budget', async () => {
+    const { service, db, saved } = await savedFixture();
+    const envelope = JSON.parse(buildExport(saved)) as { map: ReturnType<typeof cloneMap> };
+    let tamperedCount = 0;
+    for (const room of envelope.map.rooms) {
+      for (const placement of room.placements) {
+        placement.cost = 0;
+        tamperedCount++;
+      }
+    }
+    expect(tamperedCount).toBeGreaterThan(0);
+    envelope.map.budgetUsed = 0;
+    await expect(service.importJson(JSON.stringify(envelope))).rejects.toMatchObject({
+      code: 'IMPORT_INVALID',
+    });
+    db.close();
+  });
+
+  it('import rejects a map whose entrance center is a wall', async () => {
+    const { service, db, saved } = await savedFixture();
+    const envelope = JSON.parse(buildExport(saved)) as { map: ReturnType<typeof cloneMap> };
+    const entrance =
+      envelope.map.rooms.find((r) => r.isEntrance) ?? envelope.map.rooms[0]!;
+    const grid = envelope.map.tiles.map((row) => row.split(''));
+    grid[entrance.cy]![entrance.cx] = '#';
+    envelope.map.tiles = grid.map((row) => row.join(''));
+    await expect(service.importJson(JSON.stringify(envelope))).rejects.toMatchObject({
+      code: 'IMPORT_INVALID',
+    });
+    db.close();
+  });
+
   it('a tampered stored budgetUsed is recomputed on import', async () => {
     const { service, db, saved } = await savedFixture();
     const envelope = JSON.parse(buildExport(saved)) as { map: ReturnType<typeof cloneMap> };

@@ -185,6 +185,31 @@ describe('App', () => {
     expect(alert).toHaveTextContent(/would exceed the budget/);
   });
 
+  it('print view can be exited without losing the unsaved map', async () => {
+    installFakePdd();
+    const user = userEvent.setup();
+    render(<App />);
+    await awaitThemesLoaded();
+    await generateViaUi(user);
+
+    const toggle = screen.getByRole('button', { name: 'Print view' });
+    // The toggle must not live inside a panel hidden in print view.
+    expect(toggle.closest('.no-print')).toBeNull();
+    await user.click(toggle);
+
+    const exit = screen.getByRole('button', { name: 'Exit print view' });
+    expect(exit).toHaveAttribute('aria-pressed', 'true');
+    expect(exit.closest('.no-print')).toBeNull();
+    expect(screen.getByTestId('dungeon-map')).toBeInTheDocument();
+
+    await user.click(exit);
+    expect(
+      screen.getByRole('button', { name: 'Print view' }),
+    ).toHaveAttribute('aria-pressed', 'false');
+    // The unsaved generated map survived the round trip out and back.
+    expect(screen.getByTestId('dungeon-map')).toBeInTheDocument();
+  });
+
   it('saved list load and delete round trip', async () => {
     installFakePdd();
     const user = userEvent.setup();

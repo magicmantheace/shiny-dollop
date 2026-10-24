@@ -4,7 +4,7 @@
 - **Priority:** 15/17
 - **Branch:** `procedural-dungeon-designer/mvp`
 - **Build validated:** Yes — `npm run build` (renderer + main) green on Linux
-- **Automated tests executed:** Yes — 38/38 passing (33 backend + 5 renderer)
+- **Automated tests executed:** Yes — 44/44 passing (38 backend + 6 renderer)
 - **End-to-end MVP verified:** Yes — packaged-main smoke (`--pdd-smoke`, under xvfb) runs the full acceptance sequence and prints `SMOKE_OK`; see `docs/TEST_PLAN.md`
 - **Owner review:** Pending (PR intentionally left unmerged)
 
@@ -66,5 +66,12 @@ zod-validated IPC) under `app/`. Fully offline; no network calls anywhere.
 
 ## Verification summary
 
-See `docs/TEST_PLAN.md` for the full record: 38/38 tests, typecheck, lint,
+See `docs/TEST_PLAN.md` for the full record: 44/44 tests, typecheck, lint,
 build, and packaged-main smoke all green (Linux, Node 24).
+
+Codex-review fix cycle (2026-10-24): save/import now reject placements
+whose costs (or kind/key) do not match the theme tables, so zeroed costs
+cannot defeat the budget; the connectivity BFS no longer seeds a walled
+or out-of-bounds entrance center; and the print-view toggle moved to the
+header (outside every hidden panel) as a visible Exit print view control,
+so an unsaved map can no longer be trapped in print view.

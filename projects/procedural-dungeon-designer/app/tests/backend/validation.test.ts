@@ -74,6 +74,63 @@ describe('validation', () => {
     db.close();
   });
 
+  it('save rejects a map whose placement costs were zeroed to defeat the budget', async () => {
+    const { service, db } = makeFixture();
+    const map = await service.generate(BASE_PARAMS);
+    const tampered = cloneMap(map);
+    let tamperedCount = 0;
+    for (const room of tampered.rooms) {
+      for (const placement of room.placements) {
+        placement.cost = 0;
+        tamperedCount++;
+      }
+    }
+    expect(tamperedCount).toBeGreaterThan(0);
+    tampered.budgetUsed = 0;
+    await expect(
+      service.dungeonsSave({ name: 'Zeroed Costs', map: tampered }),
+    ).rejects.toMatchObject({ code: 'DUNGEON_INVALID' });
+    db.close();
+  });
+
+  it('save rejects a placement with an unknown theme key', async () => {
+    const { service, db } = makeFixture();
+    const map = await service.generate(BASE_PARAMS);
+    const tampered = cloneMap(map);
+    const room = tampered.rooms.find((r) => !r.isEntrance) ?? tampered.rooms[0]!;
+    room.placements.push({
+      id: 'p9998',
+      kind: 'treasure',
+      key: 'not-a-theme-entry',
+      name: 'Free Treasure',
+      cost: 0,
+    });
+    await expect(
+      service.dungeonsSave({ name: 'Unknown Key', map: tampered }),
+    ).rejects.toMatchObject({ code: 'DUNGEON_INVALID' });
+    db.close();
+  });
+
+  it('validateMap rejects a map whose entrance center is a wall', async () => {
+    const { service, db } = makeFixture();
+    const map = await service.generate(BASE_PARAMS);
+    const broken = cloneMap(map);
+    const entrance = broken.rooms.find((r) => r.isEntrance) ?? broken.rooms[0]!;
+    const grid = broken.tiles.map((row) => row.split(''));
+    grid[entrance.cy]![entrance.cx] = '#';
+    broken.tiles = grid.map((row) => row.join(''));
+    const result = await service.validateMap(broken);
+    expect(result.connected).toBe(false);
+    expect(result.valid).toBe(false);
+    expect(result.reachableRoomCount).toBe(0);
+    expect(result.unreachableRoomIds).toContain(entrance.id);
+    // Save must refuse it too, since save relies on the same connectivity.
+    await expect(
+      service.dungeonsSave({ name: 'Walled Entrance', map: broken }),
+    ).rejects.toMatchObject({ code: 'DUNGEON_INVALID' });
+    db.close();
+  });
+
   it('validateMap reports a valid generated map as connected and valid', async () => {
     const { service, db } = makeFixture();
     const map = await service.generate(BASE_PARAMS);

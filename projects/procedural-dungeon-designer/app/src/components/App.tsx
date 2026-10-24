@@ -336,6 +336,23 @@ export function App() {
           Generate seeded, connected dungeon maps, tune encounter budgets,
           and export deterministic layouts.
         </p>
+        {/* The print-view toggle lives in the header, outside every
+            no-print panel, so it stays visible (and clickable) while
+            print view is on — otherwise there would be no way back
+            without reloading and losing an unsaved map. Its class is
+            print-view-toggle, not no-print: no-print is hidden by the
+            .print-view rule itself, while this control must only be
+            hidden on actual paper output (see styles.css @media print). */}
+        <div className="button-row">
+          <button
+            type="button"
+            className="print-view-toggle"
+            aria-pressed={printView}
+            onClick={() => setPrintView((prev) => !prev)}
+          >
+            {printView ? 'Exit print view' : 'Print view'}
+          </button>
+        </div>
       </header>
 
       {error && (
@@ -429,17 +446,11 @@ export function App() {
             >
               Generate dungeon
             </button>
-            <button
-              type="button"
-              aria-pressed={printView}
-              onClick={() => setPrintView((prev) => !prev)}
-            >
-              Print view
-            </button>
           </div>
           <p className="note">
-            Print view shows a black-on-white map and hides the editor
-            panels; browser print works from either view.
+            Print view (in the header) shows a black-on-white map and
+            hides the editor panels; use Exit print view in the header to
+            return. Browser print works from either view.
           </p>
         </section>
 

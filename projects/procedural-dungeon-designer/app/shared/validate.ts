@@ -35,9 +35,16 @@ export function validateDungeon(map: DungeonMap): ValidationResult {
     return row !== undefined && row[x] !== '#';
   };
 
+  // The entrance center must itself be in bounds and walkable before it
+  // can seed the BFS. An imported map with a wall (or an out-of-bounds
+  // coordinate) at the entrance center has no valid starting position:
+  // seed nothing, so every room reports unreachable and valid stays false.
   const visited = new Set<string>();
-  const queue: Array<[number, number]> = [[entrance.cx, entrance.cy]];
-  visited.add(`${entrance.cx},${entrance.cy}`);
+  const queue: Array<[number, number]> = [];
+  if (walkable(entrance.cx, entrance.cy)) {
+    queue.push([entrance.cx, entrance.cy]);
+    visited.add(`${entrance.cx},${entrance.cy}`);
+  }
   while (queue.length > 0) {
     const [x, y] = queue.shift()!;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {

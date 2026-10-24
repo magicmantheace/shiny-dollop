@@ -24,6 +24,54 @@ function cloneMap(map: DungeonMap): DungeonMap {
   };
 }
 
+export interface PlacementCostMismatch {
+  placementId: string;
+  kind: PlacementKind;
+  key: string;
+  /** Theme-table cost, or null when the kind/key is unknown for the theme. */
+  expectedCost: number | null;
+  actualCost: number;
+}
+
+/**
+ * Placements on a supplied map whose cost does not match the theme table
+ * for their kind/key (including placements with an unknown kind/key).
+ * Save/import must reject maps with any mismatches: computeBudgetUsed
+ * sums supplied costs, so a map that zeroes its costs would otherwise
+ * defeat the budget even though generation/editing never produce it.
+ */
+export function placementCostMismatches(map: DungeonMap): PlacementCostMismatch[] {
+  const theme = getTheme(map.params.theme);
+  const mismatches: PlacementCostMismatch[] = [];
+  for (const room of map.rooms) {
+    for (const placement of room.placements) {
+      const entry = tableEntry(theme, placement.kind, placement.key);
+      if (!entry || entry.cost !== placement.cost) {
+        mismatches.push({
+          placementId: placement.id,
+          kind: placement.kind,
+          key: placement.key,
+          expectedCost: entry?.cost ?? null,
+          actualCost: placement.cost,
+        });
+      }
+    }
+  }
+  return mismatches;
+}
+
+export function describePlacementCostMismatches(
+  mismatches: PlacementCostMismatch[],
+): string {
+  return mismatches
+    .map((m) =>
+      m.expectedCost === null
+        ? `${m.kind}/${m.key} (placement ${m.placementId}) is not in the theme tables`
+        : `${m.kind}/${m.key} (placement ${m.placementId}) costs ${m.actualCost}, expected ${m.expectedCost} from the theme table`,
+    )
+    .join('; ');
+}
+
 export function findRoom(map: DungeonMap, roomId: string): Room {
   const room = map.rooms.find((r) => r.id === roomId);
   if (!room) throw pddError(PDD_ERROR_CODES.ROOM_NOT_FOUND, `Room not found: ${roomId}`);

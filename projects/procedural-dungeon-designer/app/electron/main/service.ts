@@ -6,7 +6,13 @@ import type { DatabaseSync } from 'node:sqlite';
 import { PDD_ERROR_CODES, isPddError, pddError } from '../../shared/errors.js';
 import { buildExport, buildMarkdown, parseExport } from '../../shared/export.js';
 import { computeBudgetUsed, generateDungeon } from '../../shared/generator.js';
-import { addPlacement, movePlacement, removePlacement } from '../../shared/placements.js';
+import {
+  addPlacement,
+  describePlacementCostMismatches,
+  movePlacement,
+  placementCostMismatches,
+  removePlacement,
+} from '../../shared/placements.js';
 import { THEMES } from '../../shared/themes.js';
 import type {
   DungeonMap,
@@ -108,6 +114,17 @@ export class DungeonService implements PddApi {
       throw pddError(
         PDD_ERROR_CODES.BUDGET_EXCEEDED,
         `Placements cost ${budgetUsed} points, over the budget limit of ${map.budgetLimit}.`,
+      );
+    }
+    // Never trust the caller's per-placement costs either: recomputing
+    // budgetUsed from supplied costs would let a map that zeroes (or
+    // discounts) its costs defeat the budget. Every placement's cost
+    // must match the theme table for its kind/key.
+    const saveCostMismatches = placementCostMismatches(map);
+    if (saveCostMismatches.length > 0) {
+      throw pddError(
+        PDD_ERROR_CODES.DUNGEON_INVALID,
+        `Placement costs do not match the theme tables: ${describePlacementCostMismatches(saveCostMismatches)}`,
       );
     }
     const validation = validateDungeon(map);
@@ -217,6 +234,15 @@ export class DungeonService implements PddApi {
       ...(structural.data as DungeonMap),
       budgetUsed: computeBudgetUsed(structural.data as DungeonMap),
     };
+    // Same theme-table cost check as save: an import that zeroes or
+    // discounts its placement costs must not enter with a fake budget.
+    const importCostMismatches = placementCostMismatches(map);
+    if (importCostMismatches.length > 0) {
+      throw pddError(
+        PDD_ERROR_CODES.IMPORT_INVALID,
+        `Imported placement costs do not match the theme tables: ${describePlacementCostMismatches(importCostMismatches)}`,
+      );
+    }
     if (map.rooms.length > 0) {
       const validation = validateDungeon(map);
       if (!validation.connected) {
