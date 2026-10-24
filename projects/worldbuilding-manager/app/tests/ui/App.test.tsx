@@ -181,6 +181,99 @@ describe('App', () => {
     expect(bodyInput.value).toContain('Unsaved draft notes.');
   });
 
+  it('edits a timeline event\'s order and story date in the detail form', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findAllByText(/Sera Vane/);
+    const entitiesPanel = screen.getByLabelText('Entities');
+    await user.click(within(entitiesPanel).getByRole('button', { name: /Harbour Founded/ }));
+
+    const orderInput = screen.getByLabelText('Edit timeline order') as HTMLInputElement;
+    const dateInput = screen.getByLabelText('Edit story date') as HTMLInputElement;
+    expect(orderInput.value).toBe('1');
+    await user.clear(orderInput);
+    await user.type(orderInput, '5');
+    await user.type(dateInput, 'Year 5');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(await screen.findByText(/Saved "Harbour Founded"\./)).toBeInTheDocument();
+    const timeline = screen.getByLabelText('Timeline');
+    expect(within(timeline).getByText(/Harbour Founded/)).toHaveTextContent('#5 Harbour Founded — Year 5');
+  });
+
+  it('edits a character\'s role and birth/death order in the detail form', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findAllByText(/Sera Vane/);
+    const entitiesPanel = screen.getByLabelText('Entities');
+    await user.click(within(entitiesPanel).getByRole('button', { name: /Sera Vane/ }));
+
+    const bornInput = screen.getByLabelText('Edit born order') as HTMLInputElement;
+    const diedInput = screen.getByLabelText('Edit died order') as HTMLInputElement;
+    expect(bornInput.value).toBe('10');
+    expect(diedInput.value).toBe('90');
+    await user.type(screen.getByLabelText('Edit role'), 'protagonist');
+    await user.clear(diedInput);
+    await user.type(diedInput, '130');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByText(/Saved "Sera Vane"\./)).toBeInTheDocument();
+
+    // Re-selecting re-initializes the drafts from the stored entity, so the
+    // persisted values (not just the typed drafts) are what show up here.
+    await user.click(within(entitiesPanel).getByRole('button', { name: /Harbour Founded/ }));
+    await user.click(within(entitiesPanel).getByRole('button', { name: /Sera Vane/ }));
+    expect((screen.getByLabelText('Edit role') as HTMLInputElement).value).toBe('protagonist');
+    expect((screen.getByLabelText('Edit born order') as HTMLInputElement).value).toBe('10');
+    expect((screen.getByLabelText('Edit died order') as HTMLInputElement).value).toBe('130');
+
+    // Clearing an order field still means "not recorded" (null) and saves.
+    await user.clear(screen.getByLabelText('Edit died order'));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByText(/Saved "Sera Vane"\./)).toBeInTheDocument();
+    await user.click(within(entitiesPanel).getByRole('button', { name: /Harbour Founded/ }));
+    await user.click(within(entitiesPanel).getByRole('button', { name: /Sera Vane/ }));
+    expect((screen.getByLabelText('Edit died order') as HTMLInputElement).value).toBe('');
+  });
+
+  it('rejects a malformed Born order on create instead of silently coercing it', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findAllByText(/Sera Vane/);
+    await user.type(screen.getByLabelText('Name'), 'Bad Born');
+    await user.type(screen.getByLabelText('Born order'), '10.9');
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Born order must be a whole number or left empty.');
+    expect(within(screen.getByLabelText('Entities')).queryByText(/Bad Born/)).not.toBeInTheDocument();
+  });
+
+  it('rejects non-numeric Died order text on create instead of silently storing null', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findAllByText(/Sera Vane/);
+    await user.type(screen.getByLabelText('Name'), 'Bad Died');
+    await user.type(screen.getByLabelText('Died order'), 'abc');
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Died order must be a whole number or left empty.');
+    expect(within(screen.getByLabelText('Entities')).queryByText(/Bad Died/)).not.toBeInTheDocument();
+  });
+
+  it('rejects a malformed Timeline order on edit and does not save', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findAllByText(/Sera Vane/);
+    const entitiesPanel = screen.getByLabelText('Entities');
+    await user.click(within(entitiesPanel).getByRole('button', { name: /Harbour Founded/ }));
+    const orderInput = screen.getByLabelText('Edit timeline order') as HTMLInputElement;
+    await user.clear(orderInput);
+    await user.type(orderInput, '12abc');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Timeline order must be a whole number or left empty.');
+    // The stored order is untouched: the timeline still shows #1, not #12.
+    const timeline = screen.getByLabelText('Timeline');
+    expect(within(timeline).getByText(/Harbour Founded/)).toHaveTextContent('#1 Harbour Founded');
+    expect(within(timeline).queryByText(/#12 Harbour/)).not.toBeInTheDocument();
+  });
+
   it('exports a JSON backup into the output box', async () => {
     const user = userEvent.setup();
     render(<App />);

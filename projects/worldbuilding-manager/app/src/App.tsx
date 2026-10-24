@@ -12,9 +12,27 @@ const TYPE_LABELS: Record<EntityType, string> = {
   note: 'Note',
 };
 
-function parseIntOrNull(v: string): number | null {
-  const n = Number.parseInt(v, 10);
-  return Number.isNaN(n) ? null : n;
+/**
+ * Strict parser for the timeline-order fields (Timeline order, Born order,
+ * Died order). Only an empty field means "no order recorded" (null); any
+ * other input must be a whole number in its entirety. Previously this used
+ * parseInt, which silently coerced `10.9` to `10`, `12abc` to `12` and
+ * non-numeric text to null — creation then reported success while
+ * persisting a different order than the author typed, or silently
+ * disabling the continuity check. Invalid input now throws, and the
+ * caller surfaces the error instead of saving.
+ */
+export function parseOrderOrNull(fieldLabel: string, raw: string): number | null {
+  const v = raw.trim();
+  if (v === '') return null;
+  if (!/^[+-]?\d+$/.test(v)) {
+    throw new Error(`${fieldLabel} must be a whole number or left empty.`);
+  }
+  const n = Number(v);
+  if (!Number.isSafeInteger(n)) {
+    throw new Error(`${fieldLabel} must be a whole number or left empty.`);
+  }
+  return n;
 }
 
 export function App(): ReactElement {
@@ -43,6 +61,11 @@ export function App(): ReactElement {
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editBody, setEditBody] = useState('');
+  const [editRole, setEditRole] = useState('');
+  const [editStoryDate, setEditStoryDate] = useState('');
+  const [editOrderKey, setEditOrderKey] = useState('');
+  const [editBorn, setEditBorn] = useState('');
+  const [editDied, setEditDied] = useState('');
 
   // link form
   const [linkTarget, setLinkTarget] = useState('');
@@ -99,6 +122,11 @@ export function App(): ReactElement {
       setEditName(selected.name);
       setEditDescription(selected.description);
       setEditBody(selected.body);
+      setEditRole(selected.role);
+      setEditStoryDate(selected.storyDate ?? '');
+      setEditOrderKey(selected.orderKey === null ? '' : String(selected.orderKey));
+      setEditBorn(selected.bornOrder === null ? '' : String(selected.bornOrder));
+      setEditDied(selected.diedOrder === null ? '' : String(selected.diedOrder));
     }
     Promise.all([api().links.forEntity(selected.id), api().revisions.list(selected.id)])
       .then(([l, r]) => {
@@ -127,9 +155,9 @@ export function App(): ReactElement {
         description: newDescription,
         body: newBody,
         storyDate: newType === 'event' ? newStoryDate || null : null,
-        orderKey: newType === 'event' ? parseIntOrNull(newOrderKey) : null,
-        bornOrder: newType === 'character' ? parseIntOrNull(newBorn) : null,
-        diedOrder: newType === 'character' ? parseIntOrNull(newDied) : null,
+        orderKey: newType === 'event' ? parseOrderOrNull('Timeline order', newOrderKey) : null,
+        bornOrder: newType === 'character' ? parseOrderOrNull('Born order', newBorn) : null,
+        diedOrder: newType === 'character' ? parseOrderOrNull('Died order', newDied) : null,
         tags: newTags.split(',').map((t) => t.trim()).filter(Boolean),
       });
       setNewName('');
@@ -144,8 +172,29 @@ export function App(): ReactElement {
   const saveEdits = (): void => {
     if (!selected) return;
     void run(async () => {
+      // The type-specific fields that determine timeline continuity are
+      // editable here too — the engine/IPC patch has always supported
+      // them, so correcting an event's date/order or a character's
+      // birth/death order no longer requires delete-and-recreate (which
+      // lost links and revision history). The order fields go through
+      // the strict parser: invalid input throws and nothing is saved.
       const updated = await api().entities.update(selected.id, {
-        name: editName, description: editDescription, body: editBody,
+        name: editName,
+        description: editDescription,
+        body: editBody,
+        ...(selected.type === 'character'
+          ? {
+              role: editRole,
+              bornOrder: parseOrderOrNull('Born order', editBorn),
+              diedOrder: parseOrderOrNull('Died order', editDied),
+            }
+          : {}),
+        ...(selected.type === 'event'
+          ? {
+              storyDate: editStoryDate.trim() === '' ? null : editStoryDate,
+              orderKey: parseOrderOrNull('Timeline order', editOrderKey),
+            }
+          : {}),
       });
       setMessage(`Saved "${updated.name}".`);
       await refresh();
@@ -317,6 +366,34 @@ export function App(): ReactElement {
               Description
               <input aria-label="Edit description" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
             </label>
+            {selected.type === 'character' && (
+              <>
+                <label>
+                  Role
+                  <input aria-label="Edit role" value={editRole} onChange={(e) => setEditRole(e.target.value)} />
+                </label>
+                <label>
+                  Born (timeline order)
+                  <input aria-label="Edit born order" value={editBorn} onChange={(e) => setEditBorn(e.target.value)} />
+                </label>
+                <label>
+                  Died (timeline order)
+                  <input aria-label="Edit died order" value={editDied} onChange={(e) => setEditDied(e.target.value)} />
+                </label>
+              </>
+            )}
+            {selected.type === 'event' && (
+              <>
+                <label>
+                  Story date
+                  <input aria-label="Edit story date" value={editStoryDate} onChange={(e) => setEditStoryDate(e.target.value)} />
+                </label>
+                <label>
+                  Timeline order
+                  <input aria-label="Edit timeline order" value={editOrderKey} onChange={(e) => setEditOrderKey(e.target.value)} />
+                </label>
+              </>
+            )}
             <label>
               Notes
               <textarea aria-label="Edit body" rows={5} value={editBody} onChange={(e) => setEditBody(e.target.value)} />

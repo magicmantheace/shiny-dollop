@@ -26,6 +26,13 @@
 - Main process (macOS): the `WorldStore` now closes on `before-quit` instead of `window-all-closed`, so close-window → reactivate keeps the database usable; `WorldStore.close()` is idempotent. Regression test with mocked Electron lifecycle + real store/IPC in `tests/backend/main-lifecycle.test.ts`.
 - Verified: 31/31 tests pass (was 27), typecheck and lint clean. All four new tests fail against the pre-fix code.
 
+## Codex review fixes (2026-10-24, PR #19 fix cycle 2)
+
+- Renderer detail form: the type-specific fields that determine timeline continuity are now editable and saved — characters get Role / Born order / Died order controls, timeline events get Story date / Timeline order controls, initialized from the selected entity (only when the selection changes, preserving the cycle-1 unsaved-edits fix) and included in the update patch the backend already supported. Correcting timeline placement no longer requires delete-and-recreate.
+- Renderer order parsing: the create and edit order fields (Timeline order, Born order, Died order) now use a strict parser — only an empty field means null; any other input must be a whole number in its entirety, otherwise a validation error is surfaced and nothing is saved. Previously `parseInt` silently coerced `10.9` → `10`, `12abc` → `12` and non-numeric text → null.
+- Re-verified the two older Codex comments from the original commit: the 64 MiB backup cap is unified across export/import/IPC schema (no residual 10 MiB limit; a >10 MiB revision-grown backup round-trips in tests), and on macOS the store closes only on `before-quit`, not `window-all-closed` (lifecycle regression test in place). Both remain fixed; no changes needed.
+- Verified: 36/36 tests pass (was 31; 5 new UI regression tests in `tests/ui/App.test.tsx`, all confirmed failing against the pre-fix code), typecheck and lint clean.
+
 ## Implemented but not verified on target OS
 
 - Windows 11 desktop behavior (window, packaged app, real user-data paths) — no Windows execution has taken place
