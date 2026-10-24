@@ -6,6 +6,7 @@ export const IpcChannels = {
   templatesList: 'dtf:templates:list',
   templatesGet: 'dtf:templates:get',
   templatesImport: 'dtf:templates:import',
+  documentsList: 'dtf:documents:list',
   documentsCreate: 'dtf:documents:create',
   documentsGet: 'dtf:documents:get',
   documentsUpdateField: 'dtf:documents:update-field',

@@ -78,6 +78,14 @@ export interface TemplateSummary {
   source: TemplateSource;
 }
 
+/** Lightweight document summary returned by documents:list. */
+export interface DocumentSummary {
+  id: string;
+  templateId: string;
+  templateName: string;
+  updatedAt: string;
+}
+
 /** A persisted user document (one filled-in template). */
 export interface DocumentRecord {
   id: string;
@@ -126,6 +134,7 @@ export interface DtfApi {
     import: (input: { bundleJson: string }) => Promise<TemplateSummary>;
   };
   documents: {
+    list: () => Promise<DocumentSummary[]>;
     create: (input: { templateId: string }) => Promise<DocumentRecord>;
     get: (input: { id: string }) => Promise<DocumentRecord>;
     updateField: (input: {

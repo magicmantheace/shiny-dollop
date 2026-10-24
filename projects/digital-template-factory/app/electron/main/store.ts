@@ -7,6 +7,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 import type {
   DocumentRecord,
+  DocumentSummary,
   TemplateManifest,
   TemplateSource,
   TemplateSummary,
@@ -162,6 +163,32 @@ export function createDocument(db: DatabaseSync, templateId: string): DocumentRe
     );
   });
   return doc;
+}
+
+/**
+ * Summaries of every persisted document, newest first. This is the
+ * authoritative document index: the renderer's local recent-documents
+ * cache must never be the only way to reach a stored document.
+ */
+export function listDocuments(db: DatabaseSync): DocumentSummary[] {
+  const rows = db
+    .prepare('SELECT * FROM documents ORDER BY updated_at DESC')
+    .all() as unknown as DocumentRow[];
+  return rows.map((row) => {
+    let templateName = row.template_id;
+    try {
+      templateName = getTemplate(db, row.template_id).manifest.name;
+    } catch {
+      // Template row missing (should not happen): fall back to its id so
+      // the document itself stays reachable from the UI.
+    }
+    return {
+      id: row.id,
+      templateId: row.template_id,
+      templateName,
+      updatedAt: row.updated_at,
+    };
+  });
 }
 
 /** Load a document by id. */

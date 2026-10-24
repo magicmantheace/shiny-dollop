@@ -116,6 +116,7 @@ export function mockDtf(overrides: MockDtfOverrides = {}): MockDtf {
       ...(overrides.templates ?? {}),
     },
     documents: {
+      list: vi.fn().mockResolvedValue([]),
       create: vi.fn(),
       get: vi.fn(),
       updateField: vi.fn().mockImplementation(

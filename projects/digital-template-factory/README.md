@@ -61,10 +61,11 @@ defined once in `app/shared/types.ts`; a thin wrapper in `app/src/api.ts`).
   content hash), then save via the native dialog. Validation failures
   list named errors (`FIELD_REQUIRED:clientName`) as buttons that focus
   the offending field.
-- **My documents** — renderer-local recent-documents index
-  (`localStorage`, since the backend exposes no list endpoint) with
-  template name, last-updated date, open, and delete with inline
-  confirmation.
+- **My documents** — populated from the backend `documents:list`
+  endpoint (every persisted document in SQLite) merged with the
+  renderer-local document index in `localStorage` (kept complete,
+  never truncated), with template name, last-updated date, open, and
+  delete with inline confirmation.
 
 Run UI checks: `npm run typecheck` and `npm test` (vitest `renderer`
 project: jsdom + fully mocked `window.dtf`; hermetic, no backend).

@@ -14,6 +14,7 @@ import {
   getDocument,
   getTemplate,
   importTemplate,
+  listDocuments,
   listTemplates,
   updateDocumentField,
   updateDocumentTokens,
@@ -118,6 +119,35 @@ describe('template listing', () => {
   });
 });
 
+function schemalessListBundle(): string {
+  return JSON.stringify({
+    manifestVersion: '1.0.0',
+    templateId: 'external-tags-1.0.0',
+    name: 'External Tags',
+    description: 'Imported template with a schema-less string list.',
+    version: '1.0.0',
+    fields: [
+      { key: 'title', label: 'Title', type: 'text', required: true },
+      {
+        key: 'tags',
+        label: 'Tags',
+        type: 'list',
+        required: false,
+        minItems: 0,
+        prefill: ['First'],
+      },
+    ],
+    defaultTokens: {
+      bg: '#ffffff',
+      text: '#111111',
+      accent: '#0f766e',
+      headingFont: 'Georgia, serif',
+      bodyFont: 'Arial, sans-serif',
+      spacing: 10,
+    },
+  });
+}
+
 describe('documents', () => {
   it('creates a document with manifest defaults', () => {
     const db = memoryDb();
@@ -215,6 +245,37 @@ describe('documents', () => {
     expect(deleteDocument(db, doc.id)).toBe(true);
     expect(deleteDocument(db, doc.id)).toBe(false);
     expect(() => getDocument(db, doc.id)).toThrow(DtfError);
+  });
+
+  it('lists all persisted documents with their template names', () => {
+    const db = memoryDb();
+    const a = createDocument(db, 'invoice-1.0.0');
+    const b = createDocument(db, 'checklist-1.0.0');
+    const listed = listDocuments(db);
+    expect(listed.map((d) => d.id).sort()).toEqual([a.id, b.id].sort());
+    const invoice = listed.find((d) => d.id === a.id);
+    expect(invoice?.templateId).toBe('invoice-1.0.0');
+    expect(invoice?.templateName).toBe(
+      getTemplate(db, 'invoice-1.0.0').manifest.name,
+    );
+    expect(invoice?.updatedAt).toBe(a.updatedAt);
+  });
+
+  it('accepts string rows when a list field has no item schema', () => {
+    const db = memoryDb();
+    importTemplate(db, schemalessListBundle());
+    const doc = createDocument(db, 'external-tags-1.0.0');
+    // The imported prefill survives document creation as string rows.
+    expect(doc.data.tags).toEqual(['First']);
+    const updated = updateDocumentField(db, doc.id, 'tags', ['First', 'Second']);
+    expect(updated.data.tags).toEqual(['First', 'Second']);
+    // Non-string rows are still rejected for a schema-less list.
+    expect(() => updateDocumentField(db, doc.id, 'tags', ['First', 42])).toThrow(
+      DtfError,
+    );
+    expect(() =>
+      updateDocumentField(db, doc.id, 'tags', [{ label: 'First' }]),
+    ).toThrow(DtfError);
   });
 
   it('throws for unknown template ids and document ids', () => {

@@ -1,9 +1,11 @@
 /**
- * Renderer-local index of recently opened documents.
+ * Renderer-local index of documents the renderer has seen.
  *
- * The backend exposes no documents:list endpoint, so the renderer keeps its
- * own lightweight index in localStorage: document id, template identity and
- * the last time the renderer saw the document change. Entries are keyed by
+ * The index is a COMPLETE index, never truncated: it is one of only two
+ * ways the documents browser learns a document exists (the other is the
+ * backend `documents:list` endpoint, which DocumentsList merges in), so
+ * evicting the oldest entry would strand that document in SQLite with no
+ * way to open, export, or delete it from the UI. Entries are keyed by
  * document id; deleting a document removes its entry.
  */
 export interface RecentDoc {
@@ -14,7 +16,6 @@ export interface RecentDoc {
 }
 
 const STORAGE_KEY = 'dtf.recentDocs.v1';
-const MAX_ENTRIES = 50;
 
 export function loadRecentDocs(): RecentDoc[] {
   try {
@@ -36,10 +37,7 @@ export function loadRecentDocs(): RecentDoc[] {
 
 function persist(entries: RecentDoc[]): void {
   try {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(entries.slice(0, MAX_ENTRIES)),
-    );
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
   } catch {
     // Storage full or unavailable: the index is best-effort only.
   }

@@ -25,6 +25,7 @@ import {
   getDocument,
   getTemplate,
   importTemplate,
+  listDocuments,
   listTemplates,
   updateDocumentField,
   updateDocumentTokens,
@@ -64,6 +65,8 @@ export function registerIpcHandlers(deps: HandlerDeps): void {
     const { bundleJson } = templatesImportSchema.parse(payload);
     return importTemplate(db, bundleJson);
   });
+
+  handle(IpcChannels.documentsList, () => listDocuments(db));
 
   handle(IpcChannels.documentsCreate, (payload) => {
     const { templateId } = documentsCreateSchema.parse(payload);

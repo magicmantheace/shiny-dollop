@@ -187,6 +187,21 @@ export function coerceFieldValue(
           `Field "${key}" needs at least ${minItems} item(s).`,
         );
       }
+      // A list with no item schema holds plain string rows: the import
+      // validator accepts string prefill for such fields and ListEditor
+      // renders them as text inputs, so they must not hit the object-row
+      // check in coerceListItem.
+      if (!f.itemSchema || f.itemSchema.length === 0) {
+        return arr.map((raw, index) => {
+          if (typeof raw !== 'string') {
+            fail(
+              'FIELD_INVALID',
+              `Item ${index} of "${key}" must be a string.`,
+            );
+          }
+          return raw as string;
+        });
+      }
       return arr.map((raw, index) => coerceListItem(f, raw, index));
     }
   }

@@ -86,6 +86,28 @@ describe('DocumentsList', () => {
     expect(screen.getByRole('button', { name: 'Simple Invoice' })).toBeInTheDocument();
   });
 
+  it('shows documents that exist only in the backend (evicted from the recent index)', async () => {
+    mockDtf({
+      documents: {
+        list: vi.fn().mockResolvedValue([
+          {
+            id: 'doc-backend-only',
+            templateId: 'weekly-planner',
+            templateName: 'Weekly Planner',
+            updatedAt: '2026-10-20T09:30:00.000Z',
+          },
+        ]),
+      },
+    });
+    seed();
+    render(<DocumentsList onOpenDocument={() => {}} />);
+
+    expect(
+      await screen.findByRole('button', { name: 'Weekly Planner' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Simple Invoice' })).toBeInTheDocument();
+  });
+
   it('shows an empty state when there are no recent documents', () => {
     mockDtf();
     render(<DocumentsList onOpenDocument={() => {}} />);

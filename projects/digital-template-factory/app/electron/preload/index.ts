@@ -17,6 +17,7 @@ const api: DtfApi = {
     import: (input) => invoke(IpcChannels.templatesImport, input),
   },
   documents: {
+    list: () => invoke(IpcChannels.documentsList, {}),
     create: (input) => invoke(IpcChannels.documentsCreate, input),
     get: (input) => invoke(IpcChannels.documentsGet, input),
     updateField: (input) => invoke(IpcChannels.documentsUpdateField, input),

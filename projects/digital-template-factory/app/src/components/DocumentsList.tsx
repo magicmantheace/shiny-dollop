@@ -11,10 +11,12 @@ interface DocumentsListProps {
 }
 
 /**
- * Recent documents, tracked in a renderer-local localStorage index (the
- * backend exposes no documents:list endpoint). Each entry shows the
- * template name, last-updated date, and a delete action with inline
- * confirmation.
+ * All documents. The browser is populated from the backend's
+ * documents:list endpoint (the authoritative SQLite index) merged with
+ * the renderer-local recent-documents index, so a document stays
+ * reachable even if its local index entry was lost. Each entry shows
+ * the template name, last-updated date, and a delete action with
+ * inline confirmation.
  */
 export function DocumentsList({ onOpenDocument }: DocumentsListProps) {
   const [docs, setDocs] = useState<RecentDoc[]>([]);
@@ -24,6 +26,27 @@ export function DocumentsList({ onOpenDocument }: DocumentsListProps) {
 
   useEffect(() => {
     setDocs(loadRecentDocs());
+    let cancelled = false;
+    api
+      .listDocuments()
+      .then((backendDocs) => {
+        if (cancelled) return;
+        const byId = new Map<string, RecentDoc>();
+        for (const entry of loadRecentDocs()) byId.set(entry.id, entry);
+        // Backend summaries win: they cover every persisted document.
+        for (const entry of backendDocs) byId.set(entry.id, entry);
+        setDocs(
+          [...byId.values()].sort((a, b) =>
+            b.updatedAt.localeCompare(a.updatedAt),
+          ),
+        );
+      })
+      .catch(() => {
+        // Backend unavailable: the local index still lists what it knows.
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleDelete(id: string) {
@@ -38,7 +61,7 @@ export function DocumentsList({ onOpenDocument }: DocumentsListProps) {
       return;
     }
     removeRecentDoc(id);
-    setDocs(loadRecentDocs());
+    setDocs((prev) => prev.filter((d) => d.id !== id));
     setDeletingId(null);
     setConfirmId(null);
   }

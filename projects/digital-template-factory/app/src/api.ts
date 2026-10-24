@@ -8,6 +8,7 @@
  */
 import type {
   DocumentRecord,
+  DocumentSummary,
   DtfApi,
   ExportFormat,
   ExportResult,
@@ -37,6 +38,9 @@ export const api = {
   },
   importTemplate(bundleJson: string): Promise<TemplateSummary> {
     return bridge().templates.import({ bundleJson });
+  },
+  listDocuments(): Promise<DocumentSummary[]> {
+    return bridge().documents.list();
   },
   createDocument(templateId: string): Promise<DocumentRecord> {
     return bridge().documents.create({ templateId });
