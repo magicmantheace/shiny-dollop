@@ -185,6 +185,112 @@ describe('App', () => {
     expect(alert).toHaveTextContent(/would exceed the budget/);
   });
 
+  it('moving a placement clears its stale destination for the next inspection', async () => {
+    const fake = installFakePdd();
+    const user = userEvent.setup();
+    render(<App />);
+    await awaitThemesLoaded();
+    await generateSmallDungeon(user);
+
+    await user.click(screen.getByRole('button', { name: 'Save dungeon' }));
+    const editor = screen.getByTestId('placement-editor');
+    expect(
+      await within(editor).findByText(/Editing saved dungeon/),
+    ).toBeInTheDocument();
+
+    // Add a placement to the initially selected (entrance) room.
+    await user.selectOptions(
+      within(editor).getByLabelText('Placement kind'),
+      'treasure',
+    );
+    await user.selectOptions(
+      within(editor).getByLabelText('Placement entry'),
+      'sunken-offering-bowl',
+    );
+    await user.click(
+      within(editor).getByRole('button', { name: 'Add placement' }),
+    );
+    const inspector = screen.getByTestId('inspector');
+    expect(
+      await within(inspector).findByText(
+        /treasure: Sunken Offering Bowl \(cost 2\)/,
+      ),
+    ).toBeInTheDocument();
+
+    const savedId = [...fake.store.keys()][0]!;
+    const rooms = fake.store.get(savedId)!.map.rooms;
+    const entrance = rooms.find((r) => r.isEntrance) ?? rooms[0]!;
+    const others = rooms.filter((r) => r.id !== entrance.id);
+    expect(others.length).toBeGreaterThanOrEqual(2);
+    const destination = others[others.length - 1]!;
+
+    // Choose the last other room explicitly, then move the placement.
+    const moveSelect = within(inspector).getByLabelText(
+      'Move Sunken Offering Bowl to room',
+    ) as HTMLSelectElement;
+    await user.selectOptions(moveSelect, destination.id);
+    expect(moveSelect.value).toBe(destination.id);
+    await user.click(
+      within(inspector).getByRole('button', {
+        name: 'Move Sunken Offering Bowl',
+      }),
+    );
+    await waitFor(() => {
+      expect(
+        within(inspector).queryByText(/Sunken Offering Bowl/),
+      ).toBeNull();
+    });
+    // The placement really landed in the chosen destination room.
+    const movedMap = fake.store.get(savedId)!.map;
+    expect(
+      movedMap.rooms
+        .find((r) => r.id === destination.id)!
+        .placements.some((p) => p.name === 'Sunken Offering Bowl'),
+    ).toBe(true);
+
+    // Inspect the destination room: the move control must default to a
+    // current option (the first other room), not the stale destination
+    // the placement already occupies.
+    fireEvent.click(screen.getByTestId(`room-${destination.id}`));
+    expect(
+      await within(inspector).findByText(
+        /treasure: Sunken Offering Bowl \(cost 2\)/,
+      ),
+    ).toBeInTheDocument();
+    const nextSelect = within(inspector).getByLabelText(
+      'Move Sunken Offering Bowl to room',
+    ) as HTMLSelectElement;
+    const expectedDefault = rooms.find((r) => r.id !== destination.id)!.id;
+    expect(nextSelect.value).toBe(expectedDefault);
+    expect(nextSelect.value).not.toBe(destination.id);
+
+    // Clicking Move without touching the select must move the placement
+    // to that current default — pre-fix it re-used the stale cached
+    // destination (the room the placement already occupies) and the
+    // "move" was a silent no-op leaving it in the destination room.
+    await user.click(
+      within(inspector).getByRole('button', {
+        name: 'Move Sunken Offering Bowl',
+      }),
+    );
+    await waitFor(() => {
+      expect(
+        within(inspector).queryByText(/Sunken Offering Bowl/),
+      ).toBeNull();
+    });
+    const remapped = fake.store.get(savedId)!.map;
+    expect(
+      remapped.rooms
+        .find((r) => r.id === expectedDefault)!
+        .placements.some((p) => p.name === 'Sunken Offering Bowl'),
+    ).toBe(true);
+    expect(
+      remapped.rooms
+        .find((r) => r.id === destination.id)!
+        .placements.some((p) => p.name === 'Sunken Offering Bowl'),
+    ).toBe(false);
+  });
+
   it('print view can be exited without losing the unsaved map', async () => {
     installFakePdd();
     const user = userEvent.setup();

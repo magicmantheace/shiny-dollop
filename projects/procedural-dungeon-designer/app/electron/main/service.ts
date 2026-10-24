@@ -243,6 +243,15 @@ export class DungeonService implements PddApi {
         `Imported placement costs do not match the theme tables: ${describePlacementCostMismatches(importCostMismatches)}`,
       );
     }
+    // Same budget rule as save: an import whose recomputed spend exceeds
+    // its budget limit must be rejected BEFORE it is persisted, not
+    // stored as an over-budget dungeon.
+    if (map.budgetUsed > map.budgetLimit) {
+      throw pddError(
+        PDD_ERROR_CODES.IMPORT_INVALID,
+        `Imported placements cost ${map.budgetUsed} points, over the budget limit of ${map.budgetLimit}.`,
+      );
+    }
     if (map.rooms.length > 0) {
       const validation = validateDungeon(map);
       if (!validation.connected) {

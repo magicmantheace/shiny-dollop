@@ -66,7 +66,7 @@ zod-validated IPC) under `app/`. Fully offline; no network calls anywhere.
 
 ## Verification summary
 
-See `docs/TEST_PLAN.md` for the full record: 56/56 tests, typecheck, lint,
+See `docs/TEST_PLAN.md` for the full record: 60/60 tests, typecheck, lint,
 build, and packaged-main smoke all green (Linux, Node 24).
 
 Codex-review fix cycle (2026-10-24): save/import now reject placements
@@ -75,6 +75,16 @@ cannot defeat the budget; the connectivity BFS no longer seeds a walled
 or out-of-bounds entrance center; and the print-view toggle moved to the
 header (outside every hidden panel) as a visible Exit print view control,
 so an unsaved map can no longer be trapped in print view.
+
+Codex-review fix cycle 3 (2026-10-24): imports now reject over-budget
+maps (recomputed spend over the budget limit) before persisting, matching
+the save rule; cached move destinations are cleared on load/generate/
+edit and are only honoured while still a current room option, so a
+stale destination can no longer no-op or misdirect a later move; and
+dungeonMapSchema now requires placement ids to be unique across the
+whole map, so save and import both reject duplicates that remove/move
+would otherwise hit in multiple rooms. 60/60 tests, typecheck, lint and
+build green.
 
 Codex-review fix cycle 2 (2026-10-24): IPC failures now travel as a
 structured { ok, value | error } envelope returned from the handlers and

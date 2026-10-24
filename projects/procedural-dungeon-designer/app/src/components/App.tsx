@@ -154,6 +154,11 @@ export function App() {
     setSavedId(saved.id);
     setSavedName(saved.name);
     setSaveName(saved.name);
+    // Cached move destinations belong to the previously displayed
+    // dungeon/placement layout: a placement id can recur in another
+    // dungeon, and a moved placement now occupies its old destination.
+    // Never let a stale target survive a load or an edit.
+    setMoveTargets({});
     setSelectedRoomId((prev) => {
       if (prev && saved.map.rooms.some((r) => r.id === prev)) return prev;
       const entrance =
@@ -174,6 +179,7 @@ export function App() {
     try {
       const map = await api().generate(params);
       setCurrentMap(map);
+      setMoveTargets({});
       setSavedId(null);
       setSavedName(null);
       setSaveName(`${params.seed} dungeon`);
@@ -220,6 +226,7 @@ export function App() {
         setSavedId(null);
         setSavedName(null);
         setSelectedRoomId(null);
+        setMoveTargets({});
       }
       setError(null);
       await refreshSavedList();
@@ -259,11 +266,28 @@ export function App() {
     const fallback = currentMap.rooms.find(
       (r) => r.id !== selectedRoom?.id,
     )?.id;
-    const toRoomId = moveTargets[placementId] ?? fallback;
+    // Only use a cached destination while it is still a current option
+    // (a room other than the one the placement is being moved from);
+    // a stale entry must fall back, never drive the move.
+    const cached = moveTargets[placementId];
+    const toRoomId =
+      cached &&
+      currentMap.rooms.some(
+        (r) => r.id === cached && r.id !== selectedRoom?.id,
+      )
+        ? cached
+        : fallback;
     if (!toRoomId) return;
     try {
       const saved = await api().placementsMove(savedId, placementId, toRoomId);
       applySaved(saved);
+      // Clear the consumed destination explicitly as well (applySaved
+      // already resets the map, this keeps the intent local).
+      setMoveTargets((prev) => {
+        const next = { ...prev };
+        delete next[placementId];
+        return next;
+      });
       setError(null);
     } catch (err) {
       reportError(err);
@@ -618,9 +642,12 @@ export function App() {
                               id={`move-select-${placement.id}`}
                               aria-label={`Move ${placement.name} to room`}
                               value={
-                                moveTargets[placement.id] ??
-                                otherRooms[0]?.id ??
-                                ''
+                                (moveTargets[placement.id] &&
+                                otherRooms.some(
+                                  (r) => r.id === moveTargets[placement.id],
+                                )
+                                  ? moveTargets[placement.id]
+                                  : otherRooms[0]?.id) ?? ''
                               }
                               disabled={!isSaved || otherRooms.length === 0}
                               onChange={(e) =>

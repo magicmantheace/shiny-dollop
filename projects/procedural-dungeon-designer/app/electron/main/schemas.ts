@@ -87,6 +87,28 @@ export const dungeonMapSchema = z
         message: 'params grid size must match the map grid size',
       });
     }
+    // Placement ids must be unique across the whole map, not just within
+    // a room: removePlacement deletes every placement with the given id
+    // and findPlacement operates on the first match, so a duplicate id
+    // in another room would corrupt unrelated placements.
+    const seenPlacementIds = new Set<string>();
+    const duplicatePlacementIds = new Set<string>();
+    for (const room of map.rooms) {
+      for (const placement of room.placements) {
+        if (seenPlacementIds.has(placement.id)) {
+          duplicatePlacementIds.add(placement.id);
+        } else {
+          seenPlacementIds.add(placement.id);
+        }
+      }
+    }
+    if (duplicatePlacementIds.size > 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['rooms'],
+        message: `placement ids must be unique across the map; duplicate placement id(s): ${[...duplicatePlacementIds].join(', ')}`,
+      });
+    }
   });
 
 export const placementOpSchema = z

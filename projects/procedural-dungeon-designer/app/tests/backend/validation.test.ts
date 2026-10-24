@@ -111,6 +111,23 @@ describe('validation', () => {
     db.close();
   });
 
+  it('save rejects duplicate placement ids across different rooms', async () => {
+    const { service, db } = makeFixture();
+    const map = await service.generate(BASE_PARAMS);
+    const tampered = cloneMap(map);
+    const withPlacements = tampered.rooms.filter((r) => r.placements.length > 0);
+    expect(withPlacements.length).toBeGreaterThanOrEqual(2);
+    // No cost/budget change: the second placement simply reuses the
+    // first placement's id, which removePlacement would otherwise hit
+    // in both rooms at once.
+    withPlacements[1]!.placements[0]!.id = withPlacements[0]!.placements[0]!.id;
+    await expect(
+      service.dungeonsSave({ name: 'Duplicate Placement Ids', map: tampered }),
+    ).rejects.toMatchObject({ code: 'DUNGEON_INVALID' });
+    expect(await service.dungeonsList()).toHaveLength(0);
+    db.close();
+  });
+
   it('validateMap rejects a map whose entrance center is a wall', async () => {
     const { service, db } = makeFixture();
     const map = await service.generate(BASE_PARAMS);

@@ -124,6 +124,36 @@ describe('export / import', () => {
     db.close();
   });
 
+  it('import rejects an over-budget map and does not persist it', async () => {
+    const { service, db, saved } = await savedFixture();
+    expect(saved.map.budgetUsed).toBeGreaterThan(0);
+    const envelope = JSON.parse(buildExport(saved)) as { map: ReturnType<typeof cloneMap> };
+    // Costs stay exactly as the theme tables dictate; only the limit is
+    // lowered below the recomputed spend, so budget is the sole defect.
+    envelope.map.budgetLimit = saved.map.budgetUsed - 1;
+    const before = await service.dungeonsList();
+    await expect(service.importJson(JSON.stringify(envelope))).rejects.toMatchObject({
+      code: 'IMPORT_INVALID',
+    });
+    expect(await service.dungeonsList()).toHaveLength(before.length);
+    db.close();
+  });
+
+  it('import rejects duplicate placement ids across different rooms', async () => {
+    const { service, db, saved } = await savedFixture();
+    const envelope = JSON.parse(buildExport(saved)) as { map: ReturnType<typeof cloneMap> };
+    const withPlacements = envelope.map.rooms.filter((r) => r.placements.length > 0);
+    expect(withPlacements.length).toBeGreaterThanOrEqual(2);
+    const dupId = withPlacements[0]!.placements[0]!.id;
+    withPlacements[1]!.placements[0]!.id = dupId;
+    const before = await service.dungeonsList();
+    await expect(service.importJson(JSON.stringify(envelope))).rejects.toMatchObject({
+      code: 'IMPORT_INVALID',
+    });
+    expect(await service.dungeonsList()).toHaveLength(before.length);
+    db.close();
+  });
+
   it('a tampered stored budgetUsed is recomputed on import', async () => {
     const { service, db, saved } = await savedFixture();
     const envelope = JSON.parse(buildExport(saved)) as { map: ReturnType<typeof cloneMap> };
