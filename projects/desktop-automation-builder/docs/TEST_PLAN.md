@@ -1,6 +1,10 @@
 # Test plan — Desktop Automation Builder
 
-**Current test status:** NOT RUN. This document defines future acceptance; no test results are implied.
+**Current test status:** RUN 2026-10-23 (Linux VM, Node 24, Electron 45, Vitest 5.0.5) — **44/44 pass** across 8 files:
+`tests/backend/*` (29 — dry-run performs zero writes; sandbox escape `../evil` and absolute-outside paths rejected with `PATH_OUTSIDE_SANDBOX`; `runsStart(approved=false)` → `awaiting-approval` with no side effects; mid-run failure persists partial log, retry resumes from the failed step only and retrying a non-failed run throws `RUN_NOT_RETRYABLE`; cancel mid-run → `cancelled` + persisted partial log; unapproved scriptId blocked; move-to-trash lands in `.dab-trash/` fully recoverable; version bumps archive snapshots; export `formatVersion 1.0.0` / import rejects major ≠ 1 and bad shapes; preload channel map asserted 1:1),
+`tests/renderer/*` (15 — hermetic mocked `window.dab`: editor add/remove/reorder + per-kind fields, import validation errors surface, approval gating incl. preview-before-start ordering and `runsStart` called with `true` only after the checkbox, run-log outcomes, retry shown only on failed runs, cancel, delete confirmation).
+`npm run typecheck` clean, `npm run lint` clean, `npm run build` green, `npm run smoke` PASS (packaged main prints SMOKE_OK under Xvfb). Re-verified independently by the coordinator on the final pushed tree (fresh `npm ci`).
+Windows click-through not executed here — marked pending, not passing.
 
 ## Required automated and integration scenarios
 
