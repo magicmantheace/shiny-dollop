@@ -57,6 +57,21 @@ export interface HandlerDeps {
 /** scanId -> cancel function for every scan currently running. */
 const activeScans = new Map<number, () => void>();
 
+/** Promises of every scan job that has not settled yet. */
+const activeScanJobs = new Set<Promise<unknown>>();
+
+/**
+ * Track a scan job's promise so shutdown can wait for it to settle.
+ * Exported for tests; registerIpcHandlers calls this for every started scan.
+ */
+export function trackScanJob(promise: Promise<unknown>): void {
+  activeScanJobs.add(promise);
+  const done = (): void => {
+    activeScanJobs.delete(promise);
+  };
+  void promise.then(done, done);
+}
+
 type InvokeFn = (event: Electron.IpcMainInvokeEvent, payload: unknown) => Promise<unknown>;
 
 function wrap(fn: (payload: unknown) => Promise<unknown> | unknown): InvokeFn {
@@ -157,6 +172,7 @@ export function registerIpcHandlers(deps: HandlerDeps): void {
         emitProgress: (data) => emitProgress(scanId, data),
       });
       activeScans.set(scanId, job.cancel);
+      trackScanJob(job.promise);
       void job.promise
         .then((result) => {
           activeScans.delete(scanId);
@@ -261,4 +277,32 @@ export function abortAllScans(): void {
     }
   }
   activeScans.clear();
+}
+
+/**
+ * Cancel all running scans AND wait until their jobs have settled — i.e.
+ * until each job's asynchronous cleanup has persisted its terminal state to
+ * the database. Shutdown must await this BEFORE closing the database:
+ * abortAllScans() alone only signals cancellation, and closing the
+ * connection while a job is still unwinding makes its cleanup fail with
+ * "database is not open", leaving the scan marked 'running' forever.
+ *
+ * Bounded by `timeoutMs`: if a job somehow never settles, shutdown proceeds
+ * anyway and the caller reconciles any leftover 'running' scans (see
+ * markRunningScansInterrupted) rather than hanging the quit forever.
+ */
+export async function settleAllScans(timeoutMs = 10_000): Promise<void> {
+  abortAllScans();
+  if (activeScanJobs.size === 0) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      Promise.allSettled([...activeScanJobs]),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }

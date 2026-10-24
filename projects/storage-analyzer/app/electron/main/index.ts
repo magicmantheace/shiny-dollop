@@ -7,7 +7,8 @@ import { app, BrowserWindow, session } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { openDatabase } from './db/database';
-import { abortAllScans, registerIpcHandlers } from './ipc/handlers';
+import { markRunningScansInterrupted } from './db/scans';
+import { registerIpcHandlers, settleAllScans } from './ipc/handlers';
 
 const isDev = !!process.env.SA_DEV_SERVER;
 let mainWindow: BrowserWindow | null = null;
@@ -88,6 +89,16 @@ function installSecurityGuards(): void {
 async function init(): Promise<void> {
   const db = openDatabase();
 
+  // Reconcile scans a previous process left behind in 'running' state
+  // (quit/killed mid-scan before its cleanup could persist a terminal
+  // state). They can never resume; close them out instead of showing
+  // them as running forever.
+  try {
+    markRunningScansInterrupted(db);
+  } catch {
+    // Never block startup on reconciliation.
+  }
+
   registerIpcHandlers({ db, getMainWindow });
 
   installSecurityGuards();
@@ -101,13 +112,31 @@ async function init(): Promise<void> {
     app.quit();
   }
 
-  app.on('before-quit', () => {
-    abortAllScans();
-    try {
-      db.close();
-    } catch {
-      // Never block shutdown on teardown.
-    }
+  // Shutdown: cancelling a scan only signals it — the job still needs the
+  // database open to persist its terminal state. Hold the quit until all
+  // jobs settle, reconcile anything left 'running', and only then close.
+  let shutdownStarted = false;
+  app.on('before-quit', (event) => {
+    if (shutdownStarted) return;
+    shutdownStarted = true;
+    event.preventDefault();
+    void settleAllScans()
+      .catch(() => {
+        // Never block shutdown on teardown.
+      })
+      .finally(() => {
+        try {
+          markRunningScansInterrupted(db);
+        } catch {
+          // Never block shutdown on teardown.
+        }
+        try {
+          db.close();
+        } catch {
+          // Never block shutdown on teardown.
+        }
+        app.quit();
+      });
   });
 }
 

@@ -41,6 +41,22 @@ Choose a directory, view ranked file/folder sizes and verified duplicate groups,
   a test bug (un-normalized input), the scans.ts TS2352 cast was reworked, and
   the eslint unused-variable errors were removed.
 
+## Codex fix cycle 1 (2026-10-24, Linux VM, Node 24)
+
+- Hash candidates are revalidated after reading (identity, size, mtime, ctime
+  vs the pre-read stat): a file changed during its own hash stream is now
+  excluded and counted as changed instead of forming a "verified" duplicate
+  group from stale bytes. Two regression tests (append-during-read and
+  same-size in-place rewrite) fail without the revalidation.
+- Quit during a scan now settles scan jobs before the database closes
+  (`settleAllScans`, bounded), and scans left in `running` state are
+  reconciled to `failed` ("Interrupted…") on startup and after settling
+  (`markRunningScansInterrupted`) instead of appearing to run forever.
+  Covered by `tests/ipc/shutdown.test.ts` + a reconciliation test in
+  `tests/db/scans.test.ts`.
+- Full suite after the fixes: 83/83 tests pass (11 files); `npm run typecheck`
+  and `npm run lint` green.
+
 ## Pending (platform)
 
 - Real Electron window launch + live end-to-end scan on Windows (unverified here).

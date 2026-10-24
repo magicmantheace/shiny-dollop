@@ -15,6 +15,7 @@ import {
   getSummary,
   listScanErrors,
   listScans,
+  markRunningScansInterrupted,
   recordFile,
   recordScanError,
   searchFiles,
@@ -165,6 +166,36 @@ describe('search', () => {
       recordFile(db, scanId, `/data/bulk/match-${i}.txt`, 1, false);
     }
     expect(searchFiles(db, scanId, 'match-')).toHaveLength(SEARCH_RESULT_LIMIT);
+    db.close();
+  });
+});
+
+describe('interrupted scan reconciliation', () => {
+  it('closes out scans left running as failed, leaves finished scans untouched', () => {
+    const db = makeTestDb();
+    const running = createScan(db, '/data/stuck');
+    const done = createScan(db, '/data/done');
+    finishScan(
+      db,
+      done,
+      'complete',
+      { files: 3, dirs: 1, bytes: 42, excluded: 0, symlinks: 0, changed: 0, errors: 0 },
+      null,
+    );
+
+    expect(markRunningScansInterrupted(db)).toBe(1);
+
+    const stuck = getScan(db, running);
+    expect(stuck?.state).toBe('failed');
+    expect(stuck?.error).toMatch(/Interrupted/);
+    expect(stuck?.finished_at).not.toBeNull();
+
+    const finished = getScan(db, done);
+    expect(finished?.state).toBe('complete');
+    expect(finished?.error).toBeNull();
+
+    // Idempotent: nothing left in 'running'.
+    expect(markRunningScansInterrupted(db)).toBe(0);
     db.close();
   });
 });

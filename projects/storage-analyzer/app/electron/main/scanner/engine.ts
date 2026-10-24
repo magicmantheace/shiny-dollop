@@ -15,6 +15,9 @@
  * - Duplicate detection is size-first, then SHA-256 stream-hash confirmed.
  *   A file whose size changed between the walk and the hash is skipped and
  *   counted as changedDuringScan — it can never form a false duplicate group.
+ *   Candidates are also revalidated AFTER hashing (identity, size, mtime,
+ *   ctime compared against the pre-read stat): a file changed during its own
+ *   read stream is excluded the same way, never stored as a verified digest.
  *
  * This module has no 'electron' imports: progress is reported through a
  * callback so backend tests can run it headless.
@@ -47,6 +50,12 @@ export interface ScanTestHooks {
   beforeEntry?: (fullPath: string) => void | Promise<void>;
   /** Called after the walk phase, before the hash phase. Test-only seam. */
   beforeHashPhase?: () => void | Promise<void>;
+  /**
+   * Called right after a candidate's bytes have been fully read for hashing,
+   * before the post-read revalidation. Test-only seam for simulating a file
+   * that changes while (or just after) it is being hashed.
+   */
+  afterHashRead?: (fullPath: string) => void | Promise<void>;
 }
 
 export interface StartScanJobOptions {
@@ -464,6 +473,36 @@ async function hashCandidates(
         }
         try {
           const digest = await sha256File(candidate.path, signal);
+          if (options.hooks?.afterHashRead) {
+            await options.hooks.afterHashRead(candidate.path);
+          }
+          // Revalidate after reading: a file that changed while its bytes
+          // were streaming (append, in-place rewrite, replacement) must not
+          // have its digest recorded — the bytes hashed may be a mix of two
+          // versions, or already stale, and the group would be presented as
+          // verified. Compare identity + size + timestamps against the
+          // pre-read stat; any difference excludes the candidate.
+          let after: Stats;
+          try {
+            after = await fsp.stat(candidate.path);
+          } catch (err) {
+            // Vanished during/just after its own read: skip, never a group.
+            deleteFile(db, candidate.id);
+            counters.changed += 1;
+            recordError(candidate.path, errnoCode(err));
+            continue;
+          }
+          if (
+            after.dev !== st.dev ||
+            after.ino !== st.ino ||
+            after.size !== st.size ||
+            after.mtimeMs !== st.mtimeMs ||
+            after.ctimeMs !== st.ctimeMs
+          ) {
+            deleteFile(db, candidate.id);
+            counters.changed += 1;
+            continue;
+          }
           updateHashStmt.run(digest, candidate.id);
         } catch (err) {
           if (err instanceof ScanAborted || signal.aborted) throw err;

@@ -248,6 +248,76 @@ describe('changed-during-scan', () => {
     expect(row?.changed_count).toBe(1);
     db.close();
   });
+
+  it('excludes a file appended to while its hash was being read; no verified group from stale bytes', async () => {
+    const root = track(makeFixtureDir());
+    const a = path.join(root, 'a', 'dup.txt');
+    const b = path.join(root, 'b', 'dup.txt');
+    writeFixture(a, 'AAAA');
+    writeFixture(b, 'AAAA');
+
+    const { db, scanId } = scanRoot(root);
+    const job = startScanJob(db, {
+      scanId,
+      rootPath: root,
+      exclusions: [],
+      emitProgress: () => {},
+      hooks: {
+        // Simulate another writer appending the moment the read stream of
+        // `a` finished: the digest was computed over the old bytes, so the
+        // stored result would describe content the file no longer has.
+        afterHashRead: (fullPath) => {
+          if (fullPath === a) {
+            fs.appendFileSync(a, 'CHANGED');
+          }
+        },
+      },
+    });
+    const result = await job.promise;
+
+    expect(result.state).toBe('complete');
+    expect(result.changed).toBe(1);
+    // The stale digest must not be presented as a verified duplicate group.
+    expect(getDuplicateGroups(db, scanId)).toHaveLength(0);
+    const row = getScan(db, scanId);
+    expect(row?.changed_count).toBe(1);
+    db.close();
+  });
+
+  it('excludes a file rewritten in place (same size) while its hash was being read', async () => {
+    const root = track(makeFixtureDir());
+    const a = path.join(root, 'a', 'dup.txt');
+    const b = path.join(root, 'b', 'dup.txt');
+    writeFixture(a, 'identical-content-12345');
+    writeFixture(b, 'identical-content-12345');
+
+    const { db, scanId } = scanRoot(root);
+    const job = startScanJob(db, {
+      scanId,
+      rootPath: root,
+      exclusions: [],
+      emitProgress: () => {},
+      hooks: {
+        // Same length, different bytes, bumped timestamps: only the
+        // post-read identity/mtime/ctime revalidation can catch this.
+        afterHashRead: (fullPath) => {
+          if (fullPath === a) {
+            fs.writeFileSync(a, 'IDENTICAL-CONTENT-12345');
+            const later = new Date(Date.now() + 5000);
+            fs.utimesSync(a, later, later);
+          }
+        },
+      },
+    });
+    const result = await job.promise;
+
+    expect(result.state).toBe('complete');
+    expect(result.changed).toBe(1);
+    expect(getDuplicateGroups(db, scanId)).toHaveLength(0);
+    const row = getScan(db, scanId);
+    expect(row?.changed_count).toBe(1);
+    db.close();
+  });
 });
 
 describe('read-only guarantee', () => {

@@ -113,6 +113,27 @@ export function finishScan(
   );
 }
 
+/**
+ * Reconcile scans left in 'running' state by a previous process that exited
+ * (or was killed) before the scan reached a terminal state — e.g. quit during
+ * a scan whose asynchronous cancellation cleanup never got to persist.
+ * Such scans can never resume, so they are closed out as 'failed' with an
+ * explanatory error instead of being presented as running forever.
+ * Returns the number of scans reconciled.
+ */
+export function markRunningScansInterrupted(db: DatabaseSync): number {
+  const result = db
+    .prepare(
+      `UPDATE scans SET state = 'failed', error = ?, finished_at = ?
+       WHERE state = 'running'`,
+    )
+    .run(
+      'Interrupted: the application closed while this scan was running.',
+      new Date().toISOString(),
+    );
+  return Number(result.changes);
+}
+
 export function recordFile(
   db: DatabaseSync,
   scanId: number,
