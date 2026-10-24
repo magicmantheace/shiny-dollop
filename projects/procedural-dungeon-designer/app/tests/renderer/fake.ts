@@ -192,6 +192,7 @@ export interface InstalledFakePdd {
   calls: string[];
   callArgs: Record<string, unknown[]>;
   store: Map<string, SavedDungeon>;
+  setBudgetLimit: (id: string, limit: number) => void;
 }
 
 /** Installs a fresh FakePddApi as `window.pdd` and returns handles to it. */
@@ -208,5 +209,6 @@ export function installFakePdd(): InstalledFakePdd {
     calls: fake.calls,
     callArgs: fake.callArgs,
     store: fake.store,
+    setBudgetLimit: (id, limit) => fake.setBudgetLimit(id, limit),
   };
 }
