@@ -34,7 +34,7 @@ Do not assume storefront installation paths equal game save locations. Do not de
 
 **Integrations:** Standalone; optional future interoperability with the existing Universal PC Game Launcher only by separate approval.
 
-Do not access or modify the other project directories, real personal data, connected accounts, or production systems to test this app. Use fixtures or explicitly approved narrow interfaces.
+Do not access or modify the other project directories, the original Crawl repository, real personal data, connected accounts, or production systems to test this app. Use fixtures or explicitly approved narrow interfaces.
 
 ### Stop/continue logic
 
