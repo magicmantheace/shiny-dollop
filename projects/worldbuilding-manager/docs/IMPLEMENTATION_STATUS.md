@@ -1,21 +1,54 @@
 # Implementation status — Novel and Worldbuilding Manager
 
-- **Overall status:** PLANNED (documentation setup only)
+- **Overall status:** MVP FUNCTIONAL / REVIEW READY (branch `worldbuilding-manager/mvp`, unmerged)
 - **Priority:** 14/17
-- **Source/code implemented:** None as part of project intake
-- **Build validated:** No
-- **Automated tests executed:** No
-- **End-to-end MVP verified:** No
+- **Source/code implemented:** Yes — `app/` (Electron 45 + React 19 + TypeScript strict + Vite, `node:sqlite`, zod-validated IPC)
+- **Build validated:** Yes — Linux VM, Node 24: `npm run build` green (typecheck + main + preload + renderer)
+- **Automated tests executed:** Yes — **27/27 pass** (23 backend engine tests against real SQLite + 4 renderer UI tests), `npm run lint` clean
+- **End-to-end MVP verified:** Yes — `npm run smoke` PASS against the compiled build on a real on-disk database: create character/location/timeline event/note → link them → search notes → continuity check → export JSON backup → import into a fresh database → byte-identical re-export → Markdown export
 - **Owner review:** Pending
 
-## First milestone
+## Implemented and verified (Linux)
 
-Create characters, locations and a timeline event, link them, search notes, and export a complete project backup.
+- Entity CRUD for characters, locations, factions, timeline events and notes, with validated persisted state and per-type fields (role, story date, order keys, birth/death order, tags)
+- Bidirectional links/relationships with labels; deletion cascades links (no dangling references — tested)
+- Timeline ordering by order key (custom calendars via free-text story dates + numeric keys)
+- FTS5 full-text search across names/descriptions/bodies with type filters
+- Deterministic continuity warnings (`EVENT_AFTER_DEATH`, `EVENT_BEFORE_BIRTH`) with positive and negative tests
+- Append-only revision history per entity
+- Versioned JSON backup (`formatVersion 1.0.0`) with byte-identical round-trip; named-error rejection for corrupt/dangling/unknown-major/oversized backups; single-document Markdown export
+- Persistence across database reopen (tested)
 
-## Next action
+## Codex review fixes (2026-10-24, PR #19 fix cycle 1)
 
-Have Muse read `AGENTS.md`, `docs/PRODUCT_SPEC.md` and `docs/MUSE_HANDOFF.md`, implement and validate the first vertical slice on a project-scoped branch.
+- Backup size policy unified: one shared 64 MiB cap (`MAX_BACKUP_BYTES` in `shared/types.ts`) enforced by both `exportBundle()` (new `EXPORT_TOO_LARGE` — an unrestorable backup is never produced) and `importBundle()`; the IPC import schema limit was aligned to the same constant. Regression tests round-trip a >10 MiB revision-grown backup and cover the over-cap export refusal.
+- Renderer: unsaved entity edits are no longer discarded when adding/removing a relationship refreshes the entity list — edit drafts initialize only when the selected entity id changes (regression test in `tests/ui/App.test.tsx`; the fake API now returns fresh objects per list call, matching IPC cloning).
+- Main process (macOS): the `WorldStore` now closes on `before-quit` instead of `window-all-closed`, so close-window → reactivate keeps the database usable; `WorldStore.close()` is idempotent. Regression test with mocked Electron lifecycle + real store/IPC in `tests/backend/main-lifecycle.test.ts`.
+- Verified: 31/31 tests pass (was 27), typecheck and lint clean. All four new tests fail against the pre-fix code.
+
+## Codex review fixes (2026-10-24, PR #19 fix cycle 2)
+
+- Renderer detail form: the type-specific fields that determine timeline continuity are now editable and saved — characters get Role / Born order / Died order controls, timeline events get Story date / Timeline order controls, initialized from the selected entity (only when the selection changes, preserving the cycle-1 unsaved-edits fix) and included in the update patch the backend already supported. Correcting timeline placement no longer requires delete-and-recreate.
+- Renderer order parsing: the create and edit order fields (Timeline order, Born order, Died order) now use a strict parser — only an empty field means null; any other input must be a whole number in its entirety, otherwise a validation error is surfaced and nothing is saved. Previously `parseInt` silently coerced `10.9` → `10`, `12abc` → `12` and non-numeric text → null.
+- Re-verified the two older Codex comments from the original commit: the 64 MiB backup cap is unified across export/import/IPC schema (no residual 10 MiB limit; a >10 MiB revision-grown backup round-trips in tests), and on macOS the store closes only on `before-quit`, not `window-all-closed` (lifecycle regression test in place). Both remain fixed; no changes needed.
+- Verified: 36/36 tests pass (was 31; 5 new UI regression tests in `tests/ui/App.test.tsx`, all confirmed failing against the pre-fix code), typecheck and lint clean.
+
+## Codex review fixes (2026-10-24, PR #19 fix cycle 3)
+
+- Backup import: revision snapshots are now validated as complete Entities before the replacement transaction begins — the entity validation was extracted into `validateCompleteEntity()` in `app/db/world.ts`, shared by bundle entities and revision snapshots, and a snapshot whose `id` does not match its revision's `entityId` is rejected. Previously only `snapshot.id` was checked, so a malformed snapshot such as `{ "id": "<entity-id>", "name": {} }` was accepted and persisted, then crashed the renderer when the revision list rendered `snapshot.name` as text. A malformed snapshot now rejects the whole restore with `IMPORT_INVALID` and the existing project is left untouched.
+- Verified: 39/39 tests pass (was 36; 3 new backend regression tests in `tests/backend/world.test.ts` — the two malformed-snapshot tests confirmed failing against the pre-fix code, plus a well-formed revision-snapshot restore test), typecheck and lint clean.
+
+## Implemented but not verified on target OS
+
+- Windows 11 desktop behavior (window, packaged app, real user-data paths) — no Windows execution has taken place
+- `npm run package:win` (electron-builder/NSIS) — configured, not run (no Wine on this VM); no code signing
+
+## Planned / not in MVP
+
+- Full relationship graph visualization (MVP lists relationships per entity)
+- Revision rollback UI, multi-project/library management, triggers or AI assistance of any kind
+- Optional character export toward AI Dungeon Master (backlog item 16; no integration built)
 
 ## Acceptance notes
 
-Record actual commits, tests, blockers and PR links here when implementation begins. Do not infer success from the existence of this planning document.
+Synthetic fictional fixtures only (e.g. "Sera Vane", "Port Sorrow") — no owner writing or personal data was used. Commands and results are recorded in `docs/TEST_PLAN.md`.
