@@ -6,7 +6,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
-import { isDabError, previewWorkflow, startRunAndWait } from './executor.js';
+import {
+  hasActiveRuns,
+  isDabError,
+  previewWorkflow,
+  shutdownActiveRuns,
+  startRunAndWait,
+} from './executor.js';
 import { registerIpcHandlers } from './ipc.js';
 import { preloadScriptPath, rendererIndexPath } from './paths.js';
 import { createWorkflow, openDatabase, updateWorkflow } from './store.js';
@@ -85,12 +91,42 @@ async function boot(): Promise<void> {
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
   });
-  app.on('before-quit', () => {
+
+  // Shutdown: an approved script runs in its own detached POSIX process
+  // group, so quitting while a run is active would leave it executing
+  // after the app exits. Stop every active run and await termination +
+  // log finalization BEFORE closing the database and exiting.
+  let shutdownStarted = false;
+  let dbClosed = false;
+  const closeDbOnce = (): void => {
+    if (dbClosed) return;
+    dbClosed = true;
     try {
       db.close();
     } catch {
       // Best effort on shutdown.
     }
+  };
+  app.on('before-quit', (event) => {
+    if (shutdownStarted) {
+      // The follow-up quit after cleanup below: let it proceed.
+      closeDbOnce();
+      return;
+    }
+    if (!hasActiveRuns()) {
+      closeDbOnce();
+      return;
+    }
+    event.preventDefault();
+    shutdownStarted = true;
+    void shutdownActiveRuns(db)
+      .catch((err: unknown) => {
+        console.error('Failed to stop active runs during shutdown:', err);
+      })
+      .finally(() => {
+        closeDbOnce();
+        app.quit();
+      });
   });
 
   await app.whenReady();

@@ -25,7 +25,7 @@ import {
   runsStartSchema,
   scriptIdSchema,
   scriptsRegisterSchema,
-  stepSchema,
+  stepsSchema,
   workflowsCreateSchema,
   workflowsDeleteSchema,
   workflowsExportSchema,
@@ -86,9 +86,10 @@ export function createHandlers(ctx: IpcContext): Record<DabIpcChannel, Handler> 
   const workflowsUpdate: Handler = async (...args) => {
     const [id, patch] = workflowsUpdateSchema.parse(args);
     if (patch.steps !== undefined) {
-      // Validate each step against the discriminated union up front so a bad
-      // step can never be persisted.
-      patch.steps.forEach((s) => stepSchema.parse(s));
+      // Validate the whole step list against the shared schema up front
+      // so a bad step list can never be persisted — including duplicate
+      // step IDs, which per-step validation alone cannot catch.
+      stepsSchema.parse(patch.steps);
     }
     const updated = updateWorkflow(db, id, {
       ...(patch.name !== undefined ? { name: patch.name } : {}),

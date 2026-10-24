@@ -44,7 +44,31 @@ export const stepSchema = z.discriminatedUnion('kind', [
   logMessageStepSchema,
 ]);
 
-export const stepsSchema = z.array(stepSchema).max(500);
+export const stepsSchema = z
+  .array(stepSchema)
+  .max(500)
+  .superRefine((steps, ctx) => {
+    // Step IDs must be unique within a workflow. Steps are addressed by
+    // ID when a failed run is retried (`retryRun` resumes at the step
+    // whose ID matches the failed step log), so a duplicate ID makes the
+    // resume position ambiguous — the first match wins and a later step
+    // with the same ID could be skipped or re-run. Reject duplicates at
+    // this shared schema so EVERY persistence path (workflow update and
+    // import alike) is covered before anything is written.
+    const seen = new Map<string, number>();
+    steps.forEach((step, index) => {
+      const firstIndex = seen.get(step.id);
+      if (firstIndex !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Duplicate step id "${step.id}" (steps ${firstIndex} and ${index}); step ids must be unique within a workflow.`,
+          path: [index, 'id'],
+        });
+      } else {
+        seen.set(step.id, index);
+      }
+    });
+  });
 
 const workflowIdSchema = z.string().min(1).max(200);
 const nonEmptyName = z.string().trim().min(1).max(200);

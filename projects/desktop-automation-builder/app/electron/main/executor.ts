@@ -631,6 +631,53 @@ export function cancelRun(db: DatabaseSync, runId: string): Run {
   return getRunOrThrow(db, runId);
 }
 
+/** True while at least one run is executing in this process. */
+export function hasActiveRuns(): boolean {
+  return activeRuns.size > 0;
+}
+
+/** IDs of the runs currently executing in this process. */
+export function activeRunIds(): string[] {
+  return [...activeRuns.keys()];
+}
+
+/**
+ * Stop every active run and wait until each one has fully terminated —
+ * child process tree killed AND final run/step state persisted.
+ *
+ * This is the application-shutdown path. Scripts are spawned in their
+ * own (detached) POSIX process group, so merely closing the database /
+ * exiting the host would leave an approved script running detached,
+ * free to keep producing side effects after the app is gone. Cancelling
+ * first signals the whole process group; awaiting each run then
+ * guarantees the executor has written the finalized (cancelled) log
+ * before the caller closes the database and exits.
+ *
+ * Runs that finish on their own while shutdown is in progress are
+ * tolerated (their cancel attempt is a no-op). Returns the IDs that
+ * were stopped (or already finishing) by this call.
+ */
+export async function shutdownActiveRuns(db: DatabaseSync): Promise<string[]> {
+  const ids = [...new Set([...activeRuns.keys(), ...backgroundRuns.keys()])];
+  for (const runId of ids) {
+    try {
+      cancelRun(db, runId);
+    } catch {
+      // Already completed / failed / cancelled in the meantime — its
+      // final state is persisted, which is all shutdown needs.
+    }
+  }
+  // Background-tracked runs: awaiting them waits for the executor's
+  // final DB writes. Runs driven directly via `executeRun` (no tracked
+  // promise) are covered by the active-registry poll below — the
+  // executor always removes itself in a `finally` after finalizing.
+  await Promise.all(ids.map((runId) => waitForRun(db, runId).catch(() => undefined)));
+  while (ids.some((runId) => activeRuns.has(runId))) {
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 5));
+  }
+  return ids;
+}
+
 /**
  * Resolve the workflow definition AS OF `version`: the current definition
  * when the version is current, otherwise the archived snapshot taken when

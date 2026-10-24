@@ -100,6 +100,28 @@ describe('ipc validation and error shape', () => {
     expect(missing).toBeNull();
   });
 
+  it('workflowsUpdate rejects duplicate step IDs and persists nothing (Codex cycle-3 regression)', async () => {
+    const handlers = wireHandlers();
+    const created = (await invoke(handlers, 'dab:workflows:create', 'dup-steps', fx.sandbox)) as {
+      id: string;
+      version: number;
+    };
+    await expect(
+      invoke(handlers, 'dab:workflows:update', created.id, {
+        steps: [
+          { id: 'same', label: 'First', kind: 'log-message', message: 'one' },
+          { id: 'same', label: 'Second', kind: 'log-message', message: 'two' },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: 'WORKFLOW_INVALID' });
+    const fetched = (await invoke(handlers, 'dab:workflows:get', created.id)) as {
+      steps: unknown[];
+      version: number;
+    };
+    expect(fetched.steps).toEqual([]);
+    expect(fetched.version).toBe(created.version);
+  });
+
   it('runsPreview of a missing workflow throws WORKFLOW_NOT_FOUND', async () => {
     const handlers = wireHandlers();
     await expect(invoke(handlers, 'dab:runs:preview', 'missing-id')).rejects.toMatchObject({

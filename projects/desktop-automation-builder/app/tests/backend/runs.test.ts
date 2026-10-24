@@ -6,10 +6,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   cancelRun,
   executeRun,
+  hasActiveRuns,
   isRunActive,
   previewWorkflow,
   retryRun,
   retryRunAndWait,
+  shutdownActiveRuns,
   startRun,
   startRunAndWait,
   waitForRun,
@@ -238,6 +240,58 @@ describe('cancellation before script spawn (Codex cycle-2 regression)', () => {
     expect(final.status).toBe('cancelled');
     expect(final.steps[0]?.outcome).toBe('cancelled');
     expect(existsSync(marker)).toBe(false);
+  });
+});
+
+describe('shutdown stops active runs (Codex cycle-3 regression)', () => {
+  it('cancels an active script run, kills its process group, and returns only after the cancelled log is finalized', async () => {
+    // The script spawns a descendant that would touch a marker after 2s.
+    // If shutdown merely closed the DB / exited (scripts are spawned in a
+    // detached process group), both the script and its descendant would
+    // keep running and the marker would appear.
+    const marker = join(fx.sandbox, 'descendant-survived.txt');
+    const scriptPath = join(fx.root, 'tree-sleep.sh');
+    writeFileSync(scriptPath, `#!/bin/sh\n(sleep 2; touch "${marker}") &\nsleep 15\n`);
+    chmodSync(scriptPath, 0o755);
+    const script = registerScript(fx.db, 'tree-sleeper', scriptPath);
+
+    const wf = createWorkflow(fx.db, { name: 'shutdown-me', sandboxRoot: fx.sandbox });
+    updateWorkflow(fx.db, wf.id, {
+      steps: [
+        { id: 'sc', label: 'Tree sleep', kind: 'run-approved-script', scriptId: script.id, args: [] },
+        { id: 'lg', label: 'End', kind: 'log-message', message: 'never reached' },
+      ],
+    });
+
+    const run = await startRun(fx.db, wf.id, { approved: true });
+    expect(run.status).toBe('running');
+    await sleep(600); // script + descendant are running
+    expect(isRunActive(run.id)).toBe(true);
+    expect(hasActiveRuns()).toBe(true);
+
+    const startedAt = Date.now();
+    const stopped = await shutdownActiveRuns(fx.db);
+    const elapsed = Date.now() - startedAt;
+
+    // Termination was awaited (not the script's 15s), and the finalized
+    // cancelled log is already persisted when shutdown returns.
+    expect(elapsed).toBeLessThan(10_000);
+    expect(stopped).toContain(run.id);
+    expect(isRunActive(run.id)).toBe(false);
+    expect(hasActiveRuns()).toBe(false);
+    const final = getRun(fx.db, run.id);
+    expect(final?.status).toBe('cancelled');
+    expect(final?.steps[0]?.outcome).toBe('cancelled');
+    expect(final?.finishedAt).toBeTruthy();
+
+    // The descendant was killed with the group: its 2s marker never fires.
+    await sleep(2_500);
+    expect(existsSync(marker)).toBe(false);
+  }, 20000);
+
+  it('shutdown with no active runs is a no-op', async () => {
+    await expect(shutdownActiveRuns(fx.db)).resolves.toEqual([]);
+    expect(hasActiveRuns()).toBe(false);
   });
 });
 

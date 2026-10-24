@@ -61,3 +61,12 @@ Five P1 findings from the Codex review, each verified against the code before fi
 
 - **Verification:** `npm test` — **57/57 pass** (44 before; +13 regression tests); `npm run typecheck`, `npm run lint`, `npm run build` clean; `npm run smoke` SMOKE_OK.
 - **Not acted on:** the unrelated `projects/game-save-manager/docs/MUSE_HANDOFF.md` line in this PR's diff came from the shared ancestry-cleanup commit `f5aa771`, not from this project's commits — left for the owner to handle separately rather than adding a cross-project edit here.
+
+## 2026-10-24 — Codex review fixes, cycle 3 (PR #16, head 56d86f6)
+
+Both findings from the cycle-2 re-review verified against the code before fixing:
+
+- **Stop active scripts before closing the application (P1, `main.ts`):** the `before-quit` handler only closed SQLite, while approved scripts run in a detached POSIX process group that would survive the app. The executor now exports `hasActiveRuns` / `activeRunIds` / `shutdownActiveRuns` — the latter cancels every active run (killing its process group) and awaits termination AND finalized (cancelled) log persistence. `main.ts` now intercepts `before-quit` when runs are active (`preventDefault`), awaits `shutdownActiveRuns`, and only then closes the DB and quits; with no active runs it closes the DB and quits as before.
+- **Reject duplicate step IDs before persisting (P2, `executor.ts` retry / `schemas.ts`):** `stepsSchema` validated steps independently, so duplicate IDs persisted and made `retryRun`'s resume-by-ID ambiguous. The shared `stepsSchema` now `superRefine`-rejects duplicate IDs (naming the ID and both indexes), covering both persistence paths that use it — workflow update (IPC handler now also parses the whole list through `stepsSchema` instead of per-step only) and import (`IMPORT_INVALID`, nothing persisted).
+
+- **Verification:** `npm test` — **70/70 pass** (65 before; +5 regression tests: shutdown cancels an active script run + kills its descendant + finalized log persisted before return, shutdown no-op with no active runs, schema rejects duplicates, import with duplicates rejected and persists nothing, IPC update with duplicates rejected and persists nothing); `npm run typecheck`, `npm run lint`, `npm run build` clean; `npm run smoke` SMOKE_OK.
