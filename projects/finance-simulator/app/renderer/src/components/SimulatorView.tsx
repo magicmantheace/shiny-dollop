@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { getSim, type SimulationResult } from '../types';
-import { dollarsToCents, formatHorizon, formatUSD } from '../lib/money';
+import { dollarsToCents, formatHorizon, formatPayoffMonth, formatUSD } from '../lib/money';
 import { monthlyIncomeTotalCents } from '../lib/frequency';
 import { validateExtraPayment } from '../lib/validation';
 import { balancePolyline, chartMaxBalance, downsample } from '../lib/chart';
@@ -149,7 +149,7 @@ function PayoffBreakdown({ comparison }: { comparison: Comparison }) {
             <tr key={d.debtId}>
               <td style={styles.td}>{d.name}</td>
               <td style={styles.tdRight}>
-                {d.payoffMonth !== null && d.payoffMonth > 0 ? `${d.payoffMonth} (${formatHorizon(d.payoffMonth)})` : 'Never'}
+                {formatPayoffMonth(d.payoffMonth)}
               </td>
               <td style={styles.tdRight}>{formatUSD(d.totalPaidCents)}</td>
               <td style={styles.tdRight}>{formatUSD(d.interestPaidCents)}</td>

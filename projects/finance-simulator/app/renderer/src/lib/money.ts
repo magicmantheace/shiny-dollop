@@ -30,6 +30,18 @@ export function formatUSD(cents: number): string {
   return usdFormatter.format(Math.round(cents) / 100);
 }
 
+/**
+ * Label a per-debt payoff month. The engine's contract (engine/simulator.ts):
+ * null = never pays off, 0 = already paid (zero starting balance), positive =
+ * that 1-based month. Zero must NOT be lumped in with null: an already-paid
+ * debt is not "Never".
+ */
+export function formatPayoffMonth(payoffMonth: number | null): string {
+  if (payoffMonth === null) return 'Never';
+  if (payoffMonth === 0) return 'Already paid (month 0)';
+  return `${payoffMonth} (${formatHorizon(payoffMonth)})`;
+}
+
 /** Humanize a payoff horizon in months, e.g. 14 -> "1 yr 2 mo", 8 -> "8 mo". */
 export function formatHorizon(months: number): string {
   if (!Number.isFinite(months) || months <= 0) return '—';

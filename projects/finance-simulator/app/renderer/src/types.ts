@@ -41,7 +41,7 @@ export interface IncomeRecord {
 export interface DebtPayoff {
   debtId: string;
   name: string;
-  payoffMonth: number | null; // null = never pays off
+  payoffMonth: number | null; // null = never pays off; 0 = already paid (zero balance)
   interestPaidCents: number;
   totalPaidCents: number;
 }
