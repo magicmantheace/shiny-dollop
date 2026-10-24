@@ -12,6 +12,18 @@ import {
 import { AIDM_CHANNELS, type AidmMethodName } from './channels.js';
 import * as s from './schemas.js';
 import type { CampaignService } from './service.js';
+import type {
+  CampaignInput,
+  CharacterInput,
+  CharacterPatch,
+  CheckRequest,
+  EncounterStartRequest,
+  HpChangeRequest,
+  MemoryInput,
+  MemoryPatch,
+  NarrationSettings,
+  RollRequest,
+} from '../../shared/types.js';
 
 export interface IpcMainLike {
   handle(channel: string, listener: (event: unknown, ...args: unknown[]) => Promise<unknown>): void;
@@ -70,7 +82,7 @@ const FALLBACKS: Record<AidmMethodName, AidmErrorCode> = {
 export function createHandlers(service: CampaignService): Record<string, Handler> {
   const byMethod: Record<AidmMethodName, Handler> = {
     campaignsList: async () => service.campaignsList(),
-    campaignsCreate: async (...a) => service.campaignsCreate(s.campaignsCreateSchema.parse(a)[0]),
+    campaignsCreate: async (...a) => service.campaignsCreate(s.campaignsCreateSchema.parse(a)[0] as CampaignInput),
     campaignsGet: async (...a) => service.campaignsGet(s.campaignsGetSchema.parse(a)[0]),
     campaignsDelete: async (...a) => service.campaignsDelete(s.campaignsDeleteSchema.parse(a)[0]),
     sessionsList: async (...a) => service.sessionsList(s.sessionsListSchema.parse(a)[0]),
@@ -86,20 +98,20 @@ export function createHandlers(service: CampaignService): Record<string, Handler
     charactersList: async (...a) => service.charactersList(s.charactersListSchema.parse(a)[0]),
     charactersCreate: async (...a) => {
       const [id, input] = s.charactersCreateSchema.parse(a);
-      return service.charactersCreate(id, input);
+      return service.charactersCreate(id, input as CharacterInput);
     },
     charactersUpdate: async (...a) => {
       const [id, patch] = s.charactersUpdateSchema.parse(a);
-      return service.charactersUpdate(id, patch);
+      return service.charactersUpdate(id, patch as CharacterPatch);
     },
     charactersDelete: async (...a) => service.charactersDelete(s.charactersDeleteSchema.parse(a)[0]),
     diceRoll: async (...a) => {
       const [id, req] = s.diceRollSchema.parse(a);
-      return service.diceRoll(id, req);
+      return service.diceRoll(id, req as RollRequest);
     },
     checkRoll: async (...a) => {
       const [id, req] = s.checkRollSchema.parse(a);
-      return service.checkRoll(id, req);
+      return service.checkRoll(id, req as CheckRequest);
     },
     logList: async (...a) => {
       const [id, sessionId] = s.logListSchema.parse(a);
@@ -111,7 +123,7 @@ export function createHandlers(service: CampaignService): Record<string, Handler
     },
     encountersStart: async (...a) => {
       const [id, req] = s.encountersStartSchema.parse(a);
-      return service.encountersStart(id, req);
+      return service.encountersStart(id, req as EncounterStartRequest);
     },
     encountersGetActive: async (...a) =>
       service.encountersGetActive(s.encountersGetActiveSchema.parse(a)[0]),
@@ -119,21 +131,21 @@ export function createHandlers(service: CampaignService): Record<string, Handler
       service.encountersAdvanceTurn(s.encountersAdvanceTurnSchema.parse(a)[0]),
     encountersApplyDamage: async (...a) => {
       const [id, req] = s.encountersApplyDamageSchema.parse(a);
-      return service.encountersApplyDamage(id, req);
+      return service.encountersApplyDamage(id, req as HpChangeRequest);
     },
     encountersApplyHeal: async (...a) => {
       const [id, req] = s.encountersApplyHealSchema.parse(a);
-      return service.encountersApplyHeal(id, req);
+      return service.encountersApplyHeal(id, req as HpChangeRequest);
     },
     encountersEnd: async (...a) => service.encountersEnd(s.encountersEndSchema.parse(a)[0]),
     memoryList: async (...a) => service.memoryList(s.memoryListSchema.parse(a)[0]),
     memoryCreate: async (...a) => {
       const [id, input] = s.memoryCreateSchema.parse(a);
-      return service.memoryCreate(id, input);
+      return service.memoryCreate(id, input as MemoryInput);
     },
     memoryUpdate: async (...a) => {
       const [id, patch] = s.memoryUpdateSchema.parse(a);
-      return service.memoryUpdate(id, patch);
+      return service.memoryUpdate(id, patch as MemoryPatch);
     },
     memoryDelete: async (...a) => service.memoryDelete(s.memoryDeleteSchema.parse(a)[0]),
     memorySearch: async (...a) => {
@@ -142,7 +154,7 @@ export function createHandlers(service: CampaignService): Record<string, Handler
     },
     narrate: async (...a) => service.narrate(s.narrateSchema.parse(a)[0]),
     settingsGet: async () => service.settingsGet(),
-    settingsUpdate: async (...a) => service.settingsUpdate(s.settingsUpdateSchema.parse(a)[0]),
+    settingsUpdate: async (...a) => service.settingsUpdate(s.settingsUpdateSchema.parse(a)[0] as NarrationSettings),
     exportCampaign: async (...a) => service.exportCampaign(s.exportCampaignSchema.parse(a)[0]),
     importCampaign: async (...a) => service.importCampaign(s.importCampaignSchema.parse(a)[0]),
     importWorldbuilding: async (...a) => {
