@@ -112,7 +112,13 @@ export async function renderInvoicePdf(
       doc.fontSize(9).fillColor('#555').text(line.detail, colX, doc.y, { width: 400 });
       doc.fillColor('#000');
     }
+    // The amount is drawn back at the row's top (y), which resets doc.y to
+    // the bottom of the single-line amount — above the bottom of a
+    // multi-line description. Restore the taller of the two before
+    // advancing, or the next charge starts inside this row's detail text.
+    const descriptionBottom = doc.y;
     doc.fontSize(10).text(formatCents(line.amountCents), amtX, y, { width: 82, align: 'right' });
+    doc.y = Math.max(descriptionBottom, doc.y);
     doc.moveDown(0.35);
   }
   doc.moveTo(colX, doc.y).lineTo(562, doc.y).stroke();

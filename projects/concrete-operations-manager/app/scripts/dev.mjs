@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Development runner: builds main+preload with tsc (watch), serves the
- * renderer with Vite, and launches Electron against the dev server.
+ * Development runner: builds main with tsc (watch), bundles the preload
+ * with Vite (watch), serves the renderer with Vite, and launches Electron
+ * against the dev server.
  */
 import { spawn } from 'node:child_process';
 import path from 'node:path';
@@ -32,9 +33,11 @@ function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-// 1. TypeScript watchers for main + preload.
+// 1. Main-process TypeScript watcher + preload Vite bundle watcher.
+// The preload must stay a single bundled file (sandboxed preloads cannot
+// require() local files), so it is built by Vite, not tsc.
 run('npx', ['tsc', '-p', 'tsconfig.main.json', '--watch', '--preserveWatchOutput']);
-run('npx', ['tsc', '-p', 'tsconfig.preload.json', '--watch', '--preserveWatchOutput']);
+run('npx', ['vite', 'build', '--config', 'vite.config.preload.ts', '--watch']);
 
 // 2. Vite dev server for the renderer.
 const vite = run('npx', ['vite']);

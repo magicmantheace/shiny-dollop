@@ -66,6 +66,39 @@ validation, CSV/PDF rendering, UI charge-line and estimate/measured labeling).
 - Restore replaces the live DB file; the app must restart its DB connection
   (handled in-process; a failed restore reopens the original).
 
+## Codex review fix cycle 2 (2026-10-24)
+
+Two P1 findings from the re-review of `1a6086e`, both verified against the
+code and fixed with regression tests:
+
+- **Sandboxed preload could not load its IPC channel constants.** The
+  preload is built with `sandbox: true`, and sandboxed preloads cannot
+  `require()` local files — but `build:preload` was a plain `tsc` emit, so
+  the compiled preload contained `require('../../shared/ipc-channels')` and
+  threw before exposing `window.concreteOps`. `build:preload` now bundles
+  the preload into a single self-contained script with Vite
+  (`vite.config.preload.ts`); the built output's only `require` is
+  `electron`, the channel constants are inlined, and the sandbox stays on.
+  `scripts/dev.mjs` watches the same Vite bundle instead of a tsc preload
+  emit. Regression tests: `tests/integration/preload-bundle.test.ts`
+  (rebuilds the preload and asserts the require set; fails on the old tsc
+  build).
+- **Invoice PDF charges overlapped multi-line descriptions.** In
+  `electron/main/export/pdf.ts` the amount was drawn back at the row top,
+  resetting `doc.y` to the single-line amount's bottom, so the following
+  `moveDown(0.35)` started the next charge inside a two-line description.
+  The row advance now preserves the description bottom and moves below the
+  taller of description/amount. Regression test in
+  `tests/integration/pdf.test.ts` renders a three-line charge row and
+  asserts the next charge's position in the PDF content stream is below
+  the description's last line (fails on the old code).
+
+Verification: **67/67 tests pass** (`npx vitest run`, 14 files; was 64),
+`npm run typecheck` and `npm run lint` clean, `npm run build` clean, and
+`npm run smoke` passed (production bundle opened a real Electron window
+under xvfb, SMOKE_OK) — which also exercises the bundled sandboxed preload
+end to end.
+
 ## Next action
 
 Owner review of the PR; Windows-side validation (installer, portable zip,
