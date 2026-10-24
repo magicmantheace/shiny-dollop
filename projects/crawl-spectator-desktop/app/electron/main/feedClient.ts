@@ -77,14 +77,20 @@ export class HttpFeedClient implements FeedSource {
 
   private async getJson(path: string): Promise<unknown> {
     const controller = new AbortController();
+    // The timeout must cover the WHOLE request, including consuming the
+    // body: fetch() resolves when headers arrive, so clearing the timer
+    // there would let a stalled body hang the request (and any reconnect
+    // waiting on it) forever instead of producing FEED_TIMEOUT.
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     let res: Response;
+    let text: string;
     try {
       res = await this.fetchFn(`${this.baseUrl}${path}`, {
         method: 'GET',
         headers: { accept: 'application/json' },
         signal: controller.signal,
       });
+      text = await res.text();
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         throw new SpectatorError(
@@ -99,7 +105,6 @@ export class HttpFeedClient implements FeedSource {
     } finally {
       clearTimeout(timer);
     }
-    const text = await res.text();
     if (text.length > this.maxBytes) {
       throw new SpectatorError(
         'FEED_RESPONSE_TOO_LARGE',

@@ -30,6 +30,11 @@ export interface FeedSnapshot {
   cursorTick: number | null;
   /** Events dropped by the bounded buffer since connect (backpressure). */
   droppedCount: number;
+  /** Catch-up windows that hit the maximum retrieval limit even after
+   *  widening: the server returns only the LAST `limit` events, so older
+   *  events in such a window may have been missed. Exact missed count is
+   *  not knowable from this client; 0 means no truncation was detected. */
+  truncatedCatchUps: number;
   bufferedCount: number;
 }
 

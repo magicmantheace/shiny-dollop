@@ -98,6 +98,16 @@ describe('HttpFeedClient failure handling (raw stub servers)', () => {
     });
   });
 
+  it('times out when headers arrive but the body stalls', async () => {
+    await withStub((res) => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.write('{"status":"ok"');
+      // Body never ends: fetch() has resolved, res.text() is pending.
+    }, async (baseUrl) => {
+      await expect(new HttpFeedClient(baseUrl, { timeoutMs: 120 }).health()).rejects.toMatchObject({ code: 'FEED_TIMEOUT' });
+    });
+  });
+
   it('reports unreachable servers actionably', async () => {
     await expect(new HttpFeedClient('http://127.0.0.1:1', { timeoutMs: 500 }).health())
       .rejects.toMatchObject({ code: 'FEED_UNREACHABLE' });

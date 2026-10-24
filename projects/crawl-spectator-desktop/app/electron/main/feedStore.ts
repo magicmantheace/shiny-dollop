@@ -20,6 +20,13 @@ export class FeedStore {
   private events: LedgerEvent[] = [];
   private readonly seen = new Set<string>();
   droppedCount = 0;
+  /** Catch-up windows that still filled the maximum retrieval limit after
+   *  widening, so events in them may have been silently omitted by the
+   *  server's last-`limit` semantics. Counted separately from droppedCount
+   *  (bounded-buffer evictions, whose exact count is known): here the exact
+   *  number of missed events is unknowable from this client, so the honest
+   *  signal is the number of truncated windows, surfaced in the snapshot. */
+  truncatedCatchUps = 0;
 
   constructor(capacity: number = DEFAULT_FEED_CAPACITY) {
     this.capacity = Math.max(1, capacity);
@@ -63,10 +70,16 @@ export class FeedStore {
     return [...this.events];
   }
 
+  /** Record a catch-up window that hit the retrieval limit (see above). */
+  noteTruncatedCatchUp(): void {
+    this.truncatedCatchUps += 1;
+  }
+
   clear(): void {
     this.events = [];
     this.seen.clear();
     this.droppedCount = 0;
+    this.truncatedCatchUps = 0;
   }
 }
 

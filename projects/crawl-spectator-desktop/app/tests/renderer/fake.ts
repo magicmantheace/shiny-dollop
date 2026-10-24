@@ -27,10 +27,13 @@ export const ossian: Descender = {
 
 export const partyEvent = makeEvent('evt-000002', 1184, 'PARTY_FORMED', ['mira-vane', 'ossian-rell'], 'Mira Vane formed the Ember Pact.');
 export const damageEvent = makeEvent('evt-000100', 1231, 'DESCENDER_DAMAGED', ['mira-vane'], 'Mira Vane was damaged by a falling bell clapper.');
+export const replayEvent = makeEvent('evt-000900', 1100, 'DESCENDER_ADVANCED', ['selka-morrow'], 'Replay-only fixture event.');
 
 export class FakeSpectator implements SpectatorApi {
   status: ConnectionStatus;
   prefs: Prefs = { baseUrl: 'http://127.0.0.1:8000', followedDescenderIds: [] };
+  /** When set, getProfile waits for this promise (stale-response tests). */
+  profileGate: Promise<void> | null = null;
   private statusListeners = new Set<(s: ConnectionStatus) => void>();
 
   constructor(mode: 'live' | 'demo' = 'demo') {
@@ -57,7 +60,10 @@ export class FakeSpectator implements SpectatorApi {
   }
   async getDescent(): Promise<null> { return null; }
   async listDescenders(): Promise<Descender[]> { return [mira, ossian]; }
-  async getProfile(id: string): Promise<Descender> { return id === 'mira-vane' ? mira : ossian; }
+  async getProfile(id: string): Promise<Descender> {
+    if (this.profileGate) await this.profileGate;
+    return id === 'mira-vane' ? mira : ossian;
+  }
   async getHistory(id: string): Promise<LedgerEvent[]> { return id === 'mira-vane' ? [damageEvent] : []; }
   async search(_query: string): Promise<{ query: string; descenders: Descender[]; events: LedgerEvent[] }> {
     return { query: _query, descenders: [mira], events: [] };
@@ -65,10 +71,10 @@ export class FakeSpectator implements SpectatorApi {
   async listParties(): Promise<Array<{ id: string; active: boolean; leader_descender_id: string | null; member_descender_ids: string[]; cohesion: number; loot_policy: string }>> {
     return [{ id: 'party-ember-pact', active: true, leader_descender_id: 'mira-vane', member_descender_ids: ['mira-vane', 'ossian-rell'], cohesion: 0.82, loot_policy: 'need_before_greed' }];
   }
-  async getFeed(): Promise<{ events: LedgerEvent[]; cursorTick: number | null; droppedCount: number; bufferedCount: number }> {
-    return { events: [partyEvent, damageEvent], cursorTick: 1231, droppedCount: 0, bufferedCount: 2 };
+  async getFeed(): Promise<{ events: LedgerEvent[]; cursorTick: number | null; droppedCount: number; truncatedCatchUps: number; bufferedCount: number }> {
+    return { events: [partyEvent, damageEvent], cursorTick: 1231, droppedCount: 0, truncatedCatchUps: 0, bufferedCount: 2 };
   }
-  async getReplay(): Promise<LedgerEvent[]> { return [damageEvent]; }
+  async getReplay(): Promise<LedgerEvent[]> { return [replayEvent]; }
   async getHighlights(): Promise<LedgerEvent[]> {
     return this.prefs.followedDescenderIds.includes('mira-vane') ? [partyEvent, damageEvent] : [];
   }

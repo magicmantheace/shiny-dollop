@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isHighlight } from '../../shared/contract';
 import type { LedgerEvent } from '../../shared/contract';
 import type { ConnectionStatus, Descender, FeedSnapshot, Party, Prefs, SearchResult } from '../../shared/types';
@@ -21,7 +21,7 @@ export function App(): React.JSX.Element {
   const [history, setHistory] = useState<LedgerEvent[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
-  const [feed, setFeed] = useState<FeedSnapshot>({ events: [], cursorTick: null, droppedCount: 0, bufferedCount: 0 });
+  const [feed, setFeed] = useState<FeedSnapshot>({ events: [], cursorTick: null, droppedCount: 0, truncatedCatchUps: 0, bufferedCount: 0 });
   const [followedOnly, setFollowedOnly] = useState(false);
   const [highlights, setHighlights] = useState<LedgerEvent[]>([]);
   const [replayAfter, setReplayAfter] = useState('');
@@ -32,7 +32,32 @@ export function App(): React.JSX.Element {
   const followed = useMemo(() => new Set(prefs.followedDescenderIds), [prefs.followedDescenderIds]);
   const connected = status?.state === 'connected';
 
-  const refreshData = useCallback(async () => {
+  // Connection identity + generation guard. Source-specific renderer
+  // state (selected profile, history, search, replay, directory, feed,
+  // highlights) belongs to ONE connection: when the identity changes
+  // (demo -> live, a different live URL, a different descent) it is all
+  // cleared synchronously, the generation is bumped, and any async
+  // response that started under the old generation is discarded — so
+  // fixture data can never reappear under a LIVE banner (or vice versa).
+  const connectionGenRef = useRef(0);
+  const connectionIdentityRef = useRef<string | null>(null);
+
+  const clearSourceSpecificState = useCallback(() => {
+    setDescenders([]);
+    setParties([]);
+    setSelectedId(null);
+    setProfile(null);
+    setHistory([]);
+    setSearchQuery('');
+    setSearchResult(null);
+    setFeed({ events: [], cursorTick: null, droppedCount: 0, truncatedCatchUps: 0, bufferedCount: 0 });
+    setHighlights([]);
+    setReplayAfter('');
+    setReplayType('');
+    setReplay([]);
+  }, []);
+
+  const refreshData = useCallback(async (gen: number = connectionGenRef.current) => {
     try {
       const [list, partyList, snapshot, hl] = await Promise.all([
         api().listDescenders(),
@@ -40,14 +65,30 @@ export function App(): React.JSX.Element {
         api().getFeed(),
         api().getHighlights(),
       ]);
+      if (gen !== connectionGenRef.current) return; // stale: previous connection
       setDescenders(list);
       setParties(partyList);
       setFeed(snapshot);
       setHighlights(hl);
     } catch (err) {
-      setActionError(errText(err));
+      if (gen === connectionGenRef.current) setActionError(errText(err));
     }
   }, []);
+
+  const applyStatus = useCallback((next: ConnectionStatus) => {
+    const identity = next.mode && next.baseUrl ? `${next.mode}|${next.baseUrl}|${next.descentId ?? ''}` : null;
+    if (next.state === 'disconnected') {
+      connectionGenRef.current += 1;
+      connectionIdentityRef.current = null;
+      clearSourceSpecificState();
+    } else if (identity !== null && connectionIdentityRef.current !== identity) {
+      connectionGenRef.current += 1;
+      connectionIdentityRef.current = identity;
+      clearSourceSpecificState();
+    }
+    setStatus(next);
+    if (next.state === 'connected') void refreshData(connectionGenRef.current);
+  }, [clearSourceSpecificState, refreshData]);
 
   useEffect(() => {
     let alive = true;
@@ -55,25 +96,21 @@ export function App(): React.JSX.Element {
       try {
         const [s, p] = await Promise.all([api().getStatus(), api().getPrefs()]);
         if (!alive) return;
-        setStatus(s);
         setPrefs(p);
         setBaseUrlInput(p.baseUrl);
-        if (s.state === 'connected') await refreshData();
+        applyStatus(s);
       } catch (err) {
         if (alive) setActionError(errText(err));
       }
     })();
-    const offStatus = api().onStatusChanged((s) => {
-      setStatus(s);
-      if (s.state === 'connected') void refreshData();
-    });
+    const offStatus = api().onStatusChanged((s) => applyStatus(s));
     const offFeed = api().onFeedChanged((snapshot) => setFeed(snapshot));
     return () => {
       alive = false;
       offStatus();
       offFeed();
     };
-  }, [refreshData]);
+  }, [applyStatus]);
 
   const run = async (fn: () => Promise<void>): Promise<void> => {
     setActionError(null);
@@ -85,32 +122,43 @@ export function App(): React.JSX.Element {
   };
 
   const selectDescender = (id: string): void => {
+    const gen = connectionGenRef.current;
     setSelectedId(id);
     void run(async () => {
       const [p, h] = await Promise.all([api().getProfile(id), api().getHistory(id)]);
+      if (gen !== connectionGenRef.current) return; // stale: previous connection
       setProfile(p);
       setHistory(h);
     });
   };
 
   const toggleFollow = (id: string): void => {
+    const gen = connectionGenRef.current;
     void run(async () => {
       const next = followed.has(id) ? await api().unfollow(id) : await api().follow(id);
       setPrefs(next);
-      setHighlights(await api().getHighlights());
+      const hl = await api().getHighlights();
+      if (gen !== connectionGenRef.current) return; // stale highlights
+      setHighlights(hl);
     });
   };
 
   const doSearch = (): void => {
+    const gen = connectionGenRef.current;
     const q = searchQuery.trim();
     if (!q) {
       setSearchResult(null);
       return;
     }
-    void run(async () => setSearchResult(await api().search(q)));
+    void run(async () => {
+      const result = await api().search(q);
+      if (gen !== connectionGenRef.current) return; // stale: previous connection
+      setSearchResult(result);
+    });
   };
 
   const loadReplay = (): void => {
+    const gen = connectionGenRef.current;
     void run(async () => {
       const after = replayAfter.trim() === '' ? null : Number(replayAfter);
       const events = await api().getReplay({
@@ -118,6 +166,7 @@ export function App(): React.JSX.Element {
         eventType: replayType.trim() === '' ? null : replayType.trim(),
         limit: 100,
       });
+      if (gen !== connectionGenRef.current) return; // stale: previous connection
       setReplay(events);
     });
   };
@@ -158,13 +207,13 @@ export function App(): React.JSX.Element {
           />
         </label>
         <div className="row">
-          <button type="button" onClick={() => void run(async () => setStatus(await api().connectLive(baseUrlInput)))}>
+          <button type="button" onClick={() => void run(async () => applyStatus(await api().connectLive(baseUrlInput)))}>
             Connect live
           </button>
-          <button type="button" onClick={() => void run(async () => setStatus(await api().connectDemo()))}>
+          <button type="button" onClick={() => void run(async () => applyStatus(await api().connectDemo()))}>
             Start demo (fixture data)
           </button>
-          <button type="button" onClick={() => void run(async () => setStatus(await api().disconnect()))}>
+          <button type="button" onClick={() => void run(async () => applyStatus(await api().disconnect()))}>
             Disconnect
           </button>
         </div>
@@ -264,7 +313,8 @@ export function App(): React.JSX.Element {
           </label>
           <p className="hint">
             Buffered {feed.bufferedCount} event(s), cursor tick {feed.cursorTick ?? '—'}
-            {feed.droppedCount > 0 ? `, ${feed.droppedCount} older event(s) dropped by the bounded buffer` : ''}.
+            {feed.droppedCount > 0 ? `, ${feed.droppedCount} older event(s) dropped by the bounded buffer` : ''}
+            {feed.truncatedCatchUps > 0 ? `, ${feed.truncatedCatchUps} catch-up window(s) hit the retrieval limit — some events may have been missed` : ''}.
           </p>
           <ul className="event-list feed">
             {visibleFeed.map((e) => (

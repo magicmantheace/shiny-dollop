@@ -47,6 +47,11 @@ export class SpectatorEngine {
   private source: FeedSource | null = null;
   private fixture: FixtureFeed | null = null;
   private descentCache: DescentSummary | null = null;
+  /** True only after the CURRENT source completed its initial sync.
+   *  Reconnects for an established source resume from the feed cursor;
+   *  reconnects for a never-established source must do a full initial
+   *  sync instead — resuming would reuse a previous source's cursor. */
+  private established = false;
   private statusValue: ConnectionStatus = {
     state: 'disconnected',
     mode: null,
@@ -100,13 +105,26 @@ export class SpectatorEngine {
 
   // -- connection lifecycle ----------------------------------------------------
 
+  /** Drop every piece of source-specific buffered state. Called when a
+   *  NEW connection starts (before any request to the new source) and on
+   *  disconnect, so a previous source's cursor/events/descent can never
+   *  leak into the new source — e.g. demo events at tick 1240 must not
+   *  become the resume cursor for a live server at tick 5. */
+  private resetSourceState(): void {
+    this.established = false;
+    this.descentCache = null;
+    this.store.clear();
+    this.emitFeed();
+  }
+
   async connectLive(baseUrlRaw: string): Promise<ConnectionStatus> {
     const baseUrl = normalizeBaseUrl(baseUrlRaw);
     savePrefs(this.db, { ...getPrefs(this.db), baseUrl });
     const run = ++this.runId;
     this.fixture = null;
     this.source = this.clientFactory(baseUrl);
-    this.setStatus({ state: 'connecting', mode: 'live', baseUrl, message: `Connecting to the live Feed at ${baseUrl}…`, reconnectAttempts: 0 });
+    this.resetSourceState();
+    this.setStatus({ state: 'connecting', mode: 'live', baseUrl, descentId: null, tick: null, message: `Connecting to the live Feed at ${baseUrl}…`, reconnectAttempts: 0 });
     await this.establish(run, 'live', baseUrl);
     return this.statusValue;
   }
@@ -115,8 +133,9 @@ export class SpectatorEngine {
     const run = ++this.runId;
     this.fixture = this.fixtureFactory();
     this.source = this.fixture;
+    this.resetSourceState();
     this.setStatus({
-      state: 'connecting', mode: 'demo', baseUrl: FIXTURE_BASE_URL_LABEL,
+      state: 'connecting', mode: 'demo', baseUrl: FIXTURE_BASE_URL_LABEL, descentId: null, tick: null,
       message: 'Starting demo mode with fixture data…', reconnectAttempts: 0,
     });
     await this.establish(run, 'demo', FIXTURE_BASE_URL_LABEL);
@@ -127,8 +146,9 @@ export class SpectatorEngine {
     this.runId += 1;
     this.source = null;
     this.fixture = null;
+    this.resetSourceState();
     this.setStatus({
-      state: 'disconnected', mode: this.statusValue.mode, baseUrl: this.statusValue.baseUrl,
+      state: 'disconnected', mode: this.statusValue.mode, baseUrl: this.statusValue.baseUrl, descentId: null, tick: null,
       message: 'Disconnected. Connect to a live Feed API or start the demo to explore the spectator.',
       reconnectAttempts: 0,
     });
@@ -147,6 +167,7 @@ export class SpectatorEngine {
       const initial = await source.ledgerEvents({ limit: 200 });
       if (run !== this.runId) return;
       this.store.ingest(initial);
+      this.established = true;
       this.setStatus({
         state: 'connected', mode, baseUrl, descentId: health.descent_id, tick: health.tick, reconnectAttempts: 0,
         message: mode === 'demo'
@@ -162,23 +183,49 @@ export class SpectatorEngine {
     }
   }
 
+  /** Fetch events after the current cursor for catch-up.
+   *
+   *  The contract returns the LAST `limit` events after `after_tick`, not
+   *  the first page — so a batch that fills the limit may have silently
+   *  omitted older events in the window. When the first request fills its
+   *  limit, widen once to `maxLimit`: if the widened batch comes back
+   *  under that limit it provably covers the whole window. If it still
+   *  fills `maxLimit`, coverage cannot be established from this client
+   *  (the contract has no backward paging), so the window is reported as
+   *  truncated instead of silently advancing the cursor past the loss. */
+  private async fetchCatchUp(source: FeedSource, limit: number, maxLimit: number): Promise<{ events: LedgerEvent[]; truncated: boolean }> {
+    const cursor = this.store.cursorTick;
+    const afterTick = cursor === null ? null : Math.max(0, cursor - 1);
+    const first = await source.ledgerEvents({ limit, afterTick });
+    if (first.length < limit || limit >= maxLimit) {
+      return { events: first, truncated: first.length >= maxLimit && limit >= maxLimit };
+    }
+    const widened = await source.ledgerEvents({ limit: maxLimit, afterTick });
+    return { events: widened, truncated: widened.length >= maxLimit };
+  }
+
+  private noteTruncatedCatchUp(): void {
+    this.store.noteTruncatedCatchUp();
+    this.setStatus({
+      message: 'Warning: a catch-up from the Feed hit the retrieval limit, so some events may have been missed. The missed count is not knowable from this client; reconnecting reloads the latest window.',
+    });
+    this.emitFeed();
+  }
+
   private async pollLoop(run: number): Promise<void> {
     while (run === this.runId && this.source) {
       await this.sleep(this.pollIntervalMs);
       if (run !== this.runId || !this.source) return;
       try {
         if (this.fixture) this.fixture.advance();
-        const cursor = this.store.cursorTick;
-        const events = await this.source.ledgerEvents({
-          limit: 300,
-          afterTick: cursor === null ? null : Math.max(0, cursor - 1),
-        });
+        const { events, truncated } = await this.fetchCatchUp(this.source, 300, 1000);
         if (run !== this.runId) return;
         const added = this.store.ingest(events);
+        if (truncated) this.noteTruncatedCatchUp();
         const health = await this.source.health();
         if (run !== this.runId) return;
         this.setStatus({ tick: health.tick, descentId: health.descent_id });
-        if (added > 0) this.emitFeed();
+        if (added > 0 || truncated) this.emitFeed();
       } catch (err) {
         if (run !== this.runId) return;
         this.setStatus({ state: 'error', message: `${errorMessage(err)} Connection lost — reconnecting…` });
@@ -198,13 +245,25 @@ export class SpectatorEngine {
       try {
         const health = await this.source.health();
         if (run !== this.runId) return;
-        const cursor = this.store.cursorTick;
-        const missed = await this.source.ledgerEvents({
-          limit: 1000,
-          afterTick: cursor === null ? null : Math.max(0, cursor - 1),
-        });
-        if (run !== this.runId) return;
-        this.store.ingest(missed);
+        let catchUpTruncated = false;
+        if (!this.established) {
+          // This source never completed its initial sync (e.g. the first
+          // health check after switching sources failed). Do NOT resume
+          // from whatever cursor happens to be buffered — do the full
+          // initial sync for THIS source instead.
+          this.descentCache = await this.source.descent();
+          if (run !== this.runId) return;
+          this.store.clear();
+          const initial = await this.source.ledgerEvents({ limit: 200 });
+          if (run !== this.runId) return;
+          this.store.ingest(initial);
+        } else {
+          const caught = await this.fetchCatchUp(this.source, 1000, 1000);
+          if (run !== this.runId) return;
+          this.store.ingest(caught.events);
+          catchUpTruncated = caught.truncated;
+        }
+        this.established = true;
         const mode = this.statusValue.mode ?? 'live';
         const baseUrl = this.statusValue.baseUrl ?? '';
         this.setStatus({
@@ -213,6 +272,7 @@ export class SpectatorEngine {
             ? 'DEMO MODE — showing invented fixture data. No live Underreach is connected.'
             : `Reconnected to the live Feed at ${baseUrl}.`,
         });
+        if (catchUpTruncated) this.noteTruncatedCatchUp();
         this.emitFeed();
         void this.pollLoop(run);
         return;
@@ -262,6 +322,7 @@ export class SpectatorEngine {
       events: this.store.snapshot(),
       cursorTick: this.store.cursorTick,
       droppedCount: this.store.droppedCount,
+      truncatedCatchUps: this.store.truncatedCatchUps,
       bufferedCount: this.store.size,
     };
   }
