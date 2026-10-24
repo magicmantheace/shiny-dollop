@@ -1,6 +1,6 @@
 # Small Business Website Generator
 
-**Status:** PLANNED — project definition only; no working application is implemented by this intake commit.
+**Status:** MVP FUNCTIONAL — 132/132 tests pass (verified 2026-10-23 on Linux); Windows click-through pending owner's hardware.
 
 **Priority:** 10 of 17 in the approved intake queue.
 **Category:** Website authoring tool
