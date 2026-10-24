@@ -34,7 +34,7 @@ No unrestricted shell execution or invisible background persistence; no privileg
 
 **Integrations:** Optional future permission-mediated action interface for Local AI Command Center.
 
-Do not access or modify the other project directories, the original Crawl repository, real personal data, connected accounts, or production systems to test this app. Use fixtures or explicitly approved narrow interfaces.
+Do not access or modify the other project directories, real personal data, connected accounts, or production systems to test this app. Use fixtures or explicitly approved narrow interfaces.
 
 ### Stop/continue logic
 
