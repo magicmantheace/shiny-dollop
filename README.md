@@ -26,7 +26,7 @@ This repository is a permanent, **multi-project** workspace. Its root is an inde
 | 9 | Digital Product Template Factory | [`projects/digital-template-factory/`](projects/digital-template-factory/README.md) | Planned |
 | 10 | Small Business Website Generator | [`projects/business-website-generator/`](projects/business-website-generator/README.md) | Planned |
 | 11 | Personal Knowledge Vault | [`projects/personal-knowledge-vault/`](projects/personal-knowledge-vault/README.md) | Planned |
-| 12 | Desktop Automation Builder | [`projects/desktop-automation-builder/`](projects/desktop-automation-builder/README.md) | Planned |
+| 12 | Desktop Automation Builder | [`projects/desktop-automation-builder/`](projects/desktop-automation-builder/README.md) | MVP functional / review ready |
 | 13 | Local AI Command Center | [`projects/local-ai-command-center/`](projects/local-ai-command-center/README.md) | Planned |
 | 14 | Novel and Worldbuilding Manager | [`projects/worldbuilding-manager/`](projects/worldbuilding-manager/README.md) | Planned |
 | 15 | Procedural Dungeon Designer | [`projects/procedural-dungeon-designer/`](projects/procedural-dungeon-designer/README.md) | Planned |
