@@ -121,7 +121,7 @@ export function requiresApproval(steps: Step[]): boolean {
 // Cancellation registry
 // ---------------------------------------------------------------------------
 
-interface ActiveRunControl {
+export interface ActiveRunControl {
   cancelled: boolean;
   child: ChildProcess | undefined;
 }
@@ -228,32 +228,70 @@ export function previewWorkflow(db: DatabaseSync, wf: Workflow): PreviewAction[]
 // ---------------------------------------------------------------------------
 
 const SCRIPT_TIMEOUT_MS = 60_000;
+/** Grace between the timeout's group SIGTERM and the SIGKILL escalation. */
+const SCRIPT_KILL_ESCALATION_MS = 1_000;
 
 function stepFailed(code: keyof typeof DAB_ERROR_CODES, message: string): DabError {
   return dabError(DAB_ERROR_CODES[code], message);
 }
 
-function runScript(
+export interface ScriptRunResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  killed: boolean;
+  timedOut: boolean;
+}
+
+/**
+ * Run an approved script. Exported for direct unit testing.
+ *
+ * Timeout handling is manual — NOT the `spawn` `timeout` option, which
+ * signals only the immediate child: descendants in the child's (detached)
+ * process group survived it and, by holding the inherited stdout/stderr
+ * pipes open, prevented `close` from ever firing. On timeout this sends
+ * SIGTERM to the whole process group (the same group-kill approach
+ * cancellation uses, via `killChildTree`) and escalates to a group
+ * SIGKILL if the tree has not exited within the escalation grace.
+ */
+export function runScript(
   scriptPath: string,
   args: string[],
   cwd: string,
   ctrl: ActiveRunControl,
-): Promise<{ exitCode: number; stdout: string; stderr: string; killed: boolean }> {
+  timeoutMs: number = SCRIPT_TIMEOUT_MS,
+): Promise<ScriptRunResult> {
   return new Promise((resolvePromise) => {
+    // A run cancelled before this point must never spawn: no child exists
+    // for `cancelRun` to have killed, so without this recheck the script
+    // would launch (and produce side effects) after cancellation.
+    if (ctrl.cancelled) {
+      resolvePromise({ exitCode: -1, stdout: '', stderr: '', killed: true, timedOut: false });
+      return;
+    }
     const child = spawn(scriptPath, args, {
       cwd,
       shell: false,
-      timeout: SCRIPT_TIMEOUT_MS,
       windowsHide: true,
-      // Own process group on POSIX so cancellation can kill the whole tree
-      // (a shell script's children would otherwise outlive it and hold the
-      // stdio pipes open).
+      // Own process group on POSIX so cancellation AND timeout can kill
+      // the whole tree (a shell script's children would otherwise outlive
+      // it and hold the stdio pipes open).
       detached: process.platform !== 'win32',
     });
     ctrl.child = child;
     let stdout = '';
     let stderr = '';
-    let killed = false;
+    let timedOut = false;
+    let escalationTimer: NodeJS.Timeout | undefined;
+    const timeoutTimer = setTimeout(() => {
+      timedOut = true;
+      signalProcessGroup(child, 'SIGTERM');
+      escalationTimer = setTimeout(() => {
+        signalProcessGroup(child, 'SIGKILL');
+      }, SCRIPT_KILL_ESCALATION_MS);
+      escalationTimer.unref();
+    }, timeoutMs);
+    timeoutTimer.unref();
     child.stdout?.on('data', (d: Buffer) => {
       stdout += d.toString();
     });
@@ -264,9 +302,11 @@ function runScript(
       // 'error' fires on spawn failure; 'close' follows and settles the promise.
     });
     child.on('close', (code, signal) => {
+      clearTimeout(timeoutTimer);
+      if (escalationTimer) clearTimeout(escalationTimer);
       if (ctrl.child === child) ctrl.child = undefined;
-      killed = signal === 'SIGKILL' || signal === 'SIGTERM';
-      resolvePromise({ exitCode: code ?? -1, stdout, stderr, killed });
+      const killed = timedOut || signal === 'SIGKILL' || signal === 'SIGTERM';
+      resolvePromise({ exitCode: code ?? -1, stdout, stderr, killed, timedOut });
     });
   });
 }
@@ -346,8 +386,29 @@ async function executeStep(
       if (!scriptStat || !scriptStat.isFile()) {
         throw stepFailed('SCRIPT_NOT_FOUND', `Step "${step.id}": approved script file not found: "${script.path}"`);
       }
+      // Recheck cancellation IMMEDIATELY before spawning: a cancel that
+      // arrived while `await stat(...)` was pending set `ctrl.cancelled`
+      // but had no child process to kill, so without this check the script
+      // would still launch and produce side effects before the post-run
+      // cancellation check noticed. (`runScript` rechecks as well.)
+      if (ctrl.cancelled) {
+        throw stepFailed('STEP_FAILED', `Step "${step.id}" was cancelled before the script started.`);
+      }
       const result = await runScript(script.path, step.args, resolve(wf.sandboxRoot), ctrl);
-      if (ctrl.cancelled || result.killed) {
+      if (ctrl.cancelled) {
+        throw stepFailed('STEP_FAILED', `Step "${step.id}" was cancelled during script execution.`);
+      }
+      // Timeout BEFORE the generic killed check: a timed-out run is
+      // signalled (so `killed` is true) but was NOT cancelled — it must
+      // be reported as a timeout failure.
+      if (result.timedOut) {
+        const detail =
+          `Script "${script.name}" timed out after ${Math.round(SCRIPT_TIMEOUT_MS / 1000)}s and its process group was terminated.` +
+          (result.stdout ? `\nstdout:\n${truncate(result.stdout)}` : '') +
+          (result.stderr ? `\nstderr:\n${truncate(result.stderr)}` : '');
+        throw stepFailed('STEP_FAILED', `Step "${step.id}" script timed out.\n${detail}`);
+      }
+      if (result.killed) {
         throw stepFailed('STEP_FAILED', `Step "${step.id}" was cancelled during script execution.`);
       }
       const detail =
@@ -368,22 +429,32 @@ async function executeStep(
   }
 }
 
-function killChildTree(child: ChildProcess | undefined): void {
-  if (!child) return;
+/**
+ * Signal the child's whole process GROUP on POSIX (children are spawned
+ * `detached`, so the child is a group leader and `-pid` reaches every
+ * descendant); falls back to signalling the child directly when the group
+ * is already gone or on Windows.
+ */
+function signalProcessGroup(child: ChildProcess, signal: 'SIGTERM' | 'SIGKILL'): void {
   const pid = child.pid;
   if (pid !== undefined && process.platform !== 'win32') {
     try {
-      process.kill(-pid, 'SIGKILL');
+      process.kill(-pid, signal);
       return;
     } catch {
       // Group already gone — fall through to a direct kill.
     }
   }
   try {
-    child.kill('SIGKILL');
+    child.kill(signal);
   } catch {
     // Process already exited; the executor will observe the flag.
   }
+}
+
+function killChildTree(child: ChildProcess | undefined): void {
+  if (!child) return;
+  signalProcessGroup(child, 'SIGKILL');
 }
 
 function errMessage(err: unknown): string {

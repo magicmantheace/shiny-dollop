@@ -215,7 +215,8 @@ export function WorkflowEditor({ workflowId, onBack, onRun }: Props) {
     }
   }
 
-  async function handleSave() {
+  /** Returns true only when the workflow is persisted (safe to navigate). */
+  async function handleSave(): Promise<boolean> {
     setSaving(true);
     setError('');
     setSavedMsg('');
@@ -228,11 +229,28 @@ export function WorkflowEditor({ workflowId, onBack, onRun }: Props) {
       setWorkflow(updated);
       setDirty(false);
       setSavedMsg(`Saved — now at version ${updated.version}.`);
+      return true;
     } catch (e) {
       setError(dabErrorMessage(e));
+      return false;
     } finally {
       setSaving(false);
     }
+  }
+
+  /**
+   * "Preview & run" must never silently discard unsaved edits: RunView
+   * loads the PERSISTED workflow, so navigating with a dirty editor both
+   * loses the local changes (the editor unmounts) and previews an older
+   * definition. Save first and navigate only on success; a failed save
+   * keeps the user (and their edits) in the editor with the error shown.
+   */
+  async function handlePreviewRun() {
+    if (dirty) {
+      const saved = await handleSave();
+      if (!saved) return;
+    }
+    onRun(workflowId);
   }
 
   if (loading) return <p>Loading workflow…</p>;
@@ -248,7 +266,8 @@ export function WorkflowEditor({ workflowId, onBack, onRun }: Props) {
           <button
             type="button"
             className="primary"
-            onClick={() => onRun(workflowId)}
+            disabled={saving}
+            onClick={() => void handlePreviewRun()}
           >
             Preview &amp; run
           </button>

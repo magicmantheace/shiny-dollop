@@ -201,6 +201,46 @@ describe('cancellation', () => {
   });
 });
 
+describe('cancellation before script spawn (Codex cycle-2 regression)', () => {
+  it('a cancel arriving while the script path is stat-checked prevents the script from ever spawning', async () => {
+    // The script's ONLY effect is creating this marker — if cancellation
+    // loses the race, the marker proves the script ran anyway.
+    const marker = join(fx.sandbox, 'script-ran.txt');
+    const scriptPath = join(fx.root, 'marker.sh');
+    writeFileSync(scriptPath, `#!/bin/sh\ntouch "${marker}"\n`);
+    chmodSync(scriptPath, 0o755);
+    const script = registerScript(fx.db, 'marker', scriptPath);
+
+    const wf = createWorkflow(fx.db, { name: 'cancel-before-spawn', sandboxRoot: fx.sandbox });
+    updateWorkflow(fx.db, wf.id, {
+      steps: [
+        { id: 'sc', label: 'Marker script', kind: 'run-approved-script', scriptId: script.id, args: [] },
+      ],
+    });
+    const wfNow = getWorkflow(fx.db, wf.id);
+    expect(wfNow).not.toBeNull();
+    const run = createRun(fx.db, {
+      workflowId: wf.id,
+      workflowVersion: wfNow!.version,
+      status: 'running',
+      dryRun: false,
+      steps: wfNow!.steps.map((s) => ({ stepId: s.id, kind: s.kind, label: s.label, outcome: 'pending' as const })),
+    });
+
+    const execPromise = executeRun(fx.db, run.id);
+    // executeRun is parked at `await stat(script.path)` when control returns
+    // here (the fs completion cannot fire during this synchronous turn), so
+    // this cancel lands exactly in the window Codex flagged: the flag is set
+    // but there is no child process to kill yet.
+    cancelRun(fx.db, run.id);
+    const final = await execPromise;
+
+    expect(final.status).toBe('cancelled');
+    expect(final.steps[0]?.outcome).toBe('cancelled');
+    expect(existsSync(marker)).toBe(false);
+  });
+});
+
 describe('retry after the workflow was edited', () => {
   it('executes the archived failed-run version, not the later edit', async () => {
     const wf = createWorkflow(fx.db, { name: 'versioned-retry', sandboxRoot: fx.sandbox });

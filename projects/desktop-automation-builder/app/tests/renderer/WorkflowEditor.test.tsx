@@ -127,6 +127,74 @@ describe('WorkflowEditor', () => {
     expect(screen.getByLabelText('Sandbox root')).toHaveValue('/chosen/dir');
   });
 
+  it('saves unsaved changes before navigating to the run view (Codex cycle-2 regression)', async () => {
+    const onRun = vi.fn();
+    const workflowsUpdate = vi.fn(
+      async (
+        id: string,
+        patch: {
+          name?: string;
+          sandboxRoot?: string;
+          steps?: Workflow['steps'];
+        },
+      ): Promise<Workflow> => ({ ...sampleWorkflow(), id, ...patch, version: 2 }),
+    );
+    installFakeDab({ workflowsUpdate });
+    const user = userEvent.setup();
+    render(<WorkflowEditor workflowId="wf-1" onBack={() => {}} onRun={onRun} />);
+    await screen.findByTestId('step-s1');
+
+    await user.clear(screen.getByLabelText('Name'));
+    await user.type(screen.getByLabelText('Name'), 'Renamed workflow');
+    expect(screen.getByText(/Unsaved changes/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Preview & run' }));
+
+    await vi.waitFor(() => expect(onRun).toHaveBeenCalledTimes(1));
+    expect(onRun).toHaveBeenCalledWith('wf-1');
+    expect(workflowsUpdate).toHaveBeenCalledTimes(1);
+    const call = workflowsUpdate.mock.calls[0];
+    if (!call) throw new Error('expected workflowsUpdate to have been called');
+    expect(call[1].name).toBe('Renamed workflow');
+  });
+
+  it('stays in the editor when saving unsaved changes for Preview & run fails', async () => {
+    const onRun = vi.fn();
+    const workflowsUpdate = vi.fn(async (): Promise<Workflow> => {
+      throw new Error('save exploded');
+    });
+    installFakeDab({ workflowsUpdate });
+    const user = userEvent.setup();
+    render(<WorkflowEditor workflowId="wf-1" onBack={() => {}} onRun={onRun} />);
+    await screen.findByTestId('step-s1');
+
+    await user.clear(screen.getByLabelText('Name'));
+    await user.type(screen.getByLabelText('Name'), 'Unsaved rename');
+
+    await user.click(screen.getByRole('button', { name: 'Preview & run' }));
+
+    await screen.findByText(/save exploded/);
+    expect(workflowsUpdate).toHaveBeenCalledTimes(1);
+    expect(onRun).not.toHaveBeenCalled();
+    // The editor (and the unsaved edit) is still mounted.
+    expect(screen.getByTestId('step-s1')).toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).toHaveValue('Unsaved rename');
+  });
+
+  it('navigates without saving when there are no unsaved changes', async () => {
+    const onRun = vi.fn();
+    const { calls } = installFakeDab();
+    const user = userEvent.setup();
+    render(<WorkflowEditor workflowId="wf-1" onBack={() => {}} onRun={onRun} />);
+    await screen.findByTestId('step-s1');
+
+    await user.click(screen.getByRole('button', { name: 'Preview & run' }));
+
+    expect(onRun).toHaveBeenCalledTimes(1);
+    expect(onRun).toHaveBeenCalledWith('wf-1');
+    expect(calls).not.toContain('workflowsUpdate');
+  });
+
   it('lists version history for inspection', async () => {
     installFakeDab();
     renderEditor();
