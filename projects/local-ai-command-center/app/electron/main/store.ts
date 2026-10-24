@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS task_logs (
   UNIQUE(task_id, seq));
 CREATE TABLE IF NOT EXISTS proposals (
   id TEXT PRIMARY KEY, task_id TEXT NOT NULL, relative_path TEXT NOT NULL, proposed_content TEXT NOT NULL,
-  diff TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, decided_at TEXT);
+  diff TEXT NOT NULL, original_hash TEXT, status TEXT NOT NULL, created_at TEXT NOT NULL, decided_at TEXT);
 CREATE TABLE IF NOT EXISTS audit (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, ts TEXT NOT NULL, actor TEXT NOT NULL, event TEXT NOT NULL, detail TEXT NOT NULL);
 CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit BEGIN SELECT RAISE(ABORT, 'audit is append-only'); END;
@@ -25,11 +25,26 @@ CREATE INDEX IF NOT EXISTS idx_task_logs_task ON task_logs(task_id, seq);
 CREATE INDEX IF NOT EXISTS idx_audit_seq ON audit(seq);
 `;
 
+/** Sentinel stored for proposals persisted before original_hash existed:
+ * their diff base is unknown, so approval must fail the freshness check
+ * instead of guessing (see LEGACY_PROPOSAL_HASH handling in the engine). */
+export const LEGACY_PROPOSAL_HASH = '__lacc_legacy_unknown__';
+
+function migrateProposalsOriginalHash(db: DatabaseSync): void {
+  const cols = db.prepare('PRAGMA table_info(proposals)').all() as unknown as Array<{ name: string }>;
+  if (cols.some((c) => c.name === 'original_hash')) return;
+  db.exec('ALTER TABLE proposals ADD COLUMN original_hash TEXT;');
+  // Existing rows have no recorded diff base. Mark them with the sentinel
+  // so a later approval is rejected as stale rather than applied blindly.
+  db.prepare('UPDATE proposals SET original_hash = ? WHERE original_hash IS NULL').run(LEGACY_PROPOSAL_HASH);
+}
+
 export function openDatabase(dbPath: string): DatabaseSync {
   const db = new DatabaseSync(dbPath);
   db.exec('PRAGMA journal_mode = WAL;');
   db.exec('PRAGMA foreign_keys = ON;');
   db.exec(MIGRATIONS);
+  migrateProposalsOriginalHash(db);
   return db;
 }
 export function transact<T>(db: DatabaseSync, fn: () => T): T {
@@ -90,14 +105,14 @@ export function listTaskLogs(db: DatabaseSync, taskId: string): TaskLogEntry[] {
 }
 
 // proposals
-interface PropRow { id: string; task_id: string; relative_path: string; proposed_content: string; diff: string; status: string; created_at: string; decided_at: string | null; }
+interface PropRow { id: string; task_id: string; relative_path: string; proposed_content: string; diff: string; original_hash: string | null; status: string; created_at: string; decided_at: string | null; }
 function rowToProposal(r: PropRow): Proposal {
-  return { id: r.id, taskId: r.task_id, relativePath: r.relative_path, proposedContent: r.proposed_content, diff: r.diff, status: r.status as ProposalStatus, createdAt: r.created_at, decidedAt: r.decided_at };
+  return { id: r.id, taskId: r.task_id, relativePath: r.relative_path, proposedContent: r.proposed_content, diff: r.diff, originalHash: r.original_hash ?? null, status: r.status as ProposalStatus, createdAt: r.created_at, decidedAt: r.decided_at };
 }
-export function insertProposal(db: DatabaseSync, input: { taskId: string; relativePath: string; proposedContent: string; diff: string }): Proposal {
+export function insertProposal(db: DatabaseSync, input: { taskId: string; relativePath: string; proposedContent: string; diff: string; originalHash: string | null }): Proposal {
   const id = randomUUID(); const ts = nowIso();
-  db.prepare('INSERT INTO proposals (id,task_id,relative_path,proposed_content,diff,status,created_at,decided_at) VALUES (?,?,?,?,?,?,?,?)')
-    .run(id, input.taskId, input.relativePath, input.proposedContent, input.diff, 'pending', ts, null);
+  db.prepare('INSERT INTO proposals (id,task_id,relative_path,proposed_content,diff,original_hash,status,created_at,decided_at) VALUES (?,?,?,?,?,?,?,?,?)')
+    .run(id, input.taskId, input.relativePath, input.proposedContent, input.diff, input.originalHash, 'pending', ts, null);
   return getProposal(db, id)!;
 }
 export function getProposal(db: DatabaseSync, id: string): Proposal | null {

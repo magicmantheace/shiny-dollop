@@ -71,6 +71,7 @@ export function sampleProposal(
     relativePath: 'notes/todo.txt',
     proposedContent: 'hello from the model\n',
     diff: '--- a/notes/todo.txt\n+++ b/notes/todo.txt\n@@ -0,0 +1 @@\n+hello from the model',
+    originalHash: null,
     status: 'pending',
     createdAt: '2026-10-23T18:02:00.000Z',
     decidedAt: null,

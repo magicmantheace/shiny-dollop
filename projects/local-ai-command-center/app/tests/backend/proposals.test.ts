@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { makeFixture } from './helpers.js';
 
@@ -64,6 +65,64 @@ describe('proposals', () => {
     await expect(engine.approve(p.id)).rejects.toMatchObject({ code: 'PATH_OUTSIDE_WORKSPACE' });
     expect(existsSync(join(outside, 'evil.txt'))).toBe(false);
     expect(engine.getProposal(p.id).status).toBe('pending');
+    db.close();
+  });
+  it('approval is rejected when the target file changed after the diff was created', async () => {
+    const { engine, db, config, ws } = makeFixture();
+    engine.saveConfig(config);
+    const { mkdirSync } = await import('node:fs');
+    mkdirSync(join(ws, 'notes'), { recursive: true });
+    writeFileSync(join(ws, 'notes/existing.txt'), 'original\n');
+    engine.submit({ prompt: proposePrompt('notes/existing.txt', 'proposed replacement\n') });
+    await engine.whenIdle();
+    const p = engine.listProposals()[0]!;
+    // The hash of the content the diff was created against is persisted.
+    expect(p.originalHash).toBe(createHash('sha256').update('original\n', 'utf8').digest('hex'));
+    // Intervening edit made while the proposal is pending.
+    writeFileSync(join(ws, 'notes/existing.txt'), 'intervening edit\n');
+    await expect(engine.approve(p.id)).rejects.toMatchObject({ code: 'PROPOSAL_FILE_CHANGED' });
+    // The intervening edit is NOT silently lost, and the proposal stays pending.
+    expect(readFileSync(join(ws, 'notes/existing.txt'), 'utf8')).toBe('intervening edit\n');
+    expect(engine.getProposal(p.id).status).toBe('pending');
+    expect(engine.listAudit(500).some((a) => a.event === 'proposal.stale')).toBe(true);
+    db.close();
+  });
+  it('approval is rejected when the file was deleted after the diff was created', async () => {
+    const { engine, db, config, ws } = makeFixture();
+    engine.saveConfig(config);
+    writeFileSync(join(ws, 'gone.txt'), 'original\n');
+    engine.submit({ prompt: proposePrompt('gone.txt', 'proposed replacement\n') });
+    await engine.whenIdle();
+    const p = engine.listProposals()[0]!;
+    unlinkSync(join(ws, 'gone.txt'));
+    await expect(engine.approve(p.id)).rejects.toMatchObject({ code: 'PROPOSAL_FILE_CHANGED' });
+    expect(existsSync(join(ws, 'gone.txt'))).toBe(false);
+    expect(engine.getProposal(p.id).status).toBe('pending');
+    db.close();
+  });
+  it('approval is rejected when a file appeared at a previously non-existent target', async () => {
+    const { engine, db, config, ws } = makeFixture();
+    engine.saveConfig(config);
+    engine.submit({ prompt: proposePrompt('fresh.txt', 'proposed content\n') });
+    await engine.whenIdle();
+    const p = engine.listProposals()[0]!;
+    expect(p.originalHash).toBeNull();
+    writeFileSync(join(ws, 'fresh.txt'), 'someone else created this\n');
+    await expect(engine.approve(p.id)).rejects.toMatchObject({ code: 'PROPOSAL_FILE_CHANGED' });
+    expect(readFileSync(join(ws, 'fresh.txt'), 'utf8')).toBe('someone else created this\n');
+    expect(engine.getProposal(p.id).status).toBe('pending');
+    db.close();
+  });
+  it('approval still applies when the target file is unchanged since the diff', async () => {
+    const { engine, db, config, ws } = makeFixture();
+    engine.saveConfig(config);
+    writeFileSync(join(ws, 'stable.txt'), 'original\n');
+    engine.submit({ prompt: proposePrompt('stable.txt', 'proposed replacement\n') });
+    await engine.whenIdle();
+    const p = engine.listProposals()[0]!;
+    const approved = await engine.approve(p.id);
+    expect(approved.status).toBe('approved');
+    expect(readFileSync(join(ws, 'stable.txt'), 'utf8')).toBe('proposed replacement\n');
     db.close();
   });
   it('escape path creates no proposal, task completes, audit records', async () => {

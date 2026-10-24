@@ -80,6 +80,14 @@ export interface Proposal {
   proposedContent: string;
   /** Unified-diff-style text of existing content -> proposed content. */
   diff: string;
+  /**
+   * SHA-256 hex hash of the target file's content at the moment the diff
+   * was created; null when the file did not exist then. Approval re-reads
+   * the file and refuses to apply the proposal (PROPOSAL_FILE_CHANGED)
+   * when the current content no longer matches this hash, so an edit made
+   * while the proposal was pending is never silently overwritten.
+   */
+  originalHash: string | null;
   status: ProposalStatus;
   createdAt: string;
   decidedAt: string | null;

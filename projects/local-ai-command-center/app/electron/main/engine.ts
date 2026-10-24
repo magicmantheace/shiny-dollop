@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
@@ -23,6 +24,11 @@ interface RunningEntry {
 }
 
 const PROPOSE_RE = new RegExp('```' + PROPOSE_FENCE + '\\s+path=([^\\s`]+)[^\\n`]*\\n([\\s\\S]*?)```', 'g');
+
+/** SHA-256 hex hash of file content, used as a proposal's diff base. */
+export function hashFileContent(content: string): string {
+  return createHash('sha256').update(content, 'utf8').digest('hex');
+}
 
 export class TaskEngine {
   private readonly db: DatabaseSync;
@@ -168,6 +174,26 @@ export class TaskEngine {
     return p;
   }
 
+  /**
+   * Freshness guard for approval: the diff the user reviewed was computed
+   * against the file content whose hash is stored on the proposal. If the
+   * file has been edited, created, or deleted since then, applying the
+   * proposal would silently discard that intervening state — reject the
+   * approval instead, leave the file and the pending proposal untouched,
+   * and audit the stale attempt. The user can reject the proposal or
+   * re-run the task to regenerate a diff against the current content.
+   */
+  private assertProposalBaseUnchanged(proposal: Proposal, task: Task): void {
+    const current = readExistingFile(task.workspaceRoot, proposal.relativePath);
+    const currentHash = current === null ? null : hashFileContent(current);
+    if (currentHash === proposal.originalHash) return;
+    appendAudit(this.db, 'system', 'proposal.stale', `proposal=${proposal.id} path=${proposal.relativePath}`);
+    throw laccError(
+      LACC_ERROR_CODES.PROPOSAL_FILE_CHANGED,
+      `Proposal ${proposal.id} was not applied: ${proposal.relativePath} changed after the diff was created, so approving it would overwrite the current file contents. The file was left unchanged and the proposal is still pending — reject it, or re-run the task to generate a fresh diff against the current content.`,
+    );
+  }
+
   async approve(id: string): Promise<Proposal> {
     // Claim the decision synchronously, before any await: a concurrent
     // approve/reject for the same proposal must fail instead of also seeing
@@ -181,12 +207,16 @@ export class TaskEngine {
       const task = storeGetTask(this.db, proposal.taskId);
       if (!task) throw laccError(LACC_ERROR_CODES.PROPOSAL_NOT_FOUND, `Proposal ${id} references a missing task.`);
       let full = resolveInWorkspace(task.workspaceRoot, proposal.relativePath);
+      this.assertProposalBaseUnchanged(proposal, task);
       await mkdir(dirname(full), { recursive: true });
       // Re-validate containment after mkdir (newly created dirs are checked)
       // and re-confirm the proposal is still pending before writing.
       full = resolveInWorkspace(task.workspaceRoot, proposal.relativePath);
       const still = storeGetProposal(this.db, id);
       if (!still || still.status !== 'pending') throw laccError(LACC_ERROR_CODES.PROPOSAL_NOT_PENDING, `Proposal ${id} is already ${still?.status ?? 'missing'}.`);
+      // Final freshness check immediately before the write, so an edit
+      // landing during mkdir cannot slip between the check and the apply.
+      this.assertProposalBaseUnchanged(still, task);
       await writeFile(full, proposal.proposedContent, 'utf8');
       const updated = updateProposalStatus(this.db, id, 'approved')!;
       appendAudit(this.db, 'user', 'proposal.approved', `proposal=${id} path=${proposal.relativePath}`);
@@ -344,7 +374,8 @@ export class TaskEngine {
       }
       const existing = readExistingFile(workspaceRoot, rawPath);
       const diff = createDiff(rawPath, existing, content);
-      const proposal = insertProposal(this.db, { taskId, relativePath: rawPath, proposedContent: content, diff });
+      const originalHash = existing === null ? null : hashFileContent(existing);
+      const proposal = insertProposal(this.db, { taskId, relativePath: rawPath, proposedContent: content, diff, originalHash });
       appendAudit(this.db, 'system', 'proposal.created', `proposal=${proposal.id} task=${taskId} path=${rawPath}`);
     }
   }
