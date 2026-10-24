@@ -35,7 +35,7 @@ No unlicensed proprietary rulebooks; AI flavor is never the authoritative rules 
 
 **Integrations:** Can import approved character/world exports from Worldbuilding Manager and dungeon manifests from Procedural Dungeon Designer.
 
-Do not access or modify the other project directories, the original Crawl repository, real personal data, connected accounts, or production systems to test this app. Use fixtures or explicitly approved narrow interfaces.
+Do not access or modify the other project directories, real personal data, connected accounts, or production systems to test this app. Use fixtures or explicitly approved narrow interfaces.
 
 ### Stop/continue logic
 
