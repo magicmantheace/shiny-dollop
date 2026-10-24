@@ -133,6 +133,47 @@ export function isDeniedSystemProcess(imageName: string): boolean {
   return SYSTEM_PROCESS_DENYLIST.some((d) => v === d || v === `${d}.exe` || `${v}.exe` === d);
 }
 
+/**
+ * PowerShell wildcard syntax. `Get-Process -Name` treats `*`, `?` and
+ * `[...]` as pattern syntax and a backtick escapes the next character, so
+ * a "name" like `explor*` matches the protected `explorer.exe` while
+ * passing the exact-match denylist above — quoting does not make the
+ * match literal. Image names are literal file names; wildcard syntax in
+ * one is never legitimate and is rejected by every backend entry point.
+ */
+const WILDCARD_RE = /[*?[\]`]/;
+
+export function hasWildcardSyntax(imageName: string): boolean {
+  return WILDCARD_RE.test(imageName);
+}
+
+/**
+ * Validation problem for a process image name, or undefined when the name
+ * is a literal, non-denylisted executable name. This is the shared backend
+ * validation: preview/activation, both OS layers, and restore consult it,
+ * so no entry point can smuggle a pattern past the denylist.
+ */
+export function processImageNameProblem(imageName: string): string | undefined {
+  const v = imageName.trim();
+  if (!v) return 'process-priority requires params.imageName';
+  if (hasWildcardSyntax(v)) {
+    return (
+      `Process image name "${imageName}" contains wildcard syntax — image names must be literal ` +
+      '(a wildcard pattern could match a protected system process).'
+    );
+  }
+  if (isDeniedSystemProcess(v)) {
+    return `Refusing to change priority of system process "${imageName}".`;
+  }
+  return undefined;
+}
+
+/** Throwing form of processImageNameProblem, for the OS layers. */
+export function assertValidProcessImageName(imageName: string): void {
+  const problem = processImageNameProblem(imageName);
+  if (problem) throw new OsLayerError('refused', problem);
+}
+
 export interface OsLayer {
   /** 'win32' for the real implementation, 'mock' for the in-memory one. */
   readonly platform: 'win32' | 'mock';

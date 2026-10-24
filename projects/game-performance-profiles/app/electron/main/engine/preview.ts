@@ -14,6 +14,7 @@ import {
   describeTarget,
   isValidGuid,
   OsLayer,
+  processImageNameProblem,
 } from '../os-layer/types.js';
 
 let changeSeq = 0;
@@ -105,7 +106,10 @@ export function validateParams(kind: ChangeKind, params: Record<string, string>)
       return undefined;
     }
     case 'process-priority': {
-      if (!(params['imageName'] ?? '').trim()) return 'process-priority requires params.imageName.';
+      // Rejects empty names, wildcard patterns (which Get-Process -Name
+      // would expand onto protected processes) and denylisted processes.
+      const nameProblem = processImageNameProblem(params['imageName'] ?? '');
+      if (nameProblem) return nameProblem;
       const p = (params['priority'] ?? '').trim().toLowerCase();
       if (p !== 'above-normal' && p !== 'high' && p !== 'abovenormal' && p !== 'above_normal') {
         return `Unsupported priority "${params['priority']}" — only above-normal and high are allowed.`;

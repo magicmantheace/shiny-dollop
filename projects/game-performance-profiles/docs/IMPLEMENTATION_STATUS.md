@@ -5,7 +5,15 @@
 - **Branch:** `game-performance-profiles/mvp` (base: origin/main @ d4441fd)
 - **Source/code implemented:** `projects/game-performance-profiles/app/` — Electron 45 + TypeScript strict + Vite, `node:sqlite`, zod IPC, typed preload, React 19 renderer
 - **Build validated:** Yes (Linux) — `npm run build` produces dist/main + dist/renderer
-- **Automated tests executed:** Yes — 69/69 backend vitest tests pass (MockOsLayer, synthetic fixtures) + 87/87 renderer UI tests pass (`app/tests-ui/`, mocked `window.gpp`, jsdom)
+- **Automated tests executed:** Yes — 100/100 backend vitest tests pass (MockOsLayer, synthetic fixtures) + 87/87 renderer UI tests pass (`app/tests-ui/`, mocked `window.gpp`, jsdom)
+
+## Codex fix cycle 1 — 2026-10-24
+
+- Wildcard process names rejected in shared backend validation (`processImageNameProblem`): `Get-Process -Name` expands `*`/`?`/`[...]`/backtick patterns, so `explor*` could have matched protected `explorer.exe` past the exact-match denylist. Enforced in preview/activation validation, MockOsLayer, and WindowsOsLayer (read/apply/restore); the denylist is also re-checked against every resolved process before any mutation.
+- Windows process priority is now single-instance by identity: resolution returns id|name|priority per instance, the first instance is the one read and later set/restored by process id — other instances' original priorities are never touched.
+- Out-of-order rollback over a shared setting rebases instead of clobbering: retiring an older journal entry while a newer entry for the same setting is live splices it out of the chain (successor inherits its `before`, OS untouched), so restore-all still recovers the original state.
+- Reverted the unrelated `projects/game-save-manager/docs/MUSE_HANDOFF.md` edit that had landed on this branch (file now matches main exactly).
+- Regression tests added for all of the above (each verified failing pre-fix); backend 69 → 100 tests, typecheck + lint + build:main clean. Windows-only execution still NOT verified (needs Adam's Windows box).
 - **End-to-end MVP verified:** Partially — backend workflow (seed → preview → approve → apply → rollback → restore-all) verified against the mock on Linux; full stack (main → preload → React UI → IPC) smoke-tested in a real window under xvfb; real Windows execution NOT verified (needs Adam's Windows box)
 - **Owner review:** Pending (coordinator reconciles and pushes; nothing pushed)
 

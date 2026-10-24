@@ -260,6 +260,64 @@ describe('restoreAll', () => {
   });
 });
 
+describe('rollbackProfile — out-of-order rollback over a shared setting', () => {
+  it('rebases the newer profile baseline so restore-all still recovers the original state', async () => {
+    const os = new MockOsLayer(); // Game Mode initially disabled
+    const db = memDb();
+    const a = makeProfile([{ kind: 'game-mode', params: { enabled: 'true' } }], 'A');
+    a.id = 'a';
+    const b = makeProfile([{ kind: 'game-mode', params: { enabled: 'false' } }], 'B');
+    b.id = 'b';
+    const getProfile = (id: string) => (id === 'a' ? a : b);
+
+    await activateProfile(a, os, { db }); // disabled -> enabled (A.before = disabled)
+    await activateProfile(b, os, { db }); // enabled -> disabled (B.before = enabled)
+    expect(os.snapshot.gameModeEnabled).toBe(false);
+
+    // Rolling back the OLDER profile must not restore its `before` over the
+    // newer profile's live state, and must rebase B's baseline to A's before.
+    let restoreCalls = 0;
+    const origRestore = os.restore.bind(os);
+    os.restore = async (kind, params, value) => {
+      restoreCalls += 1;
+      return origRestore(kind, params, value);
+    };
+    const rb = await rollbackProfile('a', os, db, getProfile);
+    expect(rb.ok).toBe(true);
+    expect(rb.rolledBack).toHaveLength(1);
+    expect(restoreCalls).toBe(0); // OS untouched: current state is B's, not A's
+    expect(os.snapshot.gameModeEnabled).toBe(false);
+    const bEntry = db.listJournal().find((e) => e.profileId === 'b')!;
+    expect(bEntry.before).toBe('disabled'); // rebased from 'enabled'
+    expect(bEntry.rolledBackAt).toBeUndefined();
+
+    const all = await restoreAll(os, db, getProfile);
+    expect(all.ok).toBe(true);
+    expect(os.snapshot.gameModeEnabled).toBe(false); // original state recovered
+    expect(db.listUnrolledBack()).toHaveLength(0);
+    db.close();
+  });
+
+  it('in-order rollback of the newest profile still restores through the OS', async () => {
+    const os = new MockOsLayer();
+    const db = memDb();
+    const a = makeProfile([{ kind: 'game-mode', params: { enabled: 'true' } }], 'A');
+    a.id = 'a';
+    const b = makeProfile([{ kind: 'game-mode', params: { enabled: 'false' } }], 'B');
+    b.id = 'b';
+    const getProfile = (id: string) => (id === 'a' ? a : b);
+    await activateProfile(a, os, { db });
+    await activateProfile(b, os, { db });
+    const rb = await rollbackProfile('b', os, db, getProfile);
+    expect(rb.ok).toBe(true);
+    expect(os.snapshot.gameModeEnabled).toBe(true); // B.before, restored live
+    const all = await restoreAll(os, db, getProfile);
+    expect(all.ok).toBe(true);
+    expect(os.snapshot.gameModeEnabled).toBe(false);
+    db.close();
+  });
+});
+
 describe('takeSnapshot', () => {
   it('records synthetic values with the exact approximate note', async () => {
     const os = new MockOsLayer({ initial: { cpuPercent: 33.3, memoryMb: 4096 } });
@@ -282,6 +340,8 @@ describe('validateParams', () => {
     expect(validateParams('process-priority', { imageName: 'g.exe', priority: 'realtime' })).toMatch(/only above-normal/);
     expect(validateParams('process-priority', { imageName: '', priority: 'high' })).toMatch(/imageName/);
     expect(validateParams('process-priority', { imageName: 'g.exe', priority: 'high' })).toBeUndefined();
+    expect(validateParams('process-priority', { imageName: 'explor*', priority: 'high' })).toMatch(/wildcard/i);
+    expect(validateParams('process-priority', { imageName: 'explorer.exe', priority: 'high' })).toMatch(/system process/i);
     expect(validateParams('fullscreen-optimizations', { childKey: '' })).toMatch(/childKey/);
     expect(validateParams('game-mode', {})).toBeUndefined();
   });

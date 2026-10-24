@@ -14,6 +14,12 @@
  * - Process priority:     `tasklist` to find the process by image name;
  *                         .NET `System.Diagnostics.Process.PriorityClass`
  *                         (via powershell.exe) to set it. Only AboveNormal/High.
+ *                         Image names must be literal (wildcard syntax is
+ *                         rejected — Get-Process -Name would expand it onto
+ *                         protected processes), the denylist is re-checked
+ *                         against every resolved process, and reads/sets
+ *                         address ONE instance by process id so other
+ *                         instances' priorities are never touched.
  * - Fullscreen optim.:    per-game values GameDVR_DXGIHonorFSEWindowsCompatible
  *                         and GameDVR_FSEBehaviorMode under
  *                         HKCU\System\GameConfigStore\Children\<game-key>.
@@ -23,6 +29,7 @@ import { execFile } from 'node:child_process';
 import type { Capability, ChangeKind } from '../../../shared/gpp-types.js';
 import {
   AllowedPriority,
+  assertValidProcessImageName,
   isDeniedSystemProcess,
   normalizeEnabled,
   normalizeGuid,
@@ -191,7 +198,7 @@ export class WindowsOsLayer implements OsLayer {
         return this.readPowerPlanRaw();
       case 'process-priority': {
         const image = (params['imageName'] ?? '').trim();
-        if (!image) throw new OsLayerError('refused', 'process-priority requires params.imageName');
+        assertValidProcessImageName(image);
         return this.readPriorityRaw(image);
       }
       case 'fullscreen-optimizations': {
@@ -219,10 +226,7 @@ export class WindowsOsLayer implements OsLayer {
       }
       case 'process-priority': {
         const image = (params['imageName'] ?? '').trim();
-        if (!image) throw new OsLayerError('refused', 'process-priority requires params.imageName');
-        if (isDeniedSystemProcess(image)) {
-          throw new OsLayerError('refused', `Refusing to change priority of system process "${image}".`);
-        }
+        assertValidProcessImageName(image);
         const priority = normalizePriority(params['priority'] ?? '');
         await this.setPriorityRaw(image, priority);
         return;
@@ -254,10 +258,7 @@ export class WindowsOsLayer implements OsLayer {
         return;
       case 'process-priority': {
         const image = (params['imageName'] ?? '').trim();
-        if (!image) throw new OsLayerError('refused', 'process-priority requires params.imageName');
-        if (isDeniedSystemProcess(image)) {
-          throw new OsLayerError('refused', `Refusing to change priority of system process "${image}".`);
-        }
+        assertValidProcessImageName(image);
         const restored = restorePriorityFromString(value);
         await this.setPriorityRaw(image, restored);
         return;
@@ -319,29 +320,54 @@ export class WindowsOsLayer implements OsLayer {
     return m[1].toLowerCase();
   }
 
-  private async readPriorityRaw(imageName: string): Promise<string> {
+  /**
+   * Resolve every running instance of the (already wildcard-validated,
+   * literal) image name to its identity: id, process name, priority class.
+   * Resolution is a read — nothing is mutated here.
+   */
+  private async resolveProcessesRaw(imageName: string): Promise<ResolvedProcess[]> {
     this.requireWin32();
     const out = await run('powershell.exe', [
       '-NoProfile', '-NonInteractive', '-Command',
-      `$p=Get-Process -Name '${psEscape(baseName(imageName))}' -ErrorAction SilentlyContinue | Select-Object -First 1;` +
-        'if ($p) { $p.PriorityClass.ToString() } else { throw "not-found" }',
+      `$ps=Get-Process -Name '${psEscape(baseName(imageName))}' -ErrorAction SilentlyContinue;` +
+        'if (-not $ps) { throw "not-found" };' +
+        '$ps | ForEach-Object { "$($_.Id)|$($_.ProcessName)|$($_.PriorityClass.ToString())" }',
     ]).catch((e) => {
       if (/not-found/.test(String(e))) {
         throw new OsLayerError('not-found', `Process "${imageName}" is not running.`);
       }
       throw e;
     });
-    return out.trim().toLowerCase().replace(/([a-z])([A-Z])/g, '$1-$2');
+    const procs = parseResolvedProcesses(out);
+    if (procs.length === 0) {
+      throw new OsLayerError('not-found', `Process "${imageName}" is not running.`);
+    }
+    return procs;
+  }
+
+  private async readPriorityRaw(imageName: string): Promise<string> {
+    // Single-instance contract (shared with setPriorityRaw): the FIRST
+    // resolved instance is the one whose priority is recorded — and the
+    // only one a later set/restore will ever touch — so other instances'
+    // original priorities are never read, changed, or overwritten.
+    const [first] = await this.resolveProcessesRaw(imageName);
+    return normalizePriorityClassName(first!.priorityClass);
   }
 
   private async setPriorityRaw(imageName: string, priority: AllowedPriority | RestorePriority): Promise<void> {
     this.requireWin32();
+    const procs = await this.resolveProcessesRaw(imageName);
+    // Enforce the denylist against every RESOLVED process before any
+    // mutation — the requested name was validated as a literal, and this
+    // closes the loop on what the OS actually matched.
+    assertNoResolvedProcessDenied(procs);
+    // Mutate exactly the same single instance readPriorityRaw records,
+    // addressed by process id — never every instance sharing the name.
+    const target = procs[0]!;
     const psClass = priorityClassName(priority);
     await run('powershell.exe', [
       '-NoProfile', '-NonInteractive', '-Command',
-      `$ps=Get-Process -Name '${psEscape(baseName(imageName))}' -ErrorAction SilentlyContinue;` +
-        'if (-not $ps) { throw "not-found" };' +
-        `$ps | ForEach-Object { $_.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::${psClass} }`,
+      buildSetPriorityByIdScript(target.id, psClass),
     ]).catch((e) => {
       if (/not-found/.test(String(e))) {
         throw new OsLayerError('not-found', `Process "${imageName}" is not running.`);
@@ -410,4 +436,63 @@ function restorePriorityFromString(value: string): RestorePriority {
   if (v === 'below-normal' || v === 'belownormal') return 'BelowNormal';
   if (v === 'idle') return 'Idle';
   return 'Normal';
+}
+
+// -- resolved-process helpers (pure; exported for tests) --------------------
+
+/** One running process instance, as resolved by resolveProcessesRaw(). */
+export interface ResolvedProcess {
+  id: number;
+  processName: string;
+  priorityClass: string;
+}
+
+/** Parse `id|processName|priorityClass` lines; blank/garbage lines are ignored. */
+export function parseResolvedProcesses(output: string): ResolvedProcess[] {
+  const procs: ResolvedProcess[] = [];
+  for (const line of output.split(/\r?\n/)) {
+    const m = /^(\d+)\|([^|]+)\|([A-Za-z]+)$/.exec(line.trim());
+    if (m) {
+      procs.push({ id: Number(m[1]), processName: m[2]!, priorityClass: m[3]! });
+    }
+  }
+  return procs;
+}
+
+/**
+ * Refuse (before any mutation) when ANY resolved process is on the
+ * system-process denylist. Get-Process returns process names without the
+ * `.exe` suffix, so both forms are checked via isDeniedSystemProcess.
+ */
+export function assertNoResolvedProcessDenied(procs: readonly ResolvedProcess[]): void {
+  for (const p of procs) {
+    if (isDeniedSystemProcess(p.processName) || isDeniedSystemProcess(`${p.processName}.exe`)) {
+      throw new OsLayerError(
+        'refused',
+        `Refusing to change priority of system process "${p.processName}" (resolved process id ${p.id}).`,
+      );
+    }
+  }
+}
+
+/** 'AboveNormal' -> 'above-normal', 'Normal' -> 'normal', etc. */
+export function normalizePriorityClassName(raw: string): string {
+  return raw.trim().replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+}
+
+/**
+ * PowerShell that sets the priority of exactly ONE process, addressed by
+ * id — the same instance readPriorityRaw recorded. Setting by id (rather
+ * than re-querying by name and touching every match) is what keeps other
+ * instances' original priorities intact across an activate/rollback cycle.
+ */
+export function buildSetPriorityByIdScript(id: number, psClass: string): string {
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new OsLayerError('refused', `Invalid process id "${id}".`);
+  }
+  return (
+    `$p=Get-Process -Id ${id} -ErrorAction SilentlyContinue;` +
+    'if (-not $p) { throw "not-found" };' +
+    `$p.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::${psClass}`
+  );
 }

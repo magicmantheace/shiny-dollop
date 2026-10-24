@@ -196,6 +196,18 @@ export class GppDatabase {
     });
   }
 
+  /**
+   * Rewrite a journal entry's `before` value. Used by out-of-order rollback
+   * rebasing: when an older entry is retired while a newer entry for the
+   * same setting is still live, the newer entry inherits the older entry's
+   * baseline so a later restore still recovers the true original value.
+   */
+  updateJournalBefore(id: string, before: string): void {
+    this.transaction(() => {
+      this.db.prepare('UPDATE journal SET before_value = ? WHERE id = ?').run(before, id);
+    });
+  }
+
   // -- snapshots -------------------------------------------------------------
 
   addSnapshot(s: Omit<ResourceSnapshot, 'id' | 'takenAt'>): ResourceSnapshot {

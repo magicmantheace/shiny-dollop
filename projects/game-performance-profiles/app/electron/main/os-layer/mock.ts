@@ -15,8 +15,8 @@
 import type { Capability, ChangeKind } from '../../../shared/gpp-types.js';
 import {
   SYSTEM_PROCESS_DENYLIST,
+  assertValidProcessImageName,
   describeDesired,
-  isDeniedSystemProcess,
   normalizeEnabled,
   normalizeGuid,
   normalizePriority,
@@ -131,8 +131,9 @@ export class MockOsLayer implements OsLayer {
       case 'power-plan':
         return this.state.activePowerGuid;
       case 'process-priority': {
-        const image = (params['imageName'] ?? '').trim().toLowerCase();
-        if (!image) throw new OsLayerError('refused', 'process-priority requires params.imageName');
+        const raw = (params['imageName'] ?? '').trim();
+        assertValidProcessImageName(raw);
+        const image = raw.toLowerCase();
         return this.state.processPriorities[image] ?? 'normal';
       }
       case 'fullscreen-optimizations': {
@@ -162,8 +163,8 @@ export class MockOsLayer implements OsLayer {
       }
       case 'process-priority': {
         const image = (params['imageName'] ?? '').trim();
-        if (!image) throw new OsLayerError('refused', 'process-priority requires params.imageName');
-        if (isDeniedSystemProcess(image) || this.extraDenied.has(image.toLowerCase())) {
+        assertValidProcessImageName(image);
+        if (this.extraDenied.has(image.toLowerCase())) {
           throw new OsLayerError(
             'refused',
             `Refusing to change priority of system process "${image}" (denylist: ${SYSTEM_PROCESS_DENYLIST.join(', ')}).`,
@@ -196,8 +197,8 @@ export class MockOsLayer implements OsLayer {
         return;
       case 'process-priority': {
         const image = (params['imageName'] ?? '').trim();
-        if (!image) throw new OsLayerError('refused', 'process-priority requires params.imageName');
-        if (isDeniedSystemProcess(image) || this.extraDenied.has(image.toLowerCase())) {
+        assertValidProcessImageName(image);
+        if (this.extraDenied.has(image.toLowerCase())) {
           throw new OsLayerError('refused', `Refusing to change priority of system process "${image}".`);
         }
         this.state.processPriorities[image.toLowerCase()] = value;
