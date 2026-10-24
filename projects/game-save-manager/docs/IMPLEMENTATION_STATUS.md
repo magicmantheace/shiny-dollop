@@ -1,21 +1,73 @@
 # Implementation status — Universal Game Save Manager
 
-- **Overall status:** PLANNED (documentation setup only)
+- **Overall status:** MVP functional / review ready (2026-10-23)
 - **Priority:** 1/17
-- **Source/code implemented:** None as part of project intake
-- **Build validated:** No
-- **Automated tests executed:** No
-- **End-to-end MVP verified:** No
-- **Owner review:** Pending
+- **Source/code implemented:** Full MVP in `projects/game-save-manager/app/` (Electron 45 + React 19 + TypeScript strict + Vite, `node:sqlite`, zod-validated IPC)
+- **Build validated:** Yes — `npm run typecheck`, `lint`, `build`, `smoke` all green on Linux (2026-10-23), independently re-run by reviewer
+- **Automated tests executed:** Yes — **74/74 pass** (50 backend with real fs fixtures + 24 UI), 2026-10-23
+- **End-to-end MVP verified:** Yes on Linux via automated tests on real fixtures (backup → modify → restore → byte-identical recovery); **pending on real Windows hardware** per the test plan's platform-gating rule
+- **Owner review:** Pending — PR shiny-dollop #4 open and unmerged
+
+## Codex-review fixes (2026-10-23, on `game-save-manager/initial-development`)
+
+All five findings from the Codex review of PR #4 were verified real and fixed:
+
+1. **manifest.json collision (data loss):** backup metadata moved from `<backupDir>/manifest.json` (inside the mirrored tree) to a sibling `<backupDir>.manifest.json`. Reads check the sibling first, fall back to the legacy in-tree path — old backups still verify/restore. `verifyBackup`/restore never hash or restore the metadata as a user file; for legacy backups a `manifest.json` entry is skipped (its on-disk bytes are old metadata, not user data).
+2. **Safety backup skipped files:** `restoreBackup` aborts with `SAFETY_BACKUP_INCOMPLETE` (naming the skipped files) before any writes when the pre-restore safety backup is incomplete.
+3. **Hash-before-copy race:** after each `copyFile`, the destination bytes are re-hashed and compared; on mismatch the partial backup dir is discarded, no DB row is recorded, and `BACKUP_COPY_MISMATCH` names the file.
+4. **Restore terminal event:** the `backups.restore` IPC handler now emits `backup.completed` on success and `backup.failed` on failure, so the UI no longer sticks on "Backing up…".
+5. **Steam userdata on secondary libraries:** userdata is searched under each Steam *client* install root (`<clientRoot>/userdata`), not derived from the game's library dir — `toInstalledGames` takes the client roots explicitly.
+
+New regression tests (8): sibling-manifest preservation incl. byte-identical restore of a user-owned `manifest.json`; legacy in-tree metadata verify+restore; legacy collision skip; safety-backup-incomplete abort before any writes; deterministic hash-race failure; restore IPC `backup.completed`/`backup.failed` emission; secondary-library userdata discovery.
 
 ## First milestone
 
-Register a manual save folder, produce a dated, checksum-verified snapshot, list backups, and restore one with a safety copy and explicit confirmation.
+Register a manual save folder, produce a dated, checksum-verified snapshot, list backups, and restore one with a safety copy and explicit confirmation. **Done.**
+
+## Verified (2026-10-23, Linux VM)
+
+- [x] Scaffold: package.json + lockfile, tsconfigs (strict), vite, vitest, eslint, electron-builder NSIS+zip config, dev/smoke scripts — `npm ci` clean.
+- [x] `npm run typecheck` — renderer, main, preload all clean.
+- [x] `npm run lint` — clean.
+- [x] `npm run test` — **74/74 pass**: backend 50 (schemas 6, migrations 2, backup-engine 19, discovery 14, scheduler 7, ipc-handlers 2) + UI 24. Real fs fixtures under `os.tmpdir()` for backend; jsdom for UI.
+- [x] `npm run build` — vite renderer + tsc main/preload succeed.
+- [x] `npm run smoke` — production bundle opened a real Electron window under xvfb (`SMOKE_OK`).
+- [x] SQLite schema: `games`, `backups`, `backup_files`, `schedules`, `schema_migrations`; migrations idempotent.
+- [x] Backup engine: create (hash/copy/manifest/DB), change-detection skip, verify (checksum/size/missing), restore (`confirmed: true` gate, pre-restore safety backup, additive overwrite, post-restore check).
+- [x] Locked/unreadable files skipped with warnings; missing save dir → actionable `SAVE_DIR_MISSING`.
+- [x] Discovery: VDF parser, Steam libraries + manifests (corrupt skipped), Epic `.item` (corrupt skipped), Battle.net detection, candidates with `verified-path` / `pattern-match` evidence, case-insensitive dedup, no invented locations.
+- [x] Scheduler: due-run, `last_run_at` bookkeeping, overlap guard, failure isolation; timers don't survive restarts (documented).
+- [x] IPC: 15 channels + `games.chooseFolder` + 3 events, zod-validated, typed `window.saveManager` preload.
+- [x] React UI (library, add-game, detail, verify, restore, schedules) built against the `shared/` contract; 24/24 UI tests pass.
+- [x] Portable Windows zip built on Linux and contents-verified (gitignored, not committed).
+
+## Pending (need Windows / owner)
+
+- [ ] Real Steam discovery against an actual Steam install.
+- [ ] Real Epic discovery against `%ProgramData%\Epic\...\Manifests`.
+- [ ] Battle.net launcher detection on a real machine.
+- [ ] `\\?\` long-path prefix behavior on paths ≥240 chars.
+- [ ] Drive-letter paths (`D:\...`), disconnected-drive errors.
+- [ ] Native folder picker (`games.chooseFolder`) in the packaged app.
+- [ ] Locked-file skip with a real game holding saves open.
+- [ ] Scheduler firing across sleep/wake and app restart.
+- [ ] Portable zip first run on the owner's Windows machine.
+- [ ] `npm run package:win` — NSIS installer builds and installs.
+- [ ] Screenshots from the real app (no mock screenshots).
+
+## Deliberately out of scope (MVP)
+
+- Backup deletion / retention pruning — no deletion features at all.
+- Battle.net game auto-discovery — manual registration only, by design.
+- Restores never delete files unknown to the backup (additive overwrite).
+- Scheduler does not backfill missed runs while the app was closed; timers do not survive reboots.
+- No cloud sync, no per-file selective restore, no update mechanism.
 
 ## Next action
 
-Have Muse read `AGENTS.md`, `docs/PRODUCT_SPEC.md` and `docs/MUSE_HANDOFF.md`, implement and validate the first vertical slice on a project-scoped branch.
+Owner review of PR #4. After merge, next milestone: backup retention settings, or proceed per the 17-project queue (Project 2: Concrete Operations Manager, already in development on `concrete-operations-manager/mvp`).
 
 ## Acceptance notes
 
-Record actual commits, tests, blockers and PR links here when implementation begins. Do not infer success from the existence of this planning document.
+- 2026-10-23: branch `game-save-manager/initial-development` rebased onto merged `main` (intake catalog `d4441fd`); docs reconciled to intake filenames (`docs/PRODUCT_SPEC.md`, `docs/IMPLEMENTATION_STATUS.md`); implementation-only files `docs/SPEC.md` and `docs/IMPLEMENTATION_TRACKER.md` folded in and removed.
+- Do not infer success from the existence of planning documents — every claim above was executed on the Linux VM with evidence, or is explicitly marked pending.
