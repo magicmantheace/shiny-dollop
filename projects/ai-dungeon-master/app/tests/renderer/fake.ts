@@ -89,7 +89,11 @@ export class FakeAidmApi implements AidmApi {
   }
 
   async sessionsList(campaignId: string): Promise<never[]> {
-    return [...this.sessions.values()].filter((s) => s.campaignId === campaignId) as never[];
+    // Return fresh copies, like real IPC deserialization: callers must
+    // not rely on session object identity surviving a refresh.
+    return [...this.sessions.values()]
+      .filter((s) => s.campaignId === campaignId)
+      .map((s) => ({ ...s })) as never[];
   }
 
   async sessionsCreate(campaignId: string, input: { title: string }) {
@@ -151,6 +155,20 @@ export class FakeAidmApi implements AidmApi {
   }
 
   async charactersDelete(id: string): Promise<void> {
+    const character = this.characters.get(id);
+    if (!character) throw aidmError(AIDM_ERROR_CODES.CHARACTER_NOT_FOUND, 'Character not found.');
+    const active = [...this.encounters.values()].find(
+      (e) =>
+        e.campaignId === character.campaignId &&
+        e.status === 'active' &&
+        e.combatants.some((c) => c.characterId === id),
+    );
+    if (active) {
+      throw aidmError(
+        AIDM_ERROR_CODES.INPUT_INVALID,
+        `${character.name} is a combatant in the active encounter "${active.name}". End the encounter before deleting this character.`,
+      );
+    }
     this.characters.delete(id);
   }
 

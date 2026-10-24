@@ -56,6 +56,82 @@ describe('campaign export / import', () => {
     expect((await fx.service.charactersList(copy.id)).map((c) => c.name)).toEqual(['Wren']);
   });
 
+  it('rejects a bundle whose character has stats: null and writes nothing', async () => {
+    const fx = makeFixture();
+    const { campaign } = await setupCampaign(fx);
+    const text = await fx.service.exportCampaign(campaign.id);
+    const bundle = JSON.parse(text) as { characters: Array<Record<string, unknown>> };
+    bundle.characters[0]!.stats = null;
+    const fx2 = makeFixture();
+    await expect(fx2.service.importCampaign(JSON.stringify(bundle))).rejects.toMatchObject({
+      code: 'IMPORT_INVALID',
+    });
+    // Validation happens before any write: the target DB stays empty.
+    expect(await fx2.service.campaignsList()).toHaveLength(0);
+  });
+
+  it('rejects bundles with dangling references or out-of-range fields', async () => {
+    const fx = makeFixture();
+    const { campaign } = await setupCampaign(fx);
+    const text = await fx.service.exportCampaign(campaign.id);
+
+    // Encounter combatant pointing at a character that is not in the bundle.
+    const dangling = JSON.parse(text) as {
+      encounters: Array<Record<string, unknown>>;
+      characters: Array<{ id: string }>;
+    };
+    // Build an encounter by hand referencing a ghost character.
+    dangling.encounters = [
+      {
+        id: 'enc-ghost',
+        campaignId: campaign.id,
+        sessionId: null,
+        name: 'Ghost fight',
+        status: 'active',
+        combatants: [
+          {
+            characterId: 'char-does-not-exist',
+            name: 'Ghost',
+            initiative: {
+              notation: '2d6',
+              spec: { count: 2, sides: 6, modifier: 0 },
+              dice: [3, 4],
+              modifier: 0,
+              total: 7,
+              stateBefore: 1,
+              stateAfter: 2,
+            },
+            initiativeTotal: 7,
+          },
+        ],
+        turnIndex: 0,
+        round: 1,
+        createdAt: '2026-10-23T00:00:00.000Z',
+        endedAt: null,
+      },
+    ];
+    await expect(fx.service.importCampaign(JSON.stringify(dangling))).rejects.toMatchObject({
+      code: 'IMPORT_INVALID',
+    });
+
+    // Stat outside the ruleset range (-2..+4).
+    const badStat = JSON.parse(text) as { characters: Array<{ stats: Record<string, number> }> };
+    badStat.characters[0]!.stats.might = 99;
+    await expect(fx.service.importCampaign(JSON.stringify(badStat))).rejects.toMatchObject({
+      code: 'IMPORT_INVALID',
+    });
+
+    // Session belonging to a different campaign id.
+    const foreign = JSON.parse(text) as { sessions: Array<{ campaignId: string }> };
+    if (foreign.sessions[0]) foreign.sessions[0].campaignId = 'camp-other';
+    await expect(fx.service.importCampaign(JSON.stringify(foreign))).rejects.toMatchObject({
+      code: 'IMPORT_INVALID',
+    });
+
+    // None of the rejected imports created a second copy of the campaign.
+    expect(await fx.service.campaignsList()).toHaveLength(1);
+  });
+
   it('rejects corrupt and unknown-major campaign bundles with named errors', async () => {
     const fx = makeFixture();
     await expect(fx.service.importCampaign('not json')).rejects.toMatchObject({

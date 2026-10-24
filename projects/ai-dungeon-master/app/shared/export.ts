@@ -127,16 +127,256 @@ export function buildCampaignBundle(bundle: CampaignBundle): string {
   return stableStringify({ ...bundle, format: CAMPAIGN_FORMAT, formatVersion: FORMAT_VERSION });
 }
 
+function invalid(message: string): never {
+  throw aidmError(AIDM_ERROR_CODES.IMPORT_INVALID, message);
+}
+
+function reqRecord(value: unknown, what: string): Record<string, unknown> {
+  if (!isRecord(value)) invalid(`${what} must be an object.`);
+  return value as Record<string, unknown>;
+}
+
+function reqStr(obj: Record<string, unknown>, key: string, what: string): string {
+  const value = obj[key];
+  if (typeof value !== 'string') invalid(`${what} has a missing or non-string "${key}".`);
+  return value as string;
+}
+
+function reqNullableStr(obj: Record<string, unknown>, key: string, what: string): string | null {
+  const value = obj[key];
+  if (value !== null && typeof value !== 'string') {
+    invalid(`${what} has a non-string, non-null "${key}".`);
+  }
+  return value as string | null;
+}
+
+function reqFiniteNum(obj: Record<string, unknown>, key: string, what: string): number {
+  const value = obj[key];
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    invalid(`${what} has a missing or non-numeric "${key}".`);
+  }
+  return value as number;
+}
+
+function reqInt(
+  obj: Record<string, unknown>,
+  key: string,
+  what: string,
+  min: number,
+  max: number,
+): number {
+  const value = reqFiniteNum(obj, key, what);
+  if (!Number.isInteger(value) || value < min || value > max) {
+    invalid(`${what} has an out-of-range "${key}" (expected an integer ${min}..${max}).`);
+  }
+  return value;
+}
+
+function reqStrArray(obj: Record<string, unknown>, key: string, what: string): string[] {
+  const value = obj[key];
+  if (!Array.isArray(value) || value.some((v) => typeof v !== 'string')) {
+    invalid(`${what} has a missing or malformed "${key}" list.`);
+  }
+  return value as string[];
+}
+
+function reqEnum<T extends string>(
+  obj: Record<string, unknown>,
+  key: string,
+  what: string,
+  allowed: readonly T[],
+): T {
+  const value = obj[key];
+  if (typeof value !== 'string' || !allowed.includes(value as T)) {
+    invalid(`${what} has an invalid "${key}".`);
+  }
+  return value as T;
+}
+
+function checkUniqueIds(records: Array<{ id: string }>, what: string): Set<string> {
+  const ids = new Set<string>();
+  for (const r of records) {
+    if (ids.has(r.id)) invalid(`Campaign import has a duplicate ${what} id "${r.id}".`);
+    ids.add(r.id);
+  }
+  return ids;
+}
+
+const ATTRIBUTE_KEYS = ['might', 'agility', 'wits', 'spirit'] as const;
+const LOG_KINDS = [
+  'roll', 'check', 'damage', 'heal', 'note', 'encounter', 'narration', 'import', 'system',
+] as const;
+
+function validateRollOutcome(value: unknown, what: string): void {
+  const outcome = reqRecord(value, what);
+  reqStr(outcome, 'notation', what);
+  const spec = reqRecord(outcome.spec, `${what} spec`);
+  reqInt(spec, 'count', `${what} spec`, 1, 100_000);
+  reqInt(spec, 'sides', `${what} spec`, 2, 100_000);
+  reqFiniteNum(spec, 'modifier', `${what} spec`);
+  const dice = outcome.dice;
+  if (!Array.isArray(dice) || dice.some((d) => typeof d !== 'number' || !Number.isFinite(d))) {
+    invalid(`${what} has a malformed "dice" list.`);
+  }
+  reqFiniteNum(outcome, 'modifier', what);
+  reqFiniteNum(outcome, 'total', what);
+  reqFiniteNum(outcome, 'stateBefore', what);
+  reqFiniteNum(outcome, 'stateAfter', what);
+}
+
+/**
+ * Validate a campaign bundle completely — every record, field type, and
+ * cross-reference — before anything is written to the database. A bundle
+ * that merely has the right envelope and array-shaped collections is NOT
+ * trusted: e.g. a character with `stats: null` must be rejected here, not
+ * persisted and crashed on later by the renderer.
+ */
 export function parseCampaignBundle(text: string): CampaignBundle {
   const env = parseJsonObject(text, 'Campaign import');
   checkFormat(env, CAMPAIGN_FORMAT, 'Campaign import');
-  const campaign = env.campaign;
-  if (!isRecord(campaign) || typeof campaign.id !== 'string' || typeof campaign.name !== 'string') {
-    throw aidmError(AIDM_ERROR_CODES.IMPORT_INVALID, 'Campaign import has no valid campaign record.');
+
+  const campaignRaw = reqRecord(env.campaign, 'Campaign import campaign');
+  const campaignId = reqStr(campaignRaw, 'id', 'Campaign');
+  if (campaignId.length === 0) invalid('Campaign has an empty "id".');
+  reqStr(campaignRaw, 'name', 'Campaign');
+  reqStr(campaignRaw, 'setting', 'Campaign');
+  reqStr(campaignRaw, 'seed', 'Campaign');
+  reqFiniteNum(campaignRaw, 'diceState', 'Campaign');
+  reqStr(campaignRaw, 'createdAt', 'Campaign');
+  reqStr(campaignRaw, 'updatedAt', 'Campaign');
+
+  const sessionsRaw = requireArray(env, 'sessions', 'Campaign import');
+  const charactersRaw = requireArray(env, 'characters', 'Campaign import');
+  const encountersRaw = requireArray(env, 'encounters', 'Campaign import');
+  const memoryRaw = requireArray(env, 'memory', 'Campaign import');
+  const logRaw = requireArray(env, 'log', 'Campaign import');
+
+  const sessions = sessionsRaw.map((item, i) => {
+    const what = `Campaign import session #${i + 1}`;
+    const s = reqRecord(item, what);
+    const id = reqStr(s, 'id', what);
+    if (reqStr(s, 'campaignId', what) !== campaignId) {
+      invalid(`${what} does not belong to the imported campaign.`);
+    }
+    reqStr(s, 'title', what);
+    reqStr(s, 'notes', what);
+    reqStr(s, 'startedAt', what);
+    reqNullableStr(s, 'endedAt', what);
+    return { id };
+  });
+  const sessionIds = checkUniqueIds(sessions, 'session');
+
+  const characters = charactersRaw.map((item, i) => {
+    const what = `Campaign import character #${i + 1}`;
+    const c = reqRecord(item, what);
+    const id = reqStr(c, 'id', what);
+    if (reqStr(c, 'campaignId', what) !== campaignId) {
+      invalid(`${what} does not belong to the imported campaign.`);
+    }
+    reqEnum(c, 'kind', what, ['pc', 'npc'] as const);
+    reqStr(c, 'name', what);
+    reqStr(c, 'archetype', what);
+    const stats = reqRecord(c.stats, `${what} stats`);
+    for (const attr of ATTRIBUTE_KEYS) {
+      reqInt(stats, attr, `${what} stats`, -2, 4);
+    }
+    const hpMax = reqInt(c, 'hpMax', what, 1, 10_000);
+    reqInt(c, 'hpCurrent', what, 0, hpMax);
+    reqStrArray(c, 'inventory', what);
+    reqStr(c, 'notes', what);
+    reqStr(c, 'createdAt', what);
+    reqStr(c, 'updatedAt', what);
+    return { id };
+  });
+  const characterIds = checkUniqueIds(characters, 'character');
+
+  for (const [i, item] of encountersRaw.entries()) {
+    const what = `Campaign import encounter #${i + 1}`;
+    const e = reqRecord(item, what);
+    reqStr(e, 'id', what);
+    if (reqStr(e, 'campaignId', what) !== campaignId) {
+      invalid(`${what} does not belong to the imported campaign.`);
+    }
+    const sessionId = reqNullableStr(e, 'sessionId', what);
+    if (sessionId !== null && !sessionIds.has(sessionId)) {
+      invalid(`${what} references an unknown session.`);
+    }
+    reqStr(e, 'name', what);
+    reqEnum(e, 'status', what, ['active', 'ended'] as const);
+    const combatants = e.combatants;
+    if (!Array.isArray(combatants)) invalid(`${what} has a missing "combatants" list.`);
+    for (const [j, cb] of combatants.entries()) {
+      const cbWhat = `${what} combatant #${j + 1}`;
+      const combatant = reqRecord(cb, cbWhat);
+      const characterId = reqStr(combatant, 'characterId', cbWhat);
+      if (!characterIds.has(characterId)) {
+        invalid(`${cbWhat} references an unknown character.`);
+      }
+      reqStr(combatant, 'name', cbWhat);
+      validateRollOutcome(combatant.initiative, `${cbWhat} initiative`);
+      reqFiniteNum(combatant, 'initiativeTotal', cbWhat);
+    }
+    if (combatants.length > 0) {
+      reqInt(e, 'turnIndex', what, 0, combatants.length - 1);
+    } else {
+      reqInt(e, 'turnIndex', what, 0, 0);
+    }
+    reqInt(e, 'round', what, 1, 1_000_000);
+    reqStr(e, 'createdAt', what);
+    reqNullableStr(e, 'endedAt', what);
   }
-  for (const key of ['sessions', 'characters', 'encounters', 'memory', 'log'] as const) {
-    requireArray(env, key, 'Campaign import');
+  checkUniqueIds(
+    encountersRaw.map((item) => ({ id: (item as Record<string, unknown>).id as string })),
+    'encounter',
+  );
+
+  for (const [i, item] of memoryRaw.entries()) {
+    const what = `Campaign import memory entry #${i + 1}`;
+    const m = reqRecord(item, what);
+    reqStr(m, 'id', what);
+    if (reqStr(m, 'campaignId', what) !== campaignId) {
+      invalid(`${what} does not belong to the imported campaign.`);
+    }
+    reqEnum(m, 'kind', what, ['npc', 'location', 'fact'] as const);
+    reqStr(m, 'title', what);
+    reqStr(m, 'body', what);
+    reqStrArray(m, 'tags', what);
+    reqEnum(m, 'source', what, ['manual', 'worldbuilding-import', 'dungeon-import'] as const);
+    reqStr(m, 'createdAt', what);
+    reqStr(m, 'updatedAt', what);
   }
+  checkUniqueIds(
+    memoryRaw.map((item) => ({ id: (item as Record<string, unknown>).id as string })),
+    'memory entry',
+  );
+
+  const seqs = new Set<number>();
+  for (const [i, item] of logRaw.entries()) {
+    const what = `Campaign import log entry #${i + 1}`;
+    const l = reqRecord(item, what);
+    reqStr(l, 'id', what);
+    if (reqStr(l, 'campaignId', what) !== campaignId) {
+      invalid(`${what} does not belong to the imported campaign.`);
+    }
+    const sessionId = reqNullableStr(l, 'sessionId', what);
+    if (sessionId !== null && !sessionIds.has(sessionId)) {
+      invalid(`${what} references an unknown session.`);
+    }
+    const seq = reqInt(l, 'seq', what, 1, Number.MAX_SAFE_INTEGER);
+    if (seqs.has(seq)) invalid(`Campaign import has a duplicate log seq ${seq}.`);
+    seqs.add(seq);
+    reqEnum(l, 'kind', what, LOG_KINDS);
+    reqStr(l, 'text', what);
+    if (l.detail !== null) reqRecord(l.detail, `${what} detail`);
+    reqNullableStr(l, 'narration', what);
+    reqNullableStr(l, 'narrationSource', what);
+    reqStr(l, 'createdAt', what);
+  }
+  checkUniqueIds(
+    logRaw.map((item) => ({ id: (item as Record<string, unknown>).id as string })),
+    'log entry',
+  );
+
   return env as unknown as CampaignBundle;
 }
 

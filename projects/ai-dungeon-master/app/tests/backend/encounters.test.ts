@@ -120,6 +120,30 @@ describe('encounters', () => {
     expect(heroAfter?.hpCurrent).toBe(10);
   });
 
+  it('refuses to delete a combatant in an active encounter, allows it after the encounter ends', async () => {
+    const fx = makeFixture();
+    const { campaign, hero, foe, slow } = await setupCombat(fx);
+    const encounter = await fx.service.encountersStart(campaign.id, {
+      name: 'Guard Duty',
+      characterIds: [hero.id, foe.id],
+    });
+    await expect(fx.service.charactersDelete(foe.id)).rejects.toMatchObject({
+      code: 'INPUT_INVALID',
+    });
+    // The character and its HP survive, and combat still works.
+    expect((await fx.service.charactersList(campaign.id)).map((c) => c.id)).toContain(foe.id);
+    await fx.service.encountersApplyDamage(encounter.id, { characterId: foe.id, amount: 2 });
+    expect(
+      (await fx.service.charactersList(campaign.id)).find((c) => c.id === foe.id)?.hpCurrent,
+    ).toBe(6);
+    // A character outside the encounter can still be deleted mid-encounter.
+    await fx.service.charactersDelete(slow.id);
+    // After the encounter ends, deleting a former combatant succeeds.
+    await fx.service.encountersEnd(encounter.id);
+    await fx.service.charactersDelete(foe.id);
+    expect((await fx.service.charactersList(campaign.id)).map((c) => c.id)).not.toContain(foe.id);
+  });
+
   it('refuses a second active encounter and actions on an ended one', async () => {
     const fx = makeFixture();
     const { campaign, hero, foe } = await setupCombat(fx);

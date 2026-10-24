@@ -113,6 +113,36 @@ describe('App', () => {
     expect(await within(memory).findByText('Sella the Ferryman')).toBeInTheDocument();
   });
 
+  it('preserves unsaved session notes across an unrelated refresh, but loads saved notes', async () => {
+    installFakeAidm();
+    const user = userEvent.setup();
+    render(<App />);
+    await createCampaign(user);
+
+    const campaigns = region('Campaigns');
+    await user.type(within(campaigns).getByLabelText('New session title'), 'Session 1');
+    await user.click(within(campaigns).getByRole('button', { name: 'Start session' }));
+    const notes = await within(campaigns).findByLabelText('Session notes');
+    await user.type(notes, 'Unsaved draft — the bell rang twice.');
+    expect(notes).toHaveValue('Unsaved draft — the bell rang twice.');
+
+    // An unrelated action (dice roll) triggers refreshAll, which installs
+    // fresh session objects; the unsaved draft must survive it.
+    const dice = region('Dice');
+    await user.click(within(dice).getByRole('button', { name: 'Roll dice' }));
+    expect(await within(dice).findByText(/2d6:/)).toBeInTheDocument();
+    expect(within(campaigns).getByLabelText('Session notes')).toHaveValue(
+      'Unsaved draft — the bell rang twice.',
+    );
+
+    // Saving still works and the saved text remains shown afterwards.
+    await user.click(within(campaigns).getByRole('button', { name: 'Save notes' }));
+    expect(await screen.findByText('Session notes saved.')).toBeInTheDocument();
+    expect(within(campaigns).getByLabelText('Session notes')).toHaveValue(
+      'Unsaved draft — the bell rang twice.',
+    );
+  });
+
   it('surfaces backend errors in the banner', async () => {
     installFakeAidm();
     const user = userEvent.setup();

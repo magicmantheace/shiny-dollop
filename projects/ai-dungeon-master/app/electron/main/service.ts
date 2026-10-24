@@ -316,7 +316,20 @@ export class CampaignService {
   }
 
   async charactersDelete(id: string): Promise<void> {
-    this.requireCharacter(id);
+    const character = this.requireCharacter(id);
+    // A combatant in an active encounter must not be deleted out from
+    // under the turn tracker: the encounter would keep referencing the
+    // character, damage/healing would fail with CHARACTER_NOT_FOUND,
+    // and the character's HP would be lost. End the encounter first.
+    const active = store
+      .listEncounters(this.db, character.campaignId)
+      .find((e) => e.status === 'active' && e.combatants.some((c) => c.characterId === id));
+    if (active) {
+      throw aidmError(
+        AIDM_ERROR_CODES.INPUT_INVALID,
+        `${character.name} is a combatant in the active encounter "${active.name}". End the encounter before deleting this character.`,
+      );
+    }
     store.deleteCharacter(this.db, id);
   }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   Campaign,
   Character,
@@ -137,8 +137,44 @@ export function App() {
     void refreshAll();
   }, [refreshAll]);
 
+  // Session-notes draft sync: refreshAll installs newly deserialized
+  // session objects on every action (dice rolls, damage, memory edits…),
+  // so keying the reset off the session OBJECT would silently discard
+  // unsaved notes. Reset the draft only when the selected session
+  // changes, or when the persisted notes change while the draft is clean
+  // (e.g. a deliberate save just landed). A dirty draft always wins.
+  const notesSyncRef = useRef<{ sessionId: string; persisted: string; draft: string } | null>(
+    null,
+  );
+  const updateSessionNotes = useCallback((value: string) => {
+    setSessionNotes(value);
+    if (notesSyncRef.current) notesSyncRef.current.draft = value;
+  }, []);
+
   useEffect(() => {
-    setSessionNotes(activeSession?.notes ?? '');
+    if (!activeSession) {
+      notesSyncRef.current = null;
+      setSessionNotes('');
+      return;
+    }
+    const sync = notesSyncRef.current;
+    if (!sync || sync.sessionId !== activeSession.id) {
+      notesSyncRef.current = {
+        sessionId: activeSession.id,
+        persisted: activeSession.notes,
+        draft: activeSession.notes,
+      };
+      setSessionNotes(activeSession.notes);
+      return;
+    }
+    if (sync.persisted !== activeSession.notes) {
+      const wasClean = sync.draft === sync.persisted;
+      sync.persisted = activeSession.notes;
+      if (wasClean) {
+        sync.draft = activeSession.notes;
+        setSessionNotes(activeSession.notes);
+      }
+    }
   }, [activeSession]);
 
   const run = useCallback(
@@ -286,7 +322,7 @@ export function App() {
                 Session notes
                 <textarea
                   value={sessionNotes}
-                  onChange={(e) => setSessionNotes(e.target.value)}
+                  onChange={(e) => updateSessionNotes(e.target.value)}
                   rows={3}
                 />
               </label>
@@ -318,6 +354,12 @@ export function App() {
                     {c.inventory.length > 0 && <> · carries: {c.inventory.join(', ')}</>}
                     <button
                       className="small"
+                      disabled={encounter?.combatants.some((cb) => cb.characterId === c.id) ?? false}
+                      title={
+                        encounter?.combatants.some((cb) => cb.characterId === c.id)
+                          ? 'In the active encounter — end it before deleting'
+                          : undefined
+                      }
                       onClick={() =>
                         void run(async () => {
                           await api().charactersDelete(c.id);
