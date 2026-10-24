@@ -35,7 +35,7 @@ No autonomous unrestricted write access, credentials, shell or network privilege
 
 **Integrations:** Later optional import from Personal Knowledge Vault and approval-mediated actions from Desktop Automation Builder.
 
-Do not access or modify the other project directories, the original Crawl repository, real personal data, connected accounts, or production systems to test this app. Use fixtures or explicitly approved narrow interfaces.
+Do not access or modify the other project directories, real personal data, connected accounts, or production systems to test this app. Use fixtures or explicitly approved narrow interfaces.
 
 ### Stop/continue logic
 
