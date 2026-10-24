@@ -2,7 +2,7 @@
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { previewWorkflow, startRun } from '../../electron/main/executor.js';
+import { previewWorkflow, startRunAndWait } from '../../electron/main/executor.js';
 import {
   createWorkflow,
   getWorkflow,
@@ -41,7 +41,7 @@ describe('approved scripts', () => {
     expect(() => previewWorkflow(fx.db, wfNow!)).toThrowError(
       expect.objectContaining({ code: 'SCRIPT_NOT_APPROVED' }),
     );
-    const run = await startRun(fx.db, wf.id, { approved: true });
+    const run = await startRunAndWait(fx.db, wf.id, { approved: true });
     expect(run.status).toBe('failed');
     expect(run.steps[0]?.outcome).toBe('failed');
     expect(run.steps[0]?.detail).toContain('not in the approved-scripts allowlist');
@@ -56,7 +56,7 @@ describe('approved scripts', () => {
         { id: 'sc', label: 'Run hello', kind: 'run-approved-script', scriptId: script.id, args: ['world'] },
       ],
     });
-    const run = await startRun(fx.db, wf.id, { approved: true });
+    const run = await startRunAndWait(fx.db, wf.id, { approved: true });
     expect(run.status).toBe('completed');
     expect(run.steps[0]?.outcome).toBe('succeeded');
     expect(run.steps[0]?.detail).toContain('hello from script world');
@@ -72,7 +72,7 @@ describe('approved scripts', () => {
         { id: 'sc', label: 'Run bad', kind: 'run-approved-script', scriptId: script.id, args: [] },
       ],
     });
-    const run = await startRun(fx.db, wf.id, { approved: true });
+    const run = await startRunAndWait(fx.db, wf.id, { approved: true });
     expect(run.status).toBe('failed');
     expect(run.steps[0]?.detail).toContain('exited with code 3');
     expect(run.steps[0]?.detail).toContain('boom');
@@ -87,7 +87,7 @@ describe('move-to-trash', () => {
     updateWorkflow(fx.db, wf.id, {
       steps: [{ id: 'tr', label: 'Trash it', kind: 'file-move-to-trash', path: 'important.txt' }],
     });
-    const run = await startRun(fx.db, wf.id, { approved: true });
+    const run = await startRunAndWait(fx.db, wf.id, { approved: true });
     expect(run.status).toBe('completed');
     expect(existsSync(original)).toBe(false);
     const trashDir = join(fx.sandbox, '.dab-trash');

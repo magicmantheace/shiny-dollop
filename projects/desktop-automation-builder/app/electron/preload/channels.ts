@@ -1,6 +1,8 @@
 // Maps every DabApi method name to its IPC channel, 1:1 with
-// DAB_IPC_CHANNELS in shared/types.ts. Shared by the preload script and the
-// main-process IPC registration so the two can never drift apart.
+// DAB_IPC_CHANNELS in shared/types.ts. Used by the main-process IPC
+// registration. The preload script carries an INLINED copy of this map:
+// a sandboxed preload cannot `require` local files, so it must stay
+// self-contained. A backend test pins the two copies to the same values.
 import { DAB_IPC_CHANNELS, type DabApi, type DabIpcChannel } from '../../shared/types.js';
 
 export const DAB_METHOD_CHANNELS: Record<keyof DabApi, DabIpcChannel> = {

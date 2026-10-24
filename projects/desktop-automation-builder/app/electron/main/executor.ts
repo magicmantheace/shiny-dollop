@@ -3,7 +3,7 @@
 // it is directly unit-testable.
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { copyFile, mkdir, rename, stat } from 'node:fs/promises';
+import { copyFile, mkdir, realpath, rename, stat } from 'node:fs/promises';
 import { basename, dirname, resolve, sep } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
@@ -49,6 +49,67 @@ export function resolveInSandbox(sandboxRoot: string, p: string, stepId: string)
   return resolved;
 }
 
+function isInsideRoot(root: string, p: string): boolean {
+  return p === root || p.startsWith(root + sep);
+}
+
+/**
+ * Filesystem-aware sandbox check for MUTATING operations. The lexical
+ * check in `resolveInSandbox` cannot see symlinks / directory junctions:
+ * a link inside the sandbox pointing outside it passes the prefix check
+ * while `copyFile` / `mkdir` / `rename` happily follow it out.
+ *
+ * This resolves the real path of the target — or, for a destination that
+ * does not exist yet, of its nearest existing ancestor — and requires it
+ * to stay inside the sandbox's real path. The not-yet-existing tail is
+ * made of plain names (no links can hide in it), so validating the
+ * deepest existing ancestor covers the whole path. Returns the lexical
+ * resolved path on success; throws PATH_OUTSIDE_SANDBOX otherwise.
+ */
+export async function resolveInSandboxReal(
+  sandboxRoot: string,
+  p: string,
+  stepId: string,
+): Promise<string> {
+  const resolved = resolveInSandbox(sandboxRoot, p, stepId);
+  const rootLexical = resolve(sandboxRoot);
+  let realRoot = rootLexical;
+  try {
+    realRoot = await realpath(rootLexical);
+  } catch {
+    // Sandbox root does not exist yet — nothing inside it can be a link,
+    // and the lexical check above has already confined the path.
+    return resolved;
+  }
+
+  let cur = resolved;
+  for (;;) {
+    try {
+      const real = await realpath(cur);
+      if (!isInsideRoot(realRoot, real)) {
+        throw dabError(
+          DAB_ERROR_CODES.PATH_OUTSIDE_SANDBOX,
+          `Step "${stepId}": path "${p}" escapes the workflow sandbox through a filesystem link (resolves to "${real}").`,
+        );
+      }
+      return resolved;
+    } catch (err) {
+      if (isDabError(err)) throw err;
+      const code = (err as { code?: unknown }).code;
+      if (code !== 'ENOENT' && code !== 'ENOTDIR') throw err;
+      const parent = dirname(cur);
+      if (parent === cur || !isInsideRoot(rootLexical, cur)) {
+        // Reached the sandbox root (or above it) without finding an
+        // existing ancestor — the lexical check already passed, so the
+        // path is confined as long as the root itself is real-checked,
+        // which the first iteration did when the root exists.
+        return resolved;
+      }
+      cur = parent;
+    }
+  }
+}
+
 /** Steps that mutate or run code — the approval gate treats them as destructive-ish. */
 const DESTRUCTIVE_KINDS: ReadonlySet<StepKind> = new Set(['file-move-to-trash', 'run-approved-script']);
 
@@ -69,6 +130,39 @@ const activeRuns = new Map<string, ActiveRunControl>();
 
 export function isRunActive(runId: string): boolean {
   return activeRuns.has(runId);
+}
+
+/**
+ * Promises of runs executing in the background (started via `startRun` /
+ * `retryRun`, which return the `running` record immediately). Lets
+ * in-process callers (smoke mode, tests) await completion via
+ * `waitForRun` without making the IPC surface block on execution.
+ */
+const backgroundRuns = new Map<string, Promise<Run>>();
+
+function launchInBackground(db: DatabaseSync, promise: Promise<Run>, runId: string): void {
+  // executeRun records step failures in the DB and resolves with the
+  // failed run; it only rejects on infrastructure errors (missing run /
+  // workflow). Swallow those here — the persisted record is the truth —
+  // so a background rejection can never crash the host process.
+  const tracked = promise.catch(() => getRunOrThrow(db, runId));
+  backgroundRuns.set(runId, tracked);
+  void tracked.finally(() => {
+    if (backgroundRuns.get(runId) === tracked) backgroundRuns.delete(runId);
+  });
+}
+
+/** Await a background run's completion; returns the current record if it is not background-tracked. */
+export async function waitForRun(db: DatabaseSync, runId: string): Promise<Run> {
+  const tracked = backgroundRuns.get(runId);
+  if (tracked) {
+    try {
+      return await tracked;
+    } catch {
+      // Fall through to the persisted record.
+    }
+  }
+  return getRunOrThrow(db, runId);
 }
 
 // ---------------------------------------------------------------------------
@@ -185,24 +279,31 @@ async function executeStep(
 ): Promise<string> {
   switch (step.kind) {
     case 'file-copy': {
-      const from = resolveInSandbox(wf.sandboxRoot, step.from, step.id);
-      const to = resolveInSandbox(wf.sandboxRoot, step.to, step.id);
+      // Sandbox violations (lexical or via filesystem links) must surface
+      // as PATH_OUTSIDE_SANDBOX, not be wrapped as a generic step failure.
+      const from = await resolveInSandboxReal(wf.sandboxRoot, step.from, step.id);
+      const to = await resolveInSandboxReal(wf.sandboxRoot, step.to, step.id);
       try {
         const st = await stat(from);
         if (!st.isFile()) throw new Error(`"${from}" is not a file`);
         await mkdir(dirname(to), { recursive: true });
+        // Re-validate the destination now that its parent exists, so a
+        // link in the destination chain can never be followed out.
+        await resolveInSandboxReal(wf.sandboxRoot, step.to, step.id);
         await copyFile(from, to);
         return `Copied ${st.size} bytes: "${from}" → "${to}"`;
       } catch (err) {
+        if (isDabError(err)) throw err;
         throw stepFailed('STEP_FAILED', `Step "${step.id}" file-copy failed: ${errMessage(err)}`);
       }
     }
     case 'file-move-to-trash': {
-      const p = resolveInSandbox(wf.sandboxRoot, step.path, step.id);
+      const p = await resolveInSandboxReal(wf.sandboxRoot, step.path, step.id);
       try {
-        const trashDir = resolveInSandbox(wf.sandboxRoot, '.dab-trash', step.id);
+        const trashDir = await resolveInSandboxReal(wf.sandboxRoot, '.dab-trash', step.id);
         await mkdir(trashDir, { recursive: true });
-        const dest = resolveInSandbox(
+        await resolveInSandboxReal(wf.sandboxRoot, '.dab-trash', step.id);
+        const dest = await resolveInSandboxReal(
           wf.sandboxRoot,
           `.dab-trash/${Date.now()}-${randomUUID().slice(0, 8)}-${basename(p)}`,
           step.id,
@@ -210,15 +311,21 @@ async function executeStep(
         await rename(p, dest);
         return `Moved "${p}" to trash: "${dest}" (recoverable)`;
       } catch (err) {
+        if (isDabError(err)) throw err;
         throw stepFailed('STEP_FAILED', `Step "${step.id}" move-to-trash failed: ${errMessage(err)}`);
       }
     }
     case 'folder-create': {
-      const p = resolveInSandbox(wf.sandboxRoot, step.path, step.id);
+      const p = await resolveInSandboxReal(wf.sandboxRoot, step.path, step.id);
       try {
         await mkdir(p, { recursive: true });
+        // The created chain must really live inside the sandbox — a link
+        // in an existing ancestor would have been caught above, and this
+        // re-check guards the directories just created.
+        await resolveInSandboxReal(wf.sandboxRoot, step.path, step.id);
         return `Created folder "${p}"`;
       } catch (err) {
+        if (isDabError(err)) throw err;
         throw stepFailed('STEP_FAILED', `Step "${step.id}" folder-create failed: ${errMessage(err)}`);
       }
     }
@@ -293,8 +400,11 @@ export interface StartRunOptions {
 
 /**
  * Create a run record. approved=false → `awaiting-approval`, zero side
- * effects. approved=true → executes immediately and resolves with the final
- * run (completed / failed / cancelled).
+ * effects. approved=true → creates the `running` record, starts execution
+ * in the background, and resolves IMMEDIATELY with the running record —
+ * callers track progress by polling `getRun` and cancel via `cancelRun`.
+ * (Blocking until execution finished made the running record — and its
+ * cancel control — unreachable during long runs.)
  */
 export async function startRun(
   db: DatabaseSync,
@@ -329,17 +439,42 @@ export async function startRun(
     dryRun: false,
     steps: wf.steps.map((s) => ({ stepId: s.id, kind: s.kind, label: s.label, outcome: 'pending' as const })),
   });
-  return executeRun(db, run.id);
+  launchInBackground(db, executeRun(db, run.id), run.id);
+  return getRunOrThrow(db, run.id);
+}
+
+/**
+ * `startRun` + await background completion. For in-process callers that
+ * genuinely need the final record (smoke mode, tests) — NOT for the IPC
+ * surface, which must return the running record immediately.
+ */
+export async function startRunAndWait(
+  db: DatabaseSync,
+  workflowId: string,
+  options: StartRunOptions,
+): Promise<Run> {
+  const run = await startRun(db, workflowId, options);
+  if (run.status !== 'running') return run;
+  return waitForRun(db, run.id);
 }
 
 /**
  * Execute (or resume) a run. Steps already recorded as `skipped` or
  * `succeeded` are not re-run — this is what makes retry-from-failure work.
+ *
+ * `workflowOverride` pins execution to a specific workflow definition
+ * (used by retry, which must run the failed run's archived version, not
+ * whatever the workflow has since been edited into). Without it, the
+ * current workflow definition is used.
  */
-export async function executeRun(db: DatabaseSync, runId: string): Promise<Run> {
+export async function executeRun(
+  db: DatabaseSync,
+  runId: string,
+  workflowOverride?: Workflow,
+): Promise<Run> {
   const run = getRun(db, runId);
   if (!run) throw dabError(DAB_ERROR_CODES.RUN_NOT_FOUND, `Run not found: ${runId}`);
-  const wf = getWorkflow(db, run.workflowId);
+  const wf = workflowOverride ?? getWorkflow(db, run.workflowId);
   if (!wf) throw dabError(DAB_ERROR_CODES.WORKFLOW_NOT_FOUND, `Workflow not found: ${run.workflowId}`);
 
   const ctrl: ActiveRunControl = { cancelled: false, child: undefined };
@@ -426,9 +561,35 @@ export function cancelRun(db: DatabaseSync, runId: string): Run {
 }
 
 /**
- * Retry a failed run: creates a NEW run of the same workflow version with
- * steps before the failed one marked `skipped`, then resumes at the failed
- * step. The original run is left untouched.
+ * Resolve the workflow definition AS OF `version`: the current definition
+ * when the version is current, otherwise the archived snapshot taken when
+ * that version was superseded. Returns null when no snapshot survives —
+ * retry must then be refused rather than silently running a different
+ * (never-approved) definition under the old version number.
+ */
+export function workflowForVersion(db: DatabaseSync, workflowId: string, version: number): Workflow | null {
+  const wf = getWorkflow(db, workflowId);
+  if (!wf) return null;
+  if (wf.version === version) return wf;
+  const snap = wf.versions.find((v) => v.version === version);
+  if (!snap) return null;
+  return { ...wf, name: snap.name, sandboxRoot: snap.sandboxRoot, steps: snap.steps, version: snap.version };
+}
+
+/**
+ * Retry a failed run: creates a NEW run of the SAME workflow version the
+ * failed run executed, with steps before the failed one marked `skipped`,
+ * then resumes at the failed step. The original run is left untouched.
+ *
+ * The definition executed is the archived snapshot of
+ * `source.workflowVersion` — never the workflow's current definition. If
+ * the workflow was edited after the failure, the edits do NOT ride along:
+ * they were never previewed or approved for this run, and recording them
+ * under the source version would corrupt the durable log. (A fresh
+ * preview/approval run of the new version is always available instead.)
+ *
+ * Like `startRun`, this returns the `running` record immediately and
+ * executes in the background.
  */
 export async function retryRun(db: DatabaseSync, runId: string): Promise<Run> {
   const source = getRunOrThrow(db, runId);
@@ -438,8 +599,14 @@ export async function retryRun(db: DatabaseSync, runId: string): Promise<Run> {
       `Run ${runId} is ${source.status}; only failed runs can be retried.`,
     );
   }
-  const wf = getWorkflow(db, source.workflowId);
-  if (!wf) throw dabError(DAB_ERROR_CODES.WORKFLOW_NOT_FOUND, `Workflow not found: ${source.workflowId}`);
+  const wf = workflowForVersion(db, source.workflowId, source.workflowVersion);
+  if (!wf) {
+    throw dabError(
+      DAB_ERROR_CODES.RUN_NOT_RETRYABLE,
+      `Run ${runId}: archived workflow version ${source.workflowVersion} is no longer available; ` +
+        'start a fresh preview/approval run of the current version instead.',
+    );
+  }
 
   const failedIdx = source.steps.findIndex((s) => s.outcome === 'failed');
   if (failedIdx === -1) {
@@ -475,7 +642,15 @@ export async function retryRun(db: DatabaseSync, runId: string): Promise<Run> {
       detail: `Skipped on retry: succeeded or passed before the failure in run ${runId}.`,
     });
   }
-  return executeRun(db, next.id);
+  launchInBackground(db, executeRun(db, next.id, wf), next.id);
+  return getRunOrThrow(db, next.id);
+}
+
+/** `retryRun` + await background completion (smoke mode / tests only). */
+export async function retryRunAndWait(db: DatabaseSync, runId: string): Promise<Run> {
+  const run = await retryRun(db, runId);
+  if (run.status !== 'running') return run;
+  return waitForRun(db, run.id);
 }
 
 export function isDabError(err: unknown): err is DabError {

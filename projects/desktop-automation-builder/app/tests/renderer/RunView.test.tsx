@@ -129,3 +129,28 @@ describe('RunView run log', () => {
     expect(badges.length).toBeGreaterThan(0);
   });
 });
+
+describe('RunView non-blocking start', () => {
+  it('closes the approval modal and exposes cancel as soon as the running record returns', async () => {
+    installFakeDab({
+      runsStart: async () => sampleRun('running'),
+      runsGet: async () => sampleRun('running'),
+    });
+    const user = userEvent.setup();
+    renderRunView();
+
+    await user.click(await screen.findByRole('button', { name: 'Preview' }));
+    await screen.findByRole('dialog');
+    await user.click(
+      screen.getByRole('checkbox', { name: /I have reviewed the planned actions/i }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Approve & run' }));
+
+    // runsStart resolved with the still-running record: the modal is gone
+    // and the in-flight run can be inspected / cancelled immediately.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: /cancel run/i }),
+    ).toBeInTheDocument();
+  });
+});

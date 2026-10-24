@@ -146,12 +146,19 @@ export interface DabApi {
   runsPreview(workflowId: string): Promise<PreviewAction[]>;
   /**
    * approved=false → returns the run in `awaiting-approval` with preview,
-   * no side effects. approved=true → executes. Throws APPROVAL_REQUIRED
-   * when a step is destructive-ish and approval was not given.
+   * no side effects. approved=true → creates the run, starts execution in
+   * the background, and resolves immediately with the `running` record;
+   * poll runsGet / cancel with runsCancel while it executes. Throws
+   * APPROVAL_REQUIRED when a step is destructive-ish and approval was
+   * not given.
    */
   runsStart(workflowId: string, approved: boolean): Promise<Run>;
   runsCancel(runId: string): Promise<Run>;
-  /** New run resuming from the failed step of a failed run. */
+  /**
+   * New run resuming from the failed step of a failed run, executing the
+   * failed run's archived workflow version (never a later edit). Resolves
+   * immediately with the `running` record, like runsStart.
+   */
   runsRetry(runId: string): Promise<Run>;
   runsGet(runId: string): Promise<Run | null>;
   runsList(workflowId?: string): Promise<Run[]>;

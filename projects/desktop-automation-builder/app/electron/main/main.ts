@@ -6,8 +6,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
-import { isDabError, previewWorkflow, startRun } from './executor.js';
+import { isDabError, previewWorkflow, startRunAndWait } from './executor.js';
 import { registerIpcHandlers } from './ipc.js';
+import { preloadScriptPath, rendererIndexPath } from './paths.js';
 import { createWorkflow, openDatabase, updateWorkflow } from './store.js';
 
 const SMOKE_ARG = '--dab-smoke';
@@ -17,14 +18,15 @@ function createWindow(): void {
     width: 1100,
     height: 750,
     webPreferences: {
-      preload: join(__dirname, '..', 'preload', 'preload.js'),
+      preload: preloadScriptPath(__dirname),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
   // Renderer bundle is produced by `npm run build:renderer` (Worker B owns
-  // app/src/** and app/index.html).
-  win.loadFile(join(__dirname, '..', 'renderer', 'index.html')).catch((err: unknown) => {
+  // app/src/** and app/index.html) and written to `dist/renderer` — two
+  // levels above this directory (`dist/electron/main`).
+  win.loadFile(rendererIndexPath(__dirname)).catch((err: unknown) => {
     console.error('Failed to load renderer:', err);
   });
 }
@@ -55,7 +57,7 @@ async function runSmoke(): Promise<void> {
       steps: [{ id: 'c1', label: 'Copy it', kind: 'file-copy', from: 'in.txt', to: 'docs/out.txt' }],
     });
     if (!wf2u) throw new Error('smoke: workflow update returned null');
-    const run = await startRun(db, wf2.id, { approved: true });
+    const run = await startRunAndWait(db, wf2.id, { approved: true });
     if (run.status !== 'completed') throw new Error(`smoke: run status ${run.status}`);
     if (run.steps[0]?.outcome !== 'succeeded') throw new Error('smoke: copy step did not succeed');
 

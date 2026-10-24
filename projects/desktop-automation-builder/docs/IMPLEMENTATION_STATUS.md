@@ -48,3 +48,16 @@ Record actual commits, tests, blockers and PR links here when implementation beg
 - **Backend implemented and verified on Linux (Node 24, Electron 45):** SQLite store (`node:sqlite`, explicit transactions) with workflows / workflow_versions / approved_scripts / runs / run_steps; sandboxed executor (path-escape rejection, dry-run preview with zero writes, approval gate, per-step durable logs, cancel with process-group kill, retry-from-failed-step); export/import with format-version checks; all 17 IPC channels zod-validated in main; preload exposes flat `window.dab` 1:1 with `DAB_IPC_CHANNELS`.
 - **Verification:** `npm test` — 44/44 green (29 backend + 15 renderer); `npm run typecheck`, `npm run lint`, `npm run build` clean; `npm run smoke` prints SMOKE_OK (packaged main under Xvfb).
 - **Unverified:** real Windows execution (script spawning uses POSIX process groups; Windows uses direct child kill), NSIS packaging.
+
+## 2026-10-24 — Codex review fixes (PR #16, head 265ab56)
+
+Five P1 findings from the Codex review, each verified against the code before fixing:
+
+- **Renderer path:** main loaded `dist/electron/renderer/index.html`; Vite writes `dist/renderer`. New `electron/main/paths.ts` helpers (`rendererIndexPath` = two levels up, `preloadScriptPath`) used by `main.ts`, unit-tested.
+- **Sandboxed preload:** preload imported `./channels.js`, which a sandboxed preload cannot `require`. The channel map is now inlined in `preload.ts` (pinned to `DAB_IPC_CHANNELS` by test); the compiled `dist/electron/preload/preload.js` requires only `electron`. `channels.ts` remains for main-process registration.
+- **Sandbox link traversal:** `resolveInSandbox` was lexical only. New `resolveInSandboxReal` realpath-validates the target / nearest existing ancestor before (and after creating) mutations in file-copy, move-to-trash, and folder-create; symlink escapes fail with `PATH_OUTSIDE_SANDBOX` and write nothing outside.
+- **Retry version:** retry loaded the workflow's current definition but recorded the failed run's version. It now executes the archived snapshot of the failed run's version (`workflowForVersion`); if no snapshot survives it refuses with `RUN_NOT_RETRYABLE` rather than running an unapproved edit.
+- **Blocking start:** `runsStart`/`runsRetry` resolved only after execution finished, so the running record and cancel were unreachable mid-run. `startRun`/`retryRun` now return the `running` record immediately and execute in the background (polling/cancel track it); `startRunAndWait`/`retryRunAndWait` preserve the blocking form for smoke/tests.
+
+- **Verification:** `npm test` — **57/57 pass** (44 before; +13 regression tests); `npm run typecheck`, `npm run lint`, `npm run build` clean; `npm run smoke` SMOKE_OK.
+- **Not acted on:** the unrelated `projects/game-save-manager/docs/MUSE_HANDOFF.md` line in this PR's diff came from the shared ancestry-cleanup commit `f5aa771`, not from this project's commits — left for the owner to handle separately rather than adding a cross-project edit here.

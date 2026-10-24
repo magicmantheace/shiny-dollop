@@ -6,9 +6,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   cancelRun,
   executeRun,
+  isRunActive,
   previewWorkflow,
   retryRun,
+  retryRunAndWait,
   startRun,
+  startRunAndWait,
+  waitForRun,
 } from '../../electron/main/executor.js';
 import {
   createRun,
@@ -102,7 +106,7 @@ describe('mid-run failure and retry', () => {
         { id: 'lg', label: 'Log', kind: 'log-message', message: 'finished' },
       ],
     });
-    const failed = await startRun(fx.db, wf.id, { approved: true });
+    const failed = await startRunAndWait(fx.db, wf.id, { approved: true });
     expect(failed.status).toBe('failed');
     expect(failed.steps.map((s) => s.outcome)).toEqual(['succeeded', 'failed', 'pending']);
     expect(failed.steps[1]?.detail).toBeTruthy();
@@ -110,7 +114,7 @@ describe('mid-run failure and retry', () => {
 
     // Fix the cause: provide the source file, then retry.
     writeFileSync(join(fx.sandbox, 'missing.txt'), 'payload');
-    const retried = await retryRun(fx.db, failed.id);
+    const retried = await retryRunAndWait(fx.db, failed.id);
     expect(retried.id).not.toBe(failed.id);
     expect(retried.status).toBe('completed');
     expect(retried.steps.map((s) => s.outcome)).toEqual(['skipped', 'succeeded', 'succeeded']);
@@ -127,7 +131,7 @@ describe('mid-run failure and retry', () => {
     updateWorkflow(fx.db, wf.id, {
       steps: [{ id: 'lg', label: 'Log', kind: 'log-message', message: 'ok' }],
     });
-    const done = await startRun(fx.db, wf.id, { approved: true });
+    const done = await startRunAndWait(fx.db, wf.id, { approved: true });
     expect(done.status).toBe('completed');
     await expect(retryRun(fx.db, done.id)).rejects.toMatchObject({ code: 'RUN_NOT_RETRYABLE' });
   });
@@ -190,9 +194,72 @@ describe('cancellation', () => {
     updateWorkflow(fx.db, wf.id, {
       steps: [{ id: 'lg', label: 'Log', kind: 'log-message', message: 'hi' }],
     });
-    const done = await startRun(fx.db, wf.id, { approved: true });
+    const done = await startRunAndWait(fx.db, wf.id, { approved: true });
     expect(() => cancelRun(fx.db, done.id)).toThrowError(
       expect.objectContaining({ code: 'RUN_NOT_CANCELLABLE' }),
     );
   });
+});
+
+describe('retry after the workflow was edited', () => {
+  it('executes the archived failed-run version, not the later edit', async () => {
+    const wf = createWorkflow(fx.db, { name: 'versioned-retry', sandboxRoot: fx.sandbox });
+    updateWorkflow(fx.db, wf.id, {
+      steps: [
+        { id: 'mk', label: 'Mkdir', kind: 'folder-create', path: 'out' },
+        { id: 'cp', label: 'Copy', kind: 'file-copy', from: 'missing.txt', to: 'out/missing.txt' },
+        { id: 'lg', label: 'Log', kind: 'log-message', message: 'finished' },
+      ],
+    });
+    const failed = await startRunAndWait(fx.db, wf.id, { approved: true });
+    expect(failed.status).toBe('failed');
+    expect(failed.workflowVersion).toBe(2);
+
+    // Edit AFTER the failure: the failed step is redefined as a folder
+    // action. Running it on retry would execute an action that was never
+    // previewed/approved for the failed run.
+    const edited = updateWorkflow(fx.db, wf.id, {
+      steps: [
+        { id: 'mk', label: 'Mkdir', kind: 'folder-create', path: 'out' },
+        { id: 'cp', label: 'Copy', kind: 'folder-create', path: 'edited-dir' },
+        { id: 'lg', label: 'Log', kind: 'log-message', message: 'finished' },
+      ],
+    });
+    expect(edited?.version).toBe(3);
+
+    // Fix the original cause and retry: the ARCHIVED file-copy must run.
+    writeFileSync(join(fx.sandbox, 'missing.txt'), 'payload');
+    const retried = await retryRunAndWait(fx.db, failed.id);
+    expect(retried.status).toBe('completed');
+    expect(retried.workflowVersion).toBe(2);
+    expect(retried.steps.map((x) => x.kind)).toEqual(['folder-create', 'file-copy', 'log-message']);
+    expect(readFileSync(join(fx.sandbox, 'out', 'missing.txt'), 'utf8')).toBe('payload');
+    expect(existsSync(join(fx.sandbox, 'edited-dir'))).toBe(false);
+  });
+});
+
+describe('non-blocking start', () => {
+  it('startRun resolves with the running record while execution is still in flight, and the run can be cancelled', async () => {
+    const scriptPath = join(fx.root, 'sleep2.sh');
+    writeFileSync(scriptPath, '#!/bin/sh\nsleep 15\n');
+    chmodSync(scriptPath, 0o755);
+    const script = registerScript(fx.db, 'sleeper2', scriptPath);
+    const wf = createWorkflow(fx.db, { name: 'async-start', sandboxRoot: fx.sandbox });
+    updateWorkflow(fx.db, wf.id, {
+      steps: [
+        { id: 'sc', label: 'Sleep script', kind: 'run-approved-script', scriptId: script.id, args: [] },
+      ],
+    });
+
+    const startedAt = Date.now();
+    const run = await startRun(fx.db, wf.id, { approved: true });
+    // The promise resolved immediately — not after the 15s script.
+    expect(Date.now() - startedAt).toBeLessThan(10_000);
+    expect(run.status).toBe('running');
+    expect(isRunActive(run.id)).toBe(true);
+
+    cancelRun(fx.db, run.id);
+    const final = await waitForRun(fx.db, run.id);
+    expect(final.status).toBe('cancelled');
+  }, 20000);
 });
