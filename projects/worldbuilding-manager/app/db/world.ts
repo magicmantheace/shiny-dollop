@@ -506,11 +506,19 @@ export class WorldStore {
     for (const raw of bundle.revisions) {
       const r = raw as Revision;
       if (!r || typeof r.entityId !== 'string' || !seen.has(r.entityId)
-        || !Number.isInteger(r.revNo) || !r.snapshot || typeof r.snapshot !== 'object'
-        || (r.snapshot as Entity).id !== r.entityId || typeof r.createdAt !== 'string') {
+        || !Number.isInteger(r.revNo) || typeof r.createdAt !== 'string') {
         fail(ErrorCodes.ImportInvalid, 'Backup contains a malformed revision.');
       }
-      revisions.push({ entityId: r.entityId, revNo: r.revNo, snapshot: r.snapshot, createdAt: r.createdAt });
+      // Validate the snapshot as a complete Entity (the same validation
+      // used for the entities themselves) BEFORE the replacement
+      // transaction begins: a snapshot such as { id, name: {} } must
+      // reject the whole restore, otherwise corrupt history is persisted
+      // and the renderer crashes rendering snapshot.name as text.
+      const snapshot = this.validateCompleteEntity(r.snapshot, 'Backup contains a malformed revision.');
+      if (snapshot.id !== r.entityId) {
+        fail(ErrorCodes.ImportInvalid, 'Backup contains a malformed revision.');
+      }
+      revisions.push({ entityId: r.entityId, revNo: r.revNo, snapshot, createdAt: r.createdAt });
     }
     // Restore semantics: replace the whole project atomically.
     this.db.exec('BEGIN');
@@ -534,8 +542,23 @@ export class WorldStore {
   }
 
   private validateBundleEntity(raw: unknown, seen: Set<string>): Entity {
+    const entity = this.validateCompleteEntity(raw, 'Backup contains a malformed entity.');
+    if (seen.has(entity.id)) {
+      fail(ErrorCodes.ImportInvalid, 'Backup contains a malformed entity.');
+    }
+    seen.add(entity.id);
+    return entity;
+  }
+
+  /**
+   * Validate a value as a complete Entity — every field present with the
+   * right type — returning a normalized copy. Used for bundle entities
+   * and for revision snapshots, which are full entity snapshots and must
+   * meet exactly the same standard.
+   */
+  private validateCompleteEntity(raw: unknown, message: string): Entity {
     const e = raw as Entity;
-    if (!e || typeof e !== 'object' || typeof e.id !== 'string' || e.id.length === 0 || seen.has(e.id)
+    if (!e || typeof e !== 'object' || typeof e.id !== 'string' || e.id.length === 0
       || !isEntityType(e.type) || typeof e.name !== 'string' || e.name.trim().length === 0
       || typeof e.role !== 'string' || typeof e.description !== 'string' || typeof e.body !== 'string'
       || !(e.storyDate === null || typeof e.storyDate === 'string')
@@ -544,9 +567,8 @@ export class WorldStore {
       || !(e.diedOrder === null || Number.isInteger(e.diedOrder))
       || !Array.isArray(e.tags) || !e.tags.every((t) => typeof t === 'string')
       || typeof e.createdAt !== 'string' || typeof e.updatedAt !== 'string') {
-      fail(ErrorCodes.ImportInvalid, 'Backup contains a malformed entity.');
+      fail(ErrorCodes.ImportInvalid, message);
     }
-    seen.add(e.id);
     return {
       id: e.id, type: e.type, name: e.name, role: e.role, description: e.description, body: e.body,
       storyDate: e.storyDate, orderKey: e.orderKey, bornOrder: e.bornOrder, diedOrder: e.diedOrder,

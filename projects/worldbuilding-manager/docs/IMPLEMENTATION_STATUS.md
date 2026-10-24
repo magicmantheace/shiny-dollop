@@ -33,6 +33,11 @@
 - Re-verified the two older Codex comments from the original commit: the 64 MiB backup cap is unified across export/import/IPC schema (no residual 10 MiB limit; a >10 MiB revision-grown backup round-trips in tests), and on macOS the store closes only on `before-quit`, not `window-all-closed` (lifecycle regression test in place). Both remain fixed; no changes needed.
 - Verified: 36/36 tests pass (was 31; 5 new UI regression tests in `tests/ui/App.test.tsx`, all confirmed failing against the pre-fix code), typecheck and lint clean.
 
+## Codex review fixes (2026-10-24, PR #19 fix cycle 3)
+
+- Backup import: revision snapshots are now validated as complete Entities before the replacement transaction begins — the entity validation was extracted into `validateCompleteEntity()` in `app/db/world.ts`, shared by bundle entities and revision snapshots, and a snapshot whose `id` does not match its revision's `entityId` is rejected. Previously only `snapshot.id` was checked, so a malformed snapshot such as `{ "id": "<entity-id>", "name": {} }` was accepted and persisted, then crashed the renderer when the revision list rendered `snapshot.name` as text. A malformed snapshot now rejects the whole restore with `IMPORT_INVALID` and the existing project is left untouched.
+- Verified: 39/39 tests pass (was 36; 3 new backend regression tests in `tests/backend/world.test.ts` — the two malformed-snapshot tests confirmed failing against the pre-fix code, plus a well-formed revision-snapshot restore test), typecheck and lint clean.
+
 ## Implemented but not verified on target OS
 
 - Windows 11 desktop behavior (window, packaged app, real user-data paths) — no Windows execution has taken place

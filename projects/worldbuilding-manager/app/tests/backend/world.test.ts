@@ -293,6 +293,62 @@ describe('backup export / import', () => {
     expect(store.listEntities()).toHaveLength(5);
   });
 
+  it('rejects a backup whose revision snapshot is malformed and leaves the existing project untouched', () => {
+    const { hero } = seed();
+    const bundle = JSON.parse(store.exportBundle()) as {
+      revisions: { entityId: string; snapshot: unknown }[];
+    };
+    // Codex PR #19 cycle 3: a snapshot like { id, name: {} } was accepted
+    // because only snapshot.id was checked; the restored entity then
+    // crashed the renderer when the revision list rendered snapshot.name.
+    const revision = bundle.revisions.find((r) => r.entityId === hero.id);
+    expect(revision).toBeDefined();
+    revision!.snapshot = { id: hero.id, name: {} };
+    expect(() => store.importBundle(JSON.stringify(bundle))).toThrowError(
+      expect.objectContaining({ code: 'IMPORT_INVALID' }),
+    );
+    // Failed import must not have replaced or corrupted the existing project.
+    expect(store.listEntities()).toHaveLength(5);
+    expect(store.getEntity(hero.id)?.name).toBe('Sera Vane');
+    expect(store.listRevisions(hero.id)).toHaveLength(1);
+    expect(store.listRevisions(hero.id)[0]?.snapshot.name).toBe('Sera Vane');
+  });
+
+  it('rejects a backup whose revision snapshot has a non-text name even when otherwise complete', () => {
+    const { hero } = seed();
+    const bundle = JSON.parse(store.exportBundle()) as {
+      revisions: { entityId: string; snapshot: Record<string, unknown> }[];
+    };
+    const revision = bundle.revisions.find((r) => r.entityId === hero.id);
+    expect(revision).toBeDefined();
+    revision!.snapshot = { ...revision!.snapshot, name: { text: 'Sera Vane' } };
+    expect(() => store.importBundle(JSON.stringify(bundle))).toThrowError(
+      expect.objectContaining({ code: 'IMPORT_INVALID' }),
+    );
+    expect(store.listEntities()).toHaveLength(5);
+    expect(store.getEntity(hero.id)?.name).toBe('Sera Vane');
+  });
+
+  it('restores a well-formed backup with valid revision snapshots', () => {
+    const { hero } = seed();
+    store.updateEntity(hero.id, { description: 'Second version.' });
+    const json = store.exportBundle();
+    const fresh = new WorldStore(':memory:');
+    try {
+      const result = fresh.importBundle(json);
+      expect(result.entities).toBe(5);
+      expect(result.revisions).toBeGreaterThanOrEqual(6);
+      const revs = fresh.listRevisions(hero.id);
+      expect(revs.map((r) => r.revNo)).toEqual([1, 2]);
+      expect(revs[0]?.snapshot.name).toBe('Sera Vane');
+      expect(typeof revs[0]?.snapshot.name).toBe('string');
+      expect(revs[1]?.snapshot.description).toBe('Second version.');
+      expect(fresh.exportBundle()).toBe(json);
+    } finally {
+      fresh.close();
+    }
+  });
+
   it('AppError is the thrown type for engine failures', () => {
     try {
       store.createEntity({ type: 'character', name: '' });
