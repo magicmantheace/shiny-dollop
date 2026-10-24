@@ -34,6 +34,16 @@ native UEFI/QEMU session with terminal, file manager and settings.
 Separate signed A/B installation and physical owner tests follow.
 See docs/adr/0013-first-boot-desktop-priority.md. Do not mark M1 complete.
 
+**Monorepo rerun (2026-10-24, shiny-dollop @ d3c7822):** the headless
+Weston probe above was rerun and **passed** in this repository/environment
+(Weston 13.0.0, pixman renderer, two configured windows), as were the
+first-window compile and all three host probe modes (basic, resize,
+two-windows), with the pinned xdg-shell 1.49 code regenerated and
+SHA-512-verified. Full commands, environment and limits:
+[monorepo baseline record](validation/monorepo-d3c7822/README.md).
+This remains host protocol evidence only — no native image was built or
+booted in that pass.
+
 ## Source-built rendering prerequisite: Pixman
 
 The separate Pixman-only prototype uses an upstream release pinned in
