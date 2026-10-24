@@ -70,6 +70,20 @@ describe('narration is flavor only', () => {
     expect(isLoopbackUrl('https://example.com')).toBe(false);
   });
 
+  it('rejects .local names: mDNS hosts are other LAN machines, not loopback', async () => {
+    expect(isLoopbackUrl('http://my-mac.local:11434')).toBe(false);
+    expect(isLoopbackUrl('http://ollama.local')).toBe(false);
+    expect(isLoopbackUrl('http://localhost.local:11434')).toBe(false);
+    const fx = makeFixture();
+    await expect(
+      fx.service.settingsUpdate({
+        narrator: 'local',
+        endpoint: 'http://my-mac.local:11434',
+        model: 'llama',
+      }),
+    ).rejects.toMatchObject({ code: 'INPUT_INVALID' });
+  });
+
   it('uses a local endpoint when one answers (loopback test server)', async () => {
     const { createServer } = await import('node:http');
     const server = createServer((req, res) => {

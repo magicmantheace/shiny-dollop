@@ -72,13 +72,11 @@ export function isLoopbackUrl(raw: string): boolean {
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
   const host = url.hostname.toLowerCase();
-  return (
-    host === 'localhost' ||
-    host === '127.0.0.1' ||
-    host === '::1' ||
-    host === '[::1]' ||
-    host.endsWith('.local')
-  );
+  // Only actual loopback hosts. A "*.local" name is NOT loopback: mDNS
+  // names resolve to any machine on the LAN, so accepting that suffix
+  // would let narration traffic (and the log text it carries) go to
+  // another computer, breaking the no-cloud / this-machine-only rule.
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
 }
 
 export class HttpNarrator implements Narrator {

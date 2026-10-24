@@ -100,17 +100,51 @@ export function App() {
     }
   }, [reportError]);
 
+  // The campaign selected RIGHT NOW, readable from async completions.
+  // State captured by a callback goes stale when the user switches
+  // campaigns while a request is in flight, so refresh results are
+  // checked against this ref before they are applied.
+  const selectedCampaignIdRef = useRef('');
+  useEffect(() => {
+    selectedCampaignIdRef.current = campaignId;
+  }, [campaignId]);
+  // Monotonic refresh generation: only the most recently started
+  // refresh may apply its results, so a slow refresh for campaign A
+  // cannot land after the refresh for campaign B (even if the user
+  // switches back to A in between).
+  const refreshGenerationRef = useRef(0);
+
   const refreshAll = useCallback(async () => {
     if (!campaignId) return;
+    const requestedCampaignId = campaignId;
+    // A refresh invoked by an action that was started under a previous
+    // campaign (its closure still holds that campaign's id) must not
+    // even start once another campaign is selected.
+    if (
+      selectedCampaignIdRef.current &&
+      selectedCampaignIdRef.current !== requestedCampaignId
+    ) {
+      return;
+    }
+    const generation = ++refreshGenerationRef.current;
+    const isStale = (): boolean =>
+      selectedCampaignIdRef.current !== requestedCampaignId ||
+      refreshGenerationRef.current !== generation;
     try {
       const [chars, sess, entries, mem, active, camp] = await Promise.all([
-        api().charactersList(campaignId),
-        api().sessionsList(campaignId),
-        api().logList(campaignId),
-        api().memoryList(campaignId),
-        api().encountersGetActive(campaignId),
-        api().campaignsGet(campaignId),
+        api().charactersList(requestedCampaignId),
+        api().sessionsList(requestedCampaignId),
+        api().logList(requestedCampaignId),
+        api().memoryList(requestedCampaignId),
+        api().encountersGetActive(requestedCampaignId),
+        api().campaignsGet(requestedCampaignId),
       ]);
+      // Discard results for a campaign that is no longer selected —
+      // including refreshes invoked by actions started before the
+      // switch (e.g. a narration for campaign A finishing after the
+      // user moved to campaign B): applying them would replace B's
+      // panels with A's data while B is the selected campaign.
+      if (isStale()) return;
       setCharacters(chars);
       setSessions(sess);
       setLog(entries);
@@ -118,6 +152,7 @@ export function App() {
       setEncounter(active);
       setCampaigns((prev) => prev.map((c) => (c.id === camp.id ? camp : c)));
     } catch (err) {
+      if (isStale()) return;
       reportError(err);
     }
   }, [campaignId, reportError]);

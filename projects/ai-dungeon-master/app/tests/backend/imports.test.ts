@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_IMPORT_CHARS } from '../../shared/export.js';
+import { importCampaignSchema } from '../../electron/main/schemas.js';
 import { DUNGEON_FIXTURE, WORLDBUILDING_FIXTURE, makeFixture } from './helpers.js';
 
 async function setupCampaign(fx: ReturnType<typeof makeFixture>) {
@@ -243,9 +245,35 @@ describe('campaign export / import', () => {
         }),
       ),
     ).rejects.toMatchObject({ code: 'IMPORT_VERSION_UNSUPPORTED' });
-    await expect(fx.service.importCampaign('x'.repeat(2_000_001))).rejects.toMatchObject({
+    await expect(fx.service.importCampaign('x'.repeat(MAX_IMPORT_CHARS + 1))).rejects.toMatchObject({
       code: 'INPUT_TOO_LARGE',
     });
+  });
+
+  it('restores a valid accumulated export larger than the old 2,000,000-char cap', async () => {
+    const fx = makeFixture();
+    const campaign = await fx.service.campaignsCreate({ name: 'Big', seed: 'big-seed' });
+    // 21 memory entries with max-size (100,000-char) bodies — all data
+    // produced by supported operations. Their export is 2,100,000+ chars
+    // and was previously rejected as INPUT_TOO_LARGE by both the parser
+    // and the IPC schema, leaving the backup unrestorable.
+    const bigBody = 'x'.repeat(100_000);
+    for (let i = 0; i < 21; i += 1) {
+      await fx.service.memoryCreate(campaign.id, {
+        kind: 'fact',
+        title: `Accumulated note ${i + 1}`,
+        body: bigBody,
+      });
+    }
+    const text = await fx.service.exportCampaign(campaign.id);
+    expect(text.length).toBeGreaterThan(2_000_000);
+    // The IPC boundary must accept the same text the parser accepts.
+    expect(importCampaignSchema.parse([text])[0]).toBe(text);
+
+    const fx2 = makeFixture();
+    const imported = await fx2.service.importCampaign(text);
+    expect(await fx2.service.memoryList(imported.id)).toHaveLength(21);
+    expect(await fx2.service.exportCampaign(imported.id)).toBe(text);
   });
 });
 

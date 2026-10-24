@@ -1,5 +1,6 @@
 // Zod schemas for every IPC method's argument tuple (mirrors AidmApi).
 import { z } from 'zod';
+import { MAX_IMPORT_CHARS } from '../../shared/export.js';
 
 const id = z.string().min(1).max(200);
 const optSessionId = z.union([id, z.null()]).optional();
@@ -129,6 +130,6 @@ export const settingsUpdateSchema = z.tuple([
 ]);
 
 export const exportCampaignSchema = z.tuple([id]);
-export const importCampaignSchema = z.tuple([z.string().min(1).max(2_000_000)]);
-export const importWorldbuildingSchema = z.tuple([id, z.string().min(1).max(2_000_000)]);
-export const importDungeonManifestSchema = z.tuple([id, z.string().min(1).max(2_000_000)]);
+export const importCampaignSchema = z.tuple([z.string().min(1).max(MAX_IMPORT_CHARS)]);
+export const importWorldbuildingSchema = z.tuple([id, z.string().min(1).max(MAX_IMPORT_CHARS)]);
+export const importDungeonManifestSchema = z.tuple([id, z.string().min(1).max(MAX_IMPORT_CHARS)]);

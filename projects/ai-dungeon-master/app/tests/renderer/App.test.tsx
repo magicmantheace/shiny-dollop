@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import './setup';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { App } from '../../src/components/App';
@@ -227,6 +227,59 @@ describe('App', () => {
     expect(importedRolls.length).toBeGreaterThan(0);
     expect(importedRolls.every((e) => e.sessionId === null)).toBe(true);
     expect(importedRolls.every((e) => e.sessionId !== sessionAId)).toBe(true);
+  });
+
+  it('discards a stale refresh when narration for campaign A finishes after switching to B', async () => {
+    const fake = installFakeAidm();
+    const user = userEvent.setup();
+    render(<App />);
+    await createCampaign(user);
+    await addCharacter(user, 'Wren', 'pc');
+
+    // Campaign B with its own distinct character.
+    const campaigns = region('Campaigns');
+    await user.type(within(campaigns).getByLabelText('Name'), 'Second Campaign');
+    await user.click(within(campaigns).getByRole('button', { name: 'Create campaign' }));
+    expect(await within(campaigns).findByText(/Second Campaign/)).toBeInTheDocument();
+    await addCharacter(user, 'Berta', 'npc');
+    const campaignA = [...fake.campaigns.values()].find((c) => c.name === 'The Mire Campaign');
+    const campaignB = [...fake.campaigns.values()].find((c) => c.name === 'Second Campaign');
+    if (!campaignA || !campaignB) throw new Error('campaigns missing');
+
+    // Back to A; hold its narration request open.
+    const select = within(campaigns).getByLabelText('Active campaign');
+    await user.selectOptions(select, campaignA.id);
+    expect(await within(region('Characters')).findByText(/Wren/)).toBeInTheDocument();
+    let resolveNarrate: (() => void) | undefined;
+    const originalNarrate = fake.narrate.bind(fake);
+    fake.narrate = async (logEntryId: string) => {
+      await new Promise<void>((resolve) => {
+        resolveNarrate = resolve;
+      });
+      return originalNarrate(logEntryId);
+    };
+    const log = region('Session log');
+    const narrateButtons = within(log).getAllByRole('button', { name: 'Narrate' });
+    await user.click(narrateButtons[narrateButtons.length - 1]!);
+    expect(resolveNarrate).toBeDefined();
+
+    // Switch to B while A's narration is still in flight; B's own
+    // refresh loads B's data.
+    await user.selectOptions(select, campaignB.id);
+    expect(await within(region('Characters')).findByText(/Berta/)).toBeInTheDocument();
+
+    // A's narration now finishes; the action's refreshAll (captured
+    // while A was selected) fetches A's data — it must be discarded,
+    // not applied over B's panels.
+    await act(async () => {
+      resolveNarrate?.();
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 30);
+      });
+    });
+    expect(within(region('Characters')).getByText(/Berta/)).toBeInTheDocument();
+    expect(within(region('Characters')).queryByText(/Wren/)).not.toBeInTheDocument();
+    expect(within(region('Session log')).queryByText(/The Mire Campaign/)).not.toBeInTheDocument();
   });
 
   it('surfaces backend errors in the banner', async () => {

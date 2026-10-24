@@ -28,7 +28,16 @@ export const CAMPAIGN_FORMAT = 'ai-dungeon-master/campaign';
 export const WORLDBUILDING_FORMAT = 'worldbuilding-manager.project';
 export const DUNGEON_FORMAT = 'procedural-dungeon-designer/map';
 export const FORMAT_VERSION = '1.0.0';
-export const MAX_IMPORT_CHARS = 2_000_000;
+// Import size limit, shared by this parser and the IPC zod schemas
+// (electron/main/schemas.ts imports this constant, so the two layers
+// cannot drift apart). Per-field text in the service is capped at
+// 100,000 characters, but a campaign accumulates an UNBOUNDED number of
+// records — sessions, memory entries, log notes — so a whole-campaign
+// backup grows with use. The previous 2,000,000-char cap made valid
+// backups unrestorable: 21 max-size notes alone produce a 2,107,914-char
+// export. 50,000,000 chars accommodates ~500 max-size fields while still
+// rejecting genuinely oversized payloads before JSON parsing.
+export const MAX_IMPORT_CHARS = 50_000_000;
 
 export function stableStringify(value: unknown): string {
   return JSON.stringify(sortValue(value), null, 2);

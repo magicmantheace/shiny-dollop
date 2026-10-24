@@ -12,7 +12,7 @@
 
 ## Cross-cutting tests
 
-- Malformed/oversized inputs — IPC zod boundary tests (`tests/backend/ipc.test.ts`), stat/HP validation, 2,000,001-char import → `INPUT_TOO_LARGE`.
+- Malformed/oversized inputs — IPC zod boundary tests (`tests/backend/ipc.test.ts`), stat/HP validation, import over the shared 50,000,000-char limit (`MAX_IMPORT_CHARS` in `shared/export.ts`, used by both the parser and the IPC schemas) → `INPUT_TOO_LARGE`; a valid accumulated export over the former 2,000,000-char cap (21 max-size memory entries) round-trips.
 - Export/import consistency — `tests/backend/imports.test.ts`: byte-identical export, fresh-DB round-trip byte-identical, id-collision remap, corrupt/unknown-major rejection; worldbuilding and dungeon contract fixtures (real v1 shapes) plus cross-format and unknown-major rejection for both.
 - Memory search — substring/tag search incl. case-insensitivity.
 - Preload hygiene — `tests/backend/preload-hygiene.test.ts`: type-only shared imports, literal channel strings, no `require(`, and the built preload has no runtime require of project modules.
