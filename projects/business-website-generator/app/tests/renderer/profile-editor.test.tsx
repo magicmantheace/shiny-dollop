@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfileEditor } from '../../src/components/ProfileEditor';
@@ -75,6 +76,62 @@ describe('ProfileEditor', () => {
 
     expect(mock.calls.updateProfile).toHaveLength(1);
     expect(mock.calls.updateProfile[0]!.patch.tagline).toBe('We fix leaks fast');
+    expect(screen.getByRole('status')).toHaveTextContent(/all changes saved/i);
+  });
+
+  it('preserves edits typed while an autosave is in flight and saves them next', async () => {
+    // Mirror the real parent (SiteWorkspace passes onSaved={setSite}): the
+    // saved site flows back in as the `site` prop.
+    function Harness() {
+      const [current, setCurrent] = useState(site);
+      return (
+        <ProfileEditor
+          site={current}
+          onSaved={setCurrent}
+          focusSectionId={null}
+          onFocusSectionDone={() => {}}
+        />
+      );
+    }
+    render(<Harness />);
+
+    // Hold the first save in flight until the test releases it; the mock
+    // still applies the submitted snapshot immediately, like the backend.
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const originalUpdate = mock.sites.updateProfile;
+    mock.sites.updateProfile = async (id, patch) => {
+      const updated = await originalUpdate(id, patch);
+      await gate;
+      return updated;
+    };
+
+    const tagline = screen.getByLabelText('Tagline');
+    fireEvent.change(tagline, { target: { value: 'First edit' } });
+    await settleAutosave();
+    expect(mock.calls.updateProfile).toHaveLength(1);
+    expect(mock.calls.updateProfile[0]!.patch.tagline).toBe('First edit');
+
+    // Type a newer edit while the first save is still awaiting its response.
+    fireEvent.change(tagline, { target: { value: 'Second edit while saving' } });
+
+    await act(async () => {
+      release();
+    });
+
+    // The in-flight (older) snapshot must not overwrite the newer draft,
+    // and the UI must not claim everything is saved.
+    expect(screen.getByLabelText('Tagline')).toHaveValue('Second edit while saving');
+    expect(screen.getByRole('status')).toHaveTextContent(/unsaved changes/i);
+    expect(screen.getByRole('status')).not.toHaveTextContent(/all changes saved/i);
+
+    // The newer draft is saved by the next autosave cycle.
+    await settleAutosave();
+    expect(mock.calls.updateProfile).toHaveLength(2);
+    expect(mock.calls.updateProfile[1]!.patch.tagline).toBe('Second edit while saving');
+    expect(screen.getByLabelText('Tagline')).toHaveValue('Second edit while saving');
     expect(screen.getByRole('status')).toHaveTextContent(/all changes saved/i);
   });
 

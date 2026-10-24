@@ -64,6 +64,9 @@ export function ProfileEditor({ site, onSaved, focusSectionId, onFocusSectionDon
   const [saveState, setSaveState] = useState<'saved' | 'dirty' | 'saving'>('saved');
   const [saveError, setSaveError] = useState<string | null>(null);
   const savedJsonRef = useRef<string>(JSON.stringify(site.profile));
+  /** JSON of the draft as of the latest render; lets an in-flight save tell
+   * whether the user kept typing after that save's snapshot was submitted. */
+  const draftJsonRef = useRef<string>(JSON.stringify(site.profile));
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
@@ -71,6 +74,7 @@ export function ProfileEditor({ site, onSaved, focusSectionId, onFocusSectionDon
   const errors = useMemo(() => collectErrors(draft, isRestaurant), [draft, isRestaurant]);
   const hasErrors = Object.keys(errors).length > 0;
   const draftJson = JSON.stringify(draft);
+  draftJsonRef.current = draftJson;
   const isDirty = draftJson !== savedJsonRef.current;
 
   // Adopt externally-updated profiles (e.g. after a save round-trip) when
@@ -104,12 +108,25 @@ export function ProfileEditor({ site, onSaved, focusSectionId, onFocusSectionDon
     }
     setSaveState('saving');
     setSaveError(null);
+    // Revision of the draft this request submits. If the live draft no
+    // longer matches it when the response arrives, the user edited while
+    // the save was in flight and those newer edits must win.
+    const submittedJson = JSON.stringify(draft);
     try {
       const updated = await getApi().sites.updateProfile(site.id, draft);
       savedJsonRef.current = JSON.stringify(updated.profile);
-      setDraft(cloneProfile(updated.profile));
-      setTouched(new Set());
-      setSaveState('saved');
+      if (draftJsonRef.current === submittedJson) {
+        // No edits during the flight: adopt the saved snapshot as before.
+        setDraft(cloneProfile(updated.profile));
+        setTouched(new Set());
+        setSaveState('saved');
+      } else {
+        // Keep the newer draft (and its touched state) untouched. It
+        // differs from the just-saved snapshot, so it stays dirty and the
+        // pending debounced autosave will submit it next; never claim
+        // "All changes saved" for edits that have not been saved yet.
+        setSaveState('dirty');
+      }
       onSaved(updated);
     } catch (e) {
       setSaveState('dirty');

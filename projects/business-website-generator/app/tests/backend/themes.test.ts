@@ -144,6 +144,22 @@ describe('restaurant theme', () => {
     expect(files['menu.html']).toContain('Test Soup');
     expect(files['menu.html']).toContain('$9.99');
   });
+
+  it('preserves day ranges and time separators in restaurant hours', () => {
+    const profile = makeProfile({
+      hours: { label: 'Hours', lines: ['Mon–Fri: 9am–5pm', 'Monday: 09:00-17:00'] },
+    });
+    const { files } = getTheme('restaurant')!.renderSite(profile);
+    for (const page of ['index.html', 'contact.html']) {
+      const html = files[page]!;
+      // Split only at the day/time boundary: the day range keeps its dash
+      // and the time range keeps its colon/dash separators intact.
+      expect(html).toContain('<th scope="row">Mon–Fri</th><td>9am–5pm</td>');
+      expect(html).toContain('<th scope="row">Monday</th><td>09:00-17:00</td>');
+      expect(html).not.toContain('Fri: 9am:5pm');
+      expect(html).not.toContain('09:00:17:00');
+    }
+  });
 });
 
 describe('author theme', () => {

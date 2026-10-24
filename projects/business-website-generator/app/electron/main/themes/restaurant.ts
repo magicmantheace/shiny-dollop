@@ -196,15 +196,39 @@ ${items}
     .join('\n');
 }
 
+/**
+ * Split an hours line at the day/time boundary only.
+ *
+ * Day ranges (`Mon–Fri`) and time ranges (`09:00-17:00`) contain their own
+ * dashes and colons, so splitting on every separator corrupts them
+ * (`Mon–Fri: 9am–5pm` became day `Mon` / time `Fri: 9am:5pm`). The boundary
+ * colon is the first colon that is not between two digits (a time colon
+ * always is); a line with no such colon falls back to splitting at the
+ * whitespace before a leading-digit time, and a line with no time part is
+ * rendered intact as the day.
+ */
+export function parseHoursLine(line: string): { day: string; time: string } {
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] !== ':') continue;
+    const before = line[i - 1] ?? '';
+    const after = line[i + 1] ?? '';
+    if (/\d/.test(before) && /\d/.test(after)) continue; // colon inside a time
+    const day = line.slice(0, i).trim();
+    const time = line.slice(i + 1).trim();
+    if (day && time) return { day, time };
+  }
+  const spaced = /^(.+?[A-Za-z])\s+(\d.*)$/.exec(line.trim());
+  if (spaced) return { day: spaced[1]!.trim(), time: spaced[2]!.trim() };
+  return { day: line.trim(), time: '' };
+}
+
 function hoursTable(profile: BusinessProfile): string {
   const label = profile.hours.label.trim() || 'Hours';
   const lines = profile.hours.lines.filter((l) => l.trim());
   if (!lines.length) return `<section aria-label="${escapeHtml(label)}"><p>Hours coming soon.</p></section>`;
   const rows = lines
     .map((line) => {
-      const parts = line.split(/[:—–-]/);
-      const day = (parts[0] ?? line).trim();
-      const time = parts.slice(1).join(':').trim();
+      const { day, time } = parseHoursLine(line);
       return `          <tr><th scope="row">${escapeHtml(day || line)}</th><td>${escapeHtml(time || '—')}</td></tr>`;
     })
     .join('\n');
