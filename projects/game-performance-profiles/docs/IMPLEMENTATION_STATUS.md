@@ -17,6 +17,12 @@
 - **End-to-end MVP verified:** Partially — backend workflow (seed → preview → approve → apply → rollback → restore-all) verified against the mock on Linux; full stack (main → preload → React UI → IPC) smoke-tested in a real window under xvfb; real Windows execution NOT verified (needs Adam's Windows box)
 - **Owner review:** Pending (coordinator reconciles and pushes; nothing pushed)
 
+## Codex fix cycle 2 — 2026-10-24
+
+- Activation, rollback and restore-all are now serialized through one shared mutation lock in the IPC handlers (`createHandlers`): the three operations queue in invocation order, so OS mutations and journal inserts can no longer interleave (e.g. a second activation started after closing the activation dialog mid-run) and journal order always matches OS mutation order. The queue never wedges on a failed operation, and activation re-reads its profile inside the lock.
+- Restore failures now preserve dependent rollback history: in `restoreAll` and `rollbackProfile`, once restoring a newer entry for a setting fails, older entries for the same setting are skipped and left un-rolled-back for a later retry instead of being restored/retired out from under the failed entry's baseline — so a second restore-all still recovers the original state (Game Mode scenario). Entries for independent settings still restore in the same run, and each skip is reported in `errors`.
+- Regression tests added for both (each verified failing pre-fix): backend 100 → 103 tests (UI suite unchanged at 87/87), typecheck (backend + renderer) + lint + build clean. Windows-only execution still NOT verified (needs Adam's Windows box).
+
 ## First milestone
 
 Define one low-risk profile, preview proposed changes, activate with approval, and fully restore prior settings.

@@ -56,6 +56,27 @@ export function createHandlers(ctx: HandlerContext): Record<string, Handler> {
   const { db, os } = ctx;
   const onProgress: ProgressCallback = (p) => ctx.emit(ACTIVATION_PROGRESS_EVENT, p);
 
+  // Shared mutation lock: activation, rollback and restore-all all mutate
+  // OS state and append/retire journal entries. If two of them ran
+  // concurrently (e.g. the renderer closes the activation dialog while an
+  // activation is still running and starts another one), their OS
+  // mutations and journal inserts could interleave, so a journal entry's
+  // recorded `before` would no longer be the value the previous entry
+  // left behind and the rollback chain would be corrupt. Queue every
+  // mutating operation through one promise chain so operations run
+  // strictly in invocation order and journal order always matches OS
+  // mutation order. The chain itself never rejects, so one failed
+  // operation cannot wedge the operations queued behind it.
+  let mutationQueue: Promise<void> = Promise.resolve();
+  function withMutationLock<T>(fn: () => Promise<T>): Promise<T> {
+    const result = mutationQueue.then(() => fn());
+    mutationQueue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
   return {
     [IPC_CHANNELS.capabilities]: async () => {
       const capabilities = await os.probeCapabilities();
@@ -109,24 +130,32 @@ export function createHandlers(ctx: HandlerContext): Record<string, Handler> {
       if (data.approved !== true) {
         return { error: 'Activation requires explicit approval (approved === true).' };
       }
-      const profile = db.getProfile(data.profileId);
-      if (!profile) return { error: `Profile "${data.profileId}" not found.` };
-      const result = await activateProfile(profile, os, { db, onProgress });
-      return { result };
+      return withMutationLock(async () => {
+        // Re-read the profile inside the lock so a queued activation sees
+        // the state the previous mutation left behind.
+        const profile = db.getProfile(data.profileId);
+        if (!profile) return { error: `Profile "${data.profileId}" not found.` };
+        const result = await activateProfile(profile, os, { db, onProgress });
+        return { result };
+      });
     },
 
     [IPC_CHANNELS.profilesRollback]: async (payload) => {
       const { data, error } = parse(rollbackProfileSchema, payload);
       if (error || !data) return { error: error ?? 'Invalid input.' };
-      const result = await rollbackProfile(data.profileId, os, db, (id) => db.getProfile(id));
-      return { result };
+      return withMutationLock(async () => {
+        const result = await rollbackProfile(data.profileId, os, db, (id) => db.getProfile(id));
+        return { result };
+      });
     },
 
     [IPC_CHANNELS.restoreAll]: async (payload) => {
       const { error } = parse(emptySchema, payload ?? {});
       if (error) return { error };
-      const result = await restoreAll(os, db, (id) => db.getProfile(id));
-      return { result };
+      return withMutationLock(async () => {
+        const result = await restoreAll(os, db, (id) => db.getProfile(id));
+        return { result };
+      });
     },
 
     [IPC_CHANNELS.journalList]: async () => {

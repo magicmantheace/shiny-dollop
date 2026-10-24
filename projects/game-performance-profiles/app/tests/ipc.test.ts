@@ -205,6 +205,109 @@ describe('rollback / restoreAll / journal', () => {
   });
 });
 
+describe('mutation serialization (activation / rollback / restoreAll)', () => {
+  it('queues a second activation behind a running one so journal order matches OS mutation order', async () => {
+    const os = new MockOsLayer();
+    const { handlers, db } = ctx(os);
+    const p1 = (await call(handlers, 'gpp:profiles:create', {
+      name: 'Enable GM',
+      changes: [{ kind: 'game-mode', params: { enabled: 'true' } }],
+    })) as { profile: { id: string } };
+    const p2 = (await call(handlers, 'gpp:profiles:create', {
+      name: 'Disable GM',
+      changes: [{ kind: 'game-mode', params: { enabled: 'false' } }],
+    })) as { profile: { id: string } };
+
+    // Block the FIRST apply call on a gate; later applies pass through.
+    let releaseGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      releaseGate = resolve;
+    });
+    let applyEntries = 0;
+    let firstApplyEntered!: () => void;
+    const firstEntered = new Promise<void>((resolve) => {
+      firstApplyEntered = resolve;
+    });
+    const origApply = os.apply.bind(os);
+    os.apply = async (kind, params) => {
+      applyEntries += 1;
+      if (applyEntries === 1) {
+        firstApplyEntered();
+        await gate;
+      }
+      return origApply(kind, params);
+    };
+
+    const first = call(handlers, 'gpp:profiles:activate', { profileId: p1.profile.id, approved: true });
+    await firstEntered;
+    const second = call(handlers, 'gpp:profiles:activate', { profileId: p2.profile.id, approved: true });
+    // Give any un-serialized second activation ample chance to run.
+    await new Promise((r) => setTimeout(r, 25));
+    expect(applyEntries).toBe(1); // second activation has NOT touched the OS yet
+    releaseGate();
+    const [r1, r2] = await Promise.all([first, second]);
+    expect((r1 as { result: { ok: boolean } }).result.ok).toBe(true);
+    expect((r2 as { result: { ok: boolean } }).result.ok).toBe(true);
+
+    // Sequential order: enable (disabled -> enabled), then disable (enabled -> disabled).
+    expect(os.snapshot.gameModeEnabled).toBe(false);
+    const journal = db.listJournal();
+    expect(journal).toHaveLength(2);
+    expect(journal[0]).toMatchObject({ profileId: p1.profile.id, before: 'disabled', after: 'enabled' });
+    expect(journal[1]).toMatchObject({ profileId: p2.profile.id, before: 'enabled', after: 'disabled' });
+    db.close();
+  });
+
+  it('queues rollback and restoreAll behind a running activation through the same lock', async () => {
+    const os = new MockOsLayer();
+    const { handlers, db } = ctx(os);
+    const p1 = (await call(handlers, 'gpp:profiles:create', {
+      name: 'Enable GM',
+      changes: [{ kind: 'game-mode', params: { enabled: 'true' } }],
+    })) as { profile: { id: string } };
+
+    let releaseGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      releaseGate = resolve;
+    });
+    let applyEntries = 0;
+    let firstApplyEntered!: () => void;
+    const firstEntered = new Promise<void>((resolve) => {
+      firstApplyEntered = resolve;
+    });
+    const origApply = os.apply.bind(os);
+    os.apply = async (kind, params) => {
+      applyEntries += 1;
+      if (applyEntries === 1) {
+        firstApplyEntered();
+        await gate;
+      }
+      return origApply(kind, params);
+    };
+    let restoreCalls = 0;
+    const origRestore = os.restore.bind(os);
+    os.restore = async (kind, params, value) => {
+      restoreCalls += 1;
+      return origRestore(kind, params, value);
+    };
+
+    const activation = call(handlers, 'gpp:profiles:activate', { profileId: p1.profile.id, approved: true });
+    await firstEntered;
+    const rollback = call(handlers, 'gpp:profiles:rollback', { profileId: p1.profile.id });
+    const restoreAllCall = call(handlers, 'gpp:profiles:restoreAll', {});
+    await new Promise((r) => setTimeout(r, 25));
+    expect(restoreCalls).toBe(0); // neither rollback nor restoreAll ran during activation
+    releaseGate();
+    const [act, rb, ra] = await Promise.all([activation, rollback, restoreAllCall]);
+    expect((act as { result: { ok: boolean } }).result.ok).toBe(true);
+    expect((rb as { result: { rolledBack: string[] } }).result.rolledBack).toHaveLength(1);
+    expect((ra as { result: { rolledBack: string[] } }).result.rolledBack).toHaveLength(0);
+    expect(os.snapshot.gameModeEnabled).toBe(false);
+    expect(db.listUnrolledBack()).toHaveLength(0);
+    db.close();
+  });
+});
+
 describe('snapshots', () => {
   it('take → list round-trips with the approximate note', async () => {
     const { handlers } = ctx();

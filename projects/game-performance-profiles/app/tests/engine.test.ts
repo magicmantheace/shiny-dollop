@@ -260,6 +260,58 @@ describe('restoreAll', () => {
   });
 });
 
+describe('restoreAll — dependent history after a restore failure', () => {
+  it('skips older entries for a failed setting but still restores independent settings, and a retry recovers the original state', async () => {
+    const os = new MockOsLayer(); // Game Mode initially disabled, power plan = Balanced GUID
+    const db = memDb();
+    const e = makeProfile([{ kind: 'power-plan', params: { guid: HIGH_PERF } }], 'E');
+    e.id = 'e';
+    const a = makeProfile([{ kind: 'game-mode', params: { enabled: 'true' } }], 'A');
+    a.id = 'a';
+    const b = makeProfile([{ kind: 'game-mode', params: { enabled: 'false' } }], 'B');
+    b.id = 'b';
+    const getProfile = (id: string) => (id === 'a' ? a : id === 'b' ? b : e);
+
+    await activateProfile(e, os, { db }); // power plan: Balanced -> HIGH_PERF (oldest)
+    await activateProfile(a, os, { db }); // game-mode: disabled -> enabled
+    await activateProfile(b, os, { db }); // game-mode: enabled -> disabled (newest)
+    expect(os.snapshot.gameModeEnabled).toBe(false);
+    expect(os.snapshot.activePowerGuid).toBe(HIGH_PERF);
+
+    // Fail only the newer game-mode restore (B: restore to 'enabled').
+    let failNewerGameMode = true;
+    const origRestore = os.restore.bind(os);
+    os.restore = async (kind, params, value) => {
+      if (failNewerGameMode && kind === 'game-mode' && value === 'enabled') {
+        throw new Error('injected restore failure');
+      }
+      return origRestore(kind, params, value);
+    };
+
+    const first = await restoreAll(os, db, getProfile);
+    expect(first.ok).toBe(false);
+    expect(first.errors.join(' ')).toMatch(/injected restore failure/);
+    // The older game-mode entry (A) must NOT be retired/restored while B is
+    // still live — doing so would invalidate B's recorded baseline.
+    const unrolled = db.listUnrolledBack();
+    expect(unrolled.map((x) => x.profileId).sort()).toEqual(['a', 'b']);
+    expect(first.rolledBack).toHaveLength(1); // only the independent power-plan entry
+    // Independent setting was still restored despite the game-mode failure.
+    expect(os.snapshot.activePowerGuid).toBe(GUID);
+    expect(os.snapshot.gameModeEnabled).toBe(false);
+
+    // Second restore-all (failure cleared) must recover the ORIGINAL state:
+    // B restores to 'enabled', then A restores to 'disabled'.
+    failNewerGameMode = false;
+    const second = await restoreAll(os, db, getProfile);
+    expect(second.ok).toBe(true);
+    expect(second.rolledBack).toHaveLength(2);
+    expect(os.snapshot.gameModeEnabled).toBe(false); // original disabled state, not 'enabled'
+    expect(db.listUnrolledBack()).toHaveLength(0);
+    db.close();
+  });
+});
+
 describe('rollbackProfile — out-of-order rollback over a shared setting', () => {
   it('rebases the newer profile baseline so restore-all still recovers the original state', async () => {
     const os = new MockOsLayer(); // Game Mode initially disabled

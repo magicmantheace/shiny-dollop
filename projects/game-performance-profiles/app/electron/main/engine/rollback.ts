@@ -14,6 +14,21 @@
  * applies set absolute values) and the immediate surviving successor's
  * `before` is rebased to this entry's `before`, splicing this entry out
  * of the history chain.
+ *
+ * Dependent history after a restore failure: entries are restored
+ * newest first, so a chain for one setting is unwound step by step. If
+ * restoring a newer entry FAILS, that entry stays live and its `before`
+ * is still the value the chain must pass through. Restoring (or
+ * splicing out) an OLDER entry for the same setting anyway would jump
+ * straight to the older baseline and retire the older entry, leaving
+ * the failed entry's `before` pointing at a state that no longer
+ * exists in the remaining history — a second restore-all would then
+ * "restore" the failed entry to that stale intermediate value and lose
+ * the original state (e.g. Game Mode originally disabled ends up
+ * enabled). So once a restore fails for a setting, every older entry
+ * for the SAME setting in this run is skipped and left un-rolled-back
+ * for a later retry, while entries for independent settings still
+ * restore normally.
  */
 
 import type { JournalEntry, RollbackResult, RestoreAllResult } from '../../../shared/gpp-types.js';
@@ -34,8 +49,17 @@ export async function rollbackProfile(
   const profile = getProfile?.(profileId);
   const rolledBack: string[] = [];
   const errors: string[] = [];
+  /** Settings whose newer entry failed to restore in this run. */
+  const failedKeys = new Set<string>();
 
   for (const entry of entries) {
+    const entryKey = overlapKey(entry, getProfile);
+    if (failedKeys.has(entryKey)) {
+      errors.push(
+        `Skipped rolling back ${entry.target}: a newer entry for the same setting could not be restored, so this entry was left in place to preserve the rollback history.`,
+      );
+      continue;
+    }
     try {
       const params = profile ? findParams(profile, entry) : {};
       // Re-read the live journal each iteration: entries retired earlier in
@@ -62,6 +86,7 @@ export async function rollbackProfile(
       db.markRolledBack(entry.id);
       rolledBack.push(entry.id);
     } catch (e) {
+      failedKeys.add(entryKey);
       errors.push(`Could not roll back ${entry.target}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
@@ -76,8 +101,17 @@ export async function restoreAll(
   const entries = db.listUnrolledBack();
   const rolledBack: string[] = [];
   const errors: string[] = [];
+  /** Settings whose newer entry failed to restore in this run. */
+  const failedKeys = new Set<string>();
 
   for (const entry of entries) {
+    const key = overlapKey(entry, getProfile);
+    if (failedKeys.has(key)) {
+      errors.push(
+        `Skipped restoring ${entry.target}: a newer entry for the same setting could not be restored, so this entry was left in place to preserve the rollback history.`,
+      );
+      continue;
+    }
     try {
       const profile = getProfile?.(entry.profileId);
       const params = profile ? findParams(profile, entry) : {};
@@ -85,6 +119,7 @@ export async function restoreAll(
       db.markRolledBack(entry.id);
       rolledBack.push(entry.id);
     } catch (e) {
+      failedKeys.add(key);
       errors.push(`Could not restore ${entry.target}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
