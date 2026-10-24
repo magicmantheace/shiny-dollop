@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLibraryData } from './hooks';
+import type { BundleImportResult } from './gmm';
 import { LibraryView } from './components/LibraryView';
 import { GameDetailView } from './components/GameDetailView';
 import { ArtworkPanel } from './components/ArtworkPanel';
@@ -25,6 +26,19 @@ export function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const data = useLibraryData(refreshKey);
   const bump = () => setRefreshKey((k) => k + 1);
+
+  // Lift the bundle import result above BundlePanel: a refresh unmounting the
+  // panel must not discard the counts / conflict decisions the user needs to see.
+  const [bundleImportResult, setBundleImportResult] = useState<BundleImportResult | null>(null);
+
+  // Once the library has loaded once, keep the current view mounted during
+  // refreshes instead of replacing it with the loading state (which unmounts
+  // panels like BundlePanel and drops their local state).
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  useEffect(() => {
+    if (!data.loading) setHasLoadedOnce(true);
+  }, [data.loading]);
+  const showContent = hasLoadedOnce ? !data.error : !data.loading && !data.error;
 
   const selectedGame = useMemo(
     () => data.games.find((g) => g.id === selectedGameId) ?? null,
@@ -64,7 +78,7 @@ export function App() {
             Failed to load library: {data.error}
           </p>
         )}
-        {!data.loading && !data.error && (
+        {showContent && (
           <>
             {view === 'library' &&
               (selectedGame ? (
@@ -94,7 +108,13 @@ export function App() {
                 onChanged={bump}
               />
             )}
-            {view === 'bundles' && <BundlePanel onChanged={bump} />}
+            {view === 'bundles' && (
+              <BundlePanel
+                onChanged={bump}
+                importResult={bundleImportResult}
+                onImportResultChange={setBundleImportResult}
+              />
+            )}
             {view === 'import' && <ImportPanel onChanged={bump} />}
           </>
         )}

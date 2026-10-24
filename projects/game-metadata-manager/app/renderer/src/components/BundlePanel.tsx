@@ -4,6 +4,13 @@ import { UndoButton } from './UndoButton';
 
 interface Props {
   onChanged: () => void;
+  /**
+   * Optional controlled import result. App lifts this state above BundlePanel
+   * so a library refresh that unmounts/remounts the panel cannot discard the
+   * import counts and conflict decisions. Standalone renders keep internal state.
+   */
+  importResult?: BundleImportResult | null;
+  onImportResultChange?: ((result: BundleImportResult | null) => void) | undefined;
 }
 
 /** Minimal typing for the File System Access API save picker, when present. */
@@ -17,7 +24,7 @@ type WindowWithSavePicker = Window & {
   showSaveFilePicker?: (options?: Record<string, unknown>) => Promise<SavePickerHandle>;
 };
 
-export function BundlePanel({ onChanged }: Props) {
+export function BundlePanel({ onChanged, importResult: controlledResult, onImportResultChange }: Props) {
   const [json, setJson] = useState<string | null>(null);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -27,7 +34,12 @@ export function BundlePanel({ onChanged }: Props) {
   const [importText, setImportText] = useState('');
   const [importBusy, setImportBusy] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
-  const [importResult, setImportResult] = useState<BundleImportResult | null>(null);
+  const [internalImportResult, setInternalImportResult] = useState<BundleImportResult | null>(null);
+  const importResult = controlledResult !== undefined ? controlledResult : internalImportResult;
+  const setImportResult = (result: BundleImportResult | null) => {
+    if (onImportResultChange) onImportResultChange(result);
+    else setInternalImportResult(result);
+  };
 
   const canNativeSave = (window as unknown as WindowWithSavePicker).showSaveFilePicker !== undefined;
 

@@ -198,8 +198,12 @@ export class Library {
     return next;
   }
 
-  /** Set a game field directly (used by undo and bundle import). */
-  setField(gameId: string, field: string, value: string): void {
+  /**
+   * Set a game field directly (used by undo and bundle import).
+   * `updatedAt` lets bundle import preserve the winning source timestamp;
+   * callers that represent a fresh local edit (undo) omit it and get now.
+   */
+  setField(gameId: string, field: string, value: string, updatedAt?: string): void {
     const column =
       field === 'title'
         ? 'title'
@@ -215,7 +219,7 @@ export class Library {
     if (!column) throw new Error(`unsupported field for setField: ${field}`);
     this.db
       .prepare(`UPDATE games SET ${column} = ?, updated_at = ? WHERE id = ?`)
-      .run(value, new Date().toISOString(), gameId);
+      .run(value, updatedAt ?? new Date().toISOString(), gameId);
   }
 
   /**
@@ -246,11 +250,14 @@ export class Library {
     this.db.prepare('DELETE FROM games WHERE id = ?').run(gameId);
   }
 
-  /** Set the artwork id (nullable), used by bundle merge. */
-  setArtworkId(gameId: string, artworkId: string | null): void {
+  /**
+   * Set the artwork id (nullable), used by bundle merge.
+   * `updatedAt` preserves the winning bundle source timestamp, like setField.
+   */
+  setArtworkId(gameId: string, artworkId: string | null, updatedAt?: string): void {
     this.db
       .prepare('UPDATE games SET artwork_id = ?, updated_at = ? WHERE id = ?')
-      .run(artworkId, new Date().toISOString(), gameId);
+      .run(artworkId, updatedAt ?? new Date().toISOString(), gameId);
   }
 
   // ---- tags ----

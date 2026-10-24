@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { makeContext, minimalPng, firstGame } from './helpers.js';
+import { makeContext, makeGame, minimalPng, firstGame } from './helpers.js';
 import type { Game, MetadataBundle } from '../shared/ipc-contract.js';
 
 describe('Library', () => {
@@ -243,6 +243,88 @@ describe('BundleIO', () => {
       const conflict2 = res2.conflicts.find((c) => c.field === 'title');
       expect(conflict2?.chosen).toBe('bundle');
       expect(ctx.library.get(game.id)?.title).toBe('Bundle Name 2');
+    } finally {
+      ctx.dispose();
+    }
+  });
+
+  it('preserves the winning bundle updatedAt for setField merges and keeps chronological ordering', () => {
+    const ctx = makeContext();
+    try {
+      const local = makeGame({
+        id: 'g-chrono',
+        title: 'January Title',
+        description: 'January desc',
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      });
+      ctx.library.insertGame(local);
+
+      const feb: MetadataBundle = {
+        formatVersion: '1.0.0',
+        exportedAt: '2025-02-01T00:00:00.000Z',
+        exporter: 'game-metadata-manager/1.0.0',
+        games: [
+          { ...local, title: 'February Title', description: 'February desc', updatedAt: '2025-02-01T00:00:00.000Z' },
+        ],
+        artwork: [],
+      };
+      ctx.bundles.importBundle(JSON.stringify(feb));
+      const afterFeb = ctx.library.get(local.id);
+      expect(afterFeb?.title).toBe('February Title');
+      // The winning source timestamp must be preserved, not replaced by import time.
+      expect(afterFeb?.updatedAt).toBe('2025-02-01T00:00:00.000Z');
+
+      // A genuinely newer (March) snapshot must still win after the February import.
+      const mar: MetadataBundle = {
+        ...feb,
+        exportedAt: '2025-03-01T00:00:00.000Z',
+        games: [
+          { ...local, title: 'March Title', description: 'March desc', updatedAt: '2025-03-01T00:00:00.000Z' },
+        ],
+      };
+      const res = ctx.bundles.importBundle(JSON.stringify(mar));
+      expect(res.updated).toBe(1);
+      const afterMar = ctx.library.get(local.id);
+      expect(afterMar?.title).toBe('March Title');
+      expect(afterMar?.updatedAt).toBe('2025-03-01T00:00:00.000Z');
+    } finally {
+      ctx.dispose();
+    }
+  });
+
+  it('preserves the winning bundle updatedAt for artworkId merges (setArtworkId path)', () => {
+    const ctx = makeContext();
+    try {
+      const local = makeGame({
+        id: 'g-art-chrono',
+        artworkId: null,
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      });
+      ctx.library.insertGame(local);
+
+      const feb: MetadataBundle = {
+        formatVersion: '1.0.0',
+        exportedAt: '2025-02-01T00:00:00.000Z',
+        exporter: 'game-metadata-manager/1.0.0',
+        games: [{ ...local, artworkId: 'art-feb', updatedAt: '2025-02-01T00:00:00.000Z' }],
+        artwork: [],
+      };
+      ctx.bundles.importBundle(JSON.stringify(feb));
+      const afterFeb = ctx.library.get(local.id);
+      expect(afterFeb?.artworkId).toBe('art-feb');
+      expect(afterFeb?.updatedAt).toBe('2025-02-01T00:00:00.000Z');
+
+      const mar: MetadataBundle = {
+        ...feb,
+        exportedAt: '2025-03-01T00:00:00.000Z',
+        games: [{ ...local, artworkId: 'art-mar', updatedAt: '2025-03-01T00:00:00.000Z' }],
+      };
+      ctx.bundles.importBundle(JSON.stringify(mar));
+      const afterMar = ctx.library.get(local.id);
+      expect(afterMar?.artworkId).toBe('art-mar');
+      expect(afterMar?.updatedAt).toBe('2025-03-01T00:00:00.000Z');
     } finally {
       ctx.dispose();
     }

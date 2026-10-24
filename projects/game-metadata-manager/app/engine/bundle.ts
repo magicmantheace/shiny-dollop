@@ -145,11 +145,11 @@ export class BundleIO {
           const before = JSON.stringify(localVal);
           const after = JSON.stringify(winner);
           if (field === 'artworkId') {
-            this.library.setArtworkId(local.id, winner as string | null);
+            this.library.setArtworkId(local.id, winner as string | null, bundleGame.updatedAt);
           } else if (field === 'title' || field === 'description') {
-            this.library.setField(local.id, field, winner as string);
+            this.library.setField(local.id, field, winner as string, bundleGame.updatedAt);
           } else {
-            this.library.setField(local.id, field, JSON.stringify(winner));
+            this.library.setField(local.id, field, JSON.stringify(winner), bundleGame.updatedAt);
           }
           this.changes.append(local.id, field, before, after);
           touched = true;
