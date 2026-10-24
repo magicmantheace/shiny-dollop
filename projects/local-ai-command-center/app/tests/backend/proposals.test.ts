@@ -32,6 +32,40 @@ describe('proposals', () => {
     await expect(engine.reject(p.id)).rejects.toMatchObject({ code: 'PROPOSAL_NOT_PENDING' });
     db.close();
   });
+  it('reject racing an in-flight approve cannot be overwritten by the approval', async () => {
+    const { engine, db, config, ws } = makeFixture();
+    engine.saveConfig(config);
+    engine.submit({ prompt: proposePrompt('notes/race.txt', 'raced\n') });
+    await engine.whenIdle();
+    const p = engine.listProposals()[0]!;
+    // Start approve without awaiting: it claims the decision synchronously
+    // before yielding on mkdir, so the racing reject must fail — it can
+    // never succeed and then be overwritten by the resumed approval.
+    const approving = engine.approve(p.id);
+    await expect(engine.reject(p.id)).rejects.toMatchObject({ code: 'PROPOSAL_NOT_PENDING' });
+    const approved = await approving;
+    expect(approved.status).toBe('approved');
+    expect(engine.getProposal(p.id).status).toBe('approved');
+    expect(readFileSync(join(ws, 'notes/race.txt'), 'utf8')).toBe('raced\n');
+    db.close();
+  });
+  it('symlink escape: approving a proposal through an outside symlink writes nothing outside', async () => {
+    const { engine, db, config, ws } = makeFixture();
+    engine.saveConfig(config);
+    engine.submit({ prompt: proposePrompt('notes/ok2.txt', 'x\n') });
+    await engine.whenIdle();
+    const p = engine.listProposals()[0]!;
+    // Point the proposal at a path through a symlinked dir outside the workspace.
+    const { mkdtempSync, symlinkSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const outside = mkdtempSync(join(tmpdir(), 'lacc-outside-'));
+    symlinkSync(outside, join(ws, 'link'), 'dir');
+    db.prepare('UPDATE proposals SET relative_path=? WHERE id=?').run('link/evil.txt', p.id);
+    await expect(engine.approve(p.id)).rejects.toMatchObject({ code: 'PATH_OUTSIDE_WORKSPACE' });
+    expect(existsSync(join(outside, 'evil.txt'))).toBe(false);
+    expect(engine.getProposal(p.id).status).toBe('pending');
+    db.close();
+  });
   it('escape path creates no proposal, task completes, audit records', async () => {
     const { engine, db, config } = makeFixture();
     engine.saveConfig(config);

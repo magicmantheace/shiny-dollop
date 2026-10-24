@@ -33,12 +33,34 @@ export class TaskEngine {
   private processing = false;
   private running = new Map<string, RunningEntry>();
   private idleWaiters: Array<() => void> = [];
+  private proposalDecisions = new Set<string>();
 
   constructor(db: DatabaseSync, opts?: TaskEngineOptions) {
     this.db = db;
     this.adapterFactory = opts?.adapterFactory ?? ((cfg) => createAdapter(cfg));
     this.nowFn = opts?.now ?? nowIso;
     this.osLayer = opts?.osLayer ?? new NodeOsLayer();
+    this.reconcilePersistedTasks();
+  }
+
+  // Startup reconciliation: tasks persisted as queued/running belong to a
+  // previous process. Running work cannot resume (its adapter call is gone),
+  // so mark it failed with a log + audit entry; queued work never started,
+  // so restore it to the in-memory queue and kick processing.
+  private reconcilePersistedTasks(): void {
+    let tasks: Task[];
+    try { tasks = storeListTasks(this.db); } catch { return; }
+    for (const task of tasks) {
+      if (task.status === 'running') {
+        const msg = `${LACC_ERROR_CODES.ADAPTER_ERROR}: Task was interrupted by an application restart before it finished.`;
+        updateTask(this.db, task.id, { status: 'failed', error: msg, finishedAt: this.nowFn() });
+        appendTaskLog(this.db, task.id, 'error', 'Task interrupted by application restart; marked failed on startup.');
+        appendAudit(this.db, 'system', 'task.interrupted', `task=${task.id}`);
+      } else if (task.status === 'queued') {
+        this.queue.push(task.id);
+      }
+    }
+    if (this.queue.length > 0) void this.kick();
   }
 
   getConfig(): EndpointConfig | null { return storeGetConfig(this.db); }
@@ -147,26 +169,46 @@ export class TaskEngine {
   }
 
   async approve(id: string): Promise<Proposal> {
+    // Claim the decision synchronously, before any await: a concurrent
+    // approve/reject for the same proposal must fail instead of also seeing
+    // `pending` and racing the file write / status update.
+    if (this.proposalDecisions.has(id)) throw laccError(LACC_ERROR_CODES.PROPOSAL_NOT_PENDING, `Proposal ${id} already has a decision in progress.`);
     const proposal = storeGetProposal(this.db, id);
     if (!proposal) throw laccError(LACC_ERROR_CODES.PROPOSAL_NOT_FOUND, `Proposal not found: ${id}`);
     if (proposal.status !== 'pending') throw laccError(LACC_ERROR_CODES.PROPOSAL_NOT_PENDING, `Proposal ${id} is already ${proposal.status}.`);
-    const task = storeGetTask(this.db, proposal.taskId);
-    if (!task) throw laccError(LACC_ERROR_CODES.PROPOSAL_NOT_FOUND, `Proposal ${id} references a missing task.`);
-    const full = resolveInWorkspace(task.workspaceRoot, proposal.relativePath);
-    await mkdir(dirname(full), { recursive: true });
-    await writeFile(full, proposal.proposedContent, 'utf8');
-    const updated = updateProposalStatus(this.db, id, 'approved')!;
-    appendAudit(this.db, 'user', 'proposal.approved', `proposal=${id} path=${proposal.relativePath}`);
-    appendAudit(this.db, 'system', 'proposal.applied', `proposal=${id} path=${proposal.relativePath}`);
-    return updated;
+    this.proposalDecisions.add(id);
+    try {
+      const task = storeGetTask(this.db, proposal.taskId);
+      if (!task) throw laccError(LACC_ERROR_CODES.PROPOSAL_NOT_FOUND, `Proposal ${id} references a missing task.`);
+      let full = resolveInWorkspace(task.workspaceRoot, proposal.relativePath);
+      await mkdir(dirname(full), { recursive: true });
+      // Re-validate containment after mkdir (newly created dirs are checked)
+      // and re-confirm the proposal is still pending before writing.
+      full = resolveInWorkspace(task.workspaceRoot, proposal.relativePath);
+      const still = storeGetProposal(this.db, id);
+      if (!still || still.status !== 'pending') throw laccError(LACC_ERROR_CODES.PROPOSAL_NOT_PENDING, `Proposal ${id} is already ${still?.status ?? 'missing'}.`);
+      await writeFile(full, proposal.proposedContent, 'utf8');
+      const updated = updateProposalStatus(this.db, id, 'approved')!;
+      appendAudit(this.db, 'user', 'proposal.approved', `proposal=${id} path=${proposal.relativePath}`);
+      appendAudit(this.db, 'system', 'proposal.applied', `proposal=${id} path=${proposal.relativePath}`);
+      return updated;
+    } finally {
+      this.proposalDecisions.delete(id);
+    }
   }
   async reject(id: string): Promise<Proposal> {
+    if (this.proposalDecisions.has(id)) throw laccError(LACC_ERROR_CODES.PROPOSAL_NOT_PENDING, `Proposal ${id} already has a decision in progress.`);
     const proposal = storeGetProposal(this.db, id);
     if (!proposal) throw laccError(LACC_ERROR_CODES.PROPOSAL_NOT_FOUND, `Proposal not found: ${id}`);
     if (proposal.status !== 'pending') throw laccError(LACC_ERROR_CODES.PROPOSAL_NOT_PENDING, `Proposal ${id} is already ${proposal.status}.`);
-    const updated = updateProposalStatus(this.db, id, 'rejected')!;
-    appendAudit(this.db, 'user', 'proposal.rejected', `proposal=${id} path=${proposal.relativePath}`);
-    return updated;
+    this.proposalDecisions.add(id);
+    try {
+      const updated = updateProposalStatus(this.db, id, 'rejected')!;
+      appendAudit(this.db, 'user', 'proposal.rejected', `proposal=${id} path=${proposal.relativePath}`);
+      return updated;
+    } finally {
+      this.proposalDecisions.delete(id);
+    }
   }
   // aliases
   approveProposal = this.approve;

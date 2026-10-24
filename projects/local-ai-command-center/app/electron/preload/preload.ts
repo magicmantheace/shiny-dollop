@@ -1,6 +1,31 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { LaccApi } from '../../shared/types.js';
-import { LACC_METHOD_CHANNELS } from './channels.js';
+import type { LaccApi, LaccMethodName } from '../../shared/types.js';
+
+// Sandboxed preload: Electron's sandboxed renderer only allows requiring
+// `electron` (and a few built-ins) — it cannot require local modules such as
+// `./channels.js` or `../../shared/types.js`. The channel map is therefore
+// inlined here so the compiled preload.js is a single self-contained script
+// whose only runtime require is `electron`. This map MUST stay identical to
+// LACC_IPC_CHANNELS in shared/types.ts (guarded by tests/backend/preload.test.ts);
+// main-process code continues to import the canonical map via channels.ts.
+const LACC_METHOD_CHANNELS: Record<LaccMethodName, string> = {
+  configGet: 'lacc:config-get',
+  configSave: 'lacc:config-save',
+  endpointHealth: 'lacc:endpoint-health',
+  endpointModels: 'lacc:endpoint-models',
+  tasksSubmit: 'lacc:tasks-submit',
+  tasksList: 'lacc:tasks-list',
+  tasksGet: 'lacc:tasks-get',
+  tasksCancel: 'lacc:tasks-cancel',
+  tasksLogs: 'lacc:tasks-logs',
+  proposalsList: 'lacc:proposals-list',
+  proposalsGet: 'lacc:proposals-get',
+  proposalsApprove: 'lacc:proposals-approve',
+  proposalsReject: 'lacc:proposals-reject',
+  auditList: 'lacc:audit-list',
+  resourcesSnapshot: 'lacc:resources-snapshot',
+  pickDirectory: 'lacc:pick-directory',
+};
 
 const lacc: LaccApi = {
   configGet: () => ipcRenderer.invoke(LACC_METHOD_CHANNELS.configGet),
