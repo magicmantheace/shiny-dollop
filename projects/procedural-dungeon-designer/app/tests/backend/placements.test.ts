@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { DungeonService } from '../../electron/main/service.js';
-import { openDatabase } from '../../electron/main/store.js';
+import { insertDungeon, openDatabase } from '../../electron/main/store.js';
+import { PDD_ERROR_CODES } from '../../shared/errors.js';
 import { computeBudgetUsed } from '../../shared/generator.js';
-import { addPlacement, movePlacement, removePlacement } from '../../shared/placements.js';
+import {
+  MAX_PLACEMENTS_PER_ROOM,
+  addPlacement,
+  movePlacement,
+  removePlacement,
+} from '../../shared/placements.js';
 import { getTheme } from '../../shared/themes.js';
 import type { DungeonMap } from '../../shared/types.js';
 import { BASE_PARAMS, makeFixture } from './helpers.js';
@@ -175,5 +181,138 @@ describe('placements (pure budget rule)', () => {
     expect(moved.rooms[1]?.placements.map((p) => p.id)).toEqual([placement.id]);
     const removed = removePlacement(moved, placement.id);
     expect(removed.budgetUsed).toBe(0);
+  });
+});
+
+describe('placements (per-room placement limit)', () => {
+  // Regression: roomSchema caps a room at 50 placements, but the edit
+  // operations only checked the budget. 51 Sunken Offering Bowls cost
+  // 102 points and fit a difficulty-5 budget (140), so placementsAdd
+  // used to persist a map that live validation, saving and JSON import
+  // all then rejected. Moving into a full room had the same problem.
+  function roomyMap(): DungeonMap {
+    const row = '#'.repeat(12);
+    const room = (id: string, isEntrance: boolean) => ({
+      id,
+      name: id,
+      x: 1,
+      y: 1,
+      w: 3,
+      h: 3,
+      cx: 2,
+      cy: 2,
+      isEntrance,
+      placements: [] as DungeonMap['rooms'][number]['placements'],
+    });
+    return {
+      params: {
+        seed: 'roomy',
+        gridWidth: 12,
+        gridHeight: 12,
+        roomCount: 3,
+        theme: 'sunken-crypt',
+        difficulty: 5,
+      },
+      gridWidth: 12,
+      gridHeight: 12,
+      tiles: Array.from({ length: 12 }, () => row),
+      rooms: [room('room-1', true), room('room-2', false)],
+      budgetLimit: 140,
+      budgetUsed: 0,
+    };
+  }
+
+  it('the limit constant matches the schema cap of 50', () => {
+    expect(MAX_PLACEMENTS_PER_ROOM).toBe(50);
+  });
+
+  it('adding the 51st placement to a room throws PLACEMENT_LIMIT_EXCEEDED even when it fits the budget', () => {
+    let map = roomyMap();
+    for (let i = 0; i < MAX_PLACEMENTS_PER_ROOM; i++) {
+      map = addPlacement(map, 'room-1', 'treasure', 'sunken-offering-bowl');
+    }
+    expect(map.rooms[0]?.placements).toHaveLength(50);
+    expect(map.budgetUsed).toBe(100); // the 51st bowl (102 total) fits the 140 budget
+    expect(() =>
+      addPlacement(map, 'room-1', 'treasure', 'sunken-offering-bowl'),
+    ).toThrowError(
+      expect.objectContaining({ code: PDD_ERROR_CODES.PLACEMENT_LIMIT_EXCEEDED }),
+    );
+    // The rejected edit leaves the map unchanged.
+    expect(map.rooms[0]?.placements).toHaveLength(50);
+    expect(map.budgetUsed).toBe(100);
+  });
+
+  it('moving a placement into a full room throws PLACEMENT_LIMIT_EXCEEDED and leaves the map unchanged', () => {
+    let map = roomyMap();
+    for (let i = 0; i < MAX_PLACEMENTS_PER_ROOM; i++) {
+      map = addPlacement(map, 'room-2', 'treasure', 'sunken-offering-bowl');
+    }
+    map = addPlacement(map, 'room-1', 'treasure', 'sunken-offering-bowl');
+    const mover = map.rooms[0]!.placements[0]!;
+    expect(() => movePlacement(map, mover.id, 'room-2')).toThrowError(
+      expect.objectContaining({ code: PDD_ERROR_CODES.PLACEMENT_LIMIT_EXCEEDED }),
+    );
+    expect(map.rooms[0]?.placements.map((p) => p.id)).toEqual([mover.id]);
+    expect(map.rooms[1]?.placements).toHaveLength(50);
+  });
+
+  it('moving within the same full room stays a valid no-op', () => {
+    let map = roomyMap();
+    for (let i = 0; i < MAX_PLACEMENTS_PER_ROOM; i++) {
+      map = addPlacement(map, 'room-1', 'treasure', 'sunken-offering-bowl');
+    }
+    const first = map.rooms[0]!.placements[0]!;
+    const moved = movePlacement(map, first.id, 'room-1');
+    expect(moved.rooms[0]?.placements).toHaveLength(50);
+  });
+
+  it('service placementsAdd rejects the 51st placement and does not persist it', async () => {
+    const { service, db } = makeFixture();
+    const generated = await service.generate(ROOMY_PARAMS);
+    const target = generated.rooms[0]!;
+    const full: DungeonMap = {
+      ...generated,
+      budgetLimit: 500,
+      rooms: generated.rooms.map((r) =>
+        r.id === target.id
+          ? {
+              ...r,
+              placements: Array.from({ length: MAX_PLACEMENTS_PER_ROOM }, (_, i) => ({
+                id: `p${i + 1}`,
+                kind: 'treasure' as const,
+                key: 'sunken-offering-bowl',
+                name: 'Sunken Offering Bowl',
+                cost: 2,
+              })),
+            }
+          : { ...r, placements: [] },
+      ),
+    };
+    full.budgetUsed = computeBudgetUsed(full);
+    insertDungeon(db, {
+      id: 'full-room-1',
+      name: 'Full Room',
+      createdAt: '2026-10-24T00:00:00.000Z',
+      updatedAt: '2026-10-24T00:00:00.000Z',
+      map: full,
+    });
+
+    await expect(
+      service.placementsAdd('full-room-1', {
+        roomId: target.id,
+        kind: 'treasure',
+        key: 'sunken-offering-bowl',
+      }),
+    ).rejects.toMatchObject({ code: PDD_ERROR_CODES.PLACEMENT_LIMIT_EXCEEDED });
+
+    // Nothing was persisted past the limit, so the stored dungeon still
+    // validates and its JSON export still imports cleanly.
+    const stored = await service.dungeonsGet('full-room-1');
+    expect(stored.map.rooms.find((r) => r.id === target.id)?.placements).toHaveLength(50);
+    const exported = await service.exportJson('full-room-1');
+    const imported = await service.importJson(exported);
+    expect(imported.map).toEqual(stored.map);
+    db.close();
   });
 });

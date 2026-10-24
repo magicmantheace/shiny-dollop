@@ -66,7 +66,7 @@ zod-validated IPC) under `app/`. Fully offline; no network calls anywhere.
 
 ## Verification summary
 
-See `docs/TEST_PLAN.md` for the full record: 44/44 tests, typecheck, lint,
+See `docs/TEST_PLAN.md` for the full record: 56/56 tests, typecheck, lint,
 build, and packaged-main smoke all green (Linux, Node 24).
 
 Codex-review fix cycle (2026-10-24): save/import now reject placements
@@ -75,3 +75,11 @@ cannot defeat the budget; the connectivity BFS no longer seeds a walled
 or out-of-bounds entrance center; and the print-view toggle moved to the
 header (outside every hidden panel) as a visible Exit print view control,
 so an unsaved map can no longer be trapped in print view.
+
+Codex-review fix cycle 2 (2026-10-24): IPC failures now travel as a
+structured { ok, value | error } envelope returned from the handlers and
+unwrapped in the preload, so named errors (e.g. BUDGET_EXCEEDED) survive
+the Electron bridge instead of being reduced to their message; and the
+per-room placement cap (50, shared constant with roomSchema) is enforced
+by add/move placement edits (PLACEMENT_LIMIT_EXCEEDED), so an edit can
+no longer persist a map that validation, saving and import would reject.

@@ -3,6 +3,7 @@
 // DungeonMap live here: tile grid shape, allowed tile characters, room
 // and placement counts, and bounded name strings.
 import { z } from 'zod';
+import { MAX_PLACEMENTS_PER_ROOM } from '../../shared/placements.js';
 
 export const themeIdSchema = z.enum(['sunken-crypt', 'ember-deep']);
 
@@ -40,7 +41,7 @@ export const roomSchema = z
     cx: z.number().int().min(0).max(10_000),
     cy: z.number().int().min(0).max(10_000),
     isEntrance: z.boolean(),
-    placements: z.array(placementSchema).max(50),
+    placements: z.array(placementSchema).max(MAX_PLACEMENTS_PER_ROOM),
   })
   .strict();
 

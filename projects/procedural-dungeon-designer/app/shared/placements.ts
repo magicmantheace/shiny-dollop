@@ -6,8 +6,28 @@
 // Removals always succeed. Costs and names always come from the theme
 // table — a client can never invent a cheaper cost for a known key, and
 // unknown keys are rejected with PLACEMENT_UNKNOWN.
+//
+// ROOM CAPACITY RULE (documented, tested): a room holds at most
+// MAX_PLACEMENTS_PER_ROOM placements — the same cap roomSchema enforces
+// on save/import. addPlacement and movePlacement enforce it up front
+// (PLACEMENT_LIMIT_EXCEEDED, map unchanged) so an edit can never persist
+// a map that validation, saving and import would then reject.
 
 import { PDD_ERROR_CODES, pddError } from './errors.js';
+
+/** Per-room placement cap; electron/main/schemas.ts uses this same
+ *  constant for roomSchema so the edit-time and save-time limits cannot
+ *  drift apart. */
+export const MAX_PLACEMENTS_PER_ROOM = 50;
+
+function assertRoomHasCapacity(room: Room): void {
+  if (room.placements.length >= MAX_PLACEMENTS_PER_ROOM) {
+    throw pddError(
+      PDD_ERROR_CODES.PLACEMENT_LIMIT_EXCEEDED,
+      `Room "${room.name}" already holds the maximum of ${MAX_PLACEMENTS_PER_ROOM} placements. Remove a placement from that room first.`,
+    );
+  }
+}
 import { computeBudgetUsed } from './generator.js';
 import { getTheme, tableEntry } from './themes.js';
 import type { DungeonMap, Placement, PlacementKind, Room } from './types.js';
@@ -118,6 +138,9 @@ export function addPlacement(
       `Unknown ${kind} for theme ${theme.id}: ${key}`,
     );
   }
+  // Capacity is checked before the budget: a full room rejects the edit
+  // even when the placement would still fit the budget.
+  assertRoomHasCapacity(findRoom(map, roomId));
   const used = computeBudgetUsed(map);
   if (used + entry.cost > map.budgetLimit) {
     throw pddError(
@@ -155,6 +178,10 @@ export function movePlacement(
   const { room: fromRoom, placement } = findPlacement(next, placementId);
   const toRoom = findRoom(next, toRoomId);
   if (fromRoom.id === toRoom.id) return next; // no-op move, still valid
+  // Moving into a full room would push it past the schema cap; reject
+  // before mutating either room (the original map is untouched either
+  // way, since all edits happen on the clone).
+  assertRoomHasCapacity(toRoom);
   fromRoom.placements = fromRoom.placements.filter((p) => p.id !== placementId);
   toRoom.placements.push(placement);
   next.budgetUsed = computeBudgetUsed(next);

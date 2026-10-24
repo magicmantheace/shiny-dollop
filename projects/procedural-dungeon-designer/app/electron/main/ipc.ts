@@ -1,6 +1,13 @@
 // IPC boundary: zod-parse the raw args array for every method, delegate
-// to DungeonService, and convert every failure to a plain { code,
-// message } PddError so nothing exotic crosses the bridge.
+// to DungeonService, and transport every outcome as a structured
+// { ok, value | error } envelope (shared/ipc-envelope).
+//
+// Failures are RETURNED as envelope data, never thrown: Electron
+// serializes errors thrown through ipcMain.handle down to their
+// message, so a thrown { code, message } PddError would lose its code
+// (e.g. BUDGET_EXCEEDED) before the renderer could display it. The
+// preload unwraps the envelope and re-throws the named error on the
+// renderer side, where the { code, message } contract holds.
 import { ZodError } from 'zod';
 import {
   PDD_ERROR_CODES,
@@ -9,6 +16,11 @@ import {
   type PddError,
   type PddErrorCode,
 } from '../../shared/errors.js';
+import {
+  errorEnvelope,
+  successEnvelope,
+  type IpcEnvelope,
+} from '../../shared/ipc-envelope.js';
 import { PDD_CHANNELS, type PddMethodName } from './channels.js';
 import {
   dungeonsDeleteSchema,
@@ -114,11 +126,11 @@ export function createHandlers(service: DungeonService): Record<string, Handler>
   >) {
     const handler = byMethod[method];
     const fallback = FALLBACKS[method];
-    table[channel] = async (...args: unknown[]) => {
+    table[channel] = async (...args: unknown[]): Promise<IpcEnvelope<unknown>> => {
       try {
-        return await handler(...args);
+        return successEnvelope(await handler(...args));
       } catch (err) {
-        throw toPlain(err, fallback);
+        return errorEnvelope(toPlain(err, fallback));
       }
     };
   }
