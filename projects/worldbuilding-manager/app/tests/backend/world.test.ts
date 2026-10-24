@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { WorldStore } from '../../db/world';
+import { MAX_BACKUP_BYTES, WorldStore } from '../../db/world';
 import { AppError } from '../../shared/errors';
 
 let store: WorldStore;
@@ -245,8 +245,40 @@ describe('backup export / import', () => {
     expect(() => store.importBundle(JSON.stringify({
       format: 'worldbuilding-manager.project', formatVersion: '2.0.0', entities: [], links: [], revisions: [],
     }))).toThrowError(expect.objectContaining({ code: 'IMPORT_VERSION_UNSUPPORTED' }));
-    expect(() => store.importBundle('x'.repeat(10 * 1024 * 1024 + 1))).toThrowError(
+    expect(() => store.importBundle('x'.repeat(MAX_BACKUP_BYTES + 1))).toThrowError(
       expect.objectContaining({ code: 'IMPORT_TOO_LARGE' }),
+    );
+  });
+
+  it('round-trips a backup grown past the former 10 MiB limit by revision history', () => {
+    // Regression: append-only revisions made exportBundle() produce backups
+    // that importBundle() then rejected with IMPORT_TOO_LARGE, so the backup
+    // was unrestorable. One long note updated repeatedly reproduces it at a
+    // scaled-down size that still crosses the old limit.
+    const note = store.createEntity({ type: 'note', name: 'Long note', body: 'x'.repeat(100_000) });
+    for (let i = 0; i < 130; i += 1) {
+      store.updateEntity(note.id, { body: `${'x'.repeat(100_000)}${i}` });
+    }
+    const json = store.exportBundle();
+    expect(Buffer.byteLength(json, 'utf8')).toBeGreaterThan(10 * 1024 * 1024);
+    const fresh = new WorldStore(':memory:');
+    try {
+      const result = fresh.importBundle(json);
+      expect(result.entities).toBe(1);
+      expect(result.revisions).toBe(131);
+      expect(fresh.listRevisions(note.id)).toHaveLength(131);
+    } finally {
+      fresh.close();
+    }
+  });
+
+  it('refuses to export an over-cap backup instead of producing an unrestorable one', () => {
+    const body = 'y'.repeat(200_000);
+    for (let i = 0; i < 200; i += 1) {
+      store.createEntity({ type: 'note', name: `Bulk note ${i}`, body });
+    }
+    expect(() => store.exportBundle()).toThrowError(
+      expect.objectContaining({ code: 'EXPORT_TOO_LARGE' }),
     );
   });
 

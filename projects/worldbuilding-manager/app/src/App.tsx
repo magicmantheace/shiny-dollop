@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import { ENTITY_TYPES } from '../shared/types';
 import type { ContinuityWarning, Entity, EntityType, LinkedEntity, Revision } from '../shared/types';
@@ -78,15 +78,28 @@ export function App(): ReactElement {
     refresh(false).catch((e: Error) => setError(e.message));
   }, [refresh]);
 
+  // The entity id the edit drafts were last initialized for. refresh()
+  // replaces the entities array with fresh objects for the SAME id (e.g.
+  // after adding/removing a relationship), and re-initializing on every
+  // such object would silently discard unsaved edits — so the drafts are
+  // initialized only when the selection actually changes to a new entity.
+  // A successful save sends exactly the draft values, so no re-init is
+  // needed afterwards either.
+  const draftEntityIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!selected) {
+      draftEntityIdRef.current = null;
       setLinked([]);
       setRevisions([]);
       return;
     }
-    setEditName(selected.name);
-    setEditDescription(selected.description);
-    setEditBody(selected.body);
+    if (draftEntityIdRef.current !== selected.id) {
+      draftEntityIdRef.current = selected.id;
+      setEditName(selected.name);
+      setEditDescription(selected.description);
+      setEditBody(selected.body);
+    }
     Promise.all([api().links.forEntity(selected.id), api().revisions.list(selected.id)])
       .then(([l, r]) => {
         setLinked(l);

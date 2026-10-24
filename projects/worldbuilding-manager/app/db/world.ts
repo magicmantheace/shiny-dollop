@@ -11,7 +11,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { AppError, ErrorCodes } from '../shared/errors';
-import { ENTITY_TYPES } from '../shared/types';
+import { ENTITY_TYPES, MAX_BACKUP_BYTES } from '../shared/types';
 import type {
   ContinuityWarning,
   Entity,
@@ -26,7 +26,8 @@ import type {
 
 export const BACKUP_FORMAT = 'worldbuilding-manager.project';
 export const BACKUP_FORMAT_VERSION = '1.0.0';
-export const MAX_BACKUP_BYTES = 10 * 1024 * 1024;
+/** Re-exported for convenience; the policy itself lives in shared/types. */
+export { MAX_BACKUP_BYTES };
 
 const MAX_NAME = 200;
 const MAX_LABEL = 80;
@@ -188,6 +189,7 @@ function byTypeNameId(a: Entity, b: Entity): number {
 
 export class WorldStore {
   private readonly db: DatabaseSync;
+  private closed = false;
 
   constructor(dbPath: string) {
     if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
@@ -196,7 +198,10 @@ export class WorldStore {
     this.db.exec(SCHEMA);
   }
 
+  /** Idempotent: safe to call from more than one shutdown path. */
   close(): void {
+    if (this.closed) return;
+    this.closed = true;
     this.db.close();
   }
 
@@ -437,13 +442,22 @@ export class WorldStore {
     const revisions: Revision[] = [];
     for (const e of entities) revisions.push(...this.listRevisions(e.id));
     revisions.sort((a, b) => a.entityId.localeCompare(b.entityId) || a.revNo - b.revNo);
-    return JSON.stringify({
+    const json = JSON.stringify({
       format: BACKUP_FORMAT,
       formatVersion: BACKUP_FORMAT_VERSION,
       entities,
       links,
       revisions: revisions.map((r) => ({ entityId: r.entityId, revNo: r.revNo, snapshot: r.snapshot, createdAt: r.createdAt })),
     }, null, 2);
+    // Enforce the same cap importBundle() enforces: never hand the user a
+    // backup that restore would reject as too large.
+    if (Buffer.byteLength(json, 'utf8') > MAX_BACKUP_BYTES) {
+      fail(
+        ErrorCodes.ExportTooLarge,
+        `This project is too large to export as a restorable backup (limit ${MAX_BACKUP_BYTES} bytes). No backup file was produced.`,
+      );
+    }
+    return json;
   }
 
   importBundle(json: string): ImportResult {

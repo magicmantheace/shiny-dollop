@@ -19,6 +19,13 @@
 - Versioned JSON backup (`formatVersion 1.0.0`) with byte-identical round-trip; named-error rejection for corrupt/dangling/unknown-major/oversized backups; single-document Markdown export
 - Persistence across database reopen (tested)
 
+## Codex review fixes (2026-10-24, PR #19 fix cycle 1)
+
+- Backup size policy unified: one shared 64 MiB cap (`MAX_BACKUP_BYTES` in `shared/types.ts`) enforced by both `exportBundle()` (new `EXPORT_TOO_LARGE` — an unrestorable backup is never produced) and `importBundle()`; the IPC import schema limit was aligned to the same constant. Regression tests round-trip a >10 MiB revision-grown backup and cover the over-cap export refusal.
+- Renderer: unsaved entity edits are no longer discarded when adding/removing a relationship refreshes the entity list — edit drafts initialize only when the selected entity id changes (regression test in `tests/ui/App.test.tsx`; the fake API now returns fresh objects per list call, matching IPC cloning).
+- Main process (macOS): the `WorldStore` now closes on `before-quit` instead of `window-all-closed`, so close-window → reactivate keeps the database usable; `WorldStore.close()` is idempotent. Regression test with mocked Electron lifecycle + real store/IPC in `tests/backend/main-lifecycle.test.ts`.
+- Verified: 31/31 tests pass (was 27), typecheck and lint clean. All four new tests fail against the pre-fix code.
+
 ## Implemented but not verified on target OS
 
 - Windows 11 desktop behavior (window, packaged app, real user-data paths) — no Windows execution has taken place

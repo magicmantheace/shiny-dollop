@@ -7,6 +7,17 @@
 export const ENTITY_TYPES = ['character', 'location', 'faction', 'event', 'note'] as const;
 export type EntityType = (typeof ENTITY_TYPES)[number];
 
+/**
+ * Single size policy for project backups, in UTF-8 bytes. It is enforced
+ * identically in both directions: `exportBundle()` refuses to produce a
+ * backup larger than this, and `importBundle()` refuses to restore one —
+ * so an exported backup is always restorable. Revisions are append-only
+ * snapshots, so this is sized generously (a single entity crosses 10 MiB
+ * after ~53 full-size note revisions); the cap exists as a guard against
+ * importing unbounded untrusted files, not as a normal working limit.
+ */
+export const MAX_BACKUP_BYTES = 64 * 1024 * 1024;
+
 export interface Entity {
   id: string;
   type: EntityType;

@@ -45,7 +45,11 @@ function makeFakeApi(): WbmApi {
         return e;
       },
       get: async (id) => entities.get(id) ?? null,
-      list: async (type) => [...entities.values()].filter((e) => !type || e.type === type),
+      // The real IPC boundary structured-clones payloads, so every list()
+      // returns fresh objects for the same ids — mirror that here.
+      list: async (type) => [...entities.values()]
+        .filter((e) => !type || e.type === type)
+        .map((e) => ({ ...e, tags: [...e.tags] })),
       update: async (id, patch: EntityPatch) => {
         const cur = entities.get(id);
         if (!cur) throw new Error('not found');
@@ -149,6 +153,32 @@ describe('App', () => {
     const list = screen.getByLabelText('Entities');
     expect(await within(list).findByText(/Sera at the Siege/)).toBeInTheDocument();
     expect(within(list).queryByText(/Harbour Founded/)).not.toBeInTheDocument();
+  });
+
+  it('preserves unsaved entity edits when a relationship is added', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findAllByText(/Sera Vane/);
+    const entitiesPanel = screen.getByLabelText('Entities');
+    await user.click(within(entitiesPanel).getByRole('button', { name: /Sera Vane/ }));
+
+    const nameInput = screen.getByLabelText('Edit name') as HTMLInputElement;
+    const bodyInput = screen.getByLabelText('Edit body') as HTMLTextAreaElement;
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Unsaved Draft Name');
+    await user.type(bodyInput, 'Unsaved draft notes.');
+
+    // Adding a relationship triggers refresh(), which replaces the entity
+    // objects — the unsaved drafts must survive it.
+    const targetSelect = screen.getByLabelText('Link target') as HTMLSelectElement;
+    const target = [...targetSelect.options].find((o) => o.textContent?.includes('Harbour Founded'));
+    expect(target).toBeDefined();
+    await user.selectOptions(targetSelect, target?.value ?? '');
+    await user.click(screen.getByRole('button', { name: 'Add link' }));
+    expect(await screen.findByText('Link added.')).toBeInTheDocument();
+
+    expect(nameInput.value).toBe('Unsaved Draft Name');
+    expect(bodyInput.value).toContain('Unsaved draft notes.');
   });
 
   it('exports a JSON backup into the output box', async () => {

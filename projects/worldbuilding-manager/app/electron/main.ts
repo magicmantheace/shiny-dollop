@@ -41,8 +41,14 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+  // On macOS the app stays alive with no windows, and 'activate' can create
+  // a new window against the already-registered IPC handlers — so the store
+  // must outlive the last window. It is closed on actual quit instead:
+  // 'before-quit' also fires for the non-macOS window-all-closed quit path.
   app.on('window-all-closed', () => {
-    store.close();
     if (process.platform !== 'darwin') app.quit();
+  });
+  app.on('before-quit', () => {
+    store.close();
   });
 });

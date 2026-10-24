@@ -1,6 +1,6 @@
 /** Zod schemas validating every IPC payload at the main-process boundary. */
 import { z } from 'zod';
-import { ENTITY_TYPES } from './types';
+import { ENTITY_TYPES, MAX_BACKUP_BYTES } from './types';
 
 const orderKey = z.number().int().nullable().optional();
 
@@ -38,4 +38,7 @@ export const searchSchema = z.object({
   type: entityTypeSchema.optional(),
 });
 
-export const importSchema = z.object({ json: z.string().max(12_000_000) });
+// Character count here, byte count in the engine: a backup within the
+// engine's byte limit never exceeds this many characters (UTF-8 uses at
+// least one byte per code unit), and the engine check stays authoritative.
+export const importSchema = z.object({ json: z.string().max(MAX_BACKUP_BYTES) });

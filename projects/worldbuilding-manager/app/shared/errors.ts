@@ -15,5 +15,6 @@ export const ErrorCodes = {
   DuplicateLink: 'DUPLICATE_LINK',
   ImportInvalid: 'IMPORT_INVALID',
   ImportTooLarge: 'IMPORT_TOO_LARGE',
+  ExportTooLarge: 'EXPORT_TOO_LARGE',
   ImportVersionUnsupported: 'IMPORT_VERSION_UNSUPPORTED',
 } as const;
