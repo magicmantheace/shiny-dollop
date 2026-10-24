@@ -87,6 +87,58 @@ describe('duplicate detection', () => {
   });
 });
 
+describe('hard links', () => {
+  function tryLink(target: string, linkPath: string): boolean {
+    try {
+      fs.mkdirSync(path.dirname(linkPath), { recursive: true });
+      fs.linkSync(target, linkPath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  it('advertises no savings for two hard links to the same 4-byte file', async () => {
+    const root = track(makeFixtureDir());
+    const orig = path.join(root, 'a', 'data.bin');
+    writeFixture(orig, 'DATA'); // 4 bytes
+    if (!tryLink(orig, path.join(root, 'b', 'alias.bin'))) return; // skip where hard links unsupported
+
+    const { db, scanId } = scanRoot(root);
+    const job = startScanJob(db, { scanId, rootPath: root, exclusions: [], emitProgress: () => {} });
+    const result = await job.promise;
+
+    expect(result.state).toBe('complete');
+    expect(result.files).toBe(2); // both paths are scanned and recorded
+    // Removing one link reclaims 0 bytes: no duplicate group may be shown.
+    expect(getDuplicateGroups(db, scanId)).toHaveLength(0);
+    db.close();
+  });
+
+  it('counts a hard-link alias plus an independent copy as one reclaimable copy', async () => {
+    const root = track(makeFixtureDir());
+    const orig = path.join(root, 'a', 'data.bin');
+    writeFixture(orig, 'DATA');
+    if (!tryLink(orig, path.join(root, 'b', 'alias.bin'))) return;
+    writeFixture(path.join(root, 'c', 'copy.bin'), 'DATA'); // independent inode, same bytes
+
+    const { db, scanId } = scanRoot(root);
+    const job = startScanJob(db, { scanId, rootPath: root, exclusions: [], emitProgress: () => {} });
+    const result = await job.promise;
+
+    expect(result.state).toBe('complete');
+    const groups = getDuplicateGroups(db, scanId);
+    expect(groups).toHaveLength(1);
+    // 2 distinct inodes: savings = 4 * (2 - 1) = 4, not 4 * (3 - 1) = 8.
+    expect(groups[0]?.files).toHaveLength(2);
+    expect(
+      (groups[0]?.files.includes(orig) ?? false) &&
+        (groups[0]?.files.includes(path.join(root, 'b', 'alias.bin')) ?? false),
+    ).toBe(false);
+    db.close();
+  });
+});
+
 describe('symlink handling', () => {
   function trySymlink(target: string, linkPath: string): boolean {
     try {

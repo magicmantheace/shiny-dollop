@@ -18,6 +18,12 @@
  *   Candidates are also revalidated AFTER hashing (identity, size, mtime,
  *   ctime compared against the pre-read stat): a file changed during its own
  *   read stream is excluded the same way, never stored as a verified digest.
+ * - Hard-link aliases are not duplicates: candidates retain their (dev, ino)
+ *   identity, and a second path to an inode that is already a candidate in
+ *   the same size group is never hashed or grouped — deleting one link to a
+ *   file reclaims 0 bytes, so it must not inflate duplicate savings. The
+ *   persistence layer collapses aliases by identity a second time when
+ *   constructing groups.
  *
  * This module has no 'electron' imports: progress is reported through a
  * callback so backend tests can run it headless.
@@ -96,6 +102,25 @@ class ScanAborted extends Error {
 interface CandidateFile {
   id: number;
   path: string;
+  dev: number;
+  ino: number;
+}
+
+/**
+ * Add a file to its size group, unless the group already holds a path to
+ * the same underlying file (same dev + inode = a hard-link alias; ino 0
+ * means the platform reported no usable inode, so never collapse on it).
+ */
+function addCandidate(ctx: WalkContext, size: number, candidate: CandidateFile): void {
+  const group = ctx.sizeGroups.get(size) ?? [];
+  if (
+    candidate.ino !== 0 &&
+    group.some((c) => c.dev === candidate.dev && c.ino === candidate.ino)
+  ) {
+    return;
+  }
+  group.push(candidate);
+  ctx.sizeGroups.set(size, group);
 }
 
 interface WalkContext {
@@ -393,10 +418,11 @@ async function walkDirectory(
           recordError(full, errnoCode(err));
           continue;
         }
-        const fileId = recordFile(db, options.scanId, full, st.size, false);
-        const group = ctx.sizeGroups.get(st.size) ?? [];
-        group.push({ id: fileId, path: full });
-        ctx.sizeGroups.set(st.size, group);
+        const fileId = recordFile(db, options.scanId, full, st.size, false, {
+          dev: st.dev,
+          ino: st.ino,
+        });
+        addCandidate(ctx, st.size, { id: fileId, path: full, dev: st.dev, ino: st.ino });
         counters.files += 1;
         counters.bytes += st.size;
         emit(full);
@@ -417,10 +443,11 @@ async function walkDirectory(
             recordError(full, 'DIRECTORY_LOOP');
           }
         } else if (st.isFile()) {
-          const fileId = recordFile(db, options.scanId, full, st.size, false);
-          const group = ctx.sizeGroups.get(st.size) ?? [];
-          group.push({ id: fileId, path: full });
-          ctx.sizeGroups.set(st.size, group);
+          const fileId = recordFile(db, options.scanId, full, st.size, false, {
+            dev: st.dev,
+            ino: st.ino,
+          });
+          addCandidate(ctx, st.size, { id: fileId, path: full, dev: st.dev, ino: st.ino });
           counters.files += 1;
           counters.bytes += st.size;
           emit(full);

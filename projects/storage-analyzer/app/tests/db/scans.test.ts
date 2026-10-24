@@ -32,7 +32,38 @@ describe('migrations', () => {
     const rows = db.prepare('SELECT version FROM schema_migrations ORDER BY version').all() as Array<{
       version: number;
     }>;
-    expect(rows.map((r) => r.version)).toEqual([1]);
+    expect(rows.map((r) => r.version)).toEqual([1, 2]);
+    db.close();
+  });
+
+  it('upgrades a v1 database: adds identity/search columns and backfills search keys', () => {
+    const db = new DatabaseSync(':memory:');
+    // Minimal v1 files table (no dev/ino/path_search), already marked applied.
+    db.exec(`
+      CREATE TABLE files (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        scan_id INTEGER NOT NULL,
+        path TEXT NOT NULL,
+        size_bytes INTEGER NOT NULL,
+        sha256 TEXT,
+        is_symlink INTEGER NOT NULL DEFAULT 0,
+        UNIQUE(scan_id, path)
+      );
+      CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY,
+        description TEXT NOT NULL,
+        applied_at TEXT NOT NULL
+      );
+      INSERT INTO schema_migrations VALUES (1, 'initial schema', '2026-01-01T00:00:00Z');
+      INSERT INTO files (scan_id, path, size_bytes, is_symlink) VALUES (1, '/data/ÉTÉ.txt', 10, 0);
+    `);
+    runMigrations(db);
+    const rows = db.prepare('SELECT version FROM schema_migrations ORDER BY version').all() as Array<{
+      version: number;
+    }>;
+    expect(rows.map((r) => r.version)).toEqual([1, 2]);
+    // The pre-existing row must be findable by a Unicode-lowercased query.
+    expect(searchFiles(db, 1, 'été').map((h) => h.path)).toEqual(['/data/ÉTÉ.txt']);
     db.close();
   });
 });
@@ -128,6 +159,41 @@ describe('duplicate queries', () => {
     db.close();
   });
 
+  it('excludes hard-link aliases: two paths to one inode form no group', () => {
+    const db = makeTestDb();
+    const scanId = createScan(db, '/data');
+    const h = 'd'.repeat(64);
+    // Two directory entries, ONE underlying file (same dev+inode, 4 bytes):
+    // deleting one link reclaims 0 bytes, so there is nothing to save.
+    const idA = recordFile(db, scanId, '/data/orig.bin', 4, false, { dev: 10, ino: 42 });
+    const idB = recordFile(db, scanId, '/data/alias.bin', 4, false, { dev: 10, ino: 42 });
+    updateFileHash(db, idA, h);
+    updateFileHash(db, idB, h);
+    expect(getDuplicateGroups(db, scanId)).toHaveLength(0);
+    db.close();
+  });
+
+  it('keeps only one path per inode when an independent copy also exists', () => {
+    const db = makeTestDb();
+    const scanId = createScan(db, '/data');
+    const h = 'e'.repeat(64);
+    const idA = recordFile(db, scanId, '/data/orig.bin', 4, false, { dev: 10, ino: 42 });
+    const idB = recordFile(db, scanId, '/data/alias.bin', 4, false, { dev: 10, ino: 42 });
+    const idC = recordFile(db, scanId, '/data/copy.bin', 4, false, { dev: 10, ino: 99 });
+    updateFileHash(db, idA, h);
+    updateFileHash(db, idB, h);
+    updateFileHash(db, idC, h);
+    const groups = getDuplicateGroups(db, scanId);
+    expect(groups).toHaveLength(1);
+    // 2 distinct inodes -> savings = size * (2 - 1), not size * (3 - 1).
+    expect(groups[0]?.files).toHaveLength(2);
+    expect(
+      (groups[0]?.files.includes('/data/orig.bin') ?? false) &&
+        (groups[0]?.files.includes('/data/alias.bin') ?? false),
+    ).toBe(false);
+    db.close();
+  });
+
   it('excludes symlinks from duplicate groups', () => {
     const db = makeTestDb();
     const scanId = createScan(db, '/data');
@@ -166,6 +232,31 @@ describe('search', () => {
       recordFile(db, scanId, `/data/bulk/match-${i}.txt`, 1, false);
     }
     expect(searchFiles(db, scanId, 'match-')).toHaveLength(SEARCH_RESULT_LIMIT);
+    db.close();
+  });
+
+  it('matches non-ASCII names case-insensitively (Unicode-aware on both sides)', () => {
+    const db = makeTestDb();
+    const scanId = createScan(db, '/data');
+    recordFile(db, scanId, '/data/ÉTÉ.txt', 10, false);
+    recordFile(db, scanId, '/data/other.doc', 40, false);
+
+    // SQLite lower() is ASCII-only and would leave 'É' unchanged; the stored
+    // search key and the query must go through the same JS normalization.
+    for (const q of ['été', 'ÉTÉ', 'Été']) {
+      const hits = searchFiles(db, scanId, q);
+      expect(hits.map((h) => h.path), `query ${q}`).toEqual(['/data/ÉTÉ.txt']);
+    }
+    db.close();
+  });
+
+  it('matches decomposed and precomposed Unicode forms consistently', () => {
+    const db = makeTestDb();
+    const scanId = createScan(db, '/data');
+    // Stored decomposed (E + combining acute), queried precomposed.
+    recordFile(db, scanId, '/data/CAFE\u0301.txt', 10, false);
+    const hits = searchFiles(db, scanId, 'caf\u00e9');
+    expect(hits.map((h) => h.path)).toEqual(['/data/CAFE\u0301.txt']);
     db.close();
   });
 });

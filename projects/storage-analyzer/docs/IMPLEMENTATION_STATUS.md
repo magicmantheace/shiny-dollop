@@ -57,6 +57,27 @@ Choose a directory, view ranked file/folder sizes and verified duplicate groups,
 - Full suite after the fixes: 83/83 tests pass (11 files); `npm run typecheck`
   and `npm run lint` green.
 
+## Codex fix cycle 2 (2026-10-24, Linux VM, Node 24)
+
+- Hard-link aliases no longer inflate duplicate savings: file records now
+  store their (dev, ino) identity (migration v2), the scanner retains that
+  identity on hash candidates and never hashes a second path to an inode
+  already in the size group, and `getDuplicateGroups` collapses aliases by
+  identity — a group needs ≥2 distinct inodes, and savings are
+  size × (distinct files − 1). Regression tests: 2 engine tests with real
+  `fs.link` fixtures (two links to a 4-byte file form no group; alias +
+  independent copy counts once) + 2 DB-level identity tests; all failed
+  before the fix.
+- File search normalizes Unicode consistently on both sides: a stored
+  `path_search` key (NFC + `toLowerCase()`, backfilled for pre-v2 rows by
+  `runMigrations`) is matched against a query normalized by the same
+  `normalizeForSearch` helper, replacing the JS-vs-SQLite `lower()`
+  mismatch that missed names like `ÉTÉ.txt`. Regression tests cover
+  non-ASCII case folding, decomposed vs precomposed forms, and a v1→v2
+  upgrade with backfill.
+- Full suite after the fixes: 90/90 tests pass (11 files, +7 new);
+  `npm run typecheck` and `npm run lint` green.
+
 ## Pending (platform)
 
 - Real Electron window launch + live end-to-end scan on Windows (unverified here).

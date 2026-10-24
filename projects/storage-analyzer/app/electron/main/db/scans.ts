@@ -7,6 +7,7 @@
  */
 import type { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
+import { normalizeForSearch } from './normalize';
 import type {
   DirSizeEntry,
   DuplicateGroup,
@@ -134,20 +135,45 @@ export function markRunningScansInterrupted(db: DatabaseSync): number {
   return Number(result.changes);
 }
 
+/** Filesystem identity of a recorded file, from `fs.stat` (dev + inode). */
+export interface FileIdentity {
+  dev: number;
+  ino: number;
+}
+
+/**
+ * Identity key for duplicate accounting. Two paths with the same
+ * (dev, ino) are hard links to ONE underlying file: deleting one link
+ * reclaims nothing, so only the first path per identity may count toward
+ * a duplicate group / its savings. A missing identity, or ino 0 (some
+ * platforms report no usable inode), is treated as distinct per row.
+ */
+function identityKey(dev: number | null, ino: number | null, rowId: number): string {
+  return dev !== null && ino !== null && ino !== 0 ? `${dev}:${ino}` : `row:${rowId}`;
+}
+
 export function recordFile(
   db: DatabaseSync,
   scanId: number,
   filePath: string,
   sizeBytes: number,
   isSymlink: boolean,
+  identity?: FileIdentity | null,
 ): number {
+  const dev = identity && identity.ino !== 0 ? identity.dev : null;
+  const ino = identity && identity.ino !== 0 ? identity.ino : null;
   const result = db
-    .prepare('INSERT OR IGNORE INTO files (scan_id, path, size_bytes, is_symlink) VALUES (?, ?, ?, ?)')
-    .run(scanId, filePath, sizeBytes, isSymlink ? 1 : 0);
+    .prepare(
+      'INSERT OR IGNORE INTO files (scan_id, path, size_bytes, is_symlink, dev, ino, path_search) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    )
+    .run(scanId, filePath, sizeBytes, isSymlink ? 1 : 0, dev, ino, normalizeForSearch(filePath));
   if (result.changes === 0) {
     const existing = db
       .prepare('SELECT id FROM files WHERE scan_id = ? AND path = ?')
       .get(scanId, filePath) as { id: number };
+    db.prepare(
+      'UPDATE files SET dev = COALESCE(dev, ?), ino = COALESCE(ino, ?), path_search = ? WHERE id = ?',
+    ).run(dev, ino, normalizeForSearch(filePath), existing.id);
     return existing.id;
   }
   return Number(result.lastInsertRowid);
@@ -232,40 +258,62 @@ export function getSummary(db: DatabaseSync, scanId: number): ResultsSummary {
 }
 
 /**
- * Only hash-confirmed groups: ≥2 files sharing an identical SHA-256.
- * Files that changed mid-scan are deleted before hashing, so they can
- * never appear here.
+ * Only hash-confirmed groups: ≥2 DISTINCT files sharing an identical
+ * SHA-256. Files that changed mid-scan are deleted before hashing, so
+ * they can never appear here. Hard-link aliases are collapsed by
+ * (dev, ino) identity before counting: two paths to the same inode are
+ * one file, and a group needs at least two distinct inodes before any
+ * savings (size × (distinct files − 1)) can be advertised.
  */
 export function getDuplicateGroups(db: DatabaseSync, scanId: number): DuplicateGroup[] {
-  const hashes = db
+  const rows = db
     .prepare(
-      `SELECT sha256, size_bytes AS sizeBytes, COUNT(*) AS c FROM files
+      `SELECT id, path, size_bytes AS sizeBytes, sha256, dev, ino FROM files
        WHERE scan_id = ? AND sha256 IS NOT NULL AND is_symlink = 0
-       GROUP BY sha256 HAVING c >= 2 ORDER BY sizeBytes DESC`,
+       ORDER BY sizeBytes DESC, sha256 ASC, path ASC`,
     )
-    .all(scanId) as Array<{ sha256: string; sizeBytes: number; c: number }>;
+    .all(scanId) as Array<{
+    id: number;
+    path: string;
+    sizeBytes: number;
+    sha256: string;
+    dev: number | null;
+    ino: number | null;
+  }>;
 
-  const filesStmt = db.prepare(
-    'SELECT path FROM files WHERE scan_id = ? AND sha256 = ? ORDER BY path ASC',
-  );
-  return hashes.map((h) => ({
-    sizeBytes: h.sizeBytes,
-    sha256: h.sha256,
-    files: (filesStmt.all(scanId, h.sha256) as Array<{ path: string }>).map((r) => r.path),
-  }));
+  const groups = new Map<string, { sizeBytes: number; sha256: string; files: string[]; seen: Set<string> }>();
+  for (const row of rows) {
+    let group = groups.get(row.sha256);
+    if (!group) {
+      group = { sizeBytes: row.sizeBytes, sha256: row.sha256, files: [], seen: new Set() };
+      groups.set(row.sha256, group);
+    }
+    const key = identityKey(row.dev, row.ino, row.id);
+    if (group.seen.has(key)) continue; // hard-link alias of a file already counted
+    group.seen.add(key);
+    group.files.push(row.path);
+  }
+  return [...groups.values()]
+    .filter((g) => g.files.length >= 2)
+    .map((g) => ({ sizeBytes: g.sizeBytes, sha256: g.sha256, files: g.files }));
 }
 
 function escapeLike(raw: string): string {
   return raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
 
-/** Case-insensitive substring search over recorded paths, capped. */
+/**
+ * Case-insensitive substring search over recorded paths, capped.
+ * Both sides go through the same Unicode-aware normalization: the query
+ * here, and the stored `path_search` key at record/migration time.
+ * (SQLite's lower() folds ASCII only and would miss non-ASCII names.)
+ */
 export function searchFiles(db: DatabaseSync, scanId: number, query: string): Array<{ path: string; size: number }> {
-  const pattern = `%${escapeLike(query.toLowerCase())}%`;
+  const pattern = `%${escapeLike(normalizeForSearch(query))}%`;
   return db
     .prepare(
       `SELECT path, size_bytes AS size FROM files
-       WHERE scan_id = ? AND is_symlink = 0 AND lower(path) LIKE ? ESCAPE '\\'
+       WHERE scan_id = ? AND is_symlink = 0 AND path_search LIKE ? ESCAPE '\\'
        ORDER BY path ASC LIMIT ?`,
     )
     .all(scanId, pattern, SEARCH_RESULT_LIMIT) as Array<{ path: string; size: number }>;

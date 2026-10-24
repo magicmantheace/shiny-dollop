@@ -4,6 +4,7 @@
  * so re-running is always safe.
  */
 import type { DatabaseSync } from 'node:sqlite';
+import { normalizeForSearch } from './normalize';
 
 interface Migration {
   version: number;
@@ -52,6 +53,17 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS scan_errors_scan ON scan_errors(scan_id);
     `,
   },
+  {
+    version: 2,
+    description:
+      'files: hard-link identity (dev, ino) and Unicode-normalized search key (path_search)',
+    sql: `
+      ALTER TABLE files ADD COLUMN dev INTEGER;
+      ALTER TABLE files ADD COLUMN ino INTEGER;
+      ALTER TABLE files ADD COLUMN path_search TEXT;
+      CREATE INDEX IF NOT EXISTS files_scan_search ON files(scan_id, path_search);
+    `,
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;
@@ -77,5 +89,30 @@ export function runMigrations(db: DatabaseSync): void {
     if (applied.has(migration.version)) continue;
     db.exec(migration.sql);
     markApplied.run(migration.version, migration.description, new Date().toISOString());
+  }
+  backfillFileSearchKeys(db);
+}
+
+/**
+ * Fill `path_search` for rows recorded before migration v2 (or by any
+ * path that left it null) using the same JS normalization queries use —
+ * SQLite's lower() cannot do this, it folds ASCII only. Idempotent:
+ * rows that already have a key are untouched.
+ */
+function backfillFileSearchKeys(db: DatabaseSync): void {
+  const rows = db
+    .prepare('SELECT id, path FROM files WHERE path_search IS NULL')
+    .all() as Array<{ id: number; path: string }>;
+  if (rows.length === 0) return;
+  const update = db.prepare('UPDATE files SET path_search = ? WHERE id = ?');
+  db.exec('BEGIN');
+  try {
+    for (const row of rows) {
+      update.run(normalizeForSearch(row.path), row.id);
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
   }
 }
