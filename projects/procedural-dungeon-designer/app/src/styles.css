@@ -1,0 +1,174 @@
+:root {
+  color-scheme: dark;
+  --bg: #101418;
+  --panel: #171d24;
+  --panel-alt: #1d2630;
+  --border: #2c3642;
+  --text: #e8eef4;
+  --muted: #9fb0c0;
+  --accent: #7fd1c0;
+  --accent-strong: #2456d6;
+  --danger: #ff8a80;
+  --danger-bg: #3a1f1f;
+  --success: #7bd88a;
+  --warning-bg: #3a2f1a;
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.app { max-width: 1200px; margin: 0 auto; padding: 0 16px 48px; }
+
+.app-header { padding: 16px 0; border-bottom: 1px solid var(--border); }
+.app-header h1 { font-size: 22px; margin: 0 0 4px; }
+.subtitle { color: var(--muted); margin: 0; }
+
+.app-main { display: grid; gap: 20px; padding-top: 20px; }
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 16px;
+}
+.panel h2 { margin-top: 0; }
+.panel h3 { margin: 8px 0 4px; }
+.panel h4 { margin: 14px 0 6px; }
+
+button {
+  font: inherit; padding: 6px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--panel-alt); color: var(--text); cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.primary { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; }
+button.danger { background: #7a2721; border-color: #7a2721; color: #fff; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+label { display: block; margin: 12px 0 4px; font-weight: 600; }
+input, select, textarea {
+  font: inherit; width: 100%; padding: 6px 8px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: #0d1116; color: var(--text);
+}
+input[type='file'] { padding: 6px 0; border: none; background: transparent; }
+
+.form-grid {
+  display: grid; gap: 4px 14px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.form-grid label { margin-top: 4px; }
+
+.theme-tagline { color: var(--muted); font-style: italic; }
+.button-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.button-row.inline { margin-top: 0; }
+.note { color: var(--success); }
+.notice {
+  padding: 8px 10px; border: 1px solid #8a6d00; border-radius: var(--radius);
+  background: var(--warning-bg); color: var(--text);
+}
+.muted { color: var(--muted); }
+.empty-state { color: var(--muted); font-size: 15px; }
+
+.error-banner {
+  margin-top: 16px; padding: 10px 12px;
+  border: 1px solid var(--danger); border-radius: var(--radius);
+  background: var(--danger-bg); color: var(--danger);
+}
+
+.workspace {
+  display: grid; gap: 20px;
+  grid-template-columns: minmax(0, 2fr) minmax(290px, 1fr);
+  align-items: start;
+}
+.side-column { display: grid; gap: 20px; }
+@media (max-width: 900px) {
+  .workspace { grid-template-columns: 1fr; }
+}
+
+.dungeon-map {
+  width: 100%; height: auto; display: block;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: #000;
+}
+.room-hit { fill: transparent; cursor: pointer; }
+.room-hit:hover { fill: rgba(255, 255, 255, 0.18); }
+.room-selected { stroke-width: 0.25; pointer-events: none; }
+
+.budget-block { margin-bottom: 12px; }
+.budget-text { font-weight: 600; margin: 0 0 6px; }
+.over-budget { color: var(--danger); }
+.budget-bar {
+  height: 10px; border: 1px solid var(--border); border-radius: 999px;
+  background: #0b0e11; overflow: hidden;
+}
+.budget-bar-fill { height: 100%; background: var(--accent); }
+.budget-bar-fill.over { background: var(--danger); }
+.validation-text { color: var(--success); margin: 8px 0 0; }
+
+.badge {
+  display: inline-block; padding: 0 8px; margin-left: 6px;
+  border-radius: 999px; border: 1px solid var(--border);
+  background: var(--panel-alt); font-size: 12px; font-weight: 600;
+}
+.entrance-badge { color: #d9b45b; border-color: #d9b45b; }
+
+.placement-list, .saved-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.placement-row {
+  display: grid; gap: 8px;
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 8px;
+}
+.placement-controls { display: flex; gap: 6px; flex-wrap: wrap; }
+.placement-controls select { flex: 1; min-width: 120px; width: auto; }
+
+.saved-row {
+  display: flex; gap: 12px; justify-content: space-between; align-items: center;
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px;
+  flex-wrap: wrap;
+}
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+code { font-family: ui-monospace, monospace; }
+
+/* ---- Print view (on-screen preview + real printing) ------------------ */
+.print-view { background: #ffffff; color: #000000; }
+.print-view .panel { background: #ffffff; border-color: #000000; color: #000000; }
+.print-view .subtitle, .print-view .muted { color: #333333; }
+.print-view .dungeon-map { background: #ffffff; border-color: #000000; }
+.print-view .tile-wall { fill: #000000; }
+.print-view .tile-floor { fill: #ffffff; }
+.print-view .tile-corridor { fill: #ffffff; }
+.print-view .tile-entrance { fill: #dddddd; }
+.print-view .room-selected { stroke: #000000; }
+.print-view .room-hit { fill: transparent; }
+.print-view .no-print { display: none !important; }
+.print-view .budget-bar-fill { background: #000000; }
+
+@media print {
+  body { background: #ffffff; }
+  .app { max-width: none; padding: 0; }
+  .panel { background: #ffffff; border-color: #000000; color: #000000; }
+  .dungeon-map { background: #ffffff; border-color: #000000; }
+  .tile-wall { fill: #000000 !important; }
+  .tile-floor { fill: #ffffff !important; }
+  .tile-corridor { fill: #ffffff !important; }
+  .tile-entrance { fill: #dddddd !important; }
+  .room-selected { stroke: #000000 !important; }
+  .room-hit { fill: transparent !important; }
+  .no-print { display: none !important; }
+  .budget-bar-fill { background: #000000 !important; }
+}
