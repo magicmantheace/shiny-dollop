@@ -31,7 +31,7 @@ This repository is a permanent, **multi-project** workspace. Its root is an inde
 | 14 | Novel and Worldbuilding Manager | [`projects/worldbuilding-manager/`](projects/worldbuilding-manager/README.md) | Planned |
 | 15 | Procedural Dungeon Designer | [`projects/procedural-dungeon-designer/`](projects/procedural-dungeon-designer/README.md) | Planned |
 | 16 | AI Dungeon Master | [`projects/ai-dungeon-master/`](projects/ai-dungeon-master/README.md) | Planned |
-| 17 | Crawl Live Spectator Desktop | [`projects/crawl-spectator-desktop/`](projects/crawl-spectator-desktop/README.md) | Planned |
+| 17 | Crawl Live Spectator Desktop | [`projects/crawl-spectator-desktop/`](projects/crawl-spectator-desktop/README.md) | MVP functional / review ready |
 
 **Start implementation with:** [Universal Game Save Manager](projects/game-save-manager/docs/MUSE_HANDOFF.md). Begin its real MVP first; do not simultaneously scaffold or claim completion for all projects.
 
