@@ -4,7 +4,7 @@
 - **Priority:** 17/17
 - **Source/code implemented:** Yes — Electron app under `app/` (Electron 45 + React 19 + TypeScript strict + Vite, `node:sqlite` preferences, zod-validated IPC and Feed payloads)
 - **Build validated:** Yes — `npm run build` green (renderer + main), Linux VM
-- **Automated tests executed:** Yes — 54/54 pass (45 backend + 9 renderer; Codex-review fix cycle 2, 2026-10-24), typecheck + lint clean, plus smoke `SMOKE_OK` (previous cycle)
+- **Automated tests executed:** Yes — 59/59 pass (50 backend + 9 renderer; Codex-review fix cycle 3, 2026-10-24), typecheck + lint clean, build green, plus smoke `SMOKE_OK` (previous cycle)
 - **End-to-end MVP verified:** In DEMO/fixture terms, yes (see below). Against a real owner-run Underreach Feed API: **implemented but not verified** (no live server exists in this environment)
 - **Owner review:** Pending (PR to be opened by the parent agent after independent verification)
 
@@ -73,6 +73,20 @@ Full derived contract: [FEED_API_CONTRACT.md](FEED_API_CONTRACT.md).
   responses are additionally guarded by a selection-specific request
   token (plus a response-ID check), so a slow response for a superseded
   Descender selection can no longer overwrite the current selection.
+- **Codex-review fixes, cycle 3 (2026-10-24):** on macOS, closing the
+  window left the process running with no way to get a window back —
+  `window-all-closed` correctly skipped `app.quit()` on darwin and
+  `mainWindow` was nulled on close, but `createWindow()` was only called
+  at boot and no `activate` handler existed. The window lifecycle now
+  lives in `electron/main/windowLifecycle.ts` (`registerWindowLifecycle`,
+  wired into `main.ts` boot): an `activate` event (e.g. a Dock click)
+  recreates the window when none exists and is a no-op when one does;
+  `window-all-closed` still quits on non-macOS platforms only. Covered
+  by 5 new regression tests in `tests/backend/windowLifecycle.test.ts`
+  (fake App: activate-after-close recreates, activate-with-window does
+  not duplicate, darwin does not quit, win32/linux quit, plus a wiring
+  check on `main.ts`). macOS itself is not available in this environment,
+  so the handler is unit-verified, not exercised on a real Mac.
 - **Preferences export/import:** versioned envelope (`formatVersion
   1.0.0`); unknown majors rejected (`PREFS_VERSION_UNSUPPORTED`).
 - **Preload hygiene:** sandboxed preload is self-contained (type-only

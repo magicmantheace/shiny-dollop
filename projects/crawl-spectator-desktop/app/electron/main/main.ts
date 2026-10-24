@@ -16,6 +16,7 @@ import { SpectatorEngine } from './engine.js';
 import { FixtureFeedServer } from './fixtureServer.js';
 import { registerIpcHandlers } from './ipc.js';
 import { openPrefsDatabase } from './prefs.js';
+import { registerWindowLifecycle } from './windowLifecycle.js';
 
 const SMOKE_ARG = '--spectator-smoke';
 
@@ -146,9 +147,9 @@ async function boot(): Promise<void> {
   const dbPath = join(app.getPath('userData'), 'spectator.sqlite');
   const db = openPrefsDatabase(dbPath);
   const engine = new SpectatorEngine(db);
-  app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit();
-  });
+  // On macOS the app stays running with no window; `activate` (e.g. a Dock
+  // click) recreates one. Other platforms quit when the last window closes.
+  registerWindowLifecycle(app, { getMainWindow: () => mainWindow, createWindow });
   app.on('before-quit', () => {
     try {
       db.close();
