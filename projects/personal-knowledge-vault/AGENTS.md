@@ -14,3 +14,19 @@ Root `AGENTS.md` overrides these instructions on conflict.
 8. Record commands actually run, observed results and unresolved platform limitations; do not claim Windows/AI/provider tests passed without executing them.
 9. Only update this project's status to MVP/verified after a genuine runnable demonstration. Maintain `docs/IMPLEMENTATION_STATUS.md` after substantive work.
 10. Leave project-specific code on a reviewable, unmerged PR. Do not modify shared root workflows or utilities without separate permission.
+
+## Implementation notes (2026-10-23, MVP)
+
+- Stack: Electron 45 + React 19 + TS strict + Vite, `node:sqlite` (FTS5
+  verified compiled in), zod-validated flat `window.pkv` IPC; canonical
+  contract in `app/shared/types.ts`.
+- Backend owns `app/electron/`, `app/db/`, `app/shared/`; renderer owns
+  `app/src/`, `app/tests/ui/`. Shared build/test scripts live in
+  `app/package.json` and must cover both sides (`typecheck`: main + preload
+  + renderer; `test`: all suites; `build`: all three outputs) — an unwired
+  gate let 7 renderer type errors slip through once; keep the gates wired.
+- Revisions are append-only enforced by a DB-level trigger; sources are
+  write-once at creation; reject requires a reason; approve is per-record.
+- Backup format `1.0.0`, byte-deterministic export; import rejects unknown
+  major versions and corrupt payloads with named errors.
+- DB lives under `app.getPath('userData')`; `*.db*` gitignored.

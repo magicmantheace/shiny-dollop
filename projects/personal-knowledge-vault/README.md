@@ -1,6 +1,6 @@
 # Personal Knowledge Vault
 
-**Status:** PLANNED — project definition only; no working application is implemented by this intake commit.
+**Status:** MVP FUNCTIONAL / REVIEW READY — working application on branch `personal-knowledge-vault/mvp`, pending owner review.
 
 **Priority:** 11 of 17 in the approved intake queue.
 **Category:** Local knowledge and memory
