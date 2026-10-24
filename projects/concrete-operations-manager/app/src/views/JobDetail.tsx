@@ -242,7 +242,11 @@ export function JobDetail({ jobId }: { jobId: number }) {
     try {
       await fn();
       await reload();
-      await refresh('audit');
+      // Full refresh, not just 'audit': actions here create shared-store
+      // records (notably invoices), and InvoiceDetail / the Invoices page /
+      // the dashboard resolve invoices exclusively from the shared store —
+      // an audit-only refresh left a newly created invoice "not found".
+      await refresh();
     } catch (err) {
       toast('error', friendlyError(err));
     } finally {

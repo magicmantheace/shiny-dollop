@@ -85,35 +85,39 @@ export function updateCustomer(db: DatabaseSync, input: CustomerUpdateInput): Cu
   const before = getCustomer(db, input.id);
   if (!before) return null;
   const now = new Date().toISOString();
+  // Nullable fields: the presence flag is 1 only when the field was actually
+  // provided (explicit null included), and the SQL tests the flag's VALUE
+  // (`CASE WHEN ? THEN`). Testing `? IS NOT NULL` instead would always fire
+  // for a 1/0 flag and erase every omitted field with NULL.
   db.prepare(
     `UPDATE customers SET
        name = COALESCE(?, name),
-       contact_name = CASE WHEN ? IS NOT NULL THEN ? ELSE contact_name END,
-       phone = CASE WHEN ? IS NOT NULL THEN ? ELSE phone END,
-       email = CASE WHEN ? IS NOT NULL THEN ? ELSE email END,
-       address = CASE WHEN ? IS NOT NULL THEN ? ELSE address END,
+       contact_name = CASE WHEN ? THEN ? ELSE contact_name END,
+       phone = CASE WHEN ? THEN ? ELSE phone END,
+       email = CASE WHEN ? THEN ? ELSE email END,
+       address = CASE WHEN ? THEN ? ELSE address END,
        tax_exempt = COALESCE(?, tax_exempt),
-       concrete_rate_cents_per_m3 = CASE WHEN ? IS NOT NULL THEN ? ELSE concrete_rate_cents_per_m3 END,
-       small_load_charge_cents = CASE WHEN ? IS NOT NULL THEN ? ELSE small_load_charge_cents END,
-       delivery_fee_mode = CASE WHEN ? IS NOT NULL THEN ? ELSE delivery_fee_mode END,
-       delivery_flat_cents = CASE WHEN ? IS NOT NULL THEN ? ELSE delivery_flat_cents END,
-       delivery_per_km_cents = CASE WHEN ? IS NOT NULL THEN ? ELSE delivery_per_km_cents END,
-       notes = CASE WHEN ? IS NOT NULL THEN ? ELSE notes END,
+       concrete_rate_cents_per_m3 = CASE WHEN ? THEN ? ELSE concrete_rate_cents_per_m3 END,
+       small_load_charge_cents = CASE WHEN ? THEN ? ELSE small_load_charge_cents END,
+       delivery_fee_mode = CASE WHEN ? THEN ? ELSE delivery_fee_mode END,
+       delivery_flat_cents = CASE WHEN ? THEN ? ELSE delivery_flat_cents END,
+       delivery_per_km_cents = CASE WHEN ? THEN ? ELSE delivery_per_km_cents END,
+       notes = CASE WHEN ? THEN ? ELSE notes END,
        updated_at = ?
      WHERE id = ?`,
   ).run(
     input.name ?? null,
-    input.contactName === undefined ? 1 : 0, input.contactName ?? null,
-    input.phone === undefined ? 1 : 0, input.phone ?? null,
-    input.email === undefined ? 1 : 0, input.email ?? null,
-    input.address === undefined ? 1 : 0, input.address ?? null,
+    input.contactName === undefined ? 0 : 1, input.contactName ?? null,
+    input.phone === undefined ? 0 : 1, input.phone ?? null,
+    input.email === undefined ? 0 : 1, input.email ?? null,
+    input.address === undefined ? 0 : 1, input.address ?? null,
     input.taxExempt === undefined ? null : input.taxExempt ? 1 : 0,
-    input.concreteRateCentsPerM3 === undefined ? 1 : 0, input.concreteRateCentsPerM3 ?? null,
-    input.smallLoadChargeCents === undefined ? 1 : 0, input.smallLoadChargeCents ?? null,
-    input.deliveryFeeMode === undefined ? 1 : 0, input.deliveryFeeMode ?? null,
-    input.deliveryFlatCents === undefined ? 1 : 0, input.deliveryFlatCents ?? null,
-    input.deliveryPerKmCents === undefined ? 1 : 0, input.deliveryPerKmCents ?? null,
-    input.notes === undefined ? 1 : 0, input.notes ?? null,
+    input.concreteRateCentsPerM3 === undefined ? 0 : 1, input.concreteRateCentsPerM3 ?? null,
+    input.smallLoadChargeCents === undefined ? 0 : 1, input.smallLoadChargeCents ?? null,
+    input.deliveryFeeMode === undefined ? 0 : 1, input.deliveryFeeMode ?? null,
+    input.deliveryFlatCents === undefined ? 0 : 1, input.deliveryFlatCents ?? null,
+    input.deliveryPerKmCents === undefined ? 0 : 1, input.deliveryPerKmCents ?? null,
+    input.notes === undefined ? 0 : 1, input.notes ?? null,
     now,
     input.id,
   );

@@ -67,24 +67,27 @@ export function updateJob(db: DatabaseSync, input: JobUpdateInput): Job | null {
   if (input.customerId !== undefined && !getCustomer(db, input.customerId)) {
     throw new OpsError(OpsErrorCodes.NOT_FOUND, `Customer #${input.customerId} does not exist.`);
   }
+  // Nullable fields: same presence-flag pattern as db/customers.ts — the
+  // flag is 1 only when the field was provided (explicit null included) and
+  // the SQL tests the flag's VALUE, so omitted fields are preserved.
   db.prepare(
     `UPDATE jobs SET
        customer_id = COALESCE(?, customer_id),
        job_date = COALESCE(?, job_date),
        delivery_location = COALESCE(?, delivery_location),
-       po_number = CASE WHEN ? IS NOT NULL THEN ? ELSE po_number END,
-       distance_tenths_km = CASE WHEN ? IS NOT NULL THEN ? ELSE distance_tenths_km END,
+       po_number = CASE WHEN ? THEN ? ELSE po_number END,
+       distance_tenths_km = CASE WHEN ? THEN ? ELSE distance_tenths_km END,
        status = COALESCE(?, status),
-       notes = CASE WHEN ? IS NOT NULL THEN ? ELSE notes END
+       notes = CASE WHEN ? THEN ? ELSE notes END
      WHERE id = ?`,
   ).run(
     input.customerId ?? null,
     input.jobDate ?? null,
     input.deliveryLocation ?? null,
-    input.poNumber === undefined ? 1 : 0, input.poNumber ?? null,
-    input.distanceTenthsKm === undefined ? 1 : 0, input.distanceTenthsKm ?? null,
+    input.poNumber === undefined ? 0 : 1, input.poNumber ?? null,
+    input.distanceTenthsKm === undefined ? 0 : 1, input.distanceTenthsKm ?? null,
     input.status ?? null,
-    input.notes === undefined ? 1 : 0, input.notes ?? null,
+    input.notes === undefined ? 0 : 1, input.notes ?? null,
     input.id,
   );
   const after = getJob(db, input.id) as Job;
