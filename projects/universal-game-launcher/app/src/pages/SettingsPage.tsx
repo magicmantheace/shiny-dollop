@@ -1,0 +1,249 @@
+import { useEffect, useState } from 'react';
+import type { GameSource, Settings, SourceStatus } from '../../shared/types';
+import { ApiCallError, formatDateTime, getApi, unwrap } from '../api';
+
+interface Props {
+  settings: Settings;
+  onRefresh: () => void;
+}
+
+const SOURCE_LABELS: Record<GameSource, string> = {
+  manual: 'Manual entries',
+  steam: 'Steam',
+  epic: 'Epic Games',
+  battlenet: 'Battle.net',
+};
+
+export default function SettingsPage({ settings, onRefresh }: Props) {
+  const [sources, setSources] = useState<SourceStatus[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [scanning, setScanning] = useState<GameSource | null>(null);
+  const [scanProgress, setScanProgress] = useState<{ scanned: number; total: number } | null>(null);
+  const [scanNote, setScanNote] = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  async function loadSources() {
+    try {
+      setSources(await unwrap(getApi().sources.status()));
+    } catch (err: unknown) {
+      setError(err instanceof ApiCallError ? err.message : String(err));
+    }
+  }
+
+  useEffect(() => {
+    void loadSources();
+  }, []);
+
+  async function scan(source: GameSource) {
+    setScanning(source);
+    setScanProgress(null);
+    setScanNote(null);
+    setError(null);
+    // Live scan progress from the main process; only relevant while scanning.
+    const unsubscribe = getApi().sources.onScanProgress((progress) => {
+      if (progress.source === source) {
+        setScanProgress({ scanned: progress.scanned, total: progress.total });
+      }
+    });
+    try {
+      const result = await unwrap(getApi().sources.scan({ source }));
+      setScanNote(
+        `Scanned ${new Date(result.scannedAt).toLocaleString()} — ${result.gamesFound} game(s) in the library.`,
+      );
+      await loadSources();
+      onRefresh();
+    } catch (err) {
+      setError(err instanceof ApiCallError ? err.message : String(err));
+    } finally {
+      unsubscribe();
+      setScanning(null);
+      setScanProgress(null);
+    }
+  }
+
+  async function cancelScan() {
+    try {
+      await unwrap(getApi().sources.cancelScan());
+      setScanNote('Cancellation requested.');
+    } catch (err) {
+      setError(err instanceof ApiCallError ? err.message : String(err));
+    } finally {
+      setScanning(null);
+    }
+  }
+
+  async function clearHistory() {
+    setBusy(true);
+    setError(null);
+    try {
+      await unwrap(getApi().sessions.clear());
+      setConfirmClear(false);
+      setScanNote('Play history cleared. Game files were not touched.');
+      onRefresh();
+    } catch (err) {
+      setError(err instanceof ApiCallError ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openClient(source: 'epic' | 'battlenet') {
+    setError(null);
+    setScanNote(null);
+    try {
+      await unwrap(getApi().sources.openClient({ source }));
+      setScanNote(
+        source === 'epic' ? 'Epic Games Launcher is opening.' : 'Battle.net is opening.',
+      );
+    } catch (err) {
+      setError(err instanceof ApiCallError ? err.message : String(err));
+    }
+  }
+
+  async function update(patch: Partial<Settings>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await unwrap(getApi().settings.update(patch));
+      onRefresh();
+    } catch (err) {
+      setError(err instanceof ApiCallError ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section aria-label="Settings">
+      <div className="page-head">
+        <h1>Settings</h1>
+      </div>
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="settings-group">
+        <h2>Playback</h2>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={settings.trackingEnabled}
+            disabled={busy}
+            onChange={(e) => update({ trackingEnabled: e.target.checked })}
+          />
+          Track play sessions
+          <span className="muted"> — record start/end times for launched games. Turn off for privacy.</span>
+        </label>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={settings.minimizeOnLaunch}
+            disabled={busy}
+            onChange={(e) => update({ minimizeOnLaunch: e.target.checked })}
+          />
+          Minimize launcher when a game starts
+        </label>
+        <label>
+          Theme
+          <select
+            value={settings.theme}
+            disabled={busy}
+            onChange={(e) => update({ theme: e.target.value as Settings['theme'] })}
+          >
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+            <option value="system">System</option>
+          </select>
+        </label>
+        {!confirmClear ? (
+          <button className="btn" onClick={() => setConfirmClear(true)} disabled={busy}>
+            Clear play history…
+          </button>
+        ) : (
+          <div className="confirm-box" role="alert">
+            <p>
+              Clear all recorded play sessions? This only deletes the launcher's own
+              records — <strong>game files are never touched</strong>.
+            </p>
+            <div className="modal-actions">
+              <button className="btn danger" onClick={clearHistory} disabled={busy}>
+                {busy ? 'Clearing…' : 'Yes, clear history'}
+              </button>
+              <button className="btn" onClick={() => setConfirmClear(false)}>
+                Keep it
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="settings-group">
+        <h2>Game sources</h2>
+        {sources.map((s) => (
+          <div key={s.source} className="source-row">
+            <span className="source-name">{SOURCE_LABELS[s.source]}</span>
+            <span className={`badge ${s.available ? '' : 'warn'}`}>
+              {s.source === 'manual'
+                ? s.available
+                  ? 'Ready'
+                  : 'Not yet available'
+                : s.available
+                  ? 'Detected'
+                  : 'Not found'}
+            </span>
+            <span className="muted">{s.reason}</span>
+            <span className="muted">
+              {s.gamesFound} in library
+              {s.lastScanAt ? ` · last scan ${formatDateTime(s.lastScanAt)}` : ''}
+            </span>
+            {(s.source === 'steam' || s.source === 'epic') &&
+              (scanning === s.source ? (
+                <span className="scan-status">
+                  <button className="btn" onClick={cancelScan}>
+                    Cancel scan
+                  </button>
+                  {scanProgress && (
+                    <span className="scan-progress" aria-live="polite">
+                      {' '}
+                      Scanning {scanProgress.scanned} of {scanProgress.total}…
+                    </span>
+                  )}
+                </span>
+              ) : (
+                <button className="btn" onClick={() => scan(s.source)} disabled={scanning !== null}>
+                  Scan now
+                </button>
+              ))}
+            {(s.source === 'epic' || s.source === 'battlenet') && s.available && (
+              <button
+                className="btn"
+                onClick={() => openClient(s.source === 'epic' ? 'epic' : 'battlenet')}
+                disabled={scanning !== null}
+              >
+                {s.source === 'epic' ? 'Open Epic Games Launcher' : 'Open Battle.net'}
+              </button>
+            )}
+            {s.source === 'battlenet' && (
+              <button className="btn" onClick={() => scan('battlenet')} disabled={scanning !== null}>
+                Check again
+              </button>
+            )}
+          </div>
+        ))}
+        {scanNote && (
+          <p className="card-notice" role="status">
+            {scanNote}
+          </p>
+        )}
+      </div>
+      <div className="settings-group">
+        <h2>About</h2>
+        <p className="muted">
+          Universal Game Launcher 0.1.0 — your library lives in this PC's app data folder. No
+          account, no telemetry.
+        </p>
+      </div>
+    </section>
+  );
+}

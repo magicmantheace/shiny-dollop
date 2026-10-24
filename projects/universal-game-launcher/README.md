@@ -1,7 +1,7 @@
 # Universal PC Game Launcher
 
-**Project status:** ACTIVE — technical specification and instructions only; application implementation pending.  
-**Project home:** `projects/universal-game-launcher/` in `magicmantheace/shiny-dollop`.  
+**Project status:** ACTIVE — M0 (scaffold), M1 (manual launcher), M2 (Steam), M3 (Epic), M4 (Battle.net) and M5 (polish: cover art, filters/a11y, tracking toggle, clear history, perf gate) implemented and verified on Linux 2026-10-22 (212/212 tests, incl. 30 new regression tests from the 2026-10-22 defect-correction phase: custom Add Game titles, async cancellable scans with progress, transactional history clear, Battle.net async spawn errors). M6 (Windows packaging): NSIS installer assembly needs Wine or a real Windows machine (`spawn wine ENOENT` on the Linux build VM); a portable Windows zip (`release/Universal Game Launcher-0.1.0-win-x64.zip`, 154 MB) builds and was verified there instead. Windows-only behaviors (real `.exe` launch, client discovery, URI handoffs, Battle.net spawn, installer run, portable-zip launch) implemented per spec, unverified pending Windows.
+**Project home:** `projects/universal-game-launcher/` in `magicmantheace/shiny-dollop`.
 **Mission:** Deliver a genuine Windows 11 desktop application that finds installed PC games, combines them into one useful library, launches them safely, and preserves local preferences and play history.
 
 The launcher must work **without a web account, subscription, hosted backend, telemetry or permission to alter other projects**. It is not intended to replace Steam/Epic/Battle.net DRM, entitlements, updates, or anti-cheat.
@@ -50,4 +50,4 @@ No root-level package manager configs. Keep application code, tests, assets, scr
 
 ## Truthful progress
 
-These files specify the target application. **They do not mean the application has been coded, packaged, installed, or tested.** Muse must update milestone checklists with real commands and results.
+M0 and M1 are implemented in `app/` (branch `universal-game-launcher/m0-m1-foundation`) and verified on Linux 2026-10-22: 56/56 tests pass, production build + real-window smoke test pass, and the M1 vertical slice (add executable → launch → observed session → favorite → restart persistence) was proven end-to-end with a real spawned process. M2 (Steam), M3 (Epic), M4 (Battle.net) and M5 (polish) followed on branch `universal-game-launcher/m3-m6-complete`: 182/182 tests pass, typecheck + lint clean, production build green. Windows `.exe` launching, real client discovery, URI handoffs and the installer run are implemented per spec but unverified — see `app/README.md` for the full verified-vs-unverified ledger and `docs/IMPLEMENTATION_PLAN.md` for the milestone checklist with evidence.
