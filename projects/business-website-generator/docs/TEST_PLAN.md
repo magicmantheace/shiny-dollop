@@ -1,6 +1,11 @@
 # Test plan — Small Business Website Generator
 
-**Current test status:** NOT RUN. This document defines future acceptance; no test results are implied.
+**Current test status:** RUN 2026-10-23 (Linux VM, Node 24) — **132/132 pass** across 15 files:
+`tests/backend/*` (99: themes determinism + injection-inertness, all five validator codes, export pipeline happy-path/blocking/dest-guards, db CRUD + reopen, IPC contract shape, preload method list),
+`tests/renderer/*` (32: editor validation blocking bad email/URL/phone, dynamic list add/remove, restaurant-vs-trades menu sections, theme switch → setTheme + preview re-render, preview iframe srcDoc/tab/viewport, export blocked-while-issues/clean-export/picker-cancel, dashboard wizard/delete/Escape),
+`tests/backend/acceptance.test.ts` (MVP walkthrough: restaurant site → fill profile → validate clean → export 6 files → internal links resolve → no third-party assets → byte-identical second export → missing name blocks export, nothing written).
+`npm run typecheck` clean (main + renderer), `npm run lint` clean, `npm run build` green, `npm run smoke` PASS (real window under xvfb, export ok).
+Windows click-through not executed here — marked pending, not passing.
 
 ## Required automated and integration scenarios
 
