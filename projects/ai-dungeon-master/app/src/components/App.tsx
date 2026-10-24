@@ -220,7 +220,7 @@ export function App() {
                   const created = await api().campaignsCreate({
                     name: newCampaignName,
                     setting: newCampaignSetting,
-                    seed: newCampaignSeed || undefined,
+                    ...(newCampaignSeed ? { seed: newCampaignSeed } : {}),
                   });
                   setNewCampaignName('');
                   setNewCampaignSetting('');
@@ -404,7 +404,7 @@ export function App() {
                     void run(async () => {
                       const res = await api().diceRoll(campaign.id, {
                         notation,
-                        label: rollLabel || undefined,
+                        ...(rollLabel ? { label: rollLabel } : {}),
                         sessionId: sessionId || null,
                       });
                       setLastRoll(
