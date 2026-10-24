@@ -1,0 +1,13 @@
+appId: com.magicmantheace.digital-template-factory
+productName: Digital Product Template Factory
+directories:
+  output: release
+files:
+  - from: dist/
+    to: .
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
