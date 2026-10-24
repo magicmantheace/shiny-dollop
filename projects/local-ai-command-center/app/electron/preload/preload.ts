@@ -1,5 +1,16 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { LaccApi, LaccMethodName } from '../../shared/types.js';
+import type {
+  AuditEntry,
+  EndpointConfig,
+  HealthResult,
+  LaccApi,
+  LaccMethodName,
+  Proposal,
+  ResourceSnapshot,
+  SubmitTaskInput,
+  Task,
+  TaskLogEntry,
+} from '../../shared/types.js';
 
 // Sandboxed preload: Electron's sandboxed renderer only allows requiring
 // `electron` (and a few built-ins) — it cannot require local modules such as
@@ -27,22 +38,51 @@ const LACC_METHOD_CHANNELS: Record<LaccMethodName, string> = {
   pickDirectory: 'lacc:pick-directory',
 };
 
+// The main side returns a structured envelope as data —
+// { ok: true, value } | { ok: false, error: { code, message } } — because a
+// { code, message } object THROWN through ipcMain.handle loses its code
+// (Electron forwards only the message). Unwrap it here so renderer callers
+// keep the declared API contract: success values directly, failures as a
+// thrown { code, message }.
+type IpcEnvelope<T> =
+  | { ok: true; value: T }
+  | { ok: false; error: { code: string; message: string } };
+
+async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
+  const result = (await ipcRenderer.invoke(channel, ...args)) as
+    | IpcEnvelope<T>
+    | T;
+  if (
+    result !== null &&
+    typeof result === 'object' &&
+    'ok' in result &&
+    typeof (result as { ok: unknown }).ok === 'boolean'
+  ) {
+    const env = result as IpcEnvelope<T>;
+    if (env.ok) return env.value;
+    throw env.error;
+  }
+  // Not an envelope (should not happen with the current main side): pass
+  // the value through untouched rather than breaking the call.
+  return result as T;
+}
+
 const lacc: LaccApi = {
-  configGet: () => ipcRenderer.invoke(LACC_METHOD_CHANNELS.configGet),
-  configSave: (config) => ipcRenderer.invoke(LACC_METHOD_CHANNELS.configSave, config),
-  endpointHealth: () => ipcRenderer.invoke(LACC_METHOD_CHANNELS.endpointHealth),
-  endpointModels: () => ipcRenderer.invoke(LACC_METHOD_CHANNELS.endpointModels),
-  tasksSubmit: (input) => ipcRenderer.invoke(LACC_METHOD_CHANNELS.tasksSubmit, input),
-  tasksList: () => ipcRenderer.invoke(LACC_METHOD_CHANNELS.tasksList),
-  tasksGet: (id) => ipcRenderer.invoke(LACC_METHOD_CHANNELS.tasksGet, id),
-  tasksCancel: (id) => ipcRenderer.invoke(LACC_METHOD_CHANNELS.tasksCancel, id),
-  tasksLogs: (id) => ipcRenderer.invoke(LACC_METHOD_CHANNELS.tasksLogs, id),
-  proposalsList: () => ipcRenderer.invoke(LACC_METHOD_CHANNELS.proposalsList),
-  proposalsGet: (id) => ipcRenderer.invoke(LACC_METHOD_CHANNELS.proposalsGet, id),
-  proposalsApprove: (id) => ipcRenderer.invoke(LACC_METHOD_CHANNELS.proposalsApprove, id),
-  proposalsReject: (id) => ipcRenderer.invoke(LACC_METHOD_CHANNELS.proposalsReject, id),
-  auditList: (limit) => ipcRenderer.invoke(LACC_METHOD_CHANNELS.auditList, limit),
-  resourcesSnapshot: () => ipcRenderer.invoke(LACC_METHOD_CHANNELS.resourcesSnapshot),
-  pickDirectory: () => ipcRenderer.invoke(LACC_METHOD_CHANNELS.pickDirectory),
+  configGet: () => invoke<EndpointConfig | null>(LACC_METHOD_CHANNELS.configGet),
+  configSave: (config) => invoke<EndpointConfig>(LACC_METHOD_CHANNELS.configSave, config),
+  endpointHealth: () => invoke<HealthResult>(LACC_METHOD_CHANNELS.endpointHealth),
+  endpointModels: () => invoke<string[]>(LACC_METHOD_CHANNELS.endpointModels),
+  tasksSubmit: (input: SubmitTaskInput) => invoke<Task>(LACC_METHOD_CHANNELS.tasksSubmit, input),
+  tasksList: () => invoke<Task[]>(LACC_METHOD_CHANNELS.tasksList),
+  tasksGet: (id) => invoke<Task>(LACC_METHOD_CHANNELS.tasksGet, id),
+  tasksCancel: (id) => invoke<Task>(LACC_METHOD_CHANNELS.tasksCancel, id),
+  tasksLogs: (id) => invoke<TaskLogEntry[]>(LACC_METHOD_CHANNELS.tasksLogs, id),
+  proposalsList: () => invoke<Proposal[]>(LACC_METHOD_CHANNELS.proposalsList),
+  proposalsGet: (id) => invoke<Proposal>(LACC_METHOD_CHANNELS.proposalsGet, id),
+  proposalsApprove: (id) => invoke<Proposal>(LACC_METHOD_CHANNELS.proposalsApprove, id),
+  proposalsReject: (id) => invoke<Proposal>(LACC_METHOD_CHANNELS.proposalsReject, id),
+  auditList: (limit) => invoke<AuditEntry[]>(LACC_METHOD_CHANNELS.auditList, limit),
+  resourcesSnapshot: () => invoke<ResourceSnapshot>(LACC_METHOD_CHANNELS.resourcesSnapshot),
+  pickDirectory: () => invoke<string | null>(LACC_METHOD_CHANNELS.pickDirectory),
 };
 contextBridge.exposeInMainWorld('lacc', lacc);

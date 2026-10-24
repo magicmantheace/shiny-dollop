@@ -67,14 +67,23 @@ export class OllamaAdapter implements RuntimeAdapter {
   private unreachable(): ReturnType<typeof laccError> {
     return laccError(LACC_ERROR_CODES.ENDPOINT_UNREACHABLE, `Could not reach the local model endpoint at ${this.baseUrl} — is the runtime (e.g. Ollama) running?`);
   }
+  private rejectRedirect(res: Response): void {
+    // Redirects are never followed (see the fetch calls): a 307/308 from the
+    // configured loopback endpoint could otherwise forward the prompt/model
+    // to an arbitrary external host without validateLoopback ever seeing it.
+    if (res.status >= 300 && res.status < 400) {
+      throw laccError(LACC_ERROR_CODES.ENDPOINT_INVALID_RESPONSE, `Endpoint at ${this.baseUrl} returned an HTTP ${res.status} redirect. Redirects are not followed, because the destination cannot be verified as loopback.`);
+    }
+  }
   async health(signal: AbortSignal): Promise<{ models: string[] }> {
     let res: Response;
     try {
-      res = await fetch(`${this.baseUrl}/api/tags`, { signal });
+      res = await fetch(`${this.baseUrl}/api/tags`, { signal, redirect: 'manual' });
     } catch (err) {
       if (isAbort(err) || (err instanceof Error && signal.aborted)) throw laccError(LACC_ERROR_CODES.ENDPOINT_TIMEOUT, `Health probe to ${this.baseUrl} timed out or was aborted.`);
       throw this.unreachable();
     }
+    this.rejectRedirect(res);
     let data: unknown;
     try { data = await res.json(); } catch { throw laccError(LACC_ERROR_CODES.ENDPOINT_INVALID_RESPONSE, `Endpoint at ${this.baseUrl} returned a non-JSON response.`); }
     if (!data || typeof data !== 'object' || !Array.isArray((data as { models?: unknown }).models)) {
@@ -94,6 +103,7 @@ export class OllamaAdapter implements RuntimeAdapter {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ model: req.model, prompt: req.prompt, stream: false }),
         signal: req.signal,
+        redirect: 'manual',
       });
     } catch (err) {
       if (isAbort(err) || req.signal.aborted) {
@@ -103,6 +113,7 @@ export class OllamaAdapter implements RuntimeAdapter {
       }
       throw this.unreachable();
     }
+    this.rejectRedirect(res);
     let data: unknown;
     try { data = await res.json(); } catch { throw laccError(LACC_ERROR_CODES.ENDPOINT_INVALID_RESPONSE, `Endpoint at ${this.baseUrl} returned a non-JSON response.`); }
     if (!data || typeof data !== 'object' || typeof (data as { response?: unknown }).response !== 'string') {

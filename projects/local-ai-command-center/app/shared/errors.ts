@@ -32,6 +32,16 @@ export function laccError(code: LaccErrorCode, message: string): LaccError {
   return { code, message };
 }
 
+/**
+ * Structured IPC transport envelope. Electron's ipcMain.handle cannot carry
+ * a thrown { code, message } object to the renderer — only the message
+ * survives — so handlers RETURN this envelope as data and the preload
+ * unwraps it (throwing `error` on failure), preserving the named code.
+ */
+export type IpcResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; error: LaccError };
+
 export function isLaccError(value: unknown): value is LaccError {
   return (
     typeof value === 'object' &&

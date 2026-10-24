@@ -1,5 +1,5 @@
 import { ZodError } from 'zod';
-import { LACC_ERROR_CODES, isLaccError, laccError, type LaccError, type LaccErrorCode } from '../../shared/errors.js';
+import { LACC_ERROR_CODES, isLaccError, laccError, type IpcResult, type LaccError, type LaccErrorCode } from '../../shared/errors.js';
 import type { LaccMethodName } from '../../shared/types.js';
 import { LACC_METHOD_CHANNELS } from '../preload/channels.js';
 import type { TaskEngine } from './engine.js';
@@ -52,8 +52,12 @@ export function createHandlers(engine: TaskEngine, pickDirectory: DialogPicker):
   for (const [method, channel] of Object.entries(LACC_METHOD_CHANNELS) as [LaccMethodName, string][]) {
     const handler = byMethod[method];
     const fallback: LaccErrorCode = method === 'configSave' ? LACC_ERROR_CODES.CONFIG_INVALID : method === 'tasksSubmit' ? LACC_ERROR_CODES.TASK_INVALID : LACC_ERROR_CODES.ADAPTER_ERROR;
-    table[channel] = async (...args: unknown[]) => {
-      try { return await handler(...args); } catch (err) { throw toPlain(err, fallback); }
+    // Return a structured envelope as DATA, never throw: Electron only
+    // forwards a thrown error's message to the renderer, which would lose
+    // the named code. The preload unwraps the envelope (see preload.ts).
+    table[channel] = async (...args: unknown[]): Promise<IpcResult<unknown>> => {
+      try { return { ok: true, value: await handler(...args) }; }
+      catch (err) { return { ok: false, error: toPlain(err, fallback) }; }
     };
   }
   // Ensure LACC_METHOD_CHANNELS is same mapping

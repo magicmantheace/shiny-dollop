@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MockAdapter, OllamaAdapter } from '../../electron/main/adapter.js';
 import { isLaccError } from '../../shared/errors.js';
 import { makeFixture } from './helpers.js';
@@ -41,5 +41,35 @@ describe('OllamaAdapter', () => {
     const a = new OllamaAdapter('http://127.0.0.1:1', 2000);
     await expect(a.health(new AbortController().signal)).rejects.toMatchObject({ code: 'ENDPOINT_UNREACHABLE' });
     db.close();
+  });
+});
+
+describe('OllamaAdapter redirect containment', () => {
+  function stubFetchReturning(status: number, payload: unknown) {
+    const fetchFn = vi.fn(async (..._args: unknown[]) => ({ status, json: async () => payload }));
+    vi.stubGlobal('fetch', fetchFn);
+    return fetchFn;
+  }
+
+  it('does not follow a redirect from health: a 307 is rejected, not forwarded', async () => {
+    const fetchFn = stubFetchReturning(307, { models: [] });
+    const a = new OllamaAdapter('http://127.0.0.1:11434', 1000);
+    await expect(a.health(new AbortController().signal)).rejects.toMatchObject({ code: 'ENDPOINT_INVALID_RESPONSE' });
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    const init = fetchFn.mock.calls[0]?.[1] as { redirect?: string } | undefined;
+    expect(['manual', 'error']).toContain(init?.redirect);
+    vi.unstubAllGlobals();
+  });
+
+  it('does not follow a redirect from generate: prompt/model are never forwarded externally', async () => {
+    const fetchFn = stubFetchReturning(308, { response: 'forwarded' });
+    const a = new OllamaAdapter('http://127.0.0.1:11434', 1000);
+    await expect(
+      a.generate({ model: 'm', prompt: 'secret prompt', signal: new AbortController().signal }),
+    ).rejects.toMatchObject({ code: 'ENDPOINT_INVALID_RESPONSE' });
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    const init = fetchFn.mock.calls[0]?.[1] as { redirect?: string } | undefined;
+    expect(['manual', 'error']).toContain(init?.redirect);
+    vi.unstubAllGlobals();
   });
 });

@@ -245,6 +245,59 @@ describe('App', () => {
     expect(screen.getByText(/user/)).toBeInTheDocument();
   });
 
+  it('polling refreshes proposals and audit when a running task completes', async () => {
+    const fake = installFakeLacc({
+      tasks: [
+        sampleTask({
+          id: 'task-run',
+          prompt: 'Generate a proposal',
+          status: 'running',
+          output: null,
+          finishedAt: null,
+        }),
+      ],
+      proposals: [],
+      audit: [],
+    });
+    render(<App />);
+    expect(await screen.findByText(/Endpoint OK/)).toBeInTheDocument();
+    expect(screen.getByText('No proposals yet.')).toBeInTheDocument();
+
+    // The task completes between polls and the engine creates a proposal.
+    fake.state.tasks = [
+      sampleTask({
+        id: 'task-run',
+        prompt: 'Generate a proposal',
+        status: 'completed',
+        output: 'done',
+      }),
+    ];
+    fake.state.proposals = [sampleProposal()];
+    const proposalsCallsBefore = fake.calls.filter(
+      (c) => c === 'proposalsList',
+    ).length;
+    const auditCallsBefore = fake.calls.filter(
+      (c) => c === 'auditList',
+    ).length;
+
+    // The poll interval is 1s of real time: the proposal must appear without
+    // any manual refresh once a poll observes the completion.
+    expect(
+      await screen.findByRole(
+        'button',
+        { name: /notes\/todo\.txt/ },
+        { timeout: 4000 },
+      ),
+    ).toBeInTheDocument();
+    expect(
+      fake.calls.filter((c) => c === 'proposalsList').length,
+    ).toBeGreaterThan(proposalsCallsBefore);
+    expect(fake.calls.filter((c) => c === 'auditList').length).toBeGreaterThan(
+      auditCallsBefore,
+    );
+    expect(screen.queryByText('No proposals yet.')).toBeNull();
+  });
+
   it('surfaces API {code, message} errors in the visible error area', async () => {
     installFakeLacc({
       overrides: {

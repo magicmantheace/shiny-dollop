@@ -72,6 +72,12 @@ export function App() {
   const selectedTaskIdRef = useRef<string | null>(null);
   selectedTaskIdRef.current = selectedTaskId;
 
+  // Snapshot of the task list as of the last render, so the polling loop can
+  // detect a queued/running -> terminal transition (proposals and audit
+  // entries are created at completion, so they must be refreshed then).
+  const tasksRef = useRef<Task[]>([]);
+  tasksRef.current = tasks;
+
   const reportError = useCallback((err: unknown) => {
     setApiError(laccErrorInfo(err));
   }, []);
@@ -175,13 +181,33 @@ export function App() {
     if (!hasActiveTask) return;
     const timer = setInterval(() => {
       void (async () => {
-        await refreshTasks();
+        const before = tasksRef.current;
+        const list = await refreshTasks();
+        if (list) {
+          // A task finishing creates proposals (and audit entries) in the
+          // engine, so observing a completion here must refresh both —
+          // otherwise the UI keeps saying "No proposals yet" until a manual
+          // refresh.
+          const finished = list.some((t) => {
+            const prev = before.find((b) => b.id === t.id);
+            return (
+              prev !== undefined &&
+              (prev.status === 'queued' || prev.status === 'running') &&
+              t.status !== 'queued' &&
+              t.status !== 'running'
+            );
+          });
+          if (finished) {
+            await refreshProposals();
+            await refreshAudit();
+          }
+        }
         const id = selectedTaskIdRef.current;
         if (id) await refreshLogs(id);
       })();
     }, 1000);
     return () => clearInterval(timer);
-  }, [hasActiveTask, refreshLogs, refreshTasks]);
+  }, [hasActiveTask, refreshAudit, refreshLogs, refreshProposals, refreshTasks]);
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? null;
   const selectedProposal =

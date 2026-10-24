@@ -27,6 +27,14 @@ describe('sandboxed preload', () => {
     expect(src).toContain("exposeInMainWorld('lacc'");
   });
 
+  it('unwraps the IPC success/error envelope instead of relying on thrown errors', () => {
+    // ipcMain.handle loses structured error codes across the boundary, so the
+    // main side returns { ok, value | error } as data and the preload unwraps.
+    expect(src).toContain('ok: false');
+    expect(src).toContain('throw env.error');
+    expect(src).toContain('ipcRenderer.invoke');
+  });
+
   it('main window does not disable the sandbox', () => {
     const main = read('electron/main/main.ts');
     expect(main).not.toContain('sandbox: false');
