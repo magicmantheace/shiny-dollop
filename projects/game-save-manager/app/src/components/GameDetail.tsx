@@ -81,14 +81,32 @@ export default function GameDetail({ game, onBack }: GameDetailProps): React.Rea
           label.trim() ? { gameId: game.id, label: label.trim() } : { gameId: game.id },
         ),
       );
+      const skippedList = result.skippedFiles
+        .map((s) => `${s.relPath} (${s.reason})`)
+        .join('; ');
       if (result.skipped) {
         setBackupNote(
-          `No changes since last backup — kept the existing backup${result.backup.label ? ` "${result.backup.label}"` : ''}.`,
+          `No changes since last backup — kept the existing backup${result.backup.label ? ` "${result.backup.label}"` : ''}.` +
+            (result.skippedFiles.length > 0
+              ? ` Warning: skipped ${result.skippedFiles.length} file${result.skippedFiles.length === 1 ? '' : 's'} that could not be read: ${skippedList}.`
+              : ''),
         );
         pushToast(
           'info',
           'No changes since last backup',
           `"${game.name}": saves are unchanged, so no new backup was created.`,
+        );
+      } else if (result.skippedFiles.length > 0) {
+        // Success-with-exclusions must not read as an ordinary success.
+        setBackupNote(
+          `Backup created, but skipped ${result.skippedFiles.length} file${result.skippedFiles.length === 1 ? '' : 's'} — NOT backed up: ${skippedList}. Resolve the problem before relying on this backup.`,
+        );
+      }
+      if (result.skippedFiles.length > 0) {
+        pushToast(
+          'error',
+          'Backup finished — files were skipped',
+          `"${game.name}": ${result.skippedFiles.length} file${result.skippedFiles.length === 1 ? '' : 's'} NOT backed up: ${skippedList}`,
         );
       }
       setLabel('');

@@ -6,6 +6,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
+import path from 'node:path';
 import {
   deleteSchedule,
   listSchedules,
@@ -99,6 +100,30 @@ describe('BackupScheduler', () => {
     expect(completed).toBeDefined();
     expect((completed?.payload as { gameId: number }).gameId).toBe(h.gameId);
     expect((completed?.payload as { skipped: boolean }).skipped).toBe(false);
+  });
+
+  it('propagates skipped-file warnings on the backup.completed event', async () => {
+    const h = setup();
+    setSchedule(h.fixture.db, { gameId: h.gameId, intervalMinutes: 60, enabled: true });
+    // A dangling symlink can never be read: the scheduled backup succeeds but
+    // must carry the skip warning so the renderer can surface it.
+    try {
+      fs.symlinkSync(
+        path.join(h.fixture.saveDir, 'does-not-exist-target'),
+        path.join(h.fixture.saveDir, 'locked.sav'),
+      );
+    } catch {
+      return; // Windows without symlink privilege.
+    }
+
+    const summary = await h.scheduler.tick();
+    expect(summary.succeeded).toBe(1);
+
+    const completed = h.events.find((e) => e.event === 'backup.completed');
+    const payload = completed?.payload as {
+      skippedFiles?: { relPath: string; reason: string }[];
+    };
+    expect(payload.skippedFiles?.some((s) => s.relPath === 'locked.sav')).toBe(true);
   });
 
   it('does not re-run a schedule before its interval elapses', async () => {

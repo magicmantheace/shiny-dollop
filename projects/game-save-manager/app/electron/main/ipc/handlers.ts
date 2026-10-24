@@ -138,6 +138,7 @@ export function registerIpcHandlers(deps: HandlerDeps): void {
       fileCount: result.backup.fileCount,
       totalBytes: result.backup.totalBytes,
       skipped: result.skipped,
+      skippedFiles: result.skippedFiles,
     };
     emitToRenderer(deps, IpcEvents.backupCompleted, completed);
     return result;
@@ -187,6 +188,9 @@ export function registerIpcHandlers(deps: HandlerDeps): void {
         fileCount: result.restoredFiles,
         totalBytes: detail?.totalBytes ?? 0,
         skipped: false,
+        // A restore either completes fully or aborts (its safety backup must
+        // be complete before any writes), so nothing was skipped here.
+        skippedFiles: [],
       };
       emitToRenderer(deps, IpcEvents.backupCompleted, completed);
       return result;

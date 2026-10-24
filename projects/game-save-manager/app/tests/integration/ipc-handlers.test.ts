@@ -8,6 +8,8 @@
  * webContents.send is a spy.
  */
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import { ipcMain, type BrowserWindow } from 'electron';
 import { registerIpcHandlers } from '../../electron/main/ipc/handlers';
 import { IpcChannels, IpcEvents } from '../../shared/ipc-channels';
@@ -22,11 +24,15 @@ vi.mock('electron', () => ({
 
 type HandlerFn = (event: unknown, payload: unknown) => Promise<unknown>;
 
-function restoreHandler(): HandlerFn {
+function findHandler(channel: string): HandlerFn {
   const calls = (ipcMain.handle as Mock).mock.calls as [string, HandlerFn][];
-  const found = calls.find(([channel]) => channel === IpcChannels.backupsRestore);
-  if (!found) throw new Error('backups.restore handler was not registered');
+  const found = calls.find(([c]) => c === channel);
+  if (!found) throw new Error(`handler was not registered for ${channel}`);
   return found[1];
+}
+
+function restoreHandler(): HandlerFn {
+  return findHandler(IpcChannels.backupsRestore);
 }
 
 let fixture: Fixture | null = null;
@@ -52,6 +58,40 @@ function useFixture(): Fixture {
   if (!fixture) throw new Error('fixture not set');
   return fixture;
 }
+
+describe('backupsCreate handler skipped-file warnings', () => {
+  it('includes skippedFiles on the backup.completed event', async () => {
+    const f = useFixture();
+    const game = addTestGame(f);
+    // A dangling symlink can never be read: create succeeds with a skip.
+    try {
+      fs.symlinkSync(
+        path.join(f.saveDir, 'does-not-exist-target'),
+        path.join(f.saveDir, 'locked.sav'),
+      );
+    } catch {
+      return; // Windows without symlink privilege.
+    }
+
+    const createHandler = findHandler(IpcChannels.backupsCreate);
+    const result = (await createHandler({}, { gameId: game.id })) as {
+      ok: boolean;
+      data?: { skippedFiles: { relPath: string }[] };
+    };
+
+    expect(result.ok).toBe(true);
+    expect(result.data?.skippedFiles.some((s) => s.relPath === 'locked.sav')).toBe(true);
+    expect(send).toHaveBeenCalledWith(
+      IpcEvents.backupCompleted,
+      expect.objectContaining({
+        gameId: game.id,
+        skippedFiles: expect.arrayContaining([
+          expect.objectContaining({ relPath: 'locked.sav' }),
+        ]),
+      }),
+    );
+  });
+});
 
 describe('backupsRestore handler terminal events', () => {
   it('emits backup.completed when a restore succeeds', async () => {

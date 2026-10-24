@@ -198,7 +198,17 @@ export function SaveManagerProvider({ children }: { children: ReactNode }): Reac
       setBackupRevision((r) => r + 1);
       const game = gamesRef.current.find((g) => g.id === e.gameId);
       const name = game ? `"${game.name}"` : `Game #${e.gameId}`;
-      if (e.skipped) {
+      const skippedFiles = e.skippedFiles ?? [];
+      if (skippedFiles.length > 0) {
+        // A "successful" backup that excluded saves must never look like an
+        // ordinary success: name the skipped paths and reasons.
+        const list = skippedFiles.map((s) => `${s.relPath} (${s.reason})`).join('; ');
+        pushToast(
+          'error',
+          'Backup finished — files were skipped',
+          `${name}: ${skippedFiles.length} file${skippedFiles.length === 1 ? '' : 's'} NOT backed up: ${list}`,
+        );
+      } else if (e.skipped) {
         pushToast('info', 'Backup skipped', `${name}: no changes since the last backup.`);
       } else {
         pushToast(

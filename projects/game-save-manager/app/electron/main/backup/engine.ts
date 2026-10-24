@@ -136,12 +136,29 @@ function toRelPath(saveDir: string, absPath: string): string {
 
 /** SHA-256 of a file, streamed so multi-GB saves don't blow up memory. */
 export async function hashFile(absPath: string): Promise<string> {
+  return (await hashFileWithSize(absPath)).sha256;
+}
+
+/**
+ * SHA-256 AND byte count of a file, measured over the SAME streamed bytes.
+ * The size must come from the bytes actually read — never from an earlier
+ * stat: a game can resize a save between the directory walk and hashing, and
+ * recording the stale walk-time size produces a manifest whose size disagrees
+ * with its own hash/copied bytes (the backup then fails verification).
+ */
+export async function hashFileWithSize(
+  absPath: string,
+): Promise<{ sha256: string; sizeBytes: number }> {
   return new Promise((resolve, reject) => {
     const hash = crypto.createHash('sha256');
+    let sizeBytes = 0;
     const stream = fs.createReadStream(withLongPathPrefix(absPath));
-    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('data', (chunk: Buffer) => {
+      sizeBytes += chunk.length;
+      hash.update(chunk);
+    });
     stream.on('error', reject);
-    stream.on('end', () => resolve(hash.digest('hex')));
+    stream.on('end', () => resolve({ sha256: hash.digest('hex'), sizeBytes }));
   });
 }
 
@@ -264,9 +281,11 @@ export async function createBackup(
     const f = files[i] as WalkedFile;
     options.onProgress?.({ phase: 'hash', done: i, total: files.length, currentFile: f.relPath });
     try {
-      const sha256 = await hashFile(f.absPath);
-      entries.push({ relPath: f.relPath, sha256, sizeBytes: f.sizeBytes });
-      totalBytes += f.sizeBytes;
+      // Size comes from the bytes actually hashed, not the walk-time stat:
+      // the file may have been resized since walkSaveDir measured it.
+      const { sha256, sizeBytes } = await hashFileWithSize(f.absPath);
+      entries.push({ relPath: f.relPath, sha256, sizeBytes });
+      totalBytes += sizeBytes;
       if (isConflictCopy(path.basename(f.relPath))) {
         notes.push(
           `Cloud-sync conflict copy backed up as-is (not resolved): ${f.relPath}`,
@@ -277,6 +296,13 @@ export async function createBackup(
     }
   }
   options.onProgress?.({ phase: 'hash', done: files.length, total: files.length });
+
+  // Skipped files are warnings the user must be able to see later, not just
+  // in the create result: persist them in the backup's notes (shown in the
+  // backup detail view) as well as in the manifest/result skippedFiles.
+  for (const s of skipped) {
+    notes.push(`Skipped file (not backed up): ${s.relPath} — ${s.reason}`);
+  }
 
   // Change detection against the latest manifest.
   if (!options.force) {
@@ -313,10 +339,11 @@ export async function createBackup(
     fs.mkdirSync(withLongPathPrefix(path.dirname(dest)), { recursive: true });
     await fs.promises.copyFile(withLongPathPrefix(src), withLongPathPrefix(dest));
     // Hash-before-copy race: the game may have rewritten the save between our
-    // hash phase and this copy. Re-hash the DESTINATION bytes and fail loudly
-    // instead of recording a checksum that doesn't match the stored bytes.
-    const destSha256 = await hashFile(dest);
-    if (destSha256 !== e.sha256) {
+    // hash phase and this copy. Re-hash the DESTINATION bytes (hash + size,
+    // measured over the stored bytes) and fail loudly instead of recording a
+    // checksum/size that doesn't match the stored bytes.
+    const destHashed = await hashFileWithSize(dest);
+    if (destHashed.sha256 !== e.sha256 || destHashed.sizeBytes !== e.sizeBytes) {
       // Discard the partial backup — a half-written version must never be
       // presented as a good one, and no DB row is recorded.
       fs.rmSync(withLongPathPrefix(backupDir), { recursive: true, force: true });
@@ -382,13 +409,19 @@ export async function verifyBackup(deps: EngineDeps, backupId: number): Promise<
 
   const corrupt: CorruptFile[] = [];
   for (const f of detail.files) {
-    // Legacy backups stored their metadata at <backupDir>/manifest.json — the
-    // bytes at that path are the OLD metadata, not the user's file, so a
-    // 'manifest.json' entry can never verify against them. Skip it rather
-    // than hashing metadata as if it were user data. (New backups keep the
-    // metadata as a sibling file, so a user's own manifest.json verifies
-    // normally.)
-    if (stored.legacy && f.relPath === 'manifest.json') continue;
+    // Legacy backups stored their metadata at <backupDir>/manifest.json — if
+    // the DB lists a user-owned 'manifest.json' entry for such a backup, the
+    // old metadata write DESTROYED that file: the bytes at the path are the
+    // metadata, not the user's save, and the original bytes are
+    // unrecoverable. Report the entry as missing/corrupt rather than
+    // silently skipping it and certifying the backup as intact. (Restore
+    // keeps its separate protection: it never copies those metadata bytes
+    // over the user's current file.) New backups keep metadata as a sibling
+    // file, so a user's own manifest.json verifies normally there.
+    if (stored.legacy && f.relPath === 'manifest.json') {
+      corrupt.push({ relPath: f.relPath, issue: 'missing', expected: f.sha256 });
+      continue;
+    }
     const absPath = path.join(detail.backupDir, ...f.relPath.split('/'));
     let stat: fs.Stats | null = null;
     try {

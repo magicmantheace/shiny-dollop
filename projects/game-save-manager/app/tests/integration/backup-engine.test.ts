@@ -452,10 +452,16 @@ describe('manifest.json collision (regression)', () => {
       files: [userManifestEntry, slotEntry],
     });
 
-    // Verify skips the un-verifiable entry instead of hashing old metadata as
-    // if it were user data…
+    // Verify must NOT certify this backup as intact: the user's manifest.json
+    // entry is unrecoverable (its bytes were destroyed by the old metadata
+    // write), so it is reported as corrupt/missing instead of being silently
+    // skipped while still counted in checkedFiles.
     const verified = await verifyBackup(deps, backup.id);
-    expect(verified.ok).toBe(true);
+    expect(verified.ok).toBe(false);
+    expect(verified.checkedFiles).toBe(2);
+    expect(verified.corrupt).toContainEqual(
+      expect.objectContaining({ relPath: 'manifest.json', issue: 'missing' }),
+    );
 
     // …and restore recovers slot1.sav without writing metadata bytes over the
     // user's current manifest.json.
@@ -498,6 +504,55 @@ describe('restoreBackup safety (regression)', () => {
     // The partial safety backup was still recorded (the escape hatch exists,
     // just incomplete) — but the restore itself never ran.
     expect(countBackups(f.db, game.id)).toBe(2);
+  });
+});
+
+describe('createBackup walk-to-hash resize (regression)', () => {
+  it('records the size of the bytes actually hashed when a file resizes after the walk', async () => {
+    const f = setup();
+    const game = addTestGame(f);
+    const deps = { db: f.db, backupsRoot: f.backupsRoot };
+
+    // Start from a 3-byte save.
+    writeFile(f.saveDir, 'slot1.sav', 'abc');
+    const sourcePath = path.join(f.saveDir, 'slot1.sav');
+    const grown = 'grown-to-19-bytes!!'; // exactly 19 bytes
+    expect(Buffer.byteLength(grown)).toBe(19);
+
+    // Simulate the game resizing the save between the directory walk (which
+    // stats 3 bytes) and hashing: the first read of the source file rewrites
+    // it to 19 bytes, so the hash — and the copy — see the new contents.
+    const origCreateReadStream = fs.createReadStream;
+    let fired = false;
+    fs.createReadStream = ((p: fs.PathLike, options?: unknown) => {
+      if (!fired && String(p) === sourcePath) {
+        fired = true;
+        fs.writeFileSync(sourcePath, grown);
+      }
+      return (origCreateReadStream as (p: fs.PathLike, o?: unknown) => fs.ReadStream)(p, options);
+    }) as typeof fs.createReadStream;
+    let created;
+    try {
+      created = await createBackup(deps, game.id);
+    } finally {
+      fs.createReadStream = origCreateReadStream;
+    }
+    expect(fired).toBe(true);
+    expect(created.skipped).toBe(false);
+
+    // The manifest/DB entry must describe the bytes actually backed up (19),
+    // not the stale walk-time size (3)…
+    const detail = getBackupDetail(f.db, created.backup.id);
+    const entry = detail?.files.find((e) => e.relPath === 'slot1.sav');
+    expect(entry?.sizeBytes).toBe(19);
+    expect(entry?.sha256).toBe(sha256Hex(grown));
+    expect(readFile(created.backup.backupDir, 'slot1.sav')).toBe(grown);
+
+    // …so the freshly created backup verifies clean instead of failing with
+    // a size mismatch.
+    const verified = await verifyBackup(deps, created.backup.id);
+    expect(verified.ok).toBe(true);
+    expect(verified.corrupt).toEqual([]);
   });
 });
 

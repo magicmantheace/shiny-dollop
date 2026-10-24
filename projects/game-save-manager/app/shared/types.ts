@@ -116,6 +116,8 @@ export interface BackupCompletedEvent {
   fileCount: number;
   totalBytes: number;
   skipped: boolean;
+  /** Files excluded from this backup (unreadable/locked), with reasons. */
+  skippedFiles: SkippedFile[];
 }
 
 export interface BackupFailedEvent {

@@ -125,6 +125,7 @@ export class BackupScheduler {
             fileCount: result.backup.fileCount,
             totalBytes: result.backup.totalBytes,
             skipped: result.skipped,
+            skippedFiles: result.skippedFiles,
           };
           this.emit(IpcEvents.backupCompleted, evt);
           if (result.skipped) summary.skipped++;
