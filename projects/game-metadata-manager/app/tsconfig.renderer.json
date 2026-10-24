@@ -1,0 +1,1 @@
+{"compilerOptions":{"jsx":"react-jsx","lib":["ES2023","DOM","DOM.Iterable"],"noEmit":true},"extends":"./tsconfig.json","include":["renderer/**/*.ts","renderer/**/*.tsx","shared/**/*.ts"]}
