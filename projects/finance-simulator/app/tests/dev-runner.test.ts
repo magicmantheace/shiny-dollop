@@ -29,4 +29,23 @@ describe('dev runner wiring', () => {
     expect(port).toBeTruthy();
     expect(devSrc).toContain(port as string);
   });
+  // Regression (Codex PR #8, cycle 2): spawning `npx` / `electron.cmd`
+  // without a shell cannot work on Windows (.cmd shims are not directly
+  // executable), and a spawn with no 'error' listener terminates the
+  // runner when a child fails to start.
+  it('does not spawn npx or a .cmd shim (Windows-incompatible without a shell)', () => {
+    expect(devSrc).not.toMatch(/run\('npx'/);
+    expect(devSrc).not.toMatch(/spawn\('npx'/);
+    expect(devSrc).not.toContain('electron.cmd');
+    expect(devSrc).not.toMatch(/['"]npx['"]/);
+  });
+  it('launches tools through their Node JS entry points (dev-commands.mjs)', () => {
+    expect(devSrc).toContain('dev-commands.mjs');
+    expect(devSrc).toMatch(/tscWatchCommand/);
+    expect(devSrc).toMatch(/viteCommand/);
+    expect(devSrc).toMatch(/electronCommand/);
+  });
+  it('handles child spawn errors instead of letting them terminate the runner', () => {
+    expect(devSrc).toMatch(/\.on\('error',/);
+  });
 });

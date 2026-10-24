@@ -30,14 +30,35 @@ export function formatUSD(cents: number): string {
   return usdFormatter.format(Math.round(cents) / 100);
 }
 
+/** Simulation horizon in engine/simulator.ts (MAX_MONTHS = 1200). */
+export const SIMULATION_HORIZON_MONTHS = 1200;
+
+/**
+ * Banner for a result that is still open when the simulation reaches its
+ * horizon. The engine stops at SIMULATION_HORIZON_MONTHS whether the debt
+ * truly never amortises (minimums below monthly interest) or would simply
+ * need longer — e.g. $1,201 at 0% APR paid $1/month still owes $1 after
+ * 1,200 months. The result carries no cause, so this wording must claim
+ * only what is known: not paid off *within the horizon*. It must NOT say
+ * "never" or blame minimums not covering interest.
+ */
+export function formatUnpaidWithinHorizon(
+  debtNames: string[],
+  horizonMonths: number = SIMULATION_HORIZON_MONTHS,
+): string {
+  const base = `Not paid off within the ${horizonMonths.toLocaleString('en-US')}-month simulation horizon (${formatHorizon(horizonMonths)})`;
+  return debtNames.length > 0 ? `${base} — still open: ${debtNames.join(', ')}.` : `${base}.`;
+}
+
 /**
  * Label a per-debt payoff month. The engine's contract (engine/simulator.ts):
- * null = never pays off, 0 = already paid (zero starting balance), positive =
- * that 1-based month. Zero must NOT be lumped in with null: an already-paid
- * debt is not "Never".
+ * null = still open at the simulation horizon (see formatUnpaidWithinHorizon
+ * — not proof it would never pay off), 0 = already paid (zero starting
+ * balance), positive = that 1-based month. Zero must NOT be lumped in with
+ * null: an already-paid debt is not unpaid.
  */
 export function formatPayoffMonth(payoffMonth: number | null): string {
-  if (payoffMonth === null) return 'Never';
+  if (payoffMonth === null) return 'Not within horizon';
   if (payoffMonth === 0) return 'Already paid (month 0)';
   return `${payoffMonth} (${formatHorizon(payoffMonth)})`;
 }

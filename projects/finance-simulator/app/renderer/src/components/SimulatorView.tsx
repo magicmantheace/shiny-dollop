@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { getSim, type SimulationResult } from '../types';
-import { dollarsToCents, formatHorizon, formatPayoffMonth, formatUSD } from '../lib/money';
+import { dollarsToCents, formatHorizon, formatPayoffMonth, formatUnpaidWithinHorizon, formatUSD } from '../lib/money';
 import { monthlyIncomeTotalCents } from '../lib/frequency';
 import { validateExtraPayment } from '../lib/validation';
 import { balancePolyline, chartMaxBalance, downsample } from '../lib/chart';
@@ -19,8 +19,7 @@ function ResultCard({ result, accent }: { result: SimulationResult; accent: stri
       </h2>
       {result.neverPaysOff || result.monthsToPayoff === null ? (
         <div style={{ ...styles.banner, ...styles.bannerWarn }}>
-          Never — minimums don&apos;t cover interest
-          {result.neverPaysOffDebts.length > 0 ? ` on: ${result.neverPaysOffDebts.join(', ')}` : ''}.
+          {formatUnpaidWithinHorizon(result.neverPaysOffDebts)}
         </div>
       ) : (
         <div style={styles.statRow}>
