@@ -34,7 +34,7 @@ Use original assets and rules; do not depend on proprietary RPG content.
 
 **Integrations:** Exports dungeon manifests for AI Dungeon Master.
 
-Do not access or modify the other project directories, the original Crawl repository, real personal data, connected accounts, or production systems to test this app. Use fixtures or explicitly approved narrow interfaces.
+Do not access or modify the other project directories, real personal data, connected accounts, or production systems to test this app. Use fixtures or explicitly approved narrow interfaces.
 
 ### Stop/continue logic
 
