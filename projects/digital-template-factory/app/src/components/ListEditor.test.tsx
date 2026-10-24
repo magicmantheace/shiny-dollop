@@ -4,6 +4,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ListEditor } from './ListEditor';
 import { invoiceManifest } from '../test-utils';
+import { coerceFieldValue } from '../../electron/main/validation';
+import type { ListItemFieldDef } from '../../shared/types';
 
 const lineItemsField = invoiceManifest.fields.find((f) => f.key === 'lineItems')!;
 
@@ -34,7 +36,7 @@ function StatefulListEditor({
 }
 
 describe('ListEditor', () => {
-  it('adds a row with empty sub-fields', async () => {
+  it('adds a row with valid bounds-aware defaults for numeric sub-fields', async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
     render(
@@ -52,8 +54,59 @@ describe('ListEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Add row' }));
 
     expect(onChange).toHaveBeenCalledTimes(1);
+    // Fixture schema: qty has min 1, price has min 0 — numeric cells must
+    // start at those bounds, not '' (which coerceFieldValue rejects, so a
+    // later successful save silently dropped the optimistic row).
+    expect(onChange).toHaveBeenCalledWith([{ desc: '', qty: 1, price: 0 }]);
+  });
+
+  it('adds a row that coerceFieldValue accepts without further edits', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ListEditor
+        inputId="field-lineItems"
+        itemSchema={lineItemsField.itemSchema}
+        minItems={0}
+        value={[]}
+        disabled={false}
+        onChange={onChange}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Add row' }));
+
+    const added = onChange.mock.calls[0]![0] as unknown[];
+    expect(() =>
+      coerceFieldValue(invoiceManifest, 'lineItems', added),
+    ).not.toThrow();
+  });
+
+  it('clamps numeric defaults into [min, max] and keeps other defaults', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    const schema: ListItemFieldDef[] = [
+      { key: 'n', label: 'N', type: 'number', required: true, min: 3, max: 10 },
+      { key: 'capped', label: 'Capped', type: 'number', required: false, max: 5 },
+      { key: 'flag', label: 'Flag', type: 'boolean', required: false },
+      { key: 'tags', label: 'Tags', type: 'string-list', required: false },
+      { key: 'when', label: 'When', type: 'date', required: false },
+    ];
+    render(
+      <ListEditor
+        inputId="field-custom"
+        itemSchema={schema}
+        minItems={0}
+        value={[]}
+        disabled={false}
+        onChange={onChange}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Add row' }));
+
     expect(onChange).toHaveBeenCalledWith([
-      { desc: '', qty: '', price: '' },
+      { n: 3, capped: 0, flag: false, tags: [], when: '' },
     ]);
   });
 

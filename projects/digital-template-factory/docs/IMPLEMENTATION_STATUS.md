@@ -94,3 +94,10 @@ Record actual commits, tests, blockers and PR links here when implementation beg
 **Final verification (coordinator, independent):** `npm test` **120/120 pass** (117 workers + 3 acceptance), `npm run typecheck` clean (renderer + main + preload), `npm run lint` clean, `npm run build` green, `npm run smoke` PASS (real window under xvfb, `smoke: OK`).
 
 **Status:** MVP functional. Unverified on real hardware: Windows 11 click-through, native save-dialog flow, portable-zip/NSIS assembly (no Wine here). No code signing. Imported (external) templates list and persist but have no renderer — `export:generate` returns `TEMPLATE_RENDER_UNSUPPORTED` for them by design.
+
+## Codex review fix cycle 1 (2026-10-24, PR #13)
+
+- Import validation (`electron/main/template-import.ts`): nested `itemSchema` entries are now fully validated (object shape, non-empty unique key, non-empty label, supported item type, boolean `required`, finite `min`/`max` with min <= max) and `prefill` rows are checked against the schema (declared keys only, required nested fields present, values satisfy type/bounds). Malformed bundles such as `itemSchema: [null]` with `prefill: [{}]` now return `TEMPLATE_INVALID` instead of persisting a template whose documents crash `ListEditor`/`renderPreviewHtml`.
+- `ListEditor` new-row defaults: numeric cells initialize to a bounds-aware default (`min` when declared, else 0, clamped to `max`) instead of `''`, which `coerceFieldValue` rejects — previously a later successful save silently dropped the optimistic row.
+- Reverted the unrelated `projects/game-save-manager/docs/MUSE_HANDOFF.md` edit on this branch back to main's version (project isolation).
+- Tests: 15 regression tests added (12 import validation, 3 ListEditor), each verified failing pre-fix. Full suite 135/135 pass; `npm run typecheck` clean. `npm run lint` cannot run on this branch: no `eslint.config.*` exists in the tree (fails identically on the pre-fix head) — pre-existing gap, not introduced here.

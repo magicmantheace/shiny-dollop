@@ -9,11 +9,32 @@ interface ListEditorProps {
   onChange: (value: unknown[]) => void;
 }
 
+/**
+ * Default for a new numeric cell: the column's `min` when declared,
+ * otherwise 0, clamped into [min, max]. An empty string is NOT a valid
+ * default — `coerceFieldValue` rejects '' as a number, so the row would
+ * exist only in optimistic editor state and a later successful save of
+ * any other field would silently drop it.
+ */
+function numericDefault(col: ListItemFieldDef): number {
+  let value = col.min ?? 0;
+  if (col.max !== undefined && value > col.max) value = col.max;
+  if (col.min !== undefined && value < col.min) value = col.min;
+  return value;
+}
+
 function emptyRow(itemSchema?: ListItemFieldDef[]): unknown {
   if (!itemSchema || itemSchema.length === 0) return '';
   const row: Record<string, unknown> = {};
   for (const col of itemSchema) {
-    row[col.key] = col.type === 'boolean' ? false : col.type === 'string-list' ? [] : '';
+    row[col.key] =
+      col.type === 'boolean'
+        ? false
+        : col.type === 'string-list'
+          ? []
+          : col.type === 'number'
+            ? numericDefault(col)
+            : '';
   }
   return row;
 }

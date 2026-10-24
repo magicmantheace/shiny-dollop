@@ -119,3 +119,173 @@ describe('parseTemplateBundle', () => {
     );
   });
 });
+
+describe('parseTemplateBundle nested list itemSchema validation', () => {
+  const validItemSchema = [
+    { key: 'desc', label: 'Description', type: 'text', required: true },
+    { key: 'qty', label: 'Quantity', type: 'number', required: true, min: 0 },
+    { key: 'price', label: 'Unit price', type: 'number', required: true, min: 0 },
+  ];
+
+  function listBundle(field: Record<string, unknown>): string {
+    return validBundle({
+      fields: [
+        { key: 'heading', label: 'Heading', type: 'text', required: true },
+        {
+          key: 'lineItems',
+          label: 'Line items',
+          type: 'list',
+          required: true,
+          minItems: 1,
+          ...field,
+        },
+      ],
+    });
+  }
+
+  it('accepts a well-formed list field with itemSchema and prefill', () => {
+    const manifest = parseTemplateBundle(
+      listBundle({
+        itemSchema: validItemSchema,
+        prefill: [{ desc: 'Widget', qty: 1, price: 10 }],
+      }),
+    );
+    expect(manifest.fields).toHaveLength(2);
+  });
+
+  it('rejects itemSchema [null] with prefill [{}] (crashes ListEditor/preview)', () => {
+    expectImportError(
+      () => parseTemplateBundle(listBundle({ itemSchema: [null], prefill: [{}] })),
+      'TEMPLATE_INVALID',
+    );
+  });
+
+  it('rejects a nested schema entry that is not an object', () => {
+    expectImportError(
+      () => parseTemplateBundle(listBundle({ itemSchema: ['desc'] })),
+      'TEMPLATE_INVALID',
+    );
+  });
+
+  it('rejects a nested schema entry with an unsupported type', () => {
+    expectImportError(
+      () =>
+        parseTemplateBundle(
+          listBundle({
+            itemSchema: [
+              { key: 'clip', label: 'Clip', type: 'video', required: false },
+            ],
+          }),
+        ),
+      'TEMPLATE_INVALID',
+    );
+  });
+
+  it('rejects a nested schema entry missing its label', () => {
+    expectImportError(
+      () =>
+        parseTemplateBundle(
+          listBundle({
+            itemSchema: [{ key: 'desc', type: 'text', required: true }],
+          }),
+        ),
+      'TEMPLATE_INVALID',
+    );
+  });
+
+  it('rejects a nested schema entry missing boolean "required"', () => {
+    expectImportError(
+      () =>
+        parseTemplateBundle(
+          listBundle({
+            itemSchema: [{ key: 'desc', label: 'Description', type: 'text' }],
+          }),
+        ),
+      'TEMPLATE_INVALID',
+    );
+  });
+
+  it('rejects a nested schema entry missing its key', () => {
+    expectImportError(
+      () =>
+        parseTemplateBundle(
+          listBundle({
+            itemSchema: [{ label: 'Description', type: 'text', required: true }],
+          }),
+        ),
+      'TEMPLATE_INVALID',
+    );
+  });
+
+  it('rejects duplicate nested schema keys', () => {
+    expectImportError(
+      () =>
+        parseTemplateBundle(
+          listBundle({
+            itemSchema: [
+              { key: 'desc', label: 'Description', type: 'text', required: true },
+              { key: 'desc', label: 'Again', type: 'text', required: false },
+            ],
+          }),
+        ),
+      'TEMPLATE_INVALID',
+    );
+  });
+
+  it('rejects a nested schema entry with a non-number min', () => {
+    expectImportError(
+      () =>
+        parseTemplateBundle(
+          listBundle({
+            itemSchema: [
+              { key: 'qty', label: 'Qty', type: 'number', required: true, min: '0' },
+            ],
+          }),
+        ),
+      'TEMPLATE_INVALID',
+    );
+  });
+
+  it('rejects prefill rows missing required nested fields', () => {
+    expectImportError(
+      () =>
+        parseTemplateBundle(
+          listBundle({ itemSchema: validItemSchema, prefill: [{}] }),
+        ),
+      'TEMPLATE_INVALID',
+    );
+  });
+
+  it('rejects prefill rows with values violating nested bounds', () => {
+    expectImportError(
+      () =>
+        parseTemplateBundle(
+          listBundle({
+            itemSchema: validItemSchema,
+            prefill: [{ desc: 'Widget', qty: -1, price: 10 }],
+          }),
+        ),
+      'TEMPLATE_INVALID',
+    );
+  });
+
+  it('rejects a prefill row that is not an object', () => {
+    expectImportError(
+      () =>
+        parseTemplateBundle(
+          listBundle({ itemSchema: validItemSchema, prefill: [null] }),
+        ),
+      'TEMPLATE_INVALID',
+    );
+  });
+
+  it('rejects prefill that is not an array', () => {
+    expectImportError(
+      () =>
+        parseTemplateBundle(
+          listBundle({ itemSchema: validItemSchema, prefill: 'nope' }),
+        ),
+      'TEMPLATE_INVALID',
+    );
+  });
+});
