@@ -7,6 +7,7 @@ This repository is a permanent, **multi-project** workspace. Its root is an inde
 | Project | Directory | Status |
 | --- | --- | --- |
 | Universal PC Game Launcher | [`projects/universal-game-launcher/`](projects/universal-game-launcher/README.md) | Existing development; unmerged review branch/PR — do not overwrite |
+| **Synveil — bootable desktop and safe installation** | [`projects/synveil/`](projects/synveil/README.md) | **CRITICAL — Muse current assignment; native desktop / A/B installation** |
 | GitHub Development Command Center | [`projects/github-development-command-center/`](projects/github-development-command-center/README.md) | PARKED — do not implement without new authorization |
 
 ## New Muse application queue — specifications only
@@ -33,7 +34,7 @@ This repository is a permanent, **multi-project** workspace. Its root is an inde
 | 16 | AI Dungeon Master | [`projects/ai-dungeon-master/`](projects/ai-dungeon-master/README.md) | Planned |
 | 17 | Crawl Live Spectator Desktop | [`projects/crawl-spectator-desktop/`](projects/crawl-spectator-desktop/README.md) | Planned |
 
-**Start implementation with:** [Universal Game Save Manager](projects/game-save-manager/docs/MUSE_HANDOFF.md). Begin its real MVP first; do not simultaneously scaffold or claim completion for all projects.
+**Current Muse assignment:** [Synveil first-boot handoff](projects/synveil/docs/MUSE_HANDOFF.md). Prioritize a real Synveil desktop, secure persistence, external-media installation, and A/B updates. The 17-app queue remains approved, but Synveil has the immediate development priority; preserve its existing branches and PRs.
 
 ## Repository rules
 
