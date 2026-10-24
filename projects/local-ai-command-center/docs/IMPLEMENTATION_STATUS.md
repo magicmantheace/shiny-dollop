@@ -1,21 +1,33 @@
 # Implementation status — Local AI Command Center
 
-- **Overall status:** PLANNED (documentation setup only)
+- **Overall status:** MVP FUNCTIONAL / REVIEW READY (branch `local-ai-command-center/mvp`, unmerged)
 - **Priority:** 13/17
-- **Source/code implemented:** None as part of project intake
-- **Build validated:** No
-- **Automated tests executed:** No
-- **End-to-end MVP verified:** No
+- **Source/code implemented:** Yes — `app/` (Electron 45 + React 19 + TypeScript strict + Vite, `node:sqlite`, zod-validated IPC)
+- **Build validated:** Yes (Linux VM, Node 24): `npm run build` green (Vite renderer + `tsc` main)
+- **Automated tests executed:** Yes — **38/38 pass** (27 backend + 11 renderer), typecheck and lint clean
+- **End-to-end MVP verified:** Yes, against the real packaged main process via the built-in smoke mode (`--lacc-smoke` under Xvfb): mock config → health → task completes → hanging task cancelled → proposed patch rejected (no file written) → proposed patch approved (file written inside workspace) → `SMOKE_OK`
 - **Owner review:** Pending
 
-## First milestone
+## Implemented and verified (Linux VM)
 
-Configure an installed local model endpoint, submit a text task, review output/logs, and cancel the task; provide useful offline setup mode.
+- **Endpoint configuration** — persisted in SQLite, zod-validated (loopback-only URL, timeout 100–120000 ms, absolute workspace root); invalid config rejected with `CONFIG_INVALID`.
+- **Health check + model list** — through a narrow `RuntimeAdapter` interface. `OllamaAdapter` calls only the configured loopback endpoint (`/api/tags`, `/api/generate`); connection failures map to `ENDPOINT_UNREACHABLE` with an actionable message, timeouts to `ENDPOINT_TIMEOUT`, malformed replies to `ENDPOINT_INVALID_RESPONSE`. Health never hangs or crashes the app.
+- **Offline setup mode** — deterministic `MockAdapter` (models `mock-echo-1`, `mock-coder-7b`) with the full workflow usable when no endpoint exists; the UI shows an offline banner with setup guidance when health fails.
+- **Task queue** — FIFO, one task at a time, persisted tasks + per-task logs; statuses queued/running/completed/failed/cancelled. Cancellation aborts the in-flight adapter request (verified against the hanging mock fixture) and is audited.
+- **Scoped workspace** — tasks/proposals bind to the configured workspace root; any escaping path (incl. untrusted model-proposed paths) is rejected with `PATH_OUTSIDE_WORKSPACE` and audited as `proposal.rejected-path`.
+- **Diff/patch proposal review** — model output containing a ```propose path=…``` block becomes a pending proposal with a unified diff. Approval writes the file inside the workspace; **rejection can never apply it** (test-proven: no file exists after rejection). Decided proposals cannot be re-decided (`PROPOSAL_NOT_PENDING`).
+- **Approval + audit log** — config saves, task lifecycle, proposal decisions and applications recorded in an append-only audit table (SQLite triggers reject UPDATE/DELETE; test-proven).
+- **Resource snapshot** — CPU count/model, 1-minute load average, RAM totals from `node:os` behind an `OsLayer` interface (mocked in tests). **GPU is reported as `unavailable` with an explicit reason — no figures are fabricated.**
+- **No-cloud default** — the only network caller is `OllamaAdapter`, constructed only with the validated loopback config. No credentials, no shell access, no paid inference.
 
-## Next action
+## Implemented but not verified on target OS
 
-Have Muse read `AGENTS.md`, `docs/PRODUCT_SPEC.md` and `docs/MUSE_HANDOFF.md`, implement and validate the first vertical slice on a project-scoped branch.
+- Windows 11 click-through of the packaged app, real Ollama (or compatible) endpoint on the owner's machine, and NSIS packaging — none have run on Windows; no Wine here. Label: **implemented but not verified on target OS**.
 
-## Acceptance notes
+## Planned / not in MVP
 
-Record actual commits, tests, blockers and PR links here when implementation begins. Do not infer success from the existence of this planning document.
+- Endpoint auto-discovery, model comparison views, GPU detection, triggers/conditions, import from Personal Knowledge Vault, approval-mediated actions from Desktop Automation Builder.
+
+## Verification record
+
+See `docs/TEST_PLAN.md` ("Verification record — 2026-10-23") for commands, counts, and environment.
