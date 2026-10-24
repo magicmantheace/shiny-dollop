@@ -1,6 +1,6 @@
 # Household Inventory and Warranty Tracker
 
-**Status:** PLANNED — project definition only; no working application is implemented by this intake commit.
+**Status:** MVP FUNCTIONAL — implemented and verified on Linux (59/59 tests, typecheck/lint/build/smoke green); Windows click-through pending owner hardware.
 
 **Priority:** 6 of 17 in the approved intake queue.
 **Category:** Offline household utility
