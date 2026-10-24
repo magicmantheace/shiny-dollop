@@ -20,6 +20,10 @@ const FRIENDLY: Record<string, { title: string; hint: string }> = {
     title: 'Backup files are missing',
     hint: 'The backup record exists but its files are gone from disk. The backup cannot be verified or restored.',
   },
+  BACKUP_DESTINATION_OVERLAPS_SAVE_DIR: {
+    title: 'Save folder overlaps backup storage',
+    hint: 'The save folder contains (or is inside) the folder where backups are stored, so a backup would copy all previous backups into itself. Register the game with its actual save folder.',
+  },
   RESTORE_NOT_CONFIRMED: {
     title: 'Restore was not confirmed',
     hint: 'Restores require explicit confirmation. Please confirm the restore dialog again.',

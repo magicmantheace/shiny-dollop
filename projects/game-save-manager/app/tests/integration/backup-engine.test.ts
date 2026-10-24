@@ -16,6 +16,7 @@ import {
 } from '../../electron/main/backup/engine';
 import { BackupError, BackupErrorCodes } from '../../electron/main/backup/errors';
 import { countBackups, getBackupDetail, insertBackup, listBackups } from '../../electron/main/db/backups';
+import { addGame } from '../../electron/main/db/games';
 import {
   addTestGame,
   makeFixture,
@@ -553,6 +554,154 @@ describe('createBackup walk-to-hash resize (regression)', () => {
     const verified = await verifyBackup(deps, created.backup.id);
     expect(verified.ok).toBe(true);
     expect(verified.corrupt).toEqual([]);
+  });
+});
+
+/**
+ * Regression tests for the second Codex review cycle: restore recovery when
+ * the original save directory is missing, and rejection of save folders
+ * that overlap the backup destination.
+ */
+describe('restoreBackup when the save folder is missing (regression)', () => {
+  it('restores an intact backup after the save folder was deleted, with an empty safety snapshot', async () => {
+    const f = setup();
+    const game = addTestGame(f);
+    const deps = { db: f.db, backupsRoot: f.backupsRoot };
+    const v1 = await createBackup(deps, game.id, { label: 'v1' });
+
+    // The save folder is deleted entirely after the backup was taken.
+    fs.rmSync(f.saveDir, { recursive: true });
+    expect(fs.existsSync(f.saveDir)).toBe(false);
+
+    // Restore must NOT die in the safety-backup step with SAVE_DIR_MISSING:
+    // it recreates the folder and recovers every file byte-for-byte.
+    const restored = await restoreBackup(deps, v1.backup.id, { confirmed: true });
+    expect(restored.mismatches).toEqual([]);
+    expect(restored.restoredFiles).toBe(4);
+    expect(readFile(f.saveDir, 'slot1.sav')).toBe('save data v1');
+    expect(readFile(f.saveDir, 'slot2.sav')).toBe('second slot v1');
+    expect(readFile(f.saveDir, 'config/settings.ini')).toContain('volume=80');
+
+    // A safety backup was still recorded first — an intentionally EMPTY
+    // snapshot (no current state existed to preserve) that verifies clean.
+    const safety = getBackupDetail(f.db, restored.safetyBackupId);
+    expect(safety?.label).toBe('pre-restore safety');
+    expect(safety?.fileCount).toBe(0);
+    expect(safety?.files).toEqual([]);
+    expect(safety?.notes).toMatch(/missing at restore time/i);
+    const safetyVerified = await verifyBackup(deps, restored.safetyBackupId);
+    expect(safetyVerified.ok).toBe(true);
+    expect(countBackups(f.db, game.id)).toBe(2);
+  });
+
+  it('rejects the restore when the save path exists but is not a folder, writing nothing', async () => {
+    const f = setup();
+    const game = addTestGame(f);
+    const deps = { db: f.db, backupsRoot: f.backupsRoot };
+    const v1 = await createBackup(deps, game.id);
+
+    // Replace the save folder with a regular file at the same path.
+    fs.rmSync(f.saveDir, { recursive: true });
+    fs.writeFileSync(f.saveDir, 'not a folder');
+
+    const err = await restoreBackup(deps, v1.backup.id, { confirmed: true }).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(BackupError);
+    expect((err as BackupError).code).toBe(BackupErrorCodes.SAVE_DIR_MISSING);
+    // Nothing written: the file is untouched and no safety backup recorded.
+    expect(fs.readFileSync(f.saveDir, 'utf8')).toBe('not a folder');
+    expect(countBackups(f.db, game.id)).toBe(1);
+  });
+
+  it('rejects the restore when the destination is unreachable (ancestor is not a directory)', async () => {
+    const f = setup();
+    const deps = { db: f.db, backupsRoot: f.backupsRoot };
+    // Register the game at a path UNDER a regular file: stat fails with
+    // ENOTDIR, not ENOENT — an unreachable destination, not a deleted folder.
+    const blocker = path.join(f.dir, 'blocker');
+    fs.writeFileSync(blocker, 'a file, not a directory');
+    const blockedSaveDir = path.join(blocker, 'saves');
+    const game = addGame(f.db, { name: 'Blocked Game', savePath: blockedSaveDir, source: 'manual' });
+
+    // An intact backup to restore (inserted directly; the save folder was
+    // never reachable in this fixture).
+    const backupDir = path.join(f.backupsRoot, String(game.id), '2026-01-01T00-00-00-000Z');
+    const saveBytes = 'blocked save v1';
+    const fileEntry = {
+      relPath: 'slot1.sav',
+      sha256: sha256Hex(saveBytes),
+      sizeBytes: Buffer.byteLength(saveBytes),
+    };
+    writeFile(backupDir, 'slot1.sav', saveBytes);
+    fs.writeFileSync(
+      siblingManifestPath(backupDir),
+      JSON.stringify({
+        version: 1,
+        gameId: game.id,
+        label: 'v1',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        notes: [],
+        skippedFiles: [],
+        files: [fileEntry],
+      }),
+    );
+    const backup = insertBackup(f.db, {
+      gameId: game.id,
+      label: 'v1',
+      fileCount: 1,
+      totalBytes: fileEntry.sizeBytes,
+      backupDir,
+      notes: null,
+      files: [fileEntry],
+    });
+
+    const err = await restoreBackup(deps, backup.id, { confirmed: true }).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(BackupError);
+    expect((err as BackupError).code).toBe(BackupErrorCodes.SAVE_DIR_MISSING);
+    // Nothing was created at the unreachable destination, no safety backup.
+    expect(fs.existsSync(blockedSaveDir)).toBe(false);
+    expect(countBackups(f.db, game.id)).toBe(1);
+  });
+});
+
+describe('backup destination overlap (regression)', () => {
+  it('rejects a save folder that contains the backup destination, before walking or writing', async () => {
+    const f = makeFixture();
+    // Register the fixture ROOT as the "save folder": it contains
+    // backupsRoot, so a walk would include every previous backup.
+    writeFile(f.dir, 'slot1.sav', 'save data v1');
+    const game = addGame(f.db, { name: 'Parent Game', savePath: f.dir, source: 'manual' });
+
+    const err = await createBackup({ db: f.db, backupsRoot: f.backupsRoot }, game.id).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(BackupError);
+    expect((err as BackupError).code).toBe(
+      BackupErrorCodes.BACKUP_DESTINATION_OVERLAPS_SAVE_DIR,
+    );
+    // Rejected before creating any output.
+    expect(countBackups(f.db, game.id)).toBe(0);
+    expect(fs.existsSync(path.join(f.backupsRoot, String(game.id)))).toBe(false);
+  });
+
+  it('rejects a save folder located inside the backup destination', async () => {
+    const f = makeFixture();
+    const insideDir = path.join(f.backupsRoot, 'not-a-save-folder');
+    writeFile(insideDir, 'slot1.sav', 'save data v1');
+    const game = addGame(f.db, { name: 'Inside Game', savePath: insideDir, source: 'manual' });
+
+    const err = await createBackup({ db: f.db, backupsRoot: f.backupsRoot }, game.id).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(BackupError);
+    expect((err as BackupError).code).toBe(
+      BackupErrorCodes.BACKUP_DESTINATION_OVERLAPS_SAVE_DIR,
+    );
+    expect(countBackups(f.db, game.id)).toBe(0);
+    expect(fs.existsSync(path.join(f.backupsRoot, String(game.id)))).toBe(false);
   });
 });
 

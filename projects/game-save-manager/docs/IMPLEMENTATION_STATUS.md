@@ -4,7 +4,7 @@
 - **Priority:** 1/17
 - **Source/code implemented:** Full MVP in `projects/game-save-manager/app/` (Electron 45 + React 19 + TypeScript strict + Vite, `node:sqlite`, zod-validated IPC)
 - **Build validated:** Yes — `npm run typecheck`, `lint`, `build`, `smoke` all green on Linux (2026-10-23), independently re-run by reviewer
-- **Automated tests executed:** Yes — **74/74 pass** (50 backend with real fs fixtures + 24 UI), 2026-10-23
+- **Automated tests executed:** Yes — **84/84 pass** (60 backend with real fs fixtures + 24 UI), 2026-10-24
 - **End-to-end MVP verified:** Yes on Linux via automated tests on real fixtures (backup → modify → restore → byte-identical recovery); **pending on real Windows hardware** per the test plan's platform-gating rule
 - **Owner review:** Pending — PR shiny-dollop #4 open and unmerged
 
@@ -19,6 +19,15 @@ All five findings from the Codex review of PR #4 were verified real and fixed:
 5. **Steam userdata on secondary libraries:** userdata is searched under each Steam *client* install root (`<clientRoot>/userdata`), not derived from the game's library dir — `toInstalledGames` takes the client roots explicitly.
 
 New regression tests (8): sibling-manifest preservation incl. byte-identical restore of a user-owned `manifest.json`; legacy in-tree metadata verify+restore; legacy collision skip; safety-backup-incomplete abort before any writes; deterministic hash-race failure; restore IPC `backup.completed`/`backup.failed` emission; secondary-library userdata discovery.
+
+## Codex-review fixes, cycle 2 (2026-10-24, on `game-save-manager/initial-development`)
+
+Both findings from the second Codex review of PR #4 were verified real and fixed:
+
+1. **Restore blocked when the original save directory is missing:** `restoreBackup` took its pre-restore safety backup via `createBackup`, which threw `SAVE_DIR_MISSING` before the restore could recreate the directory — an intact backup was unrestorable after its save folder was deleted. The safety step now probes the destination: a *genuinely absent* folder (stat ENOENT with an existing directory ancestor) records an intentionally **empty safety snapshot** (label `pre-restore safety`, 0 files, explanatory note) and the restore proceeds to recreate the folder; an unreadable/disconnected destination (non-ENOENT stat failure, no directory ancestor, or the path exists but is not a folder) is still rejected with `SAVE_DIR_MISSING` before anything is written.
+2. **Save folders containing the backup destination:** `createBackup` walked the save folder with no overlap check, so a manually registered folder containing `backupsRoot` swept every previous backup into each new snapshot (1, 3, 7, 15, … files). `createBackup` (and `restoreBackup`, before its safety step) now reject overlapping source/destination roots with the new `BACKUP_DESTINATION_OVERLAPS_SAVE_DIR` code — in either direction — before anything is walked or written.
+
+New regression tests (5): restore-after-deletion recovery with empty safety snapshot (which itself verifies clean); restore rejection when the save path is a regular file; restore rejection when the destination is unreachable (ancestor not a directory); overlap rejection for a save folder containing backup storage; overlap rejection for a save folder inside backup storage. Full suite: **84/84 pass**, typecheck and lint clean (2026-10-24, Linux VM).
 
 ## First milestone
 

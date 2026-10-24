@@ -19,6 +19,7 @@ import type {
   BackupFileEntry,
   CorruptFile,
   CreateBackupResult,
+  Game,
   RestoreBackupResult,
   SkippedFile,
   VerifyBackupResult,
@@ -224,6 +225,160 @@ function uniqueBackupDir(backupsRoot: string, gameId: number, createdAt: string)
   return dir;
 }
 
+/** Case-folded resolved path for comparisons (win32 paths are case-insensitive). */
+function normalizeForCompare(p: string): string {
+  const resolved = path.resolve(p);
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+
+/** True when `child` equals `parent` or lives anywhere underneath it. */
+export function isPathWithin(parent: string, child: string): boolean {
+  const rel = path.relative(normalizeForCompare(parent), normalizeForCompare(child));
+  return rel === '' || (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel));
+}
+
+/**
+ * Reject overlapping source/destination roots BEFORE walking or writing.
+ *
+ * If the save folder contains the backup storage folder, walking the saves
+ * includes every previous backup — each new snapshot swallows all earlier
+ * ones and the backup tree grows exponentially (1, 3, 7, 15, … files). The
+ * reverse (a "save folder" inside backup storage) is the same trap from the
+ * other side. Neither layout can ever be backed up or restored safely.
+ */
+function assertNoBackupOverlap(savePath: string, backupsRoot: string): void {
+  if (isPathWithin(savePath, backupsRoot) || isPathWithin(backupsRoot, savePath)) {
+    throw new BackupError(
+      BackupErrorCodes.BACKUP_DESTINATION_OVERLAPS_SAVE_DIR,
+      `Save folder and backup storage overlap: the save folder (${savePath}) and the ` +
+        `backup storage folder (${backupsRoot}) must not contain one another — backing up ` +
+        `would copy previous backups into every new backup and grow without bound. ` +
+        `Re-register the game with its actual save folder (not a parent of the backup ` +
+        `storage, and not a folder inside it).`,
+    );
+  }
+}
+
+function errnoCode(err: unknown): string | undefined {
+  return (err as NodeJS.ErrnoException | undefined)?.code;
+}
+
+/**
+ * True when a save path that stat() reported as ENOENT is GENUINELY absent:
+ * some ancestor exists as a readable directory, so the path is simply a
+ * deleted folder below a real location and can be recreated. False when no
+ * existing directory ancestor can be found (e.g. a disconnected drive whose
+ * root itself is gone) or an ancestor is unreadable / not a directory — in
+ * those cases absence cannot be distinguished from a lost destination, and
+ * recreating directories at a guessed location would be wrong.
+ */
+async function isGenuinelyAbsent(savePath: string): Promise<boolean> {
+  let current = path.resolve(savePath);
+  for (;;) {
+    const parent = path.dirname(current);
+    if (parent === current) return false; // Even the root is missing: disconnected.
+    try {
+      const st = await fs.promises.stat(withLongPathPrefix(parent));
+      return st.isDirectory();
+    } catch (err) {
+      if (errnoCode(err) !== 'ENOENT') return false; // Unreadable ancestor: cannot prove absence.
+      current = parent;
+    }
+  }
+}
+
+/**
+ * Record an EMPTY pre-restore safety snapshot: used when the save folder is
+ * genuinely absent at restore time. There is no current state to preserve,
+ * but the restore contract ("a safety backup is always taken first") still
+ * holds — the snapshot is recorded with zero files and a note explaining
+ * why, so `safetyBackupId` always points at a real, verifiable backup.
+ */
+function recordEmptySafetyBackup(deps: EngineDeps, game: Game): CreateBackupResult {
+  const createdAt = new Date().toISOString();
+  const backupDir = uniqueBackupDir(deps.backupsRoot, game.id, createdAt);
+  fs.mkdirSync(withLongPathPrefix(backupDir), { recursive: true });
+  const note =
+    `Save folder was missing at restore time (${game.savePath}); this safety snapshot ` +
+    `is intentionally empty — there was no current state to preserve. The restore ` +
+    `recreates the folder.`;
+  const manifest: StoredManifest = {
+    version: 1,
+    gameId: game.id,
+    label: 'pre-restore safety',
+    createdAt,
+    notes: [note],
+    skippedFiles: [],
+    files: [],
+  };
+  fs.writeFileSync(
+    withLongPathPrefix(siblingManifestPath(backupDir)),
+    JSON.stringify(manifest, null, 2),
+    'utf8',
+  );
+  const backup = insertBackup(deps.db, {
+    gameId: game.id,
+    label: 'pre-restore safety',
+    fileCount: 0,
+    totalBytes: 0,
+    backupDir,
+    notes: note,
+    files: [],
+  });
+  return { skipped: false, backup, skippedFiles: [], notes: [note] };
+}
+
+/**
+ * Take the pre-restore safety backup of the CURRENT save-dir state.
+ *
+ * Missing-destination handling: if the save folder was deleted after the
+ * backup being restored was taken, `createBackup` would throw
+ * SAVE_DIR_MISSING and the intact backup could never be restored — the
+ * restore's own directory recreation would never be reached. A genuinely
+ * absent folder (see isGenuinelyAbsent) instead gets an empty safety
+ * snapshot and the restore proceeds to recreate it. An unreadable or
+ * disconnected destination (stat fails for any other reason, the nearest
+ * existing ancestor is not a directory, or the path exists but is not a
+ * folder) is still rejected with SAVE_DIR_MISSING before anything is
+ * written — absence must never be guessed at.
+ */
+async function createSafetyBackup(
+  deps: EngineDeps,
+  game: Game,
+  onProgress: ProgressCallback | undefined,
+): Promise<CreateBackupResult> {
+  let stat: fs.Stats | null = null;
+  let statError: unknown = null;
+  try {
+    stat = await fs.promises.stat(withLongPathPrefix(game.savePath));
+  } catch (err) {
+    statError = err;
+  }
+  if (stat) {
+    if (!stat.isDirectory()) {
+      throw new BackupError(
+        BackupErrorCodes.SAVE_DIR_MISSING,
+        `Save path is not a folder: ${game.savePath}. Restore aborted — nothing was ` +
+          `written. Re-register the save folder from the Games list.`,
+      );
+    }
+    return createBackup(deps, game.id, {
+      label: 'pre-restore safety',
+      force: true,
+      onProgress,
+    });
+  }
+  if (errnoCode(statError) === 'ENOENT' && (await isGenuinelyAbsent(game.savePath))) {
+    return recordEmptySafetyBackup(deps, game);
+  }
+  throw new BackupError(
+    BackupErrorCodes.SAVE_DIR_MISSING,
+    `Save folder cannot be reached: ${game.savePath}. The drive may be disconnected ` +
+      `or the folder may be unreadable. Restore aborted — nothing was written. ` +
+      `Reconnect the drive (or re-register the save folder) and try again.`,
+  );
+}
+
 interface StoredManifest {
   version: 1;
   gameId: number;
@@ -253,6 +408,10 @@ export async function createBackup(
       `Game #${gameId} is not tracked. It may have been removed.`,
     );
   }
+
+  // Overlap check first: never walk a save folder that contains (or lives
+  // inside) the backup storage — the walk would include previous backups.
+  assertNoBackupOverlap(game.savePath, backupsRoot);
 
   let saveStat: fs.Stats;
   try {
@@ -490,12 +649,15 @@ export async function restoreBackup(
     );
   }
 
-  // 1. Safety backup of the current state (always a fresh version).
-  const safety = await createBackup(deps, game.id, {
-    label: 'pre-restore safety',
-    force: true,
-    onProgress: options.onProgress,
-  });
+  // Overlapping roots are rejected for restore too: the safety backup (and,
+  // for a missing save folder, its empty snapshot) must never be written
+  // into storage that lives inside the folder being restored over.
+  assertNoBackupOverlap(game.savePath, deps.backupsRoot);
+
+  // 1. Safety backup of the current state (always a fresh version). When
+  // the save folder itself is genuinely absent, this records an empty
+  // safety snapshot instead of failing — step 2 recreates the folder.
+  const safety = await createSafetyBackup(deps, game, options.onProgress);
   const safetyBackup = safety.backup;
 
   // The escape hatch must never be incomplete: if the safety backup had to
@@ -515,7 +677,8 @@ export async function restoreBackup(
   // never copy those bytes as if they were the user's save file.
   const legacyInTreeManifest = readStoredManifest(detail.backupDir)?.legacy === true;
 
-  // 2. Copy backup files over the save dir.
+  // 2. Copy backup files over the save dir. The mkdir recreates the folder
+  // when it was genuinely absent (the empty-safety-snapshot path above).
   fs.mkdirSync(withLongPathPrefix(game.savePath), { recursive: true });
   let restoredFiles = 0;
   for (let i = 0; i < detail.files.length; i++) {

@@ -20,6 +20,13 @@ export const BackupErrorCodes = {
    * discarded and no DB row is recorded.
    */
   BACKUP_COPY_MISMATCH: 'BACKUP_COPY_MISMATCH',
+  /**
+   * The registered save folder and the backup storage folder overlap (one
+   * contains the other). Walking the save folder would include previous
+   * backups, so every new snapshot would swallow all earlier ones and grow
+   * without bound. Rejected before anything is walked or written.
+   */
+  BACKUP_DESTINATION_OVERLAPS_SAVE_DIR: 'BACKUP_DESTINATION_OVERLAPS_SAVE_DIR',
 } as const;
 
 export type BackupErrorCode = (typeof BackupErrorCodes)[keyof typeof BackupErrorCodes];
