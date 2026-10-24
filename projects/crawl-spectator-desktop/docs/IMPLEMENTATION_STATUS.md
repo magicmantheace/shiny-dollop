@@ -4,7 +4,7 @@
 - **Priority:** 17/17
 - **Source/code implemented:** Yes — Electron app under `app/` (Electron 45 + React 19 + TypeScript strict + Vite, `node:sqlite` preferences, zod-validated IPC and Feed payloads)
 - **Build validated:** Yes — `npm run build` green (renderer + main), Linux VM
-- **Automated tests executed:** Yes — 51/51 pass (43 backend + 8 renderer; Codex-review fix cycle 2026-10-24), plus smoke `SMOKE_OK` (previous cycle)
+- **Automated tests executed:** Yes — 54/54 pass (45 backend + 9 renderer; Codex-review fix cycle 2, 2026-10-24), typecheck + lint clean, plus smoke `SMOKE_OK` (previous cycle)
 - **End-to-end MVP verified:** In DEMO/fixture terms, yes (see below). Against a real owner-run Underreach Feed API: **implemented but not verified** (no live server exists in this environment)
 - **Owner review:** Pending (PR to be opened by the parent agent after independent verification)
 
@@ -64,6 +64,15 @@ Full derived contract: [FEED_API_CONTRACT.md](FEED_API_CONTRACT.md).
   explicitly (`truncatedCatchUps` in the feed snapshot + status warning)
   instead of silently advancing past possible loss — a complete fix for
   >1000-event windows needs a contract change (no backward paging).
+- **Codex-review fixes, cycle 2 (2026-10-24):** a Descent identity
+  change at the same Feed URL is now detected from the health response
+  before any catch-up request is issued — in both the poll loop and
+  automatic reconnection the engine discards the old Descent's
+  buffer/cursor and fresh-syncs the new Descent instead of resuming
+  `after_tick=<old cursor>` against it; renderer profile/history
+  responses are additionally guarded by a selection-specific request
+  token (plus a response-ID check), so a slow response for a superseded
+  Descender selection can no longer overwrite the current selection.
 - **Preferences export/import:** versioned envelope (`formatVersion
   1.0.0`); unknown majors rejected (`PREFS_VERSION_UNSUPPORTED`).
 - **Preload hygiene:** sandboxed preload is self-contained (type-only

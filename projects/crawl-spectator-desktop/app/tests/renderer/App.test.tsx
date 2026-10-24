@@ -97,6 +97,27 @@ describe('App — descenders, profile, feed', () => {
     expect(screen.getByText('Select a Descender to inspect authentic state and history.')).toBeInTheDocument();
   });
 
+  it('rejects a profile/history response from a superseded selection', async () => {
+    const fake = new FakeSpectator('demo');
+    let releaseMira!: () => void;
+    fake.profileGates.set('mira-vane', new Promise<void>((resolve) => { releaseMira = resolve; }));
+    install(fake);
+    const user = userEvent.setup();
+    render(<App />);
+    // Select A (slow), then B (fast) before A's requests finish.
+    await user.click(await screen.findByRole('button', { name: /^mira-vane active/ }));
+    await user.click(await screen.findByRole('button', { name: /^ossian-rell active/ }));
+    // B's profile is applied and remains selected.
+    expect(await screen.findByText('Guard the party flank')).toBeInTheDocument();
+    releaseMira(); // A's slower response arrives late, under the same connection
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.getByText('Guard the party flank')).toBeInTheDocument();
+    expect(screen.queryByText('Reach the Stratum 3 exit')).not.toBeInTheDocument();
+    // A's history (the damage event in the profile history list) must not
+    // replace B's empty history either: the event appears only in the feed.
+    expect((await screen.findAllByText(/Mira Vane was damaged by a falling bell clapper/)).length).toBe(1);
+  });
+
   it('search narrows the descender list via the API', async () => {
     install(new FakeSpectator('demo'));
     const user = userEvent.setup();

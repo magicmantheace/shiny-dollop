@@ -34,6 +34,8 @@ export class FakeSpectator implements SpectatorApi {
   prefs: Prefs = { baseUrl: 'http://127.0.0.1:8000', followedDescenderIds: [] };
   /** When set, getProfile waits for this promise (stale-response tests). */
   profileGate: Promise<void> | null = null;
+  /** Per-id gates for getProfile (superseded-selection tests). */
+  profileGates = new Map<string, Promise<void>>();
   private statusListeners = new Set<(s: ConnectionStatus) => void>();
 
   constructor(mode: 'live' | 'demo' = 'demo') {
@@ -61,6 +63,8 @@ export class FakeSpectator implements SpectatorApi {
   async getDescent(): Promise<null> { return null; }
   async listDescenders(): Promise<Descender[]> { return [mira, ossian]; }
   async getProfile(id: string): Promise<Descender> {
+    const gate = this.profileGates.get(id);
+    if (gate) await gate;
     if (this.profileGate) await this.profileGate;
     return id === 'mira-vane' ? mira : ossian;
   }

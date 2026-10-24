@@ -126,9 +126,9 @@ describe('SpectatorEngine — live mode with disconnect/reconnect', () => {
 
 // -- stub source for source-switch / catch-up regressions --------------------
 
-function stubEvent(seq: number, tick: number): LedgerEvent {
+function stubEvent(seq: number, tick: number, descentId = 'descent-stub-001'): LedgerEvent {
   return {
-    id: `stub-${seq}`, descent_id: 'descent-stub-001', stratum_number: 1, tick,
+    id: `stub-${seq}`, descent_id: descentId, stratum_number: 1, tick,
     event_type: 'ENCOUNTER_TRIGGERED', summary: `stub event ${seq}`, actor_ids: [], sector_id: null,
     semantic: { importance_score: 0.4, rarity_score: 0.1, danger_level: 0.2, reversal: false, relationship_impact: 0, audience_interest_tags: [], causal_parent_ids: [] },
     canonical: true,
@@ -138,25 +138,37 @@ function stubEvent(seq: number, tick: number): LedgerEvent {
 class StubFeed implements FeedSource {
   events: LedgerEvent[] = [];
   healthFailures = 0;
+  down = false;
+  descentId = 'descent-stub-001';
   currentTick = 0;
+  ledgerCalls: Array<{ limit: number | undefined; afterTick: number | null | undefined }> = [];
   private seq = 0;
   addEvents(count: number, fromTick: number): void {
     for (let i = 0; i < count; i += 1) {
       this.seq += 1;
-      this.events.push(stubEvent(this.seq, fromTick + i));
+      this.events.push(stubEvent(this.seq, fromTick + i, this.descentId));
     }
     this.currentTick = fromTick + count - 1;
   }
+  /** Simulate the same Feed URL now serving a completely different Descent. */
+  switchDescent(descentId: string, count: number, fromTick: number): void {
+    this.descentId = descentId;
+    this.events = [];
+    this.addEvents(count, fromTick);
+  }
   async health() {
+    if (this.down) {
+      throw new SpectatorError('FEED_UNREACHABLE', 'stub feed is down');
+    }
     if (this.healthFailures > 0) {
       this.healthFailures -= 1;
       throw new SpectatorError('FEED_UNREACHABLE', 'stub feed is down');
     }
-    return { status: 'ok', world: 'The Underreach', service: 'The Feed', descent_id: 'descent-stub-001', tick: this.currentTick };
+    return { status: 'ok', world: 'The Underreach', service: 'The Feed', descent_id: this.descentId, tick: this.currentTick };
   }
   async descent() {
     return {
-      id: 'descent-stub-001', world: 'The Underreach', competition: 'The Descent', broadcast: 'The Feed',
+      id: this.descentId, world: 'The Underreach', competition: 'The Descent', broadcast: 'The Feed',
       record: 'The Ledger', status: 'active', current_tick: this.currentTick, current_stratum: 1, stratum_count: 5,
       starting_descender_count: 1, surviving_descender_count: 1, eliminated_descender_count: 0,
       ruleset_id: 'stub', ruleset_version: '1.0.0',
@@ -167,6 +179,7 @@ class StubFeed implements FeedSource {
   async descenderLedger() { return []; }
   async parties() { return []; }
   async ledgerEvents(query: ReplayQuery = {}) {
+    this.ledgerCalls.push({ limit: query.limit, afterTick: query.afterTick ?? null });
     let rows = [...this.events];
     if (query.afterTick !== undefined && query.afterTick !== null) rows = rows.filter((e) => e.tick > query.afterTick!);
     rows.sort((a, b) => a.tick - b.tick || a.id.localeCompare(b.id));
@@ -245,6 +258,63 @@ describe('SpectatorEngine — polling catch-up truncation (regression)', () => {
     expect(snapshot.cursorTick).toBe(1110);
     // The loss is reported, not hidden: snapshot counter + status warning.
     expect(engine.status.message).toContain('retrieval limit');
+    await engine.disconnect();
+    db.close();
+  });
+});
+
+describe('SpectatorEngine — descent identity changes at the same URL (regression)', () => {
+  it('fresh-syncs on the poll loop when health reports a different descent', async () => {
+    const db = openPrefsDatabase(join(dir, 'descent-poll.sqlite'));
+    const stub = new StubFeed();
+    stub.addEvents(5, 1236); // Descent A at tick 1240
+    const engine = new SpectatorEngine(db, {
+      pollIntervalMs: 30, backoffBaseMs: 30, backoffMaxMs: 60,
+      clientFactory: () => stub,
+    });
+    await engine.connectLive('http://127.0.0.1:9');
+    expect(engine.status.descentId).toBe('descent-stub-001');
+    expect(engine.feedSnapshot().cursorTick).toBe(1240);
+    const callsBeforeSwitch = stub.ledgerCalls.length;
+
+    // Same URL, different Descent: B is only at tick 5.
+    stub.switchDescent('descent-stub-002', 3, 3);
+
+    await waitFor(() => engine.status.descentId === 'descent-stub-002' && engine.feedSnapshot().cursorTick === 5);
+    const snapshot = engine.feedSnapshot();
+    expect(snapshot.events).toHaveLength(3);
+    expect(snapshot.events.every((e) => e.descent_id === 'descent-stub-002')).toBe(true);
+    // The new Descent must be loaded by a fresh sync (no cursor), never by
+    // resuming A's cursor (after_tick=1239) against B.
+    const callsAfterSwitch = stub.ledgerCalls.slice(callsBeforeSwitch);
+    expect(callsAfterSwitch.some((c) => c.afterTick === 1239)).toBe(false);
+    expect(callsAfterSwitch.some((c) => c.afterTick === null)).toBe(true);
+    await engine.disconnect();
+    db.close();
+  });
+
+  it('fresh-syncs during automatic reconnection when the descent changed while down', async () => {
+    const db = openPrefsDatabase(join(dir, 'descent-reconnect.sqlite'));
+    const stub = new StubFeed();
+    stub.addEvents(5, 1236); // Descent A at tick 1240
+    const engine = new SpectatorEngine(db, {
+      pollIntervalMs: 30, backoffBaseMs: 30, backoffMaxMs: 60,
+      clientFactory: () => stub,
+    });
+    await engine.connectLive('http://127.0.0.1:9');
+    expect(engine.feedSnapshot().cursorTick).toBe(1240);
+
+    stub.down = true;
+    await waitFor(() => engine.status.state === 'error');
+    // While the Feed is down it restarts serving Descent B at tick 5.
+    stub.switchDescent('descent-stub-002', 3, 3);
+    stub.down = false;
+
+    await waitFor(() => engine.status.state === 'connected' && engine.status.descentId === 'descent-stub-002');
+    await waitFor(() => engine.feedSnapshot().cursorTick === 5);
+    const snapshot = engine.feedSnapshot();
+    expect(snapshot.events).toHaveLength(3);
+    expect(snapshot.events.every((e) => e.descent_id === 'descent-stub-002')).toBe(true);
     await engine.disconnect();
     db.close();
   });

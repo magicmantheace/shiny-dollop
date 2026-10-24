@@ -41,8 +41,14 @@ export function App(): React.JSX.Element {
   // fixture data can never reappear under a LIVE banner (or vice versa).
   const connectionGenRef = useRef(0);
   const connectionIdentityRef = useRef<string | null>(null);
+  // Selection-specific request token: the connection generation alone
+  // cannot distinguish two selections made under the SAME connection,
+  // so a slow profile/history response for Descender A would otherwise
+  // pass the guard and overwrite Descender B selected after it.
+  const selectionGenRef = useRef(0);
 
   const clearSourceSpecificState = useCallback(() => {
+    selectionGenRef.current += 1; // invalidate any in-flight selection request
     setDescenders([]);
     setParties([]);
     setSelectedId(null);
@@ -123,10 +129,13 @@ export function App(): React.JSX.Element {
 
   const selectDescender = (id: string): void => {
     const gen = connectionGenRef.current;
+    const selectionGen = ++selectionGenRef.current;
     setSelectedId(id);
     void run(async () => {
       const [p, h] = await Promise.all([api().getProfile(id), api().getHistory(id)]);
       if (gen !== connectionGenRef.current) return; // stale: previous connection
+      if (selectionGen !== selectionGenRef.current) return; // stale: superseded selection
+      if (p.descender_id !== id) return; // response does not match the request
       setProfile(p);
       setHistory(h);
     });

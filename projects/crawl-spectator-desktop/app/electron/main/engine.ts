@@ -52,6 +52,11 @@ export class SpectatorEngine {
    *  reconnects for a never-established source must do a full initial
    *  sync instead — resuming would reuse a previous source's cursor. */
   private established = false;
+  /** Descent identity the buffered events/cursor belong to, taken from
+   *  the health response at the last (fresh) sync. If a later health
+   *  response names a different Descent, the buffer and cursor are for
+   *  the OLD Descent and must never be resumed against the new one. */
+  private establishedDescentId: string | null = null;
   private statusValue: ConnectionStatus = {
     state: 'disconnected',
     mode: null,
@@ -112,9 +117,30 @@ export class SpectatorEngine {
    *  become the resume cursor for a live server at tick 5. */
   private resetSourceState(): void {
     this.established = false;
+    this.establishedDescentId = null;
     this.descentCache = null;
     this.store.clear();
     this.emitFeed();
+  }
+
+  /** True when the source is established but is now serving a different
+   *  Descent than the one the buffered events/cursor belong to. */
+  private descentChanged(healthDescentId: string): boolean {
+    return this.established && this.establishedDescentId !== healthDescentId;
+  }
+
+  /** Full initial sync for the CURRENT source/descent: refresh the
+   *  descent summary, drop every buffered event/cursor, and load the
+   *  latest window with no resume cursor. Returns false when the run
+   *  was superseded mid-sync (the caller must abandon this run). */
+  private async syncInitial(run: number, source: FeedSource): Promise<boolean> {
+    this.descentCache = await source.descent();
+    if (run !== this.runId) return false;
+    this.store.clear();
+    const initial = await source.ledgerEvents({ limit: 200 });
+    if (run !== this.runId) return false;
+    this.store.ingest(initial);
+    return true;
   }
 
   async connectLive(baseUrlRaw: string): Promise<ConnectionStatus> {
@@ -161,13 +187,9 @@ export class SpectatorEngine {
     try {
       const health = await source.health();
       if (run !== this.runId) return;
-      this.descentCache = await source.descent();
-      if (run !== this.runId) return;
-      this.store.clear();
-      const initial = await source.ledgerEvents({ limit: 200 });
-      if (run !== this.runId) return;
-      this.store.ingest(initial);
+      if (!(await this.syncInitial(run, source))) return;
       this.established = true;
+      this.establishedDescentId = health.descent_id;
       this.setStatus({
         state: 'connected', mode, baseUrl, descentId: health.descent_id, tick: health.tick, reconnectAttempts: 0,
         message: mode === 'demo'
@@ -218,12 +240,23 @@ export class SpectatorEngine {
       if (run !== this.runId || !this.source) return;
       try {
         if (this.fixture) this.fixture.advance();
+        // Health FIRST: if the Feed at this URL now serves a different
+        // Descent, the buffered events/cursor belong to the old Descent —
+        // never request after_tick=<old cursor> against the new one.
+        // Fresh-sync instead, exactly like the initial connection.
+        const health = await this.source.health();
+        if (run !== this.runId) return;
+        if (this.descentChanged(health.descent_id)) {
+          if (!(await this.syncInitial(run, this.source))) return;
+          this.establishedDescentId = health.descent_id;
+          this.setStatus({ tick: health.tick, descentId: health.descent_id });
+          this.emitFeed();
+          continue;
+        }
         const { events, truncated } = await this.fetchCatchUp(this.source, 300, 1000);
         if (run !== this.runId) return;
         const added = this.store.ingest(events);
         if (truncated) this.noteTruncatedCatchUp();
-        const health = await this.source.health();
-        if (run !== this.runId) return;
         this.setStatus({ tick: health.tick, descentId: health.descent_id });
         if (added > 0 || truncated) this.emitFeed();
       } catch (err) {
@@ -246,17 +279,13 @@ export class SpectatorEngine {
         const health = await this.source.health();
         if (run !== this.runId) return;
         let catchUpTruncated = false;
-        if (!this.established) {
-          // This source never completed its initial sync (e.g. the first
-          // health check after switching sources failed). Do NOT resume
-          // from whatever cursor happens to be buffered — do the full
-          // initial sync for THIS source instead.
-          this.descentCache = await this.source.descent();
-          if (run !== this.runId) return;
-          this.store.clear();
-          const initial = await this.source.ledgerEvents({ limit: 200 });
-          if (run !== this.runId) return;
-          this.store.ingest(initial);
+        if (!this.established || this.descentChanged(health.descent_id)) {
+          // Either this source never completed its initial sync (e.g. the
+          // first health check after switching sources failed), or the
+          // Descent changed while we were disconnected. In both cases do
+          // NOT resume from whatever cursor happens to be buffered — do
+          // the full initial sync for THIS Descent instead.
+          if (!(await this.syncInitial(run, this.source))) return;
         } else {
           const caught = await this.fetchCatchUp(this.source, 1000, 1000);
           if (run !== this.runId) return;
@@ -264,6 +293,7 @@ export class SpectatorEngine {
           catchUpTruncated = caught.truncated;
         }
         this.established = true;
+        this.establishedDescentId = health.descent_id;
         const mode = this.statusValue.mode ?? 'live';
         const baseUrl = this.statusValue.baseUrl ?? '';
         this.setStatus({
