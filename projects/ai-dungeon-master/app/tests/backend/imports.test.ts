@@ -132,6 +132,95 @@ describe('campaign export / import', () => {
     expect(await fx.service.campaignsList()).toHaveLength(1);
   });
 
+  it('round-trips an ended encounter whose combatant was deleted after it ended', async () => {
+    const fx = makeFixture();
+    const campaign = await fx.service.campaignsCreate({ name: 'Hist', seed: 'hist-seed' });
+    const hero = await fx.service.charactersCreate(campaign.id, {
+      kind: 'pc',
+      name: 'Wren',
+      hpMax: 12,
+    });
+    const foe = await fx.service.charactersCreate(campaign.id, {
+      kind: 'npc',
+      name: 'Mire Hound',
+      hpMax: 8,
+    });
+    const encounter = await fx.service.encountersStart(campaign.id, {
+      name: 'Ambush',
+      characterIds: [hero.id, foe.id],
+    });
+    await fx.service.encountersEnd(encounter.id);
+    // Deleting a former combatant is allowed once the encounter has ended.
+    await fx.service.charactersDelete(foe.id);
+
+    // The campaign's own export must remain importable: the ended
+    // encounter is historical and may reference the deleted character.
+    const text = await fx.service.exportCampaign(campaign.id);
+    const fx2 = makeFixture();
+    const imported = await fx2.service.importCampaign(text);
+    expect((await fx2.service.charactersList(imported.id)).map((c) => c.name)).toEqual(['Wren']);
+    // Re-exporting the imported campaign reproduces the bundle exactly.
+    expect(await fx2.service.exportCampaign(imported.id)).toBe(text);
+  });
+
+  it('allows a hand-crafted ended encounter to reference a missing character, but not an active one', async () => {
+    const fx = makeFixture();
+    const { campaign } = await setupCampaign(fx);
+    const text = await fx.service.exportCampaign(campaign.id);
+    const ghostCombatant = {
+      characterId: 'char-does-not-exist',
+      name: 'Ghost',
+      initiative: {
+        notation: '2d6',
+        spec: { count: 2, sides: 6, modifier: 0 },
+        dice: [3, 4],
+        modifier: 0,
+        total: 7,
+        stateBefore: 1,
+        stateAfter: 2,
+      },
+      initiativeTotal: 7,
+    };
+    const ended = JSON.parse(text) as { encounters: Array<Record<string, unknown>> };
+    ended.encounters = [
+      {
+        id: 'enc-ended-ghost',
+        campaignId: campaign.id,
+        sessionId: null,
+        name: 'Old fight',
+        status: 'ended',
+        combatants: [ghostCombatant],
+        turnIndex: 0,
+        round: 1,
+        createdAt: '2026-10-23T00:00:00.000Z',
+        endedAt: '2026-10-23T01:00:00.000Z',
+      },
+    ];
+    const fx2 = makeFixture();
+    await expect(fx2.service.importCampaign(JSON.stringify(ended))).resolves.toMatchObject({
+      id: campaign.id,
+    });
+
+    const active = JSON.parse(text) as { encounters: Array<Record<string, unknown>> };
+    active.encounters = [
+      {
+        id: 'enc-active-ghost',
+        campaignId: campaign.id,
+        sessionId: null,
+        name: 'Live fight',
+        status: 'active',
+        combatants: [ghostCombatant],
+        turnIndex: 0,
+        round: 1,
+        createdAt: '2026-10-23T00:00:00.000Z',
+        endedAt: null,
+      },
+    ];
+    await expect(fx.service.importCampaign(JSON.stringify(active))).rejects.toMatchObject({
+      code: 'IMPORT_INVALID',
+    });
+  });
+
   it('rejects corrupt and unknown-major campaign bundles with named errors', async () => {
     const fx = makeFixture();
     await expect(fx.service.importCampaign('not json')).rejects.toMatchObject({

@@ -302,14 +302,20 @@ export function parseCampaignBundle(text: string): CampaignBundle {
       invalid(`${what} references an unknown session.`);
     }
     reqStr(e, 'name', what);
-    reqEnum(e, 'status', what, ['active', 'ended'] as const);
+    const status = reqEnum(e, 'status', what, ['active', 'ended'] as const);
     const combatants = e.combatants;
     if (!Array.isArray(combatants)) invalid(`${what} has a missing "combatants" list.`);
     for (const [j, cb] of combatants.entries()) {
       const cbWhat = `${what} combatant #${j + 1}`;
       const combatant = reqRecord(cb, cbWhat);
       const characterId = reqStr(combatant, 'characterId', cbWhat);
-      if (!characterIds.has(characterId)) {
+      // An ACTIVE encounter's combatants must all have live character
+      // sheets — damage/healing resolves through them. An ENDED encounter
+      // is a historical record: charactersDelete legitimately permits
+      // deleting a former combatant once the encounter ends, so a missing
+      // sheet must not make the campaign's own backup unimportable. The
+      // combatant's name/initiative snapshot in the bundle is the record.
+      if (status === 'active' && !characterIds.has(characterId)) {
         invalid(`${cbWhat} references an unknown character.`);
       }
       reqStr(combatant, 'name', cbWhat);

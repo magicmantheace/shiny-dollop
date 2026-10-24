@@ -41,6 +41,16 @@ export class FakeAidmApi implements AidmApi {
     return c;
   }
 
+  /** Mirrors CampaignService.requireSessionInCampaign. */
+  private sessionInCampaign(sessionId: string | null | undefined, campaignId: string): string | null {
+    if (sessionId === null || sessionId === undefined) return null;
+    const s = this.sessions.get(sessionId);
+    if (!s || s.campaignId !== campaignId) {
+      throw aidmError(AIDM_ERROR_CODES.SESSION_NOT_FOUND, 'Session is not a session of this campaign.');
+    }
+    return sessionId;
+  }
+
   private append(campaignId: string, kind: LogEntry['kind'], text: string, detail: Record<string, unknown> | null, sessionId: string | null = null): LogEntry {
     const entry: LogEntry = {
       id: nextId('log'),
@@ -174,14 +184,16 @@ export class FakeAidmApi implements AidmApi {
 
   async diceRoll(campaignId: string, req: Parameters<AidmApi['diceRoll']>[1]) {
     const campaign = this.campaign(campaignId);
+    const sessionId = this.sessionInCampaign(req.sessionId, campaignId);
     const outcome = rollNotation(req.notation, campaign.diceState);
     campaign.diceState = outcome.stateAfter;
-    const entry = this.append(campaignId, 'roll', `Rolled ${outcome.notation}: = ${outcome.total}`, { outcome }, req.sessionId ?? null);
+    const entry = this.append(campaignId, 'roll', `Rolled ${outcome.notation}: = ${outcome.total}`, { outcome }, sessionId);
     return { outcome, entry };
   }
 
   async checkRoll(campaignId: string, req: Parameters<AidmApi['checkRoll']>[1]) {
     const campaign = this.campaign(campaignId);
+    const sessionId = this.sessionInCampaign(req.sessionId, campaignId);
     const character = this.characters.get(req.characterId);
     if (!character) throw aidmError(AIDM_ERROR_CODES.CHARACTER_NOT_FOUND, 'Character not found.');
     const target = difficultyTarget(req.difficulty);
@@ -190,7 +202,7 @@ export class FakeAidmApi implements AidmApi {
     const attr = character.stats[req.attribute];
     const outcome = { ...base, notation: `2d6+${attr}`, modifier: attr, total: base.dice.reduce((s, d) => s + d, 0) + attr };
     const succeeded = checkSucceeds(outcome.total, target);
-    const entry = this.append(campaignId, 'check', `${character.name} check — ${succeeded ? 'SUCCESS' : 'FAILURE'}`, { outcome }, req.sessionId ?? null);
+    const entry = this.append(campaignId, 'check', `${character.name} check — ${succeeded ? 'SUCCESS' : 'FAILURE'}`, { outcome }, sessionId);
     return { outcome, target, succeeded, entry };
   }
 
@@ -199,11 +211,12 @@ export class FakeAidmApi implements AidmApi {
   }
 
   async logAddNote(campaignId: string, text: string, sessionId?: string | null): Promise<LogEntry> {
-    return this.append(campaignId, 'note', text, null, sessionId ?? null);
+    return this.append(campaignId, 'note', text, null, this.sessionInCampaign(sessionId, campaignId));
   }
 
   async encountersStart(campaignId: string, req: Parameters<AidmApi['encountersStart']>[1]): Promise<Encounter> {
     const campaign = this.campaign(campaignId);
+    const sessionId = this.sessionInCampaign(req.sessionId, campaignId);
     const combatants = req.characterIds.map((id) => {
       const character = this.characters.get(id);
       if (!character) throw aidmError(AIDM_ERROR_CODES.CHARACTER_NOT_FOUND, 'Character not found.');
@@ -216,7 +229,7 @@ export class FakeAidmApi implements AidmApi {
     const encounter: Encounter = {
       id: nextId('enc'),
       campaignId,
-      sessionId: req.sessionId ?? null,
+      sessionId,
       name: req.name,
       status: 'active',
       combatants,
@@ -226,7 +239,7 @@ export class FakeAidmApi implements AidmApi {
       endedAt: null,
     };
     this.encounters.set(encounter.id, encounter);
-    this.append(campaignId, 'encounter', `Encounter "${req.name}" started.`, null, req.sessionId ?? null);
+    this.append(campaignId, 'encounter', `Encounter "${req.name}" started.`, null, sessionId);
     return encounter;
   }
 

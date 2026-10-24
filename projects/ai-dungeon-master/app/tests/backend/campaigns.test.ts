@@ -126,6 +126,64 @@ describe('dice and checks through the service', () => {
     ).rejects.toMatchObject({ code: 'DICE_NOTATION_INVALID' });
   });
 
+  it('rejects a foreign session on rolls, checks, notes and encounters without persisting anything', async () => {
+    const fx = makeFixture();
+    const a = await fx.service.campaignsCreate({ name: 'A', seed: 'a-seed' });
+    const sessionA = await fx.service.sessionsCreate(a.id, { title: 'A Session' });
+    const b = await fx.service.campaignsCreate({ name: 'B', seed: 'b-seed' });
+    const heroB = await fx.service.charactersCreate(b.id, {
+      kind: 'pc',
+      name: 'B Hero',
+      hpMax: 10,
+    });
+    const bStateBefore = (await fx.service.campaignsGet(b.id)).diceState;
+    const bLogCountBefore = (await fx.service.logList(b.id)).length;
+
+    // Every write path that takes a sessionId must refuse A's session
+    // when the target campaign is B (and refuse unknown session ids).
+    await expect(
+      fx.service.diceRoll(b.id, { notation: '2d6', sessionId: sessionA.id }),
+    ).rejects.toMatchObject({ code: 'SESSION_NOT_FOUND' });
+    await expect(
+      fx.service.diceRoll(b.id, { notation: '2d6', sessionId: 'sess-does-not-exist' }),
+    ).rejects.toMatchObject({ code: 'SESSION_NOT_FOUND' });
+    await expect(
+      fx.service.checkRoll(b.id, {
+        characterId: heroB.id,
+        attribute: 'might',
+        difficulty: 'standard',
+        sessionId: sessionA.id,
+      }),
+    ).rejects.toMatchObject({ code: 'SESSION_NOT_FOUND' });
+    await expect(
+      fx.service.logAddNote(b.id, 'written into the wrong campaign', sessionA.id),
+    ).rejects.toMatchObject({ code: 'SESSION_NOT_FOUND' });
+    await expect(
+      fx.service.encountersStart(b.id, {
+        name: 'Wrong-session fight',
+        characterIds: [heroB.id],
+        sessionId: sessionA.id,
+      }),
+    ).rejects.toMatchObject({ code: 'SESSION_NOT_FOUND' });
+
+    // Nothing was persisted into B: no log entries, no encounter, and
+    // the dice stream did not advance.
+    expect((await fx.service.logList(b.id)).length).toBe(bLogCountBefore);
+    expect(await fx.service.encountersGetActive(b.id)).toBeNull();
+    expect((await fx.service.campaignsGet(b.id)).diceState).toBe(bStateBefore);
+
+    // B's own session (and a null session) still work normally.
+    const sessionB = await fx.service.sessionsCreate(b.id, { title: 'B Session' });
+    const roll = await fx.service.diceRoll(b.id, { notation: '2d6', sessionId: sessionB.id });
+    expect(roll.entry.sessionId).toBe(sessionB.id);
+    const note = await fx.service.logAddNote(b.id, 'right campaign', sessionB.id);
+    expect(note.campaignId).toBe(b.id);
+    // And B now exports/imports cleanly — no foreign session leaked in.
+    const exported = await fx.service.exportCampaign(b.id);
+    const fx2 = makeFixture();
+    await expect(fx2.service.importCampaign(exported)).resolves.toMatchObject({ id: b.id });
+  });
+
   it('two campaigns with the same seed roll identical sequences', async () => {
     const fx = makeFixture();
     const a = await fx.service.campaignsCreate({ name: 'A', seed: 'twin-seed' });

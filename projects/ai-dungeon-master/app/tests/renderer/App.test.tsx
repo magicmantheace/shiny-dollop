@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import './setup';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { App } from '../../src/components/App';
@@ -141,6 +141,92 @@ describe('App', () => {
     expect(within(campaigns).getByLabelText('Session notes')).toHaveValue(
       'Unsaved draft — the bell rang twice.',
     );
+  });
+
+  it('clears the selected session when creating a second campaign', async () => {
+    const fake = installFakeAidm();
+    const user = userEvent.setup();
+    render(<App />);
+    await createCampaign(user);
+
+    // Select a session in campaign A.
+    const campaigns = region('Campaigns');
+    await user.type(within(campaigns).getByLabelText('New session title'), 'Session A');
+    await user.click(within(campaigns).getByRole('button', { name: 'Start session' }));
+    expect(await within(campaigns).findByLabelText('Session notes')).toBeInTheDocument();
+    const sessionAId = [...fake.sessions.values()][0]?.id;
+    expect(sessionAId).toBeTruthy();
+
+    // Create campaign B: the selection must switch to B with NO session
+    // carried over from A.
+    await user.type(within(campaigns).getByLabelText('Name'), 'Second Campaign');
+    await user.click(within(campaigns).getByRole('button', { name: 'Create campaign' }));
+    expect(await within(campaigns).findByText(/Second Campaign/)).toBeInTheDocument();
+    expect(within(campaigns).queryByLabelText('Session notes')).not.toBeInTheDocument();
+    expect((within(campaigns).getByLabelText('Session') as HTMLSelectElement).value).toBe('');
+
+    // A roll in B must not be attributed to A's session.
+    const dice = region('Dice');
+    await user.click(within(dice).getByRole('button', { name: 'Roll dice' }));
+    expect(await within(dice).findByText(/2d6:/)).toBeInTheDocument();
+    const campaignB = [...fake.campaigns.values()].find((c) => c.name === 'Second Campaign');
+    expect(campaignB).toBeTruthy();
+    const bRolls = fake.log.filter((e) => e.campaignId === campaignB?.id && e.kind === 'roll');
+    expect(bRolls.length).toBeGreaterThan(0);
+    expect(bRolls.every((e) => e.sessionId === null)).toBe(true);
+    expect(bRolls.every((e) => e.sessionId !== sessionAId)).toBe(true);
+  });
+
+  it('clears the selected session when importing a campaign', async () => {
+    const fake = installFakeAidm();
+    const user = userEvent.setup();
+    render(<App />);
+    await createCampaign(user);
+
+    const campaigns = region('Campaigns');
+    await user.type(within(campaigns).getByLabelText('New session title'), 'Session A');
+    await user.click(within(campaigns).getByRole('button', { name: 'Start session' }));
+    expect(await within(campaigns).findByLabelText('Session notes')).toBeInTheDocument();
+    const sessionAId = [...fake.sessions.values()][0]?.id;
+    expect(sessionAId).toBeTruthy();
+
+    // Import a campaign bundle: the view switches to the imported
+    // campaign, so A's session must be cleared too.
+    const data = region('Campaign data');
+    const bundle = JSON.stringify({
+      campaign: {
+        id: 'camp-imported',
+        name: 'Imported Campaign',
+        setting: '',
+        seed: 'import-seed',
+        diceState: 1,
+        createdAt: '2026-10-23T00:00:00.000Z',
+        updatedAt: '2026-10-23T00:00:00.000Z',
+      },
+    });
+    // fireEvent (not user.type): the JSON braces are keyboard descriptors
+    // to user-event, not literal text.
+    fireEvent.change(
+      within(data).getByLabelText('Import campaign bundle (ai-dungeon-master/campaign v1)'),
+      { target: { value: bundle } },
+    );
+    await user.click(within(data).getByRole('button', { name: 'Import campaign' }));
+    expect(await screen.findByText(/Imported campaign/)).toBeInTheDocument();
+    expect(within(campaigns).queryByLabelText('Session notes')).not.toBeInTheDocument();
+    expect((within(campaigns).getByLabelText('Session') as HTMLSelectElement).value).toBe('');
+
+    // A roll in the imported campaign must not be attributed to A's session.
+    const dice = region('Dice');
+    await user.click(within(dice).getByRole('button', { name: 'Roll dice' }));
+    expect(await within(dice).findByText(/2d6:/)).toBeInTheDocument();
+    const imported = [...fake.campaigns.values()].find((c) => c.name === 'Imported Campaign');
+    expect(imported).toBeTruthy();
+    const importedRolls = fake.log.filter(
+      (e) => e.campaignId === imported?.id && e.kind === 'roll',
+    );
+    expect(importedRolls.length).toBeGreaterThan(0);
+    expect(importedRolls.every((e) => e.sessionId === null)).toBe(true);
+    expect(importedRolls.every((e) => e.sessionId !== sessionAId)).toBe(true);
   });
 
   it('surfaces backend errors in the banner', async () => {

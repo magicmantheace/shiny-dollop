@@ -182,7 +182,8 @@ export class CampaignService {
   ): Promise<LogEntry> {
     const campaign = this.requireCampaign(campaignId);
     requireText(text, 'Note text', MAX_TEXT);
-    return this.appendLog(campaign, sessionId ?? null, 'note', text, null);
+    const validSessionId = this.requireSessionInCampaign(sessionId, campaignId);
+    return this.appendLog(campaign, validSessionId, 'note', text, null);
   }
 
   // ---------- sessions ----------
@@ -213,6 +214,30 @@ export class CampaignService {
       throw aidmError(AIDM_ERROR_CODES.SESSION_NOT_FOUND, `Session ${id} was not found.`);
     }
     return session;
+  }
+
+  /**
+   * Validate an optional session reference for a write into `campaignId`
+   * BEFORE anything is persisted. A session from another campaign (or a
+   * nonexistent one) is rejected with SESSION_NOT_FOUND: persisting it
+   * would attribute rolls/notes/encounters to a session the target
+   * campaign does not own — and would make that campaign's own export
+   * unimportable, since the bundle cannot contain the foreign session.
+   * Returns the validated session id (or null).
+   */
+  private requireSessionInCampaign(
+    sessionId: string | null | undefined,
+    campaignId: string,
+  ): string | null {
+    if (sessionId === null || sessionId === undefined) return null;
+    const session = store.getSession(this.db, sessionId);
+    if (!session || session.campaignId !== campaignId) {
+      throw aidmError(
+        AIDM_ERROR_CODES.SESSION_NOT_FOUND,
+        `Session ${sessionId} is not a session of this campaign.`,
+      );
+    }
+    return sessionId;
   }
 
   async sessionsUpdateNotes(sessionId: string, notes: string): Promise<Session> {
@@ -337,13 +362,16 @@ export class CampaignService {
 
   async diceRoll(campaignId: string, req: RollRequest): Promise<RollResponse> {
     const campaign = this.requireCampaign(campaignId);
+    // Validate the session BEFORE rolling: a rejected roll must not
+    // advance the campaign's dice stream or write a log entry.
+    const sessionId = this.requireSessionInCampaign(req.sessionId, campaignId);
     const spec = parseDiceNotation(req.notation); // throws DICE_NOTATION_INVALID
     const outcome = rollFromState(spec, campaign.diceState);
     this.touchCampaign({ ...campaign, diceState: outcome.stateAfter });
     const label = req.label?.trim() ? ` — ${req.label.trim()}` : '';
     const entry = this.appendLog(
       campaign,
-      req.sessionId ?? null,
+      sessionId,
       'roll',
       `Rolled ${outcome.notation}${label}: [${outcome.dice.join(', ')}]${outcome.modifier !== 0 ? ` ${outcome.modifier > 0 ? '+' : '−'} ${Math.abs(outcome.modifier)}` : ''} = ${outcome.total}`,
       { outcome },
@@ -357,6 +385,7 @@ export class CampaignService {
     if (character.campaignId !== campaignId) {
       throw aidmError(AIDM_ERROR_CODES.CHARACTER_NOT_FOUND, 'Character is not in this campaign.');
     }
+    const sessionId = this.requireSessionInCampaign(req.sessionId, campaignId);
     const target = difficultyTarget(req.difficulty);
     const attributeValue = character.stats[req.attribute];
     const outcome = rollNotation('2d6', campaign.diceState);
@@ -371,7 +400,7 @@ export class CampaignService {
     const succeeded = checkSucceeds(withAttr.total, target);
     const entry = this.appendLog(
       campaign,
-      req.sessionId ?? null,
+      sessionId,
       'check',
       `${character.name} ${req.attribute} check (${req.difficulty}, target ${target}): [${withAttr.dice.join(', ')}] + ${attributeValue} = ${withAttr.total} — ${succeeded ? 'SUCCESS' : 'FAILURE'}`,
       { outcome: withAttr, target, succeeded, characterId: character.id, attribute: req.attribute },
@@ -383,6 +412,9 @@ export class CampaignService {
 
   async encountersStart(campaignId: string, req: EncounterStartRequest): Promise<Encounter> {
     const campaign = this.requireCampaign(campaignId);
+    // Validate the session BEFORE rolling initiative: a rejected start
+    // must not advance the dice stream or write any log entries.
+    const sessionId = this.requireSessionInCampaign(req.sessionId, campaignId);
     const name = requireText(req.name, 'Encounter name', 200);
     if (!Array.isArray(req.characterIds) || req.characterIds.length === 0) {
       throw aidmError(AIDM_ERROR_CODES.INPUT_INVALID, 'An encounter needs at least one character.');
@@ -420,7 +452,6 @@ export class CampaignService {
       rolled.push({ character, outcome });
     }
     this.touchCampaign({ ...campaign, diceState: state });
-    const sessionId = req.sessionId ?? null;
     for (const { character, outcome } of rolled) {
       this.appendLog(
         campaign,
@@ -706,13 +737,24 @@ export class CampaignService {
     for (const c of bundle.characters) {
       store.insertCharacter(this.db, { ...c, id: mapId(c.id), campaignId: campaign.id });
     }
+    const bundledCharacterIds = new Set(bundle.characters.map((c) => c.id));
     for (const e of bundle.encounters) {
       store.insertEncounter(this.db, {
         ...e,
         id: mapId(e.id),
         campaignId: campaign.id,
         sessionId: e.sessionId ? mapId(e.sessionId) : null,
-        combatants: e.combatants.map((cb) => ({ ...cb, characterId: mapId(cb.characterId) })),
+        // Combatants whose sheet is in the bundle follow the remap. A
+        // combatant with NO sheet in the bundle is a historical record
+        // from an ended encounter (its character was deleted after the
+        // encounter ended): keep its original id as-is instead of
+        // remapping it to a fabricated new character id.
+        combatants: e.combatants.map((cb) => ({
+          ...cb,
+          characterId: bundledCharacterIds.has(cb.characterId)
+            ? mapId(cb.characterId)
+            : cb.characterId,
+        })),
       });
     }
     for (const m of bundle.memory) {

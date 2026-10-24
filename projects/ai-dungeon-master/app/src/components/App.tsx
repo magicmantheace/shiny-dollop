@@ -263,6 +263,9 @@ export function App() {
                   setNewCampaignSeed('');
                   await refreshCampaigns();
                   setCampaignId(created.id);
+                  // Campaign transition: never carry the previous
+                  // campaign's selected session into the new one.
+                  setSessionId('');
                 })
               }
             >
@@ -861,6 +864,9 @@ export function App() {
                     setImportText('');
                     await refreshCampaigns();
                     setCampaignId(imported.id);
+                    // Campaign transition: clear any session selected in
+                    // the previously active campaign.
+                    setSessionId('');
                     setNotice(`Imported campaign “${imported.name}”.`);
                   })
                 }
