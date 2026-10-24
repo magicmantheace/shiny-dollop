@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MPL-2.0
+set -Eeuo pipefail
+source "$(dirname "$0")/../build/scripts/common.sh"
+
+LOG_DIR="$OUT_DIR/logs"
+LOG_FILE="$LOG_DIR/qemu-smoke.log"
+TIMEOUT_SECONDS="${SYNVEIL_SMOKE_TIMEOUT:-30}"
+REQUIRE_NATIVE="${SYNVEIL_SMOKE_REQUIRE_NATIVE:-0}"
+REQUIRE_DISPLAY="${SYNVEIL_SMOKE_REQUIRE_DISPLAY:-0}"
+REQUIRE_INPUT="${SYNVEIL_SMOKE_REQUIRE_INPUT:-0}"
+REQUIRE_NETWORK="${SYNVEIL_SMOKE_REQUIRE_NETWORK:-0}"
+REQUIRE_VT="${SYNVEIL_SMOKE_REQUIRE_VT:-0}"
+REQUIRE_DESKTOP="${SYNVEIL_SMOKE_REQUIRE_DESKTOP:-0}"
+case "$REQUIRE_DESKTOP" in
+    0|1) ;;
+    *) die "SYNVEIL_SMOKE_REQUIRE_DESKTOP must be 0 or 1" ;;
+esac
+case "$REQUIRE_VT" in
+    0|1) ;;
+    *) die "SYNVEIL_SMOKE_REQUIRE_VT must be 0 or 1" ;;
+esac
+case "$REQUIRE_NETWORK" in
+    0|1) ;;
+    *) die "SYNVEIL_SMOKE_REQUIRE_NETWORK must be 0 or 1" ;;
+esac
+case "$REQUIRE_INPUT" in
+    0|1) ;;
+    *) die "SYNVEIL_SMOKE_REQUIRE_INPUT must be 0 or 1" ;;
+esac
+case "$REQUIRE_DISPLAY" in
+    0|1) ;;
+    *) die "SYNVEIL_SMOKE_REQUIRE_DISPLAY must be 0 or 1" ;;
+esac
+case "$REQUIRE_NATIVE" in
+    0) ;;
+    1) LOG_FILE="$LOG_DIR/qemu-native-smoke.log" ;;
+    *) die "SYNVEIL_SMOKE_REQUIRE_NATIVE must be 0 or 1" ;;
+esac
+
+mkdir -p "$LOG_DIR"
+rm -f "$LOG_FILE"
+
+log "booting Synveil in QEMU for up to ${TIMEOUT_SECONDS}s"
+set +e
+timeout -k 3 "${TIMEOUT_SECONDS}s" bash "$ROOT_DIR/build/scripts/qemu.sh" 9>&- >"$LOG_FILE" 2>&1
+status=$?
+set -e
+
+if grep -Eq $'^SYNVEIL_BOOT_OK\r?$' "$LOG_FILE"; then
+    if [[ "$REQUIRE_DISPLAY" == 1 ]]; then
+        if ! grep -Eq $'^SYNVEIL_DISPLAY_READY\r?$' "$LOG_FILE" ||
+           grep -Eq $'^SYNVEIL_DISPLAY_UNAVAILABLE\r?$' "$LOG_FILE"; then
+            log "virtio framebuffer was not writable in guest"
+            tail -n 120 "$LOG_FILE" >&2 || true
+            exit 1
+        fi
+    fi
+    if [[ "$REQUIRE_NETWORK" == 1 ]]; then
+        if ! grep -Eq $'^SYNVEIL_NETWORK_READY\r?$' "$LOG_FILE" ||
+           grep -Eq $'^SYNVEIL_NETWORK_UNAVAILABLE\r?$' "$LOG_FILE"; then
+            log "guest did not configure QEMU DHCP networking"
+            tail -n 120 "$LOG_FILE" >&2 || true
+            exit 1
+        fi
+    fi
+    if [[ "$REQUIRE_DESKTOP" == 1 ]]; then
+        if ! grep -Eq $'^SYNVEIL_DESKTOP_READY\r?$' "$LOG_FILE"; then
+            log "graphical read-only desktop failed to start"
+            tail -n 120 "$LOG_FILE" >&2 || true
+            exit 1
+        fi
+    fi
+    if [[ "$REQUIRE_VT" == 1 ]]; then
+        if ! grep -Eq $'^SYNVEIL_VT_READY\r?$' "$LOG_FILE" ||
+           grep -Eq $'^SYNVEIL_VT_UNAVAILABLE\r?$' "$LOG_FILE"; then
+            log "guest framebuffer-backed virtual terminal is not available"
+            tail -n 120 "$LOG_FILE" >&2 || true
+            exit 1
+        fi
+    fi
+    if [[ "$REQUIRE_INPUT" == 1 ]]; then
+        if ! grep -Eq $'^SYNVEIL_INPUT_READY\r?$' "$LOG_FILE" ||
+           grep -Eq $'^SYNVEIL_INPUT_UNAVAILABLE\r?$' "$LOG_FILE"; then
+            log "guest did not detect virtual keyboard and pointer"
+            tail -n 120 "$LOG_FILE" >&2 || true
+            exit 1
+        fi
+    fi
+    if [[ "$REQUIRE_NATIVE" == 1 ]]; then
+        if ! grep -Eq $'^SYNVEIL_CORE_READY\r?$' "$LOG_FILE" ||
+           grep -Eq $'^SYNVEIL_CORE_UNAVAILABLE\r?$' "$LOG_FILE"; then
+            log "native core did not complete a successful status check"
+            tail -n 120 "$LOG_FILE" >&2 || true
+            exit 1
+        fi
+        log "QEMU native core status smoke passed"
+        exit 0
+    fi
+    log "QEMU smoke boot passed"
+    exit 0
+fi
+
+printf '[synveil] QEMU smoke boot failed (qemu/timeout status %s)\n' "$status" >&2
+tail -n 120 "$LOG_FILE" >&2 || true
+exit 1
