@@ -34,7 +34,7 @@ Do not assert structural concrete strength, code compliance, legal truck payload
 
 **Integrations:** Export format usable by Concrete Operations Manager; applications must compile and run independently.
 
-Do not access or modify the other project directories, the original Crawl repository, real personal data, connected accounts, or production systems to test this app. Use fixtures or explicitly approved narrow interfaces.
+Do not access or modify the other project directories, real personal data, connected accounts, or production systems to test this app. Use fixtures or explicitly approved narrow interfaces.
 
 ### Stop/continue logic
 
