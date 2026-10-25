@@ -154,6 +154,19 @@ describe('export / import', () => {
     db.close();
   });
 
+  it('import rejects duplicate room ids and does not persist it', async () => {
+    const { service, db, saved } = await savedFixture();
+    const envelope = JSON.parse(buildExport(saved)) as { map: ReturnType<typeof cloneMap> };
+    expect(envelope.map.rooms.length).toBeGreaterThanOrEqual(2);
+    envelope.map.rooms[1]!.id = envelope.map.rooms[0]!.id;
+    const before = await service.dungeonsList();
+    await expect(service.importJson(JSON.stringify(envelope))).rejects.toMatchObject({
+      code: 'IMPORT_INVALID',
+    });
+    expect(await service.dungeonsList()).toHaveLength(before.length);
+    db.close();
+  });
+
   it('a tampered stored budgetUsed is recomputed on import', async () => {
     const { service, db, saved } = await savedFixture();
     const envelope = JSON.parse(buildExport(saved)) as { map: ReturnType<typeof cloneMap> };

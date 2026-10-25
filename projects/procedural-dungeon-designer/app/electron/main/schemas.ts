@@ -87,6 +87,28 @@ export const dungeonMapSchema = z
         message: 'params grid size must match the map grid size',
       });
     }
+    // Room ids must be unique across the whole map: the renderer
+    // resolves selectedRoomId with rooms.find and placement operations
+    // resolve their room through findRoom (also a first-match find),
+    // so a duplicate id makes the second room uninspectable and
+    // mis-targets its placements; movePlacement also compares room
+    // ids, so moves between same-id rooms become successful no-ops.
+    const seenRoomIds = new Set<string>();
+    const duplicateRoomIds = new Set<string>();
+    for (const room of map.rooms) {
+      if (seenRoomIds.has(room.id)) {
+        duplicateRoomIds.add(room.id);
+      } else {
+        seenRoomIds.add(room.id);
+      }
+    }
+    if (duplicateRoomIds.size > 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['rooms'],
+        message: `room ids must be unique across the map; duplicate room id(s): ${[...duplicateRoomIds].join(', ')}`,
+      });
+    }
     // Placement ids must be unique across the whole map, not just within
     // a room: removePlacement deletes every placement with the given id
     // and findPlacement operates on the first match, so a duplicate id

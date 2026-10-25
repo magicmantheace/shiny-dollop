@@ -86,6 +86,12 @@ whole map, so save and import both reject duplicates that remove/move
 would otherwise hit in multiple rooms. 60/60 tests, typecheck, lint and
 build green.
 
+Codex-review fix cycle 4 (2026-10-24): dungeonMapSchema now requires
+room ids to be unique across the whole map, mirroring the placement-id
+rule, so save and import both reject duplicates that rooms.find /
+findRoom would otherwise resolve to the first room (mis-targeting
+inspection and placement moves). 62/62 tests, typecheck and lint green.
+
 Codex-review fix cycle 2 (2026-10-24): IPC failures now travel as a
 structured { ok, value | error } envelope returned from the handlers and
 unwrapped in the preload, so named errors (e.g. BUDGET_EXCEEDED) survive

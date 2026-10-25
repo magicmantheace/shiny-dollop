@@ -128,6 +128,26 @@ describe('validation', () => {
     db.close();
   });
 
+  it('save rejects duplicate room ids', async () => {
+    const { service, db } = makeFixture();
+    const map = await service.generate(BASE_PARAMS);
+    const tampered = cloneMap(map);
+    expect(tampered.rooms.length).toBeGreaterThanOrEqual(2);
+    // Distinct centers, unique placement ids, valid costs and passing
+    // connectivity are untouched: the second room simply reuses the
+    // first room's id, which rooms.find / findRoom would otherwise
+    // resolve to the first room.
+    tampered.rooms[1]!.id = tampered.rooms[0]!.id;
+    await expect(
+      service.dungeonsSave({ name: 'Duplicate Room Ids', map: tampered }),
+    ).rejects.toMatchObject({ code: 'DUNGEON_INVALID' });
+    await expect(service.validateMap(tampered)).rejects.toMatchObject({
+      code: 'DUNGEON_INVALID',
+    });
+    expect(await service.dungeonsList()).toHaveLength(0);
+    db.close();
+  });
+
   it('validateMap rejects a map whose entrance center is a wall', async () => {
     const { service, db } = makeFixture();
     const map = await service.generate(BASE_PARAMS);
