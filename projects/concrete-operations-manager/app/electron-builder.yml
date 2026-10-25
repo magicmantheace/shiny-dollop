@@ -1,0 +1,25 @@
+appId: com.magicmantheace.concrete-ops-manager
+productName: Concrete Operations Manager
+directories:
+  output: release
+files:
+  # Compiled app. The main process requires('zod') and requires('pdfkit')
+  # at runtime, so both ship. node:sqlite is provided by the Electron runtime.
+  - dist/**/*
+  - package.json
+  - node_modules/zod/**/*
+  - node_modules/pdfkit/**/*
+asar: true
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-${version}-win-x64.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Concrete Operations Manager
+# NOTE: installer build is configured but not run on Linux (needs Wine/Windows).
+# Code signing is intentionally not configured — no release without owner approval.
