@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MPL-2.0
 set -Eeuo pipefail
+# A rootfs must not inherit the build host's umask: under 0007 every
+# directory and heredoc-written file below lands as 0770/0660, which
+# locks the unprivileged session user out of /etc, /usr and its own
+# home directory. Items that need stricter modes pin them explicitly
+# (home/synveil 0700, tmp 1777, markers 0644).
+umask 022
 source "$(dirname "$0")/common.sh"
 
 NATIVE_ROOTFS="${SYNVEIL_NATIVE_ROOTFS:-0}"
