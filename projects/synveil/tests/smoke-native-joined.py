@@ -120,7 +120,7 @@ def weston_proof(qmp: Path, folder: Path, *, full: bool) -> bool:
 def guest_boot(work: Path, secret: str, *, fresh: bool, timeout: float,
                evidence_dir: Path) -> bool:
     output = evidence_dir / ("joined-first.log" if fresh else "joined-reboot.log")
-    with tempfile.TemporaryDirectory(prefix="synveil-joined-qmp-") as temp:
+    with tempfile.TemporaryDirectory(prefix="sjq-") as temp:
         qmp = Path(temp) / "monitor.sock"
         env = {key: value for key, value in os.environ.items()
                if not key.startswith("SYNVEIL_")}
