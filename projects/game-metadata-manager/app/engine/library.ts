@@ -107,6 +107,31 @@ export class Library {
     return row ? rowToGame(row) : null;
   }
 
+  getByInstallPath(installPath: string): Game | null {
+    const row = this.db
+      .prepare('SELECT * FROM games WHERE install_path = ?')
+      .get(installPath) as unknown as GameRow | undefined;
+    return row ? rowToGame(row) : null;
+  }
+
+  /**
+   * Run `fn` inside a single SQLite transaction on this connection
+   * (shared by Library/ArtworkStore/ChangeLog, which all use the same
+   * DatabaseSync). Rolls back every write made by `fn` on throw.
+   * Callers must not use methods that open their own transaction.
+   */
+  runInTransaction<T>(fn: () => T): T {
+    this.db.exec('BEGIN;');
+    try {
+      const result = fn();
+      this.db.exec('COMMIT;');
+      return result;
+    } catch (err) {
+      this.db.exec('ROLLBACK;');
+      throw err;
+    }
+  }
+
   /**
    * Recompute `missing` for every game via fs.existsSync.
    * Never deletes anything — missing rows are flagged, not removed.
@@ -223,10 +248,23 @@ export class Library {
   }
 
   /**
-   * Insert a game wholesale (used by bundle import). Upserts: if the id
-   * already exists the row is replaced only via the merge path's update().
+   * Insert a game wholesale (used by bundle import). If the id already
+   * exists the row is replaced only via the merge path's update().
+   *
+   * An installPath owned by a DIFFERENT game id is rejected outright:
+   * `games.install_path` is UNIQUE, so `INSERT OR REPLACE` would
+   * silently delete the existing row to satisfy the constraint —
+   * destroying local metadata without any timestamp comparison or
+   * conflict report. Callers that can reconcile a collision must go
+   * through the conflict-aware merge path instead.
    */
   insertGame(game: Game): void {
+    const colliding = this.getByInstallPath(game.installPath);
+    if (colliding && colliding.id !== game.id) {
+      throw new Error(
+        `install path collision: ${game.installPath} already belongs to game ${colliding.id}; refusing to replace it with game ${game.id}`
+      );
+    }
     this.db
       .prepare(
         `INSERT OR REPLACE INTO games (id, title, original_title, description, install_path, artwork_id, tag_ids, collection_ids, created_at, updated_at)

@@ -105,8 +105,6 @@ export class BundleIO {
     if (!Array.isArray(bundle.artwork)) throw new Error('bundle.artwork must be an array');
 
     const conflicts: ConflictInfo[] = [];
-    let added = 0;
-    let updated = 0;
 
     const mergeFields: Array<'title' | 'description' | 'artworkId' | 'tagIds' | 'collectionIds'> = [
       'title',
@@ -118,6 +116,36 @@ export class BundleIO {
 
     const eq = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
+    // The whole import is transactional: games, change-log entries,
+    // artwork rows and taxonomy all commit together or not at all.
+    // Previously each write committed individually, so a failure while
+    // restoring artwork (e.g. an unwritable cache) left the preceding
+    // game changes persisted while the IPC reported a failed import.
+    // Artwork files written during the import are compensated on
+    // failure: files for artwork ids that did not exist before the
+    // import are deleted after the DB rollback.
+    const preExistingArtworkIds = new Set(this.artwork.list().map((a) => a.id));
+    const attemptedNewArtworkIds: string[] = [];
+    try {
+      return this.library.runInTransaction(() =>
+        this.importBundleInTransaction(bundle, mergeFields, eq, conflicts, preExistingArtworkIds, attemptedNewArtworkIds)
+      );
+    } catch (err) {
+      for (const id of attemptedNewArtworkIds) this.artwork.deleteCachedFile(id);
+      throw err;
+    }
+  }
+
+  private importBundleInTransaction(
+    bundle: Partial<MetadataBundle> & { tags?: Tag[]; collections?: Collection[] },
+    mergeFields: Array<'title' | 'description' | 'artworkId' | 'tagIds' | 'collectionIds'>,
+    eq: (a: unknown, b: unknown) => boolean,
+    conflicts: ConflictInfo[],
+    preExistingArtworkIds: Set<string>,
+    attemptedNewArtworkIds: string[]
+  ): { added: number; updated: number; conflicts: ConflictInfo[] } {
+    let added = 0;
+    let updated = 0;
     for (const bundleGame of bundle.games as Game[]) {
       if (typeof bundleGame.id !== 'string' || !bundleGame.id) {
         throw new Error('bundle contains a game with a missing id');
@@ -168,6 +196,11 @@ export class BundleIO {
     // Restore artwork payloads into the app-owned cache.
     for (const entry of bundle.artwork as MetadataBundle['artwork']) {
       if (typeof entry.id !== 'string' || typeof entry.dataBase64 !== 'string') continue;
+      // Record new artwork ids BEFORE writing, so a write that fails
+      // part-way still gets its partial file compensated by the caller.
+      if (!preExistingArtworkIds.has(entry.id) && !attemptedNewArtworkIds.includes(entry.id)) {
+        attemptedNewArtworkIds.push(entry.id);
+      }
       this.artwork.addBase64(entry.id, entry.provenance ?? 'bundle', entry.mime, entry.dataBase64);
     }
 

@@ -163,6 +163,25 @@ export class ArtworkStore {
     return pathToFileURL(this.filePath(artworkId)).toString();
   }
 
+  /**
+   * Delete a cached artwork file by id, whatever its extension.
+   * Used to compensate filesystem writes when a surrounding bundle
+   * import rolls back: the DB row is undone by the transaction, and
+   * this removes the orphaned file. No-op when no file exists.
+   */
+  deleteCachedFile(artworkId: string): void {
+    for (const ext of ['.png', '.jpg', '.webp']) {
+      const full = join(this.cacheDir, `${artworkId}${ext}`);
+      if (existsSync(full)) {
+        try {
+          unlinkSync(full);
+        } catch {
+          // best effort compensation
+        }
+      }
+    }
+  }
+
   /** Remove all artwork rows and their cached files. */
   clear(): void {
     for (const art of this.list()) {

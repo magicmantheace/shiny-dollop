@@ -169,6 +169,31 @@ describe('Library', () => {
     }
   });
 
+  it('insertGame rejects an install-path collision with a different game id instead of replacing the local game', () => {
+    const ctx = makeContext();
+    try {
+      const local = makeGame({
+        id: 'g-local',
+        title: 'Locally Edited',
+        installPath: 'C:/Games/Shared/game.exe',
+        updatedAt: '2025-06-01T00:00:00.000Z',
+      });
+      ctx.library.insertGame(local);
+      const incoming = makeGame({
+        id: 'g-incoming',
+        title: 'Incoming',
+        installPath: 'C:/Games/Shared/game.exe',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      });
+      expect(() => ctx.library.insertGame(incoming)).toThrow(/install path collision/);
+      expect(ctx.library.get('g-local')?.title).toBe('Locally Edited');
+      expect(ctx.library.get('g-incoming')).toBeNull();
+      expect(ctx.library.list()).toHaveLength(1);
+    } finally {
+      ctx.dispose();
+    }
+  });
+
   it('addTag returns the existing tag on duplicate names', () => {
     const ctx = makeContext();
     try {
@@ -456,6 +481,70 @@ describe('BundleIO', () => {
         JSON.stringify({ formatVersion: '1.2.3', games: [], artwork: [] })
       );
       expect(res.added).toBe(0);
+    } finally {
+      ctx.dispose();
+    }
+  });
+
+  it('bundle import rejects an install-path collision and leaves the local game intact', () => {
+    const ctx = makeContext();
+    try {
+      const local = makeGame({
+        id: 'g-local2',
+        title: 'Locally Edited',
+        installPath: 'C:/Games/Shared2/game.exe',
+        updatedAt: '2025-06-01T00:00:00.000Z',
+      });
+      ctx.library.insertGame(local);
+      const bundle: MetadataBundle = {
+        formatVersion: '1.0.0',
+        exportedAt: '2025-01-01T00:00:00.000Z',
+        exporter: 'game-metadata-manager/1.0.0',
+        games: [
+          makeGame({
+            id: 'g-incoming2',
+            title: 'Older Incoming',
+            installPath: 'C:/Games/Shared2/game.exe',
+            createdAt: '2025-01-01T00:00:00.000Z',
+            updatedAt: '2025-01-01T00:00:00.000Z',
+          }),
+        ],
+        artwork: [],
+      };
+      expect(() => ctx.bundles.importBundle(JSON.stringify(bundle))).toThrow(/install path collision/);
+      expect(ctx.library.get('g-local2')?.title).toBe('Locally Edited');
+      expect(ctx.library.get('g-incoming2')).toBeNull();
+    } finally {
+      ctx.dispose();
+    }
+  });
+
+  it('rolls back all bundle mutations when artwork restoration fails', () => {
+    const ctx = makeContext();
+    try {
+      const cacheDir = join(ctx.dir, 'artwork-cache');
+      // Sabotage the artwork cache: replace its directory with a file
+      // so writing restored artwork must throw.
+      rmSync(cacheDir, { recursive: true, force: true });
+      writeFileSync(cacheDir, 'not a directory');
+
+      const game = makeGame({ id: 'g-rollback', installPath: 'C:/Games/Rollback/game.exe' });
+      const bundle: MetadataBundle = {
+        formatVersion: '1.0.0',
+        exportedAt: new Date().toISOString(),
+        exporter: 'game-metadata-manager/1.0.0',
+        games: [game],
+        artwork: [
+          { id: 'art-rollback', provenance: 'bundle', mime: 'image/png', dataBase64: minimalPng().toString('base64') },
+        ],
+      };
+      expect(() => ctx.bundles.importBundle(JSON.stringify(bundle))).toThrow();
+      // Nothing from the failed import may persist.
+      expect(ctx.library.get('g-rollback')).toBeNull();
+      expect(ctx.library.list()).toHaveLength(0);
+      expect(ctx.changes.listForGame('g-rollback')).toHaveLength(0);
+      expect(ctx.changes.mostRecent()).toBeNull();
+      expect(ctx.artwork.list()).toHaveLength(0);
     } finally {
       ctx.dispose();
     }
