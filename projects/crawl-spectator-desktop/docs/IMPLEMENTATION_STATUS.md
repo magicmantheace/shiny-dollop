@@ -119,3 +119,12 @@ without duplicates → follow Mira → highlights populate → replay after
 tick 1220 returns only later events → disconnect. The packaged-main
 smoke run performs the equivalent flow over real HTTP against the
 fixture server and prints `SMOKE_OK`.
+
+## Codex-review fixes, cycle 4 (2026-10-24, PR #22, FINAL)
+
+Both findings from the cycle-3 re-review verified against the code before fixing:
+
+- **Enforce the response size limit while consuming the body (P2, `feedClient.ts`):** `getJson` used `res.text()`, buffering the entire body before the `MAX_RESPONSE_BYTES` check. It now reads the body incrementally with a stream reader, counts bytes as they arrive, and cancels the request as soon as the limit is exceeded (`FEED_RESPONSE_TOO_LARGE`); the whole-request timeout still covers body consumption.
+- **Avoid counting evicted events again on overlapping polls (P2, `feedStore.ts`):** evicted event ids were deleted from `seen`, so re-polling the cursor tick (600 events at one tick against a 500 capacity) re-accepted and re-counted the same 100 evicted events on every poll. The store now remembers evictions via a bounded FIFO tombstone set plus an eviction watermark (the greatest evicted (tick, id); evictions are always a sorted prefix), and replayed evicted events are ignored instead of being accepted and counted again. `clear()` resets both.
+
+- **Verification:** `npm test` — **61/61 pass** (59 before; +2 regression tests: endless oversized body rejected with `FEED_RESPONSE_TOO_LARGE` while streaming instead of timing out, and evicted events not recounted across three replayed polls of the same 600-event tick); `npm run typecheck`, `npm run lint`, `npm run build` clean.

@@ -42,6 +42,26 @@ describe('FeedStore', () => {
     expect(store.droppedCount).toBe(991);
   });
 
+  it('does not recount evicted events when overlapping polls replay the cursor tick', () => {
+    const store = new FeedStore(500);
+    // 600 events sharing one tick: resume re-requests that whole tick,
+    // so the identical batch arrives again on every poll.
+    const batch = Array.from({ length: 600 }, (_, i) =>
+      ev(`e${String(i).padStart(4, '0')}`, 42),
+    );
+    expect(store.ingest(batch)).toBe(600);
+    expect(store.size).toBe(500);
+    expect(store.droppedCount).toBe(100);
+    for (let poll = 0; poll < 3; poll += 1) {
+      expect(store.ingest(batch)).toBe(0);
+      expect(store.size).toBe(500);
+      expect(store.droppedCount).toBe(100);
+    }
+    // Genuinely new events at a later tick are still accepted.
+    expect(store.ingest([ev('new-1', 43)])).toBe(1);
+    expect(store.droppedCount).toBe(101);
+  });
+
   it('cursor is null when empty', () => {
     expect(new FeedStore().cursorTick).toBeNull();
   });

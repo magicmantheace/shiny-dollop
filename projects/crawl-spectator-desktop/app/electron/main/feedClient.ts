@@ -75,6 +75,53 @@ export class HttpFeedClient implements FeedSource {
     this.fetchFn = options.fetchFn ?? fetch;
   }
 
+  /**
+   * Read a response body INCREMENTALLY, counting bytes as they arrive
+   * and cancelling the request the moment the safety limit is exceeded.
+   * (`res.text()` buffered the entire body before any limit could be
+   * checked, so an oversized or endless stream could exhaust memory in
+   * the main process first.)
+   */
+  private async readBodyBounded(res: Response): Promise<string> {
+    if (!res.body) {
+      const text = await res.text();
+      if (new TextEncoder().encode(text).byteLength > this.maxBytes) {
+        throw new SpectatorError(
+          'FEED_RESPONSE_TOO_LARGE',
+          `The Feed API response exceeded the ${this.maxBytes}-byte safety limit and was discarded.`,
+        );
+      }
+      return text;
+    }
+    const reader = res.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > this.maxBytes) {
+        try {
+          await reader.cancel();
+        } catch {
+          // Best effort: the request is being abandoned either way.
+        }
+        throw new SpectatorError(
+          'FEED_RESPONSE_TOO_LARGE',
+          `The Feed API response exceeded the ${this.maxBytes}-byte safety limit and was discarded.`,
+        );
+      }
+      chunks.push(value);
+    }
+    const merged = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      merged.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return new TextDecoder().decode(merged);
+  }
+
   private async getJson(path: string): Promise<unknown> {
     const controller = new AbortController();
     // The timeout must cover the WHOLE request, including consuming the
@@ -90,8 +137,9 @@ export class HttpFeedClient implements FeedSource {
         headers: { accept: 'application/json' },
         signal: controller.signal,
       });
-      text = await res.text();
+      text = await this.readBodyBounded(res);
     } catch (err) {
+      if (err instanceof SpectatorError) throw err;
       if (err instanceof Error && err.name === 'AbortError') {
         throw new SpectatorError(
           'FEED_TIMEOUT',
@@ -104,12 +152,6 @@ export class HttpFeedClient implements FeedSource {
       );
     } finally {
       clearTimeout(timer);
-    }
-    if (text.length > this.maxBytes) {
-      throw new SpectatorError(
-        'FEED_RESPONSE_TOO_LARGE',
-        `The Feed API response exceeded the ${this.maxBytes}-byte safety limit and was discarded.`,
-      );
     }
     if (res.status === 404) {
       throw new SpectatorError('FEED_NOT_FOUND', 'The Feed API reported that the requested item does not exist (404).');

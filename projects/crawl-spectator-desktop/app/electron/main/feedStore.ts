@@ -19,6 +19,21 @@ export class FeedStore {
   private readonly capacity: number;
   private events: LedgerEvent[] = [];
   private readonly seen = new Set<string>();
+  /**
+   * Deduplication state for EVICTED events. Evicted ids used to be
+   * deleted from `seen`, so when a poll re-requested the cursor tick
+   * (deliberately, for tick-granular resume) the same evicted events
+   * were accepted, evicted and counted as drops AGAIN on every poll —
+   * the loss count grew indefinitely on an idle Feed. Two bounded
+   * mechanisms now remember them:
+   *  - `evictedIds`: a FIFO tombstone set (capped, see below);
+   *  - `evictionWatermark`: the greatest (tick, id) ever evicted.
+   *    Evictions always remove a sorted prefix of the buffer, so any
+   *    replayed event at or below the watermark that is not currently
+   *    buffered was already counted once and must be ignored.
+   */
+  private readonly evictedIds = new Set<string>();
+  private evictionWatermark: LedgerEvent | null = null;
   droppedCount = 0;
   /** Catch-up windows that still filled the maximum retrieval limit after
    *  widening, so events in them may have been silently omitted by the
@@ -50,6 +65,15 @@ export class FeedStore {
     let added = 0;
     for (const event of batch) {
       if (this.seen.has(event.id)) continue;
+      // Already evicted once and counted: a replay (overlapping poll of
+      // the cursor tick) must not accept or count it again.
+      if (this.evictedIds.has(event.id)) continue;
+      if (
+        this.evictionWatermark &&
+        compareEvents(event, this.evictionWatermark) <= 0
+      ) {
+        continue;
+      }
       this.seen.add(event.id);
       this.events.push(event);
       added += 1;
@@ -59,7 +83,26 @@ export class FeedStore {
       if (this.events.length > this.capacity) {
         const excess = this.events.length - this.capacity;
         const dropped = this.events.splice(0, excess);
-        for (const event of dropped) this.seen.delete(event.id);
+        for (const event of dropped) {
+          this.seen.delete(event.id);
+          this.evictedIds.add(event.id);
+        }
+        const lastDropped = dropped[dropped.length - 1];
+        if (
+          lastDropped &&
+          (!this.evictionWatermark ||
+            compareEvents(lastDropped, this.evictionWatermark) > 0)
+        ) {
+          this.evictionWatermark = lastDropped;
+        }
+        // Bound the tombstone set itself (FIFO): the watermark above
+        // still covers anything trimmed from it, since evictions are a
+        // sorted prefix.
+        const tombstoneCap = Math.max(1024, this.capacity * 2);
+        while (this.evictedIds.size > tombstoneCap) {
+          const oldest = this.evictedIds.values().next().value as string;
+          this.evictedIds.delete(oldest);
+        }
         this.droppedCount += excess;
       }
     }
@@ -78,6 +121,8 @@ export class FeedStore {
   clear(): void {
     this.events = [];
     this.seen.clear();
+    this.evictedIds.clear();
+    this.evictionWatermark = null;
     this.droppedCount = 0;
     this.truncatedCatchUps = 0;
   }

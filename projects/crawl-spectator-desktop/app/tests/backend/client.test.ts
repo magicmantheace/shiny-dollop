@@ -81,6 +81,35 @@ describe('HttpFeedClient failure handling (raw stub servers)', () => {
     });
   });
 
+  it('enforces the size limit WHILE streaming, cancelling an endless oversized body', async () => {
+    // The body never ends and grows without bound: a client that
+    // buffers the whole body before checking the limit (res.text())
+    // can only fail via the request timeout, while an incremental
+    // reader rejects as soon as the limit is crossed.
+    const stub: Server = createServer((_req, res) => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      const chunk = 'x'.repeat(1024);
+      const timer = setInterval(() => {
+        res.write(chunk);
+      }, 5);
+      res.on('close', () => clearInterval(timer));
+    });
+    await new Promise<void>((resolve) => stub.listen(0, '127.0.0.1', () => resolve()));
+    const port = (stub.address() as { port: number }).port;
+    try {
+      const startedAt = Date.now();
+      await expect(
+        new HttpFeedClient(`http://127.0.0.1:${port}`, {
+          timeoutMs: 10_000,
+          maxResponseBytes: 4096,
+        }).health(),
+      ).rejects.toMatchObject({ code: 'FEED_RESPONSE_TOO_LARGE' });
+      expect(Date.now() - startedAt).toBeLessThan(5_000);
+    } finally {
+      await new Promise<void>((resolve) => stub.close(() => resolve()));
+    }
+  });
+
   it('rejects contract-violating payloads', async () => {
     await withStub((res) => {
       res.writeHead(200, { 'content-type': 'application/json' });
