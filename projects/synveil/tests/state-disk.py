@@ -23,7 +23,7 @@ class StateDiskTests(unittest.TestCase):
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
             self.assertEqual(run.call_count, 2)
             self.assertEqual(run.call_args_list[0].args[0], [
-                "sgdisk", "-n", "1:2048:-2048", "-t", "1:8300",
+                "sgdisk", "-n", "1:2048:+62M", "-t", "1:8300",
                 "-c", "1:Synveil State",
                 "-u", "1:7c9e2d41-8b3a-4f5e-a6d1-2e8c4b7f9053", str(path)])
             self.assertEqual(run.call_args_list[1].args[0], [

@@ -39,12 +39,13 @@ def create_state_disk(path: Path, size_mib: int) -> None:
         with os.fdopen(fd, "wb") as output:
             os.ftruncate(output.fileno(), size_mib * 1024 * 1024)
         subprocess.run(
-            ["sgdisk", "-n", "1:2048:-2048", "-t", "1:8300",
-             "-c", "1:" + STATE_PARTNAME, "-u", "1:" + STATE_PARTUUID,
-             str(path)],
+            ["sgdisk", "-n", "1:2048:+" + str(size_mib - 2) + "M",
+             "-t", "1:8300", "-c", "1:" + STATE_PARTNAME,
+             "-u", "1:" + STATE_PARTUUID, str(path)],
             check=True)
-        # Partition 1 spans from 1 MiB to 1 MiB before the end of the
-        # image (leaving room for the backup GPT), in 4 KiB blocks.
+        # Partition 1 starts at 1 MiB and is exactly (size_mib - 2) MiB:
+        # sized explicitly because an end-relative partition would stop
+        # at the backup GPT and end up smaller than the filesystem.
         fs_blocks = (size_mib - 2) * 256
         subprocess.run(
             ["mkfs.ext4", "-F", "-q", "-L", STATE_FS_LABEL, "-b", "4096",
