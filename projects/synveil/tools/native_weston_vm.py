@@ -132,6 +132,19 @@ def build():
     program = subprocess.check_output([str(tools['readelf']), '-l', str(output)], text=True)
     if 'Advanced Micro Devices X86-64' not in header or '/lib64/ld-linux-x86-64.so.2' not in program:
         raise ValueError('fixture application did not link to native target glibc')
+    # Directory modes must not depend on the builder's umask: the base
+    # rootfs builder and the asset copies inherit it, so a restrictive
+    # umask (e.g. 0007) silently produces 0770 system directories that
+    # the unprivileged fixture user cannot traverse (su: can't execute
+    # '/bin/sh'). Normalize every directory to the conventional system
+    # mode; the fixture init still tightens the private runtime
+    # directories (home, /run/user/1000) to 0700 before the session.
+    for folder, subdirs, _files in os.walk(rootfs):
+        Path(folder).chmod(0o755)
+        for name in subdirs:
+            entry = Path(folder) / name
+            if not entry.is_symlink():
+                entry.chmod(0o755)
     # Repack only the separately built Synveil root plus explicit component
     # assets. These commands address regular files; there is no loop/mount/dd
     # path to an owner disk, and no generated dependency-system rootfs import.
