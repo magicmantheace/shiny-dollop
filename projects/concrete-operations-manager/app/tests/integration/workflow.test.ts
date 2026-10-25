@@ -102,6 +102,39 @@ describe('MVP workflow', () => {
     expect(JSON.stringify({ ...getQuote(db, v1.id), status: 'issued' })).toBe(v1Snapshot);
   });
 
+  it('notes-only draft update preserves manual price overrides; explicit null resets them', () => {
+    const { jobId } = setup();
+    const draft = createQuote(db, jobId, null);
+    const overridden = updateDraft(db, draft.id, {
+      rateOverrideCentsPerM3: 20000,
+      smallLoadChargeOverrideCents: 10000,
+    });
+    expect(overridden.params.concreteRateCentsPerM3).toBe(20000);
+    expect(overridden.params.smallLoadChargeCents).toBe(10000);
+
+    // Omitting the override fields must not discard them (regression:
+    // omitted fields were converted to null and resolved to defaults
+    // 18000 / 15000, silently changing the total).
+    const notesOnly = updateDraft(db, draft.id, { notes: 'notes only' });
+    expect(notesOnly.notes).toBe('notes only');
+    expect(notesOnly.params.concreteRateCentsPerM3).toBe(20000);
+    expect(notesOnly.params.smallLoadChargeCents).toBe(10000);
+    expect(notesOnly.totalCents).toBe(overridden.totalCents);
+
+    // A single omitted field is preserved independently of the other.
+    const oneField = updateDraft(db, draft.id, { rateOverrideCentsPerM3: 21000 });
+    expect(oneField.params.concreteRateCentsPerM3).toBe(21000);
+    expect(oneField.params.smallLoadChargeCents).toBe(10000);
+
+    // Explicit null is the reset signal: back to defaults.
+    const reset = updateDraft(db, draft.id, {
+      rateOverrideCentsPerM3: null,
+      smallLoadChargeOverrideCents: null,
+    });
+    expect(reset.params.concreteRateCentsPerM3).toBe(18000);
+    expect(reset.params.smallLoadChargeCents).toBe(15000);
+  });
+
   it('issued quotes reject edits and double-issue', () => {
     const { jobId } = setup();
     const v1 = issueQuote(db, createQuote(db, jobId, null).id);

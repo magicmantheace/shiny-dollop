@@ -72,6 +72,35 @@ describe('calibration exchange envelope', () => {
     ).toThrow(/undeclared materialId/);
   });
 
+  it('preserves unknown additive fields from a compatible minor version on import (opaque round-trip)', () => {
+    db = makeTestDb();
+    // Additive optional fields at every nesting level, as a future
+    // minor version might emit. Regression: storing the Zod-parsed
+    // envelope stripped all of these on import/export.
+    const withExtras = {
+      ...VALID_ENVELOPE,
+      futureTopLevel: { anything: [1, 2, 3] },
+      units: { ...VALID_ENVELOPE.units, futureUnitNote: 'keep me' },
+      materials: [
+        { ...VALID_ENVELOPE.materials[0], futureMaterialField: 'keep me' },
+        VALID_ENVELOPE.materials[1],
+      ],
+      calibrations: [
+        { ...VALID_ENVELOPE.calibrations[0], futureCalibrationField: 99 },
+      ],
+      mixes: [
+        {
+          mixDesignId: 'C25/30',
+          nominalOnly: true as const,
+          futureMixField: 'keep me',
+          components: [{ materialId: 'cement-type10', targetPerM3: 320, futureComponentField: true }],
+        },
+      ],
+    };
+    const profile = importCalibrationProfile(db, withExtras);
+    expect(JSON.parse(profile.payloadJson)).toEqual(withExtras);
+  });
+
   it('rejects non-object and non-JSON payloads at import', () => {
     db = makeTestDb();
     expect(() => importCalibrationProfile(db, null)).toThrow(OpsError);

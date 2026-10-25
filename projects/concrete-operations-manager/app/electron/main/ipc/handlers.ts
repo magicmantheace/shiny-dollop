@@ -266,8 +266,10 @@ export function registerIpcHandlers(deps: HandlerDeps): void {
     const input = quoteUpdateDraftSchema.parse(payload);
     return updateDraft(db, input.id, {
       notes: input.notes,
-      rateOverrideCentsPerM3: input.rateOverrideCentsPerM3 ?? null,
-      smallLoadChargeOverrideCents: input.smallLoadChargeOverrideCents ?? null,
+      // Pass omission through as undefined: updateDraft preserves the
+      // existing override for omitted fields; explicit null resets it.
+      rateOverrideCentsPerM3: input.rateOverrideCentsPerM3,
+      smallLoadChargeOverrideCents: input.smallLoadChargeOverrideCents,
     });
   });
   handle(IpcChannels.quotesIssue, async (payload) => issueQuote(db, idParam.parse(payload).id));

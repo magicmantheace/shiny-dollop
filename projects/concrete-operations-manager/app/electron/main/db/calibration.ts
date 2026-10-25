@@ -105,12 +105,19 @@ export function listCalibrationProfiles(db: DatabaseSync): CalibrationProfile[] 
 export function importCalibrationProfile(db: DatabaseSync, payload: unknown): CalibrationProfile {
   const envelope = parseCalibrationEnvelope(payload);
   const now = new Date().toISOString();
+  // Store the ORIGINAL validated payload, not the Zod-parsed result:
+  // the schemas strip unknown keys, so serializing the parsed envelope
+  // silently dropped additive optional fields from compatible minor
+  // versions (extra top-level/nested fields). The payload is treated
+  // as opaque — validation only checks the known envelope — so the
+  // original JSON must round-trip through import → export intact.
+  const originalJson = JSON.stringify(payload);
   const result = db
     .prepare(
       `INSERT INTO calibration_profiles (name, format_version, payload_json, imported_at)
        VALUES (?, ?, ?, ?)`,
     )
-    .run(envelope.profileName, envelope.formatVersion, JSON.stringify(envelope), now);
+    .run(envelope.profileName, envelope.formatVersion, originalJson, now);
   const id = Number(result.lastInsertRowid);
   const row = db.prepare('SELECT * FROM calibration_profiles WHERE id = ?').get(id) as Record<string, unknown>;
   const profile = mapProfile(row);

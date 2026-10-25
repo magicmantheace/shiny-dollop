@@ -159,7 +159,11 @@ export function createQuote(db: DatabaseSync, jobId: number, notes: string | nul
 export function updateDraft(
   db: DatabaseSync,
   id: number,
-  patch: { notes?: string | null; rateOverrideCentsPerM3?: number | null; smallLoadChargeOverrideCents?: number | null },
+  patch: {
+    notes?: string | null | undefined;
+    rateOverrideCentsPerM3?: number | null | undefined;
+    smallLoadChargeOverrideCents?: number | null | undefined;
+  },
 ): Quote {
   const before = getQuote(db, id);
   if (!before) throw new OpsError(OpsErrorCodes.NOT_FOUND, `Quote #${id} does not exist.`);
@@ -176,9 +180,21 @@ export function updateDraft(
     mixDesignId: p.mixDesignId,
     liters: p.quotedLiters,
   }));
+  // Omitted override fields preserve the draft's existing effective
+  // pricing (captured in its params snapshot); only an explicit null
+  // resets an override to the customer/app defaults, and only an
+  // explicit number replaces it. Previously `?? null` turned an
+  // omission into a reset, so a notes-only edit silently discarded
+  // manual prices and changed the quote total.
   const params = resolvePricingParams(db, customer, job, {
-    rateOverrideCentsPerM3: patch.rateOverrideCentsPerM3 ?? null,
-    smallLoadChargeOverrideCents: patch.smallLoadChargeOverrideCents ?? null,
+    rateOverrideCentsPerM3:
+      patch.rateOverrideCentsPerM3 === undefined
+        ? before.params.concreteRateCentsPerM3
+        : patch.rateOverrideCentsPerM3,
+    smallLoadChargeOverrideCents:
+      patch.smallLoadChargeOverrideCents === undefined
+        ? before.params.smallLoadChargeCents
+        : patch.smallLoadChargeOverrideCents,
   });
   const totals = computeTotals(volumes, params);
   const snapshot = snapshotParams(volumes, params, false);

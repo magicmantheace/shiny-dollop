@@ -99,6 +99,31 @@ Verification: **67/67 tests pass** (`npx vitest run`, 14 files; was 64),
 under xvfb, SMOKE_OK) — which also exercises the bundled sandboxed preload
 end to end.
 
+## Codex review fix cycle 3 (2026-10-24)
+
+Two P2 findings from the re-review of `26d16b9`, both verified against the
+code and fixed with regression tests:
+
+- **Notes-only draft updates discarded manual price overrides.**
+  `updateDraft` (and the IPC handler) converted omitted override fields
+  to `null`, which resolves to customer/app defaults — so setting a rate
+  of 20000 and small-load charge of 10000 and then editing only the
+  notes reverted them to 18000 / 15000 and changed the quote total.
+  Omitted fields now preserve the draft's existing effective pricing
+  from its params snapshot; explicit `null` remains the reset signal.
+  Regression test in `tests/integration/workflow.test.ts`.
+- **Calibration import stripped unknown fields.** The stored payload
+  was the Zod-parsed envelope, whose schemas strip unknown keys, so
+  additive optional fields from a compatible minor version were lost
+  on an import → export round-trip, contrary to the documented
+  minor-version policy in `docs/CALIBRATION_EXCHANGE.md`.
+  `importCalibrationProfile` now stores the original validated payload
+  JSON verbatim. Regression test in
+  `tests/integration/calibration.test.ts`.
+
+Verification: **69/69 tests pass** (`npx vitest run`, 14 files; was 67),
+`npm run typecheck` and `npm run lint` clean.
+
 ## Next action
 
 Owner review of the PR; Windows-side validation (installer, portable zip,
