@@ -1,6 +1,6 @@
 # Local AI Command Center
 
-**Status:** PLANNED — project definition only; no working application is implemented by this intake commit.
+**Status:** MVP FUNCTIONAL / REVIEW READY — working application in `app/` on branch `local-ai-command-center/mvp` (unmerged). 38/38 automated tests pass; end-to-end workflow verified via the packaged main's smoke mode on Linux. Windows 11 behavior is implemented but not verified on target OS. See [implementation status](docs/IMPLEMENTATION_STATUS.md).
 
 **Priority:** 13 of 17 in the approved intake queue.
 **Category:** AI operations desktop
