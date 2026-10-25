@@ -1,6 +1,6 @@
 # Procedural Dungeon Designer
 
-**Status:** PLANNED — project definition only; no working application is implemented by this intake commit.
+**Status:** MVP FUNCTIONAL / REVIEW READY — deterministic seeded dungeon generator with budgets, editor, persistence and versioned export, implemented and verified on Linux (see `docs/IMPLEMENTATION_STATUS.md`). Windows 11 behavior is implemented but not verified on target OS.
 
 **Priority:** 15 of 17 in the approved intake queue.
 **Category:** Game design / tabletop
