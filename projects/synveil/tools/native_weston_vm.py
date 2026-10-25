@@ -99,13 +99,21 @@ def build():
     config = rootfs / 'etc/synveil'
     config.mkdir(exist_ok=True)
     shutil.copyfile(FIXTURE / 'weston.ini', config / 'weston-vm.ini')
+    (config / 'weston-vm.ini').chmod(0o644)
     (config / 'native-weston-vm-only').write_text('disposable QEMU fixture; not owner authentication\n')
+    (config / 'native-weston-vm-only').chmod(0o644)
     # Own fixed, locked fixture identities. The recipe builder's account files
     # are never imported; no credential enrollment or root serial shell exists.
     (rootfs / 'etc/passwd').write_text(
         'root:x:0:0:root:/root:/bin/false\n'
         'synveil:x:1000:1000:Synveil VM fixture:/home/synveil:/bin/sh\n')
     (rootfs / 'etc/group').write_text('root:x:0:\nseat:x:1000:synveil\n')
+    # Account databases and the fixture config above are read by the
+    # unprivileged session user; like the directory modes, their file
+    # modes must not be left to the builder's umask (0660 under 0007
+    # made weston-vm.ini unreadable and weston exited fatally).
+    (rootfs / 'etc/passwd').chmod(0o644)
+    (rootfs / 'etc/group').chmod(0o644)
     (rootfs / 'etc/shadow').write_text('root:!:0:0:99999:7:::\nsynveil:!:0:0:99999:7:::\n')
     (rootfs / 'etc/shadow').chmod(0o600)
     generated = OUT / 'generated'
