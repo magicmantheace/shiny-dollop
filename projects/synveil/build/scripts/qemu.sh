@@ -87,11 +87,18 @@ else
 fi
 
 # State is a second, separately writable disk; EFI remains read-only.
+# SYNVEIL_QEMU_STATE_USB=1 attaches it over usb-storage instead of
+# virtio-blk: the physical install target is a USB SSD, whose
+# enumeration timing the state mount must tolerate (ADR 0019).
 if [[ -n "$STATE_DISK" ]]; then
     QEMU_ARGS+=(
         -drive "if=none,id=synveil_state,file=$STATE_DISK,format=raw,readonly=off"
-        -device "virtio-blk-pci,drive=synveil_state"
     )
+    if [[ "${SYNVEIL_QEMU_STATE_USB:-0}" == 1 ]]; then
+        QEMU_ARGS+=(-device "usb-storage,drive=synveil_state")
+    else
+        QEMU_ARGS+=(-device "virtio-blk-pci,drive=synveil_state")
+    fi
 fi
 
 if [[ -r /dev/kvm && "${SYNVEIL_QEMU_TCG:-0}" != 1 ]]; then
