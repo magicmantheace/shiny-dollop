@@ -62,7 +62,7 @@ blkid, or extra tooling in the initramfs, and the kernel emits each
 identity key at most once; duplicate or conflicting identity keys are
 treated as ambiguous and rejected.
 
-One residual constraint: the state partition must be on a device the
-kernel has probed before the initramfs mount step (true for the install
-image's own disk and for virtio/ATA/NVMe state disks). A state volume
-on a late-enumerated USB device is not supported by this policy.
+One residual constraint at the time of this ADR: the state partition
+had to be on a device the kernel probed before the initramfs mount
+step. ADR 0019 supersedes that constraint with a bounded wait for
+late-enumerating (USB) media.
