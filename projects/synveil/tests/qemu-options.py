@@ -150,6 +150,16 @@ with open(os.environ["SYNVEIL_TEST_DISK"], "w") as disk:
         self.assertNotIn("virtio-vga", args)
         self.assertNotIn("virtio-net-pci,netdev=synveil_net", args)
 
+    def test_boot_image_read_only_unless_explicitly_writable(self):
+        _, args = self.invoke()
+        drives = [arg for arg in args if "id=synveil_disk" in arg]
+        self.assertEqual(len(drives), 1)
+        self.assertIn("readonly=on", drives[0])
+        _, args = self.invoke({"SYNVEIL_QEMU_IMAGE_WRITABLE": "1"})
+        drives = [arg for arg in args if "id=synveil_disk" in arg]
+        self.assertEqual(len(drives), 1)
+        self.assertIn("readonly=off", drives[0])
+
     def test_graphics_and_network_devices_are_opt_in(self):
         result, args = self.invoke({"SYNVEIL_QEMU_DISPLAY": "gtk",
                                     "SYNVEIL_QEMU_NETWORK": "1"})

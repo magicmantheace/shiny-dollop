@@ -33,6 +33,13 @@ STATE_DISK="${SYNVEIL_QEMU_STATE_DISK:-}"
 if [[ -n "$STATE_DISK" ]]; then
     [[ -f "$STATE_DISK" && ! -L "$STATE_DISK" ]] || die "state disk must be a regular file: $STATE_DISK"
 fi
+# The boot image is firmware and stays read-only. The single exception is
+# an explicit test opt-in for the joined image, whose state partition
+# lives inside the boot image itself (ADR 0017) and must persist.
+IMAGE_WRITABLE="${SYNVEIL_QEMU_IMAGE_WRITABLE:-0}"
+[[ "$IMAGE_WRITABLE" == 0 || "$IMAGE_WRITABLE" == 1 ]] || die "SYNVEIL_QEMU_IMAGE_WRITABLE must be 0 or 1"
+IMAGE_READONLY=on
+[[ "$IMAGE_WRITABLE" == 1 ]] && IMAGE_READONLY=off
 
 QEMU_MACHINE=q35
 if [[ "$DISPLAY_BACKEND" != none || "$VIDEO" == 1 ]]; then
@@ -55,7 +62,7 @@ QEMU_ARGS=(
     -serial stdio
     -monitor none
     -no-reboot
-    -drive "if=none,id=synveil_disk,file=$IMAGE,format=raw,readonly=on"
+    -drive "if=none,id=synveil_disk,file=$IMAGE,format=raw,readonly=$IMAGE_READONLY"
     -device "virtio-blk-pci,drive=synveil_disk,bootindex=1"
 )
 
