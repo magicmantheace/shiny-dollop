@@ -4,7 +4,7 @@
 - **Priority:** 1/17
 - **Source/code implemented:** Full MVP in `projects/game-save-manager/app/` (Electron 45 + React 19 + TypeScript strict + Vite, `node:sqlite`, zod-validated IPC)
 - **Build validated:** Yes — `npm run typecheck`, `lint`, `build`, `smoke` all green on Linux (2026-10-23), independently re-run by reviewer
-- **Automated tests executed:** Yes — **84/84 pass** (60 backend with real fs fixtures + 24 UI), 2026-10-24
+- **Automated tests executed:** Yes — **88/88 pass** (62 backend with real fs fixtures + 26 UI), 2026-10-24
 - **End-to-end MVP verified:** Yes on Linux via automated tests on real fixtures (backup → modify → restore → byte-identical recovery); **pending on real Windows hardware** per the test plan's platform-gating rule
 - **Owner review:** Pending — PR shiny-dollop #4 open and unmerged
 
@@ -28,6 +28,14 @@ Both findings from the second Codex review of PR #4 were verified real and fixed
 2. **Save folders containing the backup destination:** `createBackup` walked the save folder with no overlap check, so a manually registered folder containing `backupsRoot` swept every previous backup into each new snapshot (1, 3, 7, 15, … files). `createBackup` (and `restoreBackup`, before its safety step) now reject overlapping source/destination roots with the new `BACKUP_DESTINATION_OVERLAPS_SAVE_DIR` code — in either direction — before anything is walked or written.
 
 New regression tests (5): restore-after-deletion recovery with empty safety snapshot (which itself verifies clean); restore rejection when the save path is a regular file; restore rejection when the destination is unreachable (ancestor not a directory); overlap rejection for a save folder containing backup storage; overlap rejection for a save folder inside backup storage. Full suite: **84/84 pass**, typecheck and lint clean (2026-10-24, Linux VM).
+
+## Codex-review fixes, cycle 3 (2026-10-24, on `game-save-manager/initial-development`)
+
+The single finding from the third Codex review of PR #4 was verified real and fixed:
+
+1. **UNC syntax broken when prefixing long Windows paths:** `withLongPathPrefix` prepended `\\?\` directly to the resolved path, so a long UNC path `\\server\share\...` became the invalid `\\?\\server\share\...` instead of `\\?\UNC\server\share\...` — saves on network shares at ≥240 chars were rejected/skipped. The conversion now lives in the exported, platform-independent `win32LongPathPrefix` helper (built on `path.win32` semantics so it is testable on Linux) and delegates the namespacing to `path.win32.toNamespacedPath()` once the ≥240-char threshold is met; already-namespaced paths are returned untouched and short paths keep their previous resolved-but-unprefixed form. Windows filesystem behaviour itself was not executed — still pending real-Windows validation.
+
+New regression tests (4, `tests/unit/long-path.test.ts`): long UNC → `\\?\UNC\` form (cross-checked against `path.win32.toNamespacedPath()`); long drive-letter → `\\?\` form; short UNC/drive paths unprefixed; already-namespaced long paths untouched. Full suite: **88/88 pass** (62 backend + 26 UI; baseline 84), typecheck and lint clean (2026-10-24, Linux VM).
 
 ## First milestone
 

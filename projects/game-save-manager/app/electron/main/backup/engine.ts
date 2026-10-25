@@ -64,15 +64,30 @@ function isConflictCopy(baseName: string): boolean {
 }
 
 /**
+ * Win32 long-path conversion, expressed with `path.win32` semantics so it
+ * is testable on any platform. Only paths at/over the length threshold are
+ * namespaced; shorter paths are returned resolved but otherwise unchanged.
+ *
+ * UNC paths need the extended form `\\?\UNC\server\share\...`: naively
+ * prepending `\\?\` to `\\server\share\...` produces the invalid
+ * `\\?\\server\share\...`. `path.win32.toNamespacedPath()` performs the
+ * correct conversion for drive-letter, UNC, and device paths (and leaves
+ * already-namespaced paths untouched), so delegate to it.
+ */
+export function win32LongPathPrefix(p: string): string {
+  const absolute = path.win32.resolve(p);
+  if (absolute.startsWith('\\\\?\\')) return absolute;
+  return absolute.length >= 240 ? path.win32.toNamespacedPath(absolute) : absolute;
+}
+
+/**
  * On win32, prefix over-long absolute paths with \\?\ so CreateFileW accepts
  * them. No-op on other platforms (and on win32 for short paths).
  * NOTE: pending validation on real Windows — see IMPLEMENTATION_TRACKER.md.
  */
 export function withLongPathPrefix(p: string): string {
   if (process.platform !== 'win32') return p;
-  if (p.startsWith('\\\\?\\')) return p;
-  const absolute = path.resolve(p);
-  return absolute.length >= 240 ? `\\\\?\\${absolute}` : absolute;
+  return win32LongPathPrefix(p);
 }
 
 /** Recursively list files under dir. Unreadable/locked files are skipped, never fatal. */
