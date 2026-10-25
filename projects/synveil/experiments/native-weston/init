@@ -34,7 +34,7 @@ chmod 0755 /run/user /home /var/cache || fail
 chown 1000:1000 /run/user/1000 /home/synveil /var/cache/fontconfig || fail
 chmod 0700 /run/user/1000 /home/synveil
 hostname synveil-vm
-for daemon in /lib/udev/udevd /usr/lib/udev/udevd; do
+for daemon in /sbin/udevd /lib/udev/udevd /usr/lib/udev/udevd; do
     [ -x "$daemon" ] && "$daemon" --daemon && break
 done
 udevadm trigger --action=add || fail
