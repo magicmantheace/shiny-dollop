@@ -7,6 +7,14 @@ This record separates what was **actually rerun in this repository and
 environment** from historical upstream evidence, which remains labeled
 historical and is not repeated here.
 
+> **Correction (2026-10-25, commit `d208b7c`):** the "2 blocked
+> (`qemu-lock`, `qemu-options`)" framing below was wrong. Those are
+> host-fixture checks that never needed a built image; the
+> image-provenance gate in `tools/offline_checks.py` was misapplied to
+> them by name prefix. The gate now covers only genuine guest entries,
+> and both tiers pass outright (quick 27/27, host 30/30). See
+> `docs/validation/qemu-desktop-auth-f48771c/`.
+
 ## Environment
 
 - Linux VM, 2 CPUs, 7 GiB RAM, x86_64; shell umask **0007** (this matters —
