@@ -58,10 +58,28 @@ def weston_proof(qmp: Path, folder: Path, *, full: bool) -> bool:
         count += 1
         return weston_smoke.screenshot(qmp, folder, count)
 
+    def valid_frame(timeout_s):
+        # Before Weston presents its first frame (and briefly while it
+        # repaints) the scanout is blank and the weston helper raises;
+        # that is "not ready", not a proof failure. Poll for a real
+        # frame instead of aborting the whole acceptance.
+        end = time.monotonic() + timeout_s
+        while True:
+            try:
+                return frame()
+            except ValueError:
+                if time.monotonic() >= end:
+                    raise
+                time.sleep(0.25)
+
     deadline = time.monotonic() + 120
     initial = None
     while time.monotonic() < deadline:
-        width, height, data = frame()
+        try:
+            width, height, data = frame()
+        except ValueError:
+            time.sleep(0.25)
+            continue
         window = weston_smoke.original_window(width, height, data)
         if window and weston_smoke.terminal_pixels_visible(width, height, data, window):
             initial = (width, height, window)
@@ -75,7 +93,7 @@ def weston_proof(qmp: Path, folder: Path, *, full: bool) -> bool:
     weston_smoke.drag(qmp, width, height, (x + 30, y + 14),
                       (x + 30 + dx, y + 14 + dy))
     time.sleep(0.3)
-    frame_data = frame()
+    frame_data = valid_frame(10)
     moved = weston_smoke.original_window(*frame_data)
     if not moved or abs(moved[0] - x) < 30 or abs(moved[1] - y) < 20:
         return False
@@ -86,7 +104,7 @@ def weston_proof(qmp: Path, folder: Path, *, full: bool) -> bool:
         weston_smoke.drag(qmp, width, height, (x + w - 10, y + h - 10),
                           (x + w - 10 + dx, y + h - 10 + dy))
         time.sleep(0.3)
-        frame_data = frame()
+        frame_data = valid_frame(10)
         resized = weston_smoke.original_window(*frame_data)
         if not resized or abs(resized[2] - w) < 20 or abs(resized[3] - h) < 20:
             return False
@@ -96,12 +114,15 @@ def weston_proof(qmp: Path, folder: Path, *, full: bool) -> bool:
     send_keys(qmp, ('esc',), timeout=5)
     deadline = time.monotonic() + 60
     while time.monotonic() < deadline:
-        if weston_smoke.original_window(*frame()) is None:
-            break
+        try:
+            if weston_smoke.original_window(*frame()) is None:
+                break
+        except ValueError:
+            break  # blank scanout: the window is gone with the desktop
         time.sleep(0.25)
     else:
         return False
-    frame_data = frame()
+    frame_data = valid_frame(10)
     try:
         tx, ty = weston_smoke.terminal_point(*frame_data)
     except RuntimeError:
