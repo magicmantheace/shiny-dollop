@@ -78,6 +78,23 @@ Choose a directory, view ranked file/folder sizes and verified duplicate groups,
 - Full suite after the fixes: 90/90 tests pass (11 files, +7 new);
   `npm run typecheck` and `npm run lint` green.
 
+## Codex fix cycle 3 (2026-10-24, Linux VM, Node 24)
+
+- Folder sizes in `getSummary` are now descendant totals: each file's size
+  and count accumulate into its immediate parent AND every ancestor up to
+  (and including) the scan root, instead of only the immediate parent.
+  Previously a folder containing only subfolders (e.g. `/data/large` holding
+  `part1/` + `part2/` at 600 bytes each) was absent from the ranking while
+  a flat 900-byte folder ranked first; both the Results view and exported
+  reports (which share `getSummary`) now show the containing folders.
+  Accumulation stops at the scan root — nothing above it is synthesized.
+  One existing assertion was updated for the corrected semantics (the scan
+  root now aggregates its subfolders and ranks first). Regression test
+  mirrors the review fixture (large = 1200 bytes / 2 files, outranking
+  small = 900) and was verified failing pre-fix.
+- Full suite after the fix: 91/91 tests pass (11 files, +1 new);
+  `npm run typecheck` and `npm run lint` green.
+
 ## Pending (platform)
 
 - Real Electron window launch + live end-to-end scan on Windows (unverified here).

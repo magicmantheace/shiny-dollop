@@ -208,6 +208,15 @@ const LARGEST_FILES_LIMIT = 100;
 const DIR_SIZES_LIMIT = 100;
 export const SEARCH_RESULT_LIMIT = 500;
 
+/** Normalize a directory path for ancestor comparison (no trailing separator, except the filesystem root itself). */
+function normalizeDir(dirPath: string): string {
+  const normalized = path.normalize(dirPath);
+  const root = path.parse(normalized).root;
+  return normalized.length > root.length && normalized.endsWith(path.sep)
+    ? normalized.slice(0, -path.sep.length)
+    : normalized;
+}
+
 function extensionOf(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase();
   return ext; // "" when the file has no extension
@@ -229,14 +238,27 @@ export function getSummary(db: DatabaseSync, scanId: number): ResultsSummary {
     .prepare('SELECT path, size_bytes FROM files WHERE scan_id = ? AND is_symlink = 0')
     .all(scanId) as Array<{ path: string; size_bytes: number }>;
 
+  // Folder sizes are DESCENDANT totals: each file contributes its size and
+  // count to its immediate parent AND to every ancestor directory up to
+  // (and including) the scan root. Counting only the immediate parent made
+  // folders containing only subfolders vanish from the ranking entirely —
+  // e.g. /data/large holding part1/ + part2/ at 600 bytes each never
+  // appeared, while a flat /data/small at 900 bytes ranked first.
+  const scanRoot = scan ? normalizeDir(scan.root_path) : null;
   const dirAgg = new Map<string, { bytes: number; files: number }>();
   const typeAgg = new Map<string, { files: number; bytes: number }>();
   for (const row of rows) {
-    const dir = path.dirname(row.path);
-    const d = dirAgg.get(dir) ?? { bytes: 0, files: 0 };
-    d.bytes += row.size_bytes;
-    d.files += 1;
-    dirAgg.set(dir, d);
+    let dir = path.dirname(row.path);
+    for (;;) {
+      const d = dirAgg.get(dir) ?? { bytes: 0, files: 0 };
+      d.bytes += row.size_bytes;
+      d.files += 1;
+      dirAgg.set(dir, d);
+      if (scanRoot !== null && dir === scanRoot) break;
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
 
     const ext = extensionOf(row.path);
     const t = typeAgg.get(ext) ?? { files: 0, bytes: 0 };

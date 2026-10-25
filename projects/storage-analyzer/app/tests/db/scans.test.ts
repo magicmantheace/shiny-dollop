@@ -121,8 +121,15 @@ describe('summary queries', () => {
     expect(dirA).toEqual({ path: '/data/a', bytes: 1000, files: 2 });
     const dirB = summary.dirSizes.find((d) => d.path === '/data/b');
     expect(dirB).toEqual({ path: '/data/b', bytes: 75, files: 2 });
+    // Folder sizes are descendant totals up to the scan root: /data itself
+    // aggregates both subfolders and therefore ranks first.
+    expect(summary.dirSizes.find((d) => d.path === '/data')).toEqual({
+      path: '/data',
+      bytes: 1075,
+      files: 4,
+    });
     // ranked by bytes desc
-    expect(summary.dirSizes[0]?.path).toBe('/data/a');
+    expect(summary.dirSizes[0]?.path).toBe('/data');
 
     const iso = summary.typeSummary.find((t) => t.ext === '.iso');
     expect(iso).toEqual({ ext: '.iso', files: 1, bytes: 900 });
@@ -130,6 +137,43 @@ describe('summary queries', () => {
     expect(txt).toEqual({ ext: '.txt', files: 2, bytes: 150 }); // case-insensitive
     const none = summary.typeSummary.find((t) => t.ext === '');
     expect(none).toEqual({ ext: '', files: 1, bytes: 25 });
+    db.close();
+  });
+
+  it('includes descendant files when calculating folder sizes (regression)', () => {
+    const db = makeTestDb();
+    const scanId = createScan(db, '/data');
+    // /data/large contains ONLY subfolders: part1 and part2 at 600 bytes each.
+    recordFile(db, scanId, '/data/large/part1/blob-a.bin', 600, false);
+    recordFile(db, scanId, '/data/large/part2/blob-b.bin', 600, false);
+    recordFile(db, scanId, '/data/small/blob-c.bin', 900, false);
+    updateScanCounters(db, scanId, { files: 3, dirs: 4, bytes: 2100, excluded: 0, symlinks: 0, changed: 0, errors: 0 });
+
+    const summary = getSummary(db, scanId);
+    // Before the fix /data/large was absent entirely (each file counted only
+    // toward its immediate parent) and /data/small ranked first.
+    expect(summary.dirSizes.find((d) => d.path === '/data/large')).toEqual({
+      path: '/data/large',
+      bytes: 1200,
+      files: 2,
+    });
+    expect(summary.dirSizes.find((d) => d.path === '/data/large/part1')).toEqual({
+      path: '/data/large/part1',
+      bytes: 600,
+      files: 1,
+    });
+    // The largest CONTAINING folder outranks the flat 900-byte folder, and
+    // accumulation stops at the scan root (no '/' entry above it).
+    const largeIdx = summary.dirSizes.findIndex((d) => d.path === '/data/large');
+    const smallIdx = summary.dirSizes.findIndex((d) => d.path === '/data/small');
+    expect(largeIdx).toBeGreaterThanOrEqual(0);
+    expect(smallIdx).toBeGreaterThan(largeIdx);
+    expect(summary.dirSizes.find((d) => d.path === '/')).toBeUndefined();
+    expect(summary.dirSizes.find((d) => d.path === '/data')).toEqual({
+      path: '/data',
+      bytes: 2100,
+      files: 3,
+    });
     db.close();
   });
 });
