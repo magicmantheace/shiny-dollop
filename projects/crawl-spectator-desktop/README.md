@@ -1,6 +1,6 @@
 # Crawl Live Spectator Desktop
 
-**Status:** PLANNED — project definition only; no working application is implemented by this intake commit.
+**Status:** MVP FUNCTIONAL / REVIEW READY — working application implemented on branch `crawl-spectator-desktop/mvp` (see [implementation status](docs/IMPLEMENTATION_STATUS.md)).
 
 **Priority:** 17 of 17 in the approved intake queue.
 **Category:** Underreach spectator client
@@ -25,9 +25,29 @@ Connect to a running local Underreach Feed API, display real Descenders, select 
 - Replay browser and highlights
 - Archived Descent navigation
 
-## Proposed implementation direction
+## Implementation
 
-Desktop client with typed, versioned read-only API adapter and reconnect handling; use existing Underreach Feed contracts. Muse must confirm feasibility before committing to framework choices.
+Electron + React + TypeScript (strict) desktop client under `app/`, with a
+typed, zod-validated read-only adapter for the public Feed API contract
+(derived in [docs/FEED_API_CONTRACT.md](docs/FEED_API_CONTRACT.md)),
+reconnect with backoff and tick-cursor resume, a bounded live Ledger
+buffer, local-only follow preferences (SQLite), a replay browser, and
+locally computed highlights. A deterministic demo mode with invented
+fixture Descenders is built in and is always labeled DEMO in the UI —
+it is never presented as live data.
+
+### Run it
+
+```bash
+cd app
+npm ci
+npm run build
+npx electron .        # or: npm run smoke  (headless acceptance walkthrough)
+```
+
+In the app: enter your local Feed API base URL and **Connect live**, or
+**Start demo** to explore with fixture data. Development: `npm test`,
+`npm run typecheck`, `npm run lint`.
 
 ## Dependencies and boundaries
 
