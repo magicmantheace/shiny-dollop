@@ -99,10 +99,7 @@ fn state_mount_device(mounts: &str) -> Option<String> {
         if target != "/var" {
             continue;
         }
-        matching = match matching.checked_add(1) {
-            Some(value) => value,
-            None => return None,
-        };
+        matching = matching.checked_add(1)?;
         let fs_type = fields.next();
         let mount_flags = fields.next().unwrap_or("");
         let writable = mount_flags.split(',').any(|flag| flag == "rw");
@@ -111,11 +108,7 @@ fn state_mount_device(mounts: &str) -> Option<String> {
         }
         found = Some(device.to_string());
     }
-    if matching == 1 {
-        found
-    } else {
-        None
-    }
+    if matching == 1 { found } else { None }
 }
 
 fn uevent_is_state_partition(uevent: &str) -> bool {
@@ -310,10 +303,7 @@ mod tests {
     fn only_unique_writable_var_mount_names_the_credential_device() {
         let expected =
             "/dev/vda / ext4 rw,relatime 0 0\n/dev/vdb1 /var ext4 rw,nosuid,nodev,noatime 0 0\n";
-        assert_eq!(
-            state_mount_device(expected).as_deref(),
-            Some("/dev/vdb1")
-        );
+        assert_eq!(state_mount_device(expected).as_deref(), Some("/dev/vdb1"));
         // The device name itself is not the authority at this layer: any
         // name is returned and must still pass the GPT identity check
         // before a credential is touched.
