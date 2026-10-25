@@ -246,7 +246,7 @@ def build(*, resume=False):
         # unrelated packages. This is build caching, not runtime evidence.
         if list((build_dir / "build").glob("cairo-*/.stamp_configured")):
             run(base + ["cairo-reconfigure"], env=env)
-    run(base + ["-j4", "weston", "dejavu"], env=env)
+    run(base + ["-j4", "weston", "dejavu", "util-linux"], env=env)
     target = build_dir / "target"
     required = ("usr/bin/weston", "usr/bin/weston-terminal", "usr/bin/weston-simple-shm",
                 "usr/libexec/weston-desktop-shell")
