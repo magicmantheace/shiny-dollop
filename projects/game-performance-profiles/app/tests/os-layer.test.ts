@@ -18,8 +18,13 @@ import {
 import {
   assertNoResolvedProcessDenied,
   buildSetPriorityByIdScript,
+  buildSetPriorityByIdentityScript,
+  identityOf,
   normalizePriorityClassName,
   parseResolvedProcesses,
+  planPriorityRestore,
+  PriorityRecoveryLog,
+  type ResolvedProcess,
 } from '../electron/main/os-layer/windows.js';
 
 const HIGH_PERF = '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c';
@@ -184,12 +189,97 @@ describe('Windows resolved-process handling (per-instance priority)', () => {
     expect(() => buildSetPriorityByIdScript(1.5, 'High')).toThrow();
   });
 
+  it('parses creation-time ticks when present and stays compatible with 3-field lines', () => {
+    const procs = parseResolvedProcesses('111|game|Normal|639231234560000000\r\n222|game|Idle\n');
+    expect(procs).toEqual([
+      { id: 111, processName: 'game', priorityClass: 'Normal', startTimeTicks: '639231234560000000' },
+      { id: 222, processName: 'game', priorityClass: 'Idle' },
+    ]);
+  });
+
   it('normalizes .NET priority class names to the journal format', () => {
     expect(normalizePriorityClassName('AboveNormal')).toBe('above-normal');
     expect(normalizePriorityClassName('BelowNormal')).toBe('below-normal');
     expect(normalizePriorityClassName('Normal')).toBe('normal');
     expect(normalizePriorityClassName('High')).toBe('high');
     expect(normalizePriorityClassName('Idle')).toBe('idle');
+  });
+});
+
+describe('Windows process identity across priority changes and restoration', () => {
+  // The Codex scenario: instance A (pid 111, Normal) is the one activation
+  // changed; instance B (pid 222, Idle) of the same executable was never
+  // touched. A exits before rollback. Restoration must NOT write A's
+  // recorded Normal onto B.
+  const instanceA: ResolvedProcess = {
+    id: 111,
+    processName: 'game',
+    priorityClass: 'Normal',
+    startTimeTicks: '639231234560000000',
+  };
+  const instanceB: ResolvedProcess = {
+    id: 222,
+    processName: 'game',
+    priorityClass: 'Idle',
+    startTimeTicks: '639231240000000000',
+  };
+
+  it('recovery log retains the selected PID + creation identity for the recorded before-value', () => {
+    const log = new PriorityRecoveryLog();
+    log.record('game.exe', identityOf(instanceA), 'normal');
+    expect(log.find('game.exe', 'normal')).toEqual({ id: 111, startTimeTicks: '639231234560000000' });
+    expect(log.find('GAME.EXE', 'normal')).toEqual({ id: 111, startTimeTicks: '639231234560000000' });
+    expect(log.find('game.exe', 'idle')).toBeUndefined();
+    log.consume('game.exe', 'normal');
+    expect(log.find('game.exe', 'normal')).toBeUndefined();
+  });
+
+  it('stacked activations of one executable unwind newest-first per before-value', () => {
+    const log = new PriorityRecoveryLog();
+    log.record('game.exe', identityOf(instanceA), 'normal');
+    log.record('game.exe', identityOf(instanceA), 'high');
+    expect(log.find('game.exe', 'high')).toEqual(identityOf(instanceA));
+    log.consume('game.exe', 'high');
+    expect(log.find('game.exe', 'normal')).toEqual(identityOf(instanceA));
+  });
+
+  it('plans a set on the recorded instance even when it is not the first resolved', () => {
+    const plan = planPriorityRestore([instanceB, instanceA], identityOf(instanceA));
+    expect(plan).toEqual({ action: 'set', target: instanceA });
+  });
+
+  it('plans GONE (touch nothing) when the recorded instance exited and only a replacement remains', () => {
+    const plan = planPriorityRestore([instanceB], identityOf(instanceA));
+    expect(plan).toEqual({ action: 'gone' });
+  });
+
+  it('plans GONE when the pid was reused by a process with a different creation time', () => {
+    const reused: ResolvedProcess = { ...instanceA, startTimeTicks: '639232000000000000' };
+    const plan = planPriorityRestore([reused, instanceB], identityOf(instanceA));
+    expect(plan).toEqual({ action: 'gone' });
+  });
+
+  it('without retained identity, restores only an unambiguous single instance', () => {
+    expect(planPriorityRestore([instanceB], undefined)).toEqual({ action: 'set', target: instanceB });
+    expect(planPriorityRestore([instanceA, instanceB], undefined)).toEqual({ action: 'ambiguous' });
+  });
+
+  it('identity set script re-verifies creation ticks before mutating', () => {
+    const script = buildSetPriorityByIdentityScript(instanceA, 'Normal');
+    expect(script).toContain('Get-Process -Id 111');
+    expect(script).toContain('StartTime.ToUniversalTime().Ticks -ne 639231234560000000');
+    expect(script).toContain('identity-changed');
+    expect(script).toContain('ProcessPriorityClass]::Normal');
+    expect(script).not.toContain('Get-Process -Name');
+  });
+
+  it('identity set script degrades to pid-only when creation ticks are unknown', () => {
+    const noTicks: ResolvedProcess = { id: 222, processName: 'game', priorityClass: 'Idle' };
+    const script = buildSetPriorityByIdentityScript(noTicks, 'Idle');
+    expect(script).toContain('Get-Process -Id 222');
+    expect(script).not.toContain('StartTime');
+    const zeroTicks: ResolvedProcess = { ...noTicks, startTimeTicks: '0' };
+    expect(buildSetPriorityByIdentityScript(zeroTicks, 'Idle')).not.toContain('StartTime');
   });
 });
 

@@ -19,7 +19,14 @@
  *                         protected processes), the denylist is re-checked
  *                         against every resolved process, and reads/sets
  *                         address ONE instance by process id so other
- *                         instances' priorities are never touched.
+ *                         instances' priorities are never touched. The
+ *                         selected instance's identity (process id +
+ *                         creation-time ticks) is retained as recovery
+ *                         state at apply() time; restore() re-targets
+ *                         exactly that identity and touches NOTHING when
+ *                         the original instance has exited (or its pid has
+ *                         been reused), instead of re-resolving the image
+ *                         name onto a surviving replacement instance.
  * - Fullscreen optim.:    per-game values GameDVR_DXGIHonorFSEWindowsCompatible
  *                         and GameDVR_FSEBehaviorMode under
  *                         HKCU\System\GameConfigStore\Children\<game-key>.
@@ -83,6 +90,14 @@ export class WindowsOsLayer implements OsLayer {
 
   /** Cached probe results; apply() refuses anything probed unsupported. */
   private capabilitiesCache: Capability[] | undefined;
+
+  /**
+   * Process-priority recovery state: for each image name, the stack of
+   * instances apply() actually mutated (identity + the priority recorded
+   * just before the mutation). restore() consumes the matching entry and
+   * re-targets that exact instance — never a same-name replacement.
+   */
+  private priorityRecovery = new PriorityRecoveryLog();
 
   private requireWin32(): void {
     if (process.platform !== 'win32') {
@@ -228,7 +243,7 @@ export class WindowsOsLayer implements OsLayer {
         const image = (params['imageName'] ?? '').trim();
         assertValidProcessImageName(image);
         const priority = normalizePriority(params['priority'] ?? '');
-        await this.setPriorityRaw(image, priority);
+        await this.applyPriorityRaw(image, priority);
         return;
       }
       case 'fullscreen-optimizations': {
@@ -260,7 +275,7 @@ export class WindowsOsLayer implements OsLayer {
         const image = (params['imageName'] ?? '').trim();
         assertValidProcessImageName(image);
         const restored = restorePriorityFromString(value);
-        await this.setPriorityRaw(image, restored);
+        await this.restorePriorityRaw(image, restored);
         return;
       }
       case 'fullscreen-optimizations': {
@@ -322,7 +337,9 @@ export class WindowsOsLayer implements OsLayer {
 
   /**
    * Resolve every running instance of the (already wildcard-validated,
-   * literal) image name to its identity: id, process name, priority class.
+   * literal) image name to its identity: id, process name, priority class,
+   * and creation-time ticks (0 when StartTime is not readable for that
+   * instance — identity then degrades to the process id alone).
    * Resolution is a read — nothing is mutated here.
    */
   private async resolveProcessesRaw(imageName: string): Promise<ResolvedProcess[]> {
@@ -331,7 +348,8 @@ export class WindowsOsLayer implements OsLayer {
       '-NoProfile', '-NonInteractive', '-Command',
       `$ps=Get-Process -Name '${psEscape(baseName(imageName))}' -ErrorAction SilentlyContinue;` +
         'if (-not $ps) { throw "not-found" };' +
-        '$ps | ForEach-Object { "$($_.Id)|$($_.ProcessName)|$($_.PriorityClass.ToString())" }',
+        '$ps | ForEach-Object { $t=0; try { $t=$_.StartTime.ToUniversalTime().Ticks } catch {}; ' +
+        '"$($_.Id)|$($_.ProcessName)|$($_.PriorityClass.ToString())|$t" }',
     ]).catch((e) => {
       if (/not-found/.test(String(e))) {
         throw new OsLayerError('not-found', `Process "${imageName}" is not running.`);
@@ -346,7 +364,7 @@ export class WindowsOsLayer implements OsLayer {
   }
 
   private async readPriorityRaw(imageName: string): Promise<string> {
-    // Single-instance contract (shared with setPriorityRaw): the FIRST
+    // Single-instance contract (shared with applyPriorityRaw): the FIRST
     // resolved instance is the one whose priority is recorded — and the
     // only one a later set/restore will ever touch — so other instances'
     // original priorities are never read, changed, or overwritten.
@@ -354,7 +372,12 @@ export class WindowsOsLayer implements OsLayer {
     return normalizePriorityClassName(first!.priorityClass);
   }
 
-  private async setPriorityRaw(imageName: string, priority: AllowedPriority | RestorePriority): Promise<void> {
+  /**
+   * Apply path: resolve ONCE, retain the selected instance's identity and
+   * its pre-change priority as recovery state, then mutate exactly that
+   * instance (identity-verified again inside the set script).
+   */
+  private async applyPriorityRaw(imageName: string, priority: AllowedPriority): Promise<void> {
     this.requireWin32();
     const procs = await this.resolveProcessesRaw(imageName);
     // Enforce the denylist against every RESOLVED process before any
@@ -364,12 +387,75 @@ export class WindowsOsLayer implements OsLayer {
     // Mutate exactly the same single instance readPriorityRaw records,
     // addressed by process id — never every instance sharing the name.
     const target = procs[0]!;
+    const before = normalizePriorityClassName(target.priorityClass);
+    await this.setPriorityOnInstance(imageName, target, priority);
+    // Record recovery state only after the mutation succeeded: restore()
+    // must be able to find (and only ever touch) this exact instance.
+    this.priorityRecovery.record(imageName, identityOf(target), before);
+  }
+
+  /**
+   * Restore path: re-target the instance apply() selected, via the
+   * retained recovery identity — NOT a fresh name resolution. When the
+   * original instance has exited (or its pid was reused by a process with
+   * a different creation time), restore is a successful no-op: there is
+   * nothing left to restore, and writing the recorded priority onto a
+   * surviving same-name instance would corrupt a process this app never
+   * changed. Without retained identity (e.g. a journal entry written
+   * before this session), restore proceeds only when exactly ONE instance
+   * matches — with several, it refuses rather than guessing.
+   */
+  private async restorePriorityRaw(imageName: string, priority: RestorePriority): Promise<void> {
+    this.requireWin32();
+    const beforeKey = normalizePriorityClassName(priorityClassName(priority));
+    // Peek, don't consume yet: if the set below fails, the entry must stay
+    // so a retry still targets the recorded instance instead of degrading
+    // to a name-based guess.
+    const identity = this.priorityRecovery.find(imageName, beforeKey);
+    let procs: ResolvedProcess[];
+    try {
+      procs = await this.resolveProcessesRaw(imageName);
+    } catch (e) {
+      // With a retained identity, "no instances running" just means the
+      // original is gone — nothing to restore, nothing to touch.
+      if (identity && e instanceof OsLayerError && e.code === 'not-found') {
+        this.priorityRecovery.consume(imageName, beforeKey);
+        return;
+      }
+      throw e;
+    }
+    assertNoResolvedProcessDenied(procs);
+    const plan = planPriorityRestore(procs, identity);
+    switch (plan.action) {
+      case 'gone':
+        this.priorityRecovery.consume(imageName, beforeKey);
+        return; // original instance exited / pid reused: touch nothing
+      case 'ambiguous':
+        throw new OsLayerError(
+          'refused',
+          `Refusing to restore priority for "${imageName}": ${procs.length} instances are running ` +
+            'and the instance originally changed is not recorded in this session, so restoring ' +
+            'could modify the wrong instance. The journal entry was left in place.',
+        );
+      case 'set':
+        await this.setPriorityOnInstance(imageName, plan.target, priority);
+        this.priorityRecovery.consume(imageName, beforeKey);
+        return;
+    }
+  }
+
+  /** Set one already-resolved instance's priority, verifying its identity in the set script itself. */
+  private async setPriorityOnInstance(
+    imageName: string,
+    target: ResolvedProcess,
+    priority: AllowedPriority | RestorePriority,
+  ): Promise<void> {
     const psClass = priorityClassName(priority);
     await run('powershell.exe', [
       '-NoProfile', '-NonInteractive', '-Command',
-      buildSetPriorityByIdScript(target.id, psClass),
+      buildSetPriorityByIdentityScript(target, psClass),
     ]).catch((e) => {
-      if (/not-found/.test(String(e))) {
+      if (/not-found|identity-changed/.test(String(e))) {
         throw new OsLayerError('not-found', `Process "${imageName}" is not running.`);
       }
       throw e;
@@ -445,18 +531,132 @@ export interface ResolvedProcess {
   id: number;
   processName: string;
   priorityClass: string;
+  /**
+   * Process creation time as .NET DateTime ticks (string: the value
+   * exceeds Number.MAX_SAFE_INTEGER), or '0'/absent when StartTime was
+   * not readable. Together with `id` this is the instance's identity:
+   * a reused pid has a different creation time.
+   */
+  startTimeTicks?: string;
 }
 
-/** Parse `id|processName|priorityClass` lines; blank/garbage lines are ignored. */
+/** Parse `id|processName|priorityClass[|startTimeTicks]` lines; blank/garbage lines are ignored. */
 export function parseResolvedProcesses(output: string): ResolvedProcess[] {
   const procs: ResolvedProcess[] = [];
   for (const line of output.split(/\r?\n/)) {
-    const m = /^(\d+)\|([^|]+)\|([A-Za-z]+)$/.exec(line.trim());
+    const m = /^(\d+)\|([^|]+)\|([A-Za-z]+)(?:\|(\d+))?$/.exec(line.trim());
     if (m) {
-      procs.push({ id: Number(m[1]), processName: m[2]!, priorityClass: m[3]! });
+      procs.push({
+        id: Number(m[1]),
+        processName: m[2]!,
+        priorityClass: m[3]!,
+        ...(m[4] !== undefined ? { startTimeTicks: m[4] } : {}),
+      });
     }
   }
   return procs;
+}
+
+/** The identity of one process instance: pid + creation time. */
+export interface ProcessIdentity {
+  id: number;
+  startTimeTicks?: string;
+}
+
+export function identityOf(proc: ResolvedProcess): ProcessIdentity {
+  return {
+    id: proc.id,
+    ...(proc.startTimeTicks !== undefined ? { startTimeTicks: proc.startTimeTicks } : {}),
+  };
+}
+
+/** True when ticks carry real creation-time information ('0' = unreadable). */
+function ticksKnown(ticks: string | undefined): ticks is string {
+  return ticks !== undefined && ticks !== '0';
+}
+
+/**
+ * Decide what a priority restore may touch.
+ *
+ * - With a retained identity: `set` only the exact instance (same pid AND,
+ *   when both are known, same creation ticks). A pid whose creation ticks
+ *   differ is a DIFFERENT process that reused the pid — that, like a pid
+ *   that no longer exists, is `gone`: the original instance exited and no
+ *   surviving instance may be modified in its place.
+ * - Without a retained identity: `set` only when exactly one instance is
+ *   running (unambiguous); with several, `ambiguous` — the caller refuses
+ *   rather than guessing which instance the journal entry belongs to.
+ */
+export type PriorityRestorePlan =
+  | { action: 'set'; target: ResolvedProcess }
+  | { action: 'gone' }
+  | { action: 'ambiguous' };
+
+export function planPriorityRestore(
+  procs: readonly ResolvedProcess[],
+  identity: ProcessIdentity | undefined,
+): PriorityRestorePlan {
+  if (identity) {
+    const match = procs.find((p) => p.id === identity.id);
+    if (!match) return { action: 'gone' };
+    if (
+      ticksKnown(identity.startTimeTicks) &&
+      ticksKnown(match.startTimeTicks) &&
+      match.startTimeTicks !== identity.startTimeTicks
+    ) {
+      return { action: 'gone' }; // pid reused by a later process
+    }
+    return { action: 'set', target: match };
+  }
+  if (procs.length === 1) return { action: 'set', target: procs[0]! };
+  return { action: 'ambiguous' };
+}
+
+/**
+ * Recovery state for process-priority changes: per image name, a stack of
+ * { identity, before } entries recorded by apply() for the instance it
+ * actually mutated. restore() looks up the entry whose recorded `before`
+ * matches the journal value being restored (newest first — rollback
+ * unwinds newest first) so stacked activations of the same executable
+ * each restore their own instance state.
+ */
+export class PriorityRecoveryLog {
+  private stacks = new Map<string, Array<{ identity: ProcessIdentity; before: string }>>();
+
+  private key(imageName: string): string {
+    return imageName.trim().toLowerCase();
+  }
+
+  record(imageName: string, identity: ProcessIdentity, before: string): void {
+    const k = this.key(imageName);
+    const stack = this.stacks.get(k) ?? [];
+    stack.push({ identity, before });
+    this.stacks.set(k, stack);
+  }
+
+  /** Newest retained identity whose recorded before-value matches, or undefined. */
+  find(imageName: string, before: string): ProcessIdentity | undefined {
+    const stack = this.stacks.get(this.key(imageName));
+    if (!stack) return undefined;
+    for (let i = stack.length - 1; i >= 0; i--) {
+      if (stack[i]!.before === before) return stack[i]!.identity;
+    }
+    return undefined;
+  }
+
+  /** Drop the newest entry matching `before` (after a restore used it). */
+  consume(imageName: string, before: string): void {
+    const k = this.key(imageName);
+    const stack = this.stacks.get(k);
+    if (!stack) return;
+    for (let i = stack.length - 1; i >= 0; i--) {
+      if (stack[i]!.before === before) {
+        stack.splice(i, 1);
+        break;
+      }
+    }
+    if (stack.length === 0) this.stacks.delete(k);
+  }
 }
 
 /**
@@ -494,5 +694,26 @@ export function buildSetPriorityByIdScript(id: number, psClass: string): string 
     `$p=Get-Process -Id ${id} -ErrorAction SilentlyContinue;` +
     'if (-not $p) { throw "not-found" };' +
     `$p.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::${psClass}`
+  );
+}
+
+/**
+ * Like buildSetPriorityByIdScript, but the script itself re-verifies the
+ * instance's creation-time ticks before mutating: if the pid was reused
+ * between resolution and this call, it throws "identity-changed" and
+ * touches nothing. This closes the exit/reuse race inside the restore
+ * path, not just at plan time.
+ */
+export function buildSetPriorityByIdentityScript(proc: ResolvedProcess, psClass: string): string {
+  const base = buildSetPriorityByIdScript(proc.id, psClass);
+  if (!ticksKnown(proc.startTimeTicks)) return base;
+  if (!/^\d+$/.test(proc.startTimeTicks)) {
+    throw new OsLayerError('refused', `Invalid process start-time ticks "${proc.startTimeTicks}".`);
+  }
+  const verify =
+    `if ($p.StartTime.ToUniversalTime().Ticks -ne ${proc.startTimeTicks}) { throw "identity-changed" };`;
+  return base.replace(
+    'if (-not $p) { throw "not-found" };',
+    `if (-not $p) { throw "not-found" };${verify}`,
   );
 }

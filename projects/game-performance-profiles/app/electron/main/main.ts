@@ -17,6 +17,7 @@ import { MockOsLayer } from './os-layer/mock.js';
 import { WindowsOsLayer } from './os-layer/windows.js';
 import { OsLayer } from './os-layer/types.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
+import { startAppWindow } from './startup.js';
 import { seedProfile, SEED_PROFILE_NAME } from './seed.js';
 
 const SMOKE = process.argv.includes('--smoke');
@@ -56,12 +57,16 @@ async function main(): Promise<void> {
   const os = chooseOsLayer();
   if (seedProfile(db)) console.log(`[gpp] seeded built-in profile "${SEED_PROFILE_NAME}"`);
 
-  const window = await createWindow();
-  registerIpcHandlers({
-    db,
-    os,
-    emit: (event, payload) => {
-      window.webContents.send(event, payload);
+  // Register the IPC handlers BEFORE the window starts loading the
+  // renderer: the renderer's data hook issues its initial IPC requests as
+  // soon as it mounts, which can happen before loadFile() resolves, and
+  // unregistered channels reject with "No handler registered". The emit
+  // callback forwards progress events to the window once it exists.
+  await startAppWindow({
+    registerHandlers: (emit) => registerIpcHandlers({ db, os, emit }),
+    createWindow,
+    sendToWindow: (win, event, payload) => {
+      win.webContents.send(event, payload);
     },
   });
 
