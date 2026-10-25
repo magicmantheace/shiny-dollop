@@ -230,6 +230,83 @@ export function previewWorkflow(db: DatabaseSync, wf: Workflow): PreviewAction[]
 const SCRIPT_TIMEOUT_MS = 60_000;
 /** Grace between the timeout's group SIGTERM and the SIGKILL escalation. */
 const SCRIPT_KILL_ESCALATION_MS = 1_000;
+/**
+ * Hard cap on script stdout/stderr RETAINED in memory while a script
+ * runs. Streams are always drained to completion (a full pipe would
+ * deadlock the child), but only the first this-many characters per
+ * stream are kept; anything beyond is counted and discarded, with a
+ * truncation marker appended when the result is read. The persisted
+ * step detail is truncated to MAX_DETAIL anyway, so retaining an
+ * unbounded buffer only risked exhausting the main process's memory
+ * on a noisy script.
+ */
+export const MAX_RETAINED_SCRIPT_OUTPUT = 32_768;
+
+interface BoundedCollector {
+  push(chunk: string): void;
+  value(): string;
+  truncated: boolean;
+}
+
+function makeBoundedCollector(limit: number): BoundedCollector {
+  let buf = '';
+  const collector: BoundedCollector = {
+    truncated: false,
+    push(chunk: string) {
+      if (collector.truncated) return;
+      const room = limit - buf.length;
+      if (chunk.length <= room) {
+        buf += chunk;
+      } else {
+        buf += chunk.slice(0, Math.max(0, room));
+        collector.truncated = true;
+      }
+    },
+    value() {
+      return collector.truncated ? `${buf}…[output truncated while collecting]` : buf;
+    },
+  };
+  return collector;
+}
+
+/** True while any member of the child's POSIX process group is alive. */
+function processGroupAlive(child: ChildProcess): boolean {
+  const pid = child.pid;
+  if (pid === undefined || process.platform === 'win32') return false;
+  try {
+    process.kill(-pid, 0);
+    return true;
+  } catch (err) {
+    return (err as { code?: unknown }).code === 'EPERM';
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
+}
+
+/**
+ * Terminate any descendants that survived the script's own exit and
+ * wait until the process group is empty. An approved script can spawn
+ * a background subprocess with redirected stdio and exit successfully;
+ * without this, the `close` handler would release supervision while
+ * that descendant keeps running detached — invisible background
+ * persistence, and `shutdownActiveRuns` could no longer stop it.
+ * SIGTERM first (grace for well-behaved cleanup), then SIGKILL.
+ */
+async function terminateSurvivingDescendants(child: ChildProcess): Promise<void> {
+  if (process.platform === 'win32' || child.pid === undefined) return;
+  if (!processGroupAlive(child)) return;
+  signalProcessGroup(child, 'SIGTERM');
+  for (let waited = 0; waited < 500 && processGroupAlive(child); waited += 25) {
+    await sleep(25);
+  }
+  if (!processGroupAlive(child)) return;
+  signalProcessGroup(child, 'SIGKILL');
+  for (let waited = 0; waited < 1_000 && processGroupAlive(child); waited += 25) {
+    await sleep(25);
+  }
+}
 
 function stepFailed(code: keyof typeof DAB_ERROR_CODES, message: string): DabError {
   return dabError(DAB_ERROR_CODES[code], message);
@@ -279,8 +356,8 @@ export function runScript(
       detached: process.platform !== 'win32',
     });
     ctrl.child = child;
-    let stdout = '';
-    let stderr = '';
+    const stdoutCollector = makeBoundedCollector(MAX_RETAINED_SCRIPT_OUTPUT);
+    const stderrCollector = makeBoundedCollector(MAX_RETAINED_SCRIPT_OUTPUT);
     let timedOut = false;
     let escalationTimer: NodeJS.Timeout | undefined;
     const timeoutTimer = setTimeout(() => {
@@ -293,20 +370,34 @@ export function runScript(
     }, timeoutMs);
     timeoutTimer.unref();
     child.stdout?.on('data', (d: Buffer) => {
-      stdout += d.toString();
+      stdoutCollector.push(d.toString());
     });
     child.stderr?.on('data', (d: Buffer) => {
-      stderr += d.toString();
+      stderrCollector.push(d.toString());
     });
     child.on('error', () => {
       // 'error' fires on spawn failure; 'close' follows and settles the promise.
     });
     child.on('close', (code, signal) => {
-      clearTimeout(timeoutTimer);
-      if (escalationTimer) clearTimeout(escalationTimer);
-      if (ctrl.child === child) ctrl.child = undefined;
-      const killed = timedOut || signal === 'SIGKILL' || signal === 'SIGTERM';
-      resolvePromise({ exitCode: code ?? -1, stdout, stderr, killed, timedOut });
+      void (async () => {
+        clearTimeout(timeoutTimer);
+        if (escalationTimer) clearTimeout(escalationTimer);
+        // The step is NOT complete while descendants of the script are
+        // still alive in its process group: terminate them and wait
+        // for the group to empty BEFORE releasing supervision
+        // (ctrl.child) and resolving, so the run can only be recorded
+        // completed once nothing it spawned is still running.
+        await terminateSurvivingDescendants(child);
+        if (ctrl.child === child) ctrl.child = undefined;
+        const killed = timedOut || signal === 'SIGKILL' || signal === 'SIGTERM';
+        resolvePromise({
+          exitCode: code ?? -1,
+          stdout: stdoutCollector.value(),
+          stderr: stderrCollector.value(),
+          killed,
+          timedOut,
+        });
+      })();
     });
   });
 }
