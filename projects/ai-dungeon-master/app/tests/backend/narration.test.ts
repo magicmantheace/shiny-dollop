@@ -84,6 +84,46 @@ describe('narration is flavor only', () => {
     ).rejects.toMatchObject({ code: 'INPUT_INVALID' });
   });
 
+  it('never follows a redirect from the loopback endpoint (prompt is not forwarded)', async () => {
+    const { createServer } = await import('node:http');
+    let targetHits = 0;
+    const target = createServer((_req, res) => {
+      targetHits += 1;
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ response: 'Leaked narration.' }));
+    });
+    await new Promise<void>((resolve) => target.listen(0, '127.0.0.1', resolve));
+    const targetAddress = target.address();
+    if (!targetAddress || typeof targetAddress === 'string') throw new Error('no address');
+    const redirector = createServer((_req, res) => {
+      // 307 preserves method + body on a following client — exactly the
+      // leak path. Even a loopback target must receive NOTHING, because
+      // the same mechanism reaches non-loopback destinations.
+      res.writeHead(307, { location: `http://127.0.0.1:${targetAddress.port}/api/generate` });
+      res.end();
+    });
+    await new Promise<void>((resolve) => redirector.listen(0, '127.0.0.1', resolve));
+    try {
+      const address = redirector.address();
+      if (!address || typeof address === 'string') throw new Error('no address');
+      const fx = makeFixture();
+      const { roll } = await setup(fx);
+      await fx.service.settingsUpdate({
+        narrator: 'local',
+        endpoint: `http://127.0.0.1:${address.port}`,
+        model: 'test-model',
+      });
+      const res = await fx.service.narrate(roll.entry.id);
+      // Narration fell back to the mock; the redirect target never saw
+      // the prompt-bearing POST.
+      expect(res.source).toBe('mock-fallback');
+      expect(targetHits).toBe(0);
+    } finally {
+      redirector.close();
+      target.close();
+    }
+  });
+
   it('uses a local endpoint when one answers (loopback test server)', async () => {
     const { createServer } = await import('node:http');
     const server = createServer((req, res) => {

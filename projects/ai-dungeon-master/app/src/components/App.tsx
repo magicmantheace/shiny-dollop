@@ -870,44 +870,55 @@ export function App() {
               </div>
             </section>
 
-            <section className="panel" aria-label="Campaign data">
-              <h2>Campaign data</h2>
-              <div className="row">
-                <button
-                  onClick={() =>
-                    void run(async () => {
-                      const text = await api().exportCampaign(campaign.id);
-                      setExportText(text);
-                      downloadText(`${campaign.name.replace(/\W+/g, '-').toLowerCase()}-campaign.json`, text);
-                    })
-                  }
-                >
-                  Export campaign
-                </button>
-              </div>
-              {exportText && (
-                <textarea readOnly value={exportText} rows={6} aria-label="Exported campaign JSON" />
-              )}
-              <label>
-                Import campaign bundle (ai-dungeon-master/campaign v1)
-                <textarea value={importText} onChange={(e) => setImportText(e.target.value)} rows={4} />
-              </label>
-              <button
-                onClick={() =>
-                  void run(async () => {
-                    const imported = await api().importCampaign(importText);
-                    setImportText('');
-                    await refreshCampaigns();
-                    setCampaignId(imported.id);
-                    // Campaign transition: clear any session selected in
-                    // the previously active campaign.
-                    setSessionId('');
-                    setNotice(`Imported campaign “${imported.name}”.`);
-                  })
-                }
-              >
-                Import campaign
-              </button>
+          </>
+        )}
+        <section className="panel" aria-label="Campaign data">
+          <h2>Campaign data</h2>
+          {/* Whole-campaign IMPORT lives in this always-visible section:
+              restoring a backup must work on a fresh installation with
+              no campaign selected, and importCampaign needs none. The
+              campaign-scoped actions below (export, worldbuilding and
+              dungeon imports into the active campaign) stay conditional. */}
+          {campaign && (
+          <div className="row">
+            <button
+              onClick={() =>
+                void run(async () => {
+                  const text = await api().exportCampaign(campaign.id);
+                  setExportText(text);
+                  downloadText(`${campaign.name.replace(/\W+/g, '-').toLowerCase()}-campaign.json`, text);
+                })
+              }
+            >
+              Export campaign
+            </button>
+          </div>
+          )}
+          {exportText && (
+            <textarea readOnly value={exportText} rows={6} aria-label="Exported campaign JSON" />
+          )}
+          <label>
+            Import campaign bundle (ai-dungeon-master/campaign v1)
+            <textarea value={importText} onChange={(e) => setImportText(e.target.value)} rows={4} />
+          </label>
+          <button
+            onClick={() =>
+              void run(async () => {
+                const imported = await api().importCampaign(importText);
+                setImportText('');
+                await refreshCampaigns();
+                setCampaignId(imported.id);
+                // Campaign transition: clear any session selected in
+                // the previously active campaign.
+                setSessionId('');
+                setNotice(`Imported campaign “${imported.name}”.`);
+              })
+            }
+          >
+            Import campaign
+          </button>
+          {campaign && (
+            <>
               <label>
                 Import Worldbuilding Manager backup (creates memory entries)
                 <textarea value={wbText} onChange={(e) => setWbText(e.target.value)} rows={4} />
@@ -940,9 +951,9 @@ export function App() {
               >
                 Import dungeon manifest
               </button>
-            </section>
-          </>
-        )}
+            </>
+          )}
+        </section>
       </main>
     </div>
   );

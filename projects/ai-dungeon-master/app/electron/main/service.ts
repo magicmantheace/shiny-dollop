@@ -721,6 +721,12 @@ export class CampaignService {
 
   async importCampaign(text: string): Promise<Campaign> {
     const bundle = parseCampaignBundle(text);
+    // The whole restore is transactional: a bundle whose campaign id is
+    // new but which reuses an existing session/character/log id passes
+    // bundle validation, yet a later insert fails on the uniqueness
+    // constraint. Without a transaction that left a partially restored
+    // campaign behind; now any failure rolls every insert back.
+    return store.transact(this.db, () => {
     // Remap ids when any of them already exist in this database.
     const collides = store.getCampaign(this.db, bundle.campaign.id) !== null;
     const remap = new Map<string, string>();
@@ -769,6 +775,7 @@ export class CampaignService {
       });
     }
     return campaign;
+    });
   }
 
   async importWorldbuilding(campaignId: string, text: string): Promise<ImportSummary> {

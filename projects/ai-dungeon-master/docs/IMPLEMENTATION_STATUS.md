@@ -49,3 +49,13 @@ Original and documented in `app/shared/ruleset.ts`: four attributes, 2d6 checks,
 - Linux (this VM): implemented **and verified**.
 - Windows 11 click-through, NSIS packaging on Windows: **implemented but not verified on target OS** (no Wine/Windows here). No code signing.
 - A real local model endpoint on the owner's machine: the HTTP narrator is verified against a loopback test server; a real Ollama instance is **implemented but unverified**.
+
+## Codex-review fixes, cycle 4 (2026-10-24, PR #21, FINAL)
+
+All three findings from the cycle-3 re-review verified against the code before fixing:
+
+- **Reject redirects from the loopback narration endpoint (P1, `narrator.ts`):** `HttpNarrator` used fetch's default redirect handling, so a 307/308 from the configured loopback endpoint would forward the POST body (session event text) to a non-loopback destination. The fetch now uses `redirect: 'manual'` and any 3xx response is rejected as `NARRATION_UNAVAILABLE` (the service then falls back to mock narration) — no redirect is ever followed and no data is sent to a redirect target.
+- **Make campaign imports transactional (P2, `service.ts` / `store.ts`):** `importCampaign` inserted the campaign and its rows one by one with no transaction, so a bundle with a new campaign id but a reused session/character id left a partially restored campaign behind when a later insert hit the uniqueness constraint. The store now exposes `transact(...)` and the whole import runs inside it — any failure rolls back every insert.
+- **Expose campaign import without an active campaign (P2, `App.tsx`):** the Campaign data section (including whole-campaign import) sat inside the `campaign &&` conditional, so a fresh installation had to create a dummy campaign before restoring a backup. The section now renders unconditionally; only the campaign-scoped actions (export, worldbuilding/dungeon imports into the active campaign) remain conditional.
+
+- **Verification:** `npm test` — **55/55 pass** (52 before; +3 regression tests: redirect never followed / target receives nothing, transactional import rollback on a colliding later insert, campaign import visible and usable with no active campaign); `npm run typecheck`, `npm run lint`, `npm run build` clean.

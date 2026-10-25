@@ -72,6 +72,33 @@ describe('campaign export / import', () => {
     expect(await fx2.service.campaignsList()).toHaveLength(0);
   });
 
+  it('rolls back the whole import when a later insert collides (transactional)', async () => {
+    const fx = makeFixture();
+    const { campaign, hero } = await setupCampaign(fx);
+    const text = await fx.service.exportCampaign(campaign.id);
+    // New campaign id (so no id remap is triggered — remap only keys off
+    // the campaign id), but the bundle still carries the EXISTING
+    // character/session ids: the campaign row inserts first, then a
+    // later insert fails on the primary key. Without a transaction the
+    // new campaign (and any rows inserted before the failure) persisted.
+    const bundle = JSON.parse(text) as {
+      campaign: { id: string };
+      characters: Array<{ id: string }>;
+    };
+    bundle.campaign.id = 'camp-brand-new';
+    expect(bundle.characters[0]?.id).toBe(hero.id);
+    await expect(fx.service.importCampaign(JSON.stringify(bundle))).rejects.toThrow();
+    // Nothing from the failed import survives: no second campaign, and
+    // no orphaned rows under the new campaign id.
+    const campaigns = await fx.service.campaignsList();
+    expect(campaigns.map((c) => c.id)).toEqual([campaign.id]);
+    await expect(fx.service.campaignsGet('camp-brand-new')).rejects.toMatchObject({
+      code: 'CAMPAIGN_NOT_FOUND',
+    });
+    // The original campaign is untouched.
+    expect((await fx.service.charactersList(campaign.id)).map((c) => c.id)).toEqual([hero.id]);
+  });
+
   it('rejects bundles with dangling references or out-of-range fields', async () => {
     const fx = makeFixture();
     const { campaign } = await setupCampaign(fx);

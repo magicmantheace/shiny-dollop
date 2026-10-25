@@ -45,6 +45,36 @@ describe('App', () => {
     expect(screen.queryByRole('region', { name: 'Characters' })).not.toBeInTheDocument();
   });
 
+  it('exposes campaign import with no active campaign (fresh-install restore)', async () => {
+    const fake = installFakeAidm();
+    const user = userEvent.setup();
+    render(<App />);
+    // No campaign exists or is selected, yet the Campaign data section
+    // and its whole-campaign import controls are present.
+    expect(screen.queryByRole('region', { name: 'Characters' })).not.toBeInTheDocument();
+    const data = region('Campaign data');
+    const bundle = JSON.stringify({
+      campaign: {
+        id: 'camp-restored',
+        name: 'Restored Campaign',
+        setting: '',
+        seed: 'restore-seed',
+        diceState: 1,
+        createdAt: '2026-10-23T00:00:00.000Z',
+        updatedAt: '2026-10-23T00:00:00.000Z',
+      },
+    });
+    fireEvent.change(
+      within(data).getByLabelText('Import campaign bundle (ai-dungeon-master/campaign v1)'),
+      { target: { value: bundle } },
+    );
+    await user.click(within(data).getByRole('button', { name: 'Import campaign' }));
+    expect(await screen.findByText(/Imported campaign/)).toBeInTheDocument();
+    expect([...fake.campaigns.values()].some((c) => c.name === 'Restored Campaign')).toBe(true);
+    // The imported campaign becomes active, revealing campaign panels.
+    expect(await screen.findByRole('region', { name: 'Characters' })).toBeInTheDocument();
+  });
+
   it('runs the acceptance flow: campaign → characters → roll → encounter → damage', async () => {
     installFakeAidm();
     const user = userEvent.setup();

@@ -105,6 +105,13 @@ export class HttpNarrator implements Narrator {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         signal: controller.signal,
+        // NEVER follow redirects: the configured endpoint was validated
+        // as loopback, but a 307/308 redirect could forward the POST
+        // body (which contains session event text) to a non-loopback
+        // destination, silently breaking the loopback-only guarantee.
+        // With `redirect: 'manual'` a redirect surfaces as a response
+        // here and is rejected below without sending data anywhere else.
+        redirect: 'manual',
         body: JSON.stringify({
           model: this.model,
           stream: false,
@@ -113,6 +120,12 @@ export class HttpNarrator implements Narrator {
             `Do not invent dice results or change any outcome.\nEvent: ${context.entry.text}`,
         }),
       });
+      if (res.status >= 300 && res.status < 400) {
+        throw aidmError(
+          AIDM_ERROR_CODES.NARRATION_UNAVAILABLE,
+          `Narration endpoint attempted a redirect (${res.status}); redirects are not followed from the loopback narration endpoint.`,
+        );
+      }
       if (!res.ok) {
         throw aidmError(
           AIDM_ERROR_CODES.NARRATION_UNAVAILABLE,

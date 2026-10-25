@@ -74,6 +74,23 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 `;
 
+/** Run fn inside an explicit transaction; rolls back on throw. */
+export function transact<T>(db: DatabaseSync, fn: () => T): T {
+  db.exec('BEGIN');
+  try {
+    const result = fn();
+    db.exec('COMMIT');
+    return result;
+  } catch (err) {
+    try {
+      db.exec('ROLLBACK');
+    } catch {
+      // Already rolled back / no transaction — preserve the original error.
+    }
+    throw err;
+  }
+}
+
 export function openDatabase(dbPath: string): DatabaseSync {
   const db = new DatabaseSync(dbPath);
   db.exec('PRAGMA journal_mode = WAL;');
