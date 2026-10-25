@@ -147,12 +147,17 @@ def build():
     # '/bin/sh'). Normalize every directory to the conventional system
     # mode; the fixture init still tightens the private runtime
     # directories (home, /run/user/1000) to 0700 before the session.
-    for folder, subdirs, _files in os.walk(rootfs):
+    for folder, subdirs, files in os.walk(rootfs):
         Path(folder).chmod(0o755)
         for name in subdirs:
             entry = Path(folder) / name
             if not entry.is_symlink():
                 entry.chmod(0o755)
+        for name in files:
+            entry = Path(folder) / name
+            if entry.is_symlink() or entry == rootfs / 'etc/shadow':
+                continue
+            entry.chmod(0o755 if entry.stat().st_mode & 0o111 else 0o644)
     # Repack only the separately built Synveil root plus explicit component
     # assets. These commands address regular files; there is no loop/mount/dd
     # path to an owner disk, and no generated dependency-system rootfs import.
