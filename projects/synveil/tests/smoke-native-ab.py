@@ -184,16 +184,18 @@ class Boot:
             self.process.wait(timeout=5)
 
 
-def login(boot, secret, timeout=420):
+def login(boot, secret, timeout=420, since=0):
     """Wait for the graphical login, prove scanout, authenticate.
 
-    All marker waits are anchored at entry: one Boot object spans
-    several guest boots (reboots stay inside one QEMU process), so
-    an unanchored wait would be satisfied by the PREVIOUS boot's
-    LOGIN_READY / AUTH_ACTIVE lines and the secret would be typed
-    into a guest that has not reached its greeter yet.
+    `since` is the caller's line index for the start of the
+    current guest boot cycle. One Boot object spans several guest
+    boots (reboots stay inside one QEMU process), so a post-reboot
+    login MUST pass its cycle mark: an unanchored wait would be
+    satisfied by the PREVIOUS boot's LOGIN_READY / AUTH_ACTIVE
+    lines and the secret would be typed into a guest that has not
+    reached its greeter yet. First-cycle logins use the default.
     """
-    anchor = len(boot.lines)
+    anchor = since
     if not boot.wait("SYNVEIL_LOGIN_READY", timeout, since=anchor):
         save_failure_frame(boot, "login-ready")
         return False
@@ -475,7 +477,7 @@ def main():
             if ok:
                 ok = boot.wait("SYNVEIL_AB_TRIAL_BOOT", args.timeout, since=staged_at)
             if ok:
-                ok = login(boot, secret)
+                ok = login(boot, secret, since=staged_at)
             if ok:
                 ok = desktop_color_proof(boot, 2)
             if ok:
@@ -509,7 +511,7 @@ def main():
             terminal_command(boot, "reboot")
             ok = boot.wait("SYNVEIL_AB_TRIAL_BOOT", args.timeout, since=mark)
             if ok:
-                ok = login(boot, secret)
+                ok = login(boot, secret, since=mark)
             if ok:
                 ok = desktop_color_proof(boot, 1)
             if ok:
@@ -545,7 +547,7 @@ def main():
                 # generation's hook; the confirmed generation boots.
                 ok = boot.wait("SYNVEIL_AB_CONFIRMED_BOOT", args.timeout, since=mark)
             if ok:
-                ok = login(boot, secret)
+                ok = login(boot, secret, since=mark)
         boot.quit()
         artifacts = state_artifacts(disk, work)
         control = artifacts["control"] or {}
