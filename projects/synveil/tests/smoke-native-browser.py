@@ -960,6 +960,22 @@ def main():
     return finish(build_info, tls_info, results, code)
 
 
+def enroll_first_user(boot, secret):
+    """First boot on a fresh disk: the greeter IS the graphical
+    enrollment — create the password, confirm it, completion —
+    exactly the A/B proof's S0 protocol. Later boots (same DATA
+    partition) go straight to login."""
+    if not boot.wait("SYNVEIL_ENROLL_READY", 240):
+        return False
+    try:
+        ab.type_test_secret(boot.qmp, secret, timeout=18)
+        if boot.wait("SYNVEIL_ENROLL_CONFIRM_READY", 60):
+            ab.type_test_secret(boot.qmp, secret, timeout=18)
+    except (ab.QMPError, OSError, ValueError):
+        return False
+    return boot.wait("SYNVEIL_ENROLL_COMPLETED", 120)
+
+
 def _run_boots(results, record, log, workdir, vars_template, secret,
                releases):
     if True:
@@ -970,63 +986,72 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
         boot.start(secret)
         try:
             network = boot.wait("SYNVEIL_NETWORK_READY", 600)
-            logged_in = ab.login(boot, secret)
+            enrolled = enroll_first_user(boot, secret) if network else False
+            logged_in = ab.login(boot, secret) if enrolled else False
             page = page_proof(boot) if logged_in else False
             if page:
                 remember_browser_rect(boot)
             record("B0", network_ready=bool(network and logged_in),
-                   page_proof=bool(page))
-            # B1: first download (Chromium downloads directly to
-            # ~/Downloads — no dialog; evidence is the file itself).
-            got = click_link(boot, LINK_PAYLOAD, "payload") \
-                and wait_download_get(log, GOOD_PORT, "/payload.bin", 1)
-            if got:
-                time.sleep(10)
-            record("B1", download_started=bool(got))
-            # B2: collision — Chromium must uniquify, never
-            # overwrite: 'payload (1).bin' appears alongside the
-            # untouched original (verified at readback).
-            got2 = False
-            if ensure_page(boot):
-                got2 = click_link(boot, LINK_PAYLOAD, "payload-again") \
-                    and wait_download_get(log, GOOD_PORT, "/payload.bin", 2)
-                if got2:
+                   enrolled=bool(enrolled), page_proof=bool(page))
+            if page:
+                # B1: first download (Chromium downloads directly to
+                # ~/Downloads — no dialog; evidence is the file itself).
+                got = click_link(boot, LINK_PAYLOAD, "payload") \
+                    and wait_download_get(log, GOOD_PORT, "/payload.bin", 1)
+                if got:
                     time.sleep(10)
-            record("B2", second_download=bool(got2))
-            # B3: insufficient storage — the 448 MiB payload cannot
-            # fit the DATA partition; the download must fail and
-            # the browser must stay alive.
-            alive = False
-            if ensure_page(boot):
-                if click_link(boot, LINK_BIG, "big") \
-                        and wait_download_get(log, GOOD_PORT, "/big.bin", 1):
-                    time.sleep(120)
-                    alive = page_proof(boot, timeout=120)
-            record("B3", browser_alive_after=bool(alive))
-            # B4: bad TLS endpoint.
-            page_left = back_restored = False
-            if ensure_page(boot):
-                if click_link(boot, LINK_BAD, "bad"):
-                    page_left = page_absent(boot, timeout=180)
-                    if back_from_interstitial(boot):
-                        back_restored = page_proof(boot, timeout=120)
-                        if back_restored:
-                            remember_browser_rect(boot)
-            record("B4", page_left=bool(page_left),
-                   back_restored=bool(back_restored))
-            # Graphical file access + in-guest digest, then reboot.
-            close_browser_window(boot)
-            refresh_files_window(boot)
-            terminal_command(boot, "dl-sha256")
-            mark = len(boot.lines)
-            terminal_command(boot, "reboot")
-            network2 = boot.wait_count("SYNVEIL_NETWORK_READY", 2, 600)
-            logged2 = ab.login(boot, secret, since=mark)
-            page2 = page_proof(boot) if logged2 else False
-            record("B5", network_ready_again=bool(network2 and logged2),
-                   page_proof=bool(page2))
-            close_browser_window(boot)
-            terminal_command(boot, "dl-sha256")
+                record("B1", download_started=bool(got))
+                # B2: collision — Chromium must uniquify, never
+                # overwrite: 'payload (1).bin' appears alongside the
+                # untouched original (verified at readback).
+                got2 = False
+                if ensure_page(boot):
+                    got2 = click_link(boot, LINK_PAYLOAD, "payload-again") \
+                        and wait_download_get(log, GOOD_PORT, "/payload.bin", 2)
+                    if got2:
+                        time.sleep(10)
+                record("B2", second_download=bool(got2))
+                # B3: insufficient storage — the 448 MiB payload cannot
+                # fit the DATA partition; the download must fail and
+                # the browser must stay alive.
+                alive = False
+                if ensure_page(boot):
+                    if click_link(boot, LINK_BIG, "big") \
+                            and wait_download_get(log, GOOD_PORT, "/big.bin", 1):
+                        time.sleep(120)
+                        alive = page_proof(boot, timeout=120)
+                record("B3", browser_alive_after=bool(alive))
+                # B4: bad TLS endpoint.
+                page_left = back_restored = False
+                if ensure_page(boot):
+                    if click_link(boot, LINK_BAD, "bad"):
+                        page_left = page_absent(boot, timeout=180)
+                        if back_from_interstitial(boot):
+                            back_restored = page_proof(boot, timeout=120)
+                            if back_restored:
+                                remember_browser_rect(boot)
+                record("B4", page_left=bool(page_left),
+                       back_restored=bool(back_restored))
+                # Graphical file access + in-guest digest, then reboot.
+                close_browser_window(boot)
+                refresh_files_window(boot)
+                terminal_command(boot, "dl-sha256")
+                mark = len(boot.lines)
+                terminal_command(boot, "reboot")
+                network2 = boot.wait_count("SYNVEIL_NETWORK_READY", 2, 600)
+                logged2 = ab.login(boot, secret, since=mark)
+                page2 = page_proof(boot) if logged2 else False
+                record("B5", network_ready_again=bool(network2 and logged2),
+                       page_proof=bool(page2))
+                close_browser_window(boot)
+                terminal_command(boot, "dl-sha256")
+            else:
+                record("B1", download_started=False)
+                record("B2", second_download=False)
+                record("B3", browser_alive_after=False)
+                record("B4", page_left=False, back_restored=False)
+                record("B5", network_ready_again=False,
+                       page_proof=False)
         finally:
             boot.quit()
         facts1 = browser_artifacts(DISK, workdir / "readback1")
