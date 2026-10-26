@@ -35,12 +35,24 @@ struct Fe([u64; 5]);
 
 fn carry(mut h: [u64; 5]) -> [u64; 5] {
     let mut c;
-    c = h[0] >> 51; h[0] &= MASK; h[1] += c;
-    c = h[1] >> 51; h[1] &= MASK; h[2] += c;
-    c = h[2] >> 51; h[2] &= MASK; h[3] += c;
-    c = h[3] >> 51; h[3] &= MASK; h[4] += c;
-    c = h[4] >> 51; h[4] &= MASK; h[0] += c * 19;
-    c = h[0] >> 51; h[0] &= MASK; h[1] += c;
+    c = h[0] >> 51;
+    h[0] &= MASK;
+    h[1] += c;
+    c = h[1] >> 51;
+    h[1] &= MASK;
+    h[2] += c;
+    c = h[2] >> 51;
+    h[2] &= MASK;
+    h[3] += c;
+    c = h[3] >> 51;
+    h[3] &= MASK;
+    h[4] += c;
+    c = h[4] >> 51;
+    h[4] &= MASK;
+    h[0] += c * 19;
+    c = h[0] >> 51;
+    h[0] &= MASK;
+    h[1] += c;
     h
 }
 
@@ -58,35 +70,31 @@ impl Fe {
     }
 
     fn add(&self, other: &Fe) -> Fe {
-        let mut out = [0u64; 5];
-        for i in 0..5 {
-            out[i] = self.0[i] + other.0[i];
-        }
-        Fe(carry(out))
+        Fe(carry(std::array::from_fn(|i| self.0[i] + other.0[i])))
     }
 
     /// 2p in radix 2^51 limbs, the bias that keeps subtraction
     /// non-negative limb-wise for weakly reduced inputs.
     fn two_p() -> [u64; 5] {
-        [(1 << 52) - 38, (1 << 52) - 2, (1 << 52) - 2, (1 << 52) - 2, (1 << 52) - 2]
+        [
+            (1 << 52) - 38,
+            (1 << 52) - 2,
+            (1 << 52) - 2,
+            (1 << 52) - 2,
+            (1 << 52) - 2,
+        ]
     }
 
     fn sub(&self, other: &Fe) -> Fe {
         let bias = Self::two_p();
-        let mut out = [0u64; 5];
-        for i in 0..5 {
-            out[i] = self.0[i] + bias[i] - other.0[i];
-        }
-        Fe(carry(out))
+        Fe(carry(std::array::from_fn(|i| {
+            self.0[i] + bias[i] - other.0[i]
+        })))
     }
 
     fn neg(&self) -> Fe {
         let bias = Self::two_p();
-        let mut out = [0u64; 5];
-        for i in 0..5 {
-            out[i] = bias[i] - self.0[i];
-        }
-        Fe(carry(out))
+        Fe(carry(std::array::from_fn(|i| bias[i] - self.0[i])))
     }
 
     fn mul(&self, other: &Fe) -> Fe {
@@ -100,9 +108,7 @@ impl Fe {
         }
         // Fold coefficients >= 2^255 back with 2^255 = 19 (mod p).
         let mut r = [0u128; 5];
-        for i in 0..5 {
-            r[i] = c[i];
-        }
+        r.copy_from_slice(&c[..5]);
         r[0] += c[5] * 19;
         r[1] += c[6] * 19;
         r[2] += c[7] * 19;
@@ -116,7 +122,13 @@ impl Fe {
         r[4] &= u128::from(MASK);
         r[1] += r[0] >> 51;
         r[0] &= u128::from(MASK);
-        Fe([r[0] as u64, r[1] as u64, r[2] as u64, r[3] as u64, r[4] as u64])
+        Fe([
+            r[0] as u64,
+            r[1] as u64,
+            r[2] as u64,
+            r[3] as u64,
+            r[4] as u64,
+        ])
     }
 
     fn sqr(&self) -> Fe {
@@ -141,12 +153,15 @@ impl Fe {
         self.pow(&[0xffffffffffffffeb, u64::MAX, u64::MAX, 0x7fffffffffffffff])
     }
 
-    fn to_bytes(&self) -> [u8; 32] {
+    fn to_bytes(self) -> [u8; 32] {
         // Fully reduce: conditionally subtract p (twice for safety).
         let mut h = carry(self.0);
         let p: [i128; 5] = [
-            (1i128 << 51) - 19, (1i128 << 51) - 1, (1i128 << 51) - 1,
-            (1i128 << 51) - 1, (1i128 << 51) - 1,
+            (1i128 << 51) - 19,
+            (1i128 << 51) - 1,
+            (1i128 << 51) - 1,
+            (1i128 << 51) - 1,
+            (1i128 << 51) - 1,
         ];
         for _ in 0..2 {
             let mut borrow: i128 = 0;
@@ -229,14 +244,11 @@ struct Curve {
 impl Curve {
     fn new() -> Self {
         // d = -121665 / 121666 (mod p)
-        let d = Fe::from_u64(121665)
-            .mul(&Fe::from_u64(121666).inv())
-            .neg();
+        let d = Fe::from_u64(121665).mul(&Fe::from_u64(121666).inv()).neg();
         let d2 = d.add(&d);
         // sqrt(-1) = 2^((p-1)/4); (p-1)/4 = 2^253 - 5.
-        let sqrt_m1 = Fe::from_u64(2).pow(&[
-            0xfffffffffffffffb, u64::MAX, u64::MAX, 0x1fffffffffffffff,
-        ]);
+        let sqrt_m1 =
+            Fe::from_u64(2).pow(&[0xfffffffffffffffb, u64::MAX, u64::MAX, 0x1fffffffffffffff]);
         Curve { d, d2, sqrt_m1 }
     }
 }
@@ -252,7 +264,12 @@ struct Point {
 
 impl Point {
     fn identity() -> Self {
-        Point { x: Fe::zero(), y: Fe::one(), t: Fe::zero(), z: Fe::one() }
+        Point {
+            x: Fe::zero(),
+            y: Fe::one(),
+            t: Fe::zero(),
+            z: Fe::one(),
+        }
     }
 
     fn add(&self, other: &Point, curve: &Curve) -> Point {
@@ -264,7 +281,12 @@ impl Point {
         let f = d.sub(&c);
         let g = d.add(&c);
         let h = b.add(&a);
-        Point { x: e.mul(&f), y: g.mul(&h), t: e.mul(&h), z: f.mul(&g) }
+        Point {
+            x: e.mul(&f),
+            y: g.mul(&h),
+            t: e.mul(&h),
+            z: f.mul(&g),
+        }
     }
 
     fn double(&self) -> Point {
@@ -276,7 +298,12 @@ impl Point {
         let g = d.add(&b);
         let f = g.sub(&c);
         let h = d.sub(&b);
-        Point { x: e.mul(&f), y: g.mul(&h), t: e.mul(&h), z: f.mul(&g) }
+        Point {
+            x: e.mul(&f),
+            y: g.mul(&h),
+            t: e.mul(&h),
+            z: f.mul(&g),
+        }
     }
 
     /// Double-and-add over a little-endian scalar of up to 64 bytes.
@@ -292,6 +319,7 @@ impl Point {
         result
     }
 
+    #[cfg(test)]
     fn encode(&self) -> [u8; 32] {
         let z_inv = self.z.inv();
         let x = self.x.mul(&z_inv);
@@ -357,7 +385,12 @@ fn decode(bytes: &[u8; 32], curve: &Curve) -> Option<Point> {
     if x.is_zero() && sign == 1 {
         return None;
     }
-    Some(Point { x, y, t: x.mul(&y), z: Fe::one() })
+    Some(Point {
+        x,
+        y,
+        t: x.mul(&y),
+        z: Fe::one(),
+    })
 }
 
 fn base_point(curve: &Curve) -> Point {
@@ -370,15 +403,24 @@ fn base_point(curve: &Curve) -> Point {
 /// Group order L = 2^252 + 27742317777372353535851937790883648493,
 /// as little-endian u64 words.
 const GROUP_ORDER: [u64; 4] = [
-    0x5812631a5cf5d3ed, 0x14def9dea2f79cd6, 0, 0x1000000000000000,
+    0x5812631a5cf5d3ed,
+    0x14def9dea2f79cd6,
+    0,
+    0x1000000000000000,
 ];
 
 fn scalar_below_group_order(s: &[u8; 32]) -> bool {
     let mut words = [0u64; 4];
     for i in 0..4 {
         words[i] = u64::from_le_bytes([
-            s[i * 8], s[i * 8 + 1], s[i * 8 + 2], s[i * 8 + 3],
-            s[i * 8 + 4], s[i * 8 + 5], s[i * 8 + 6], s[i * 8 + 7],
+            s[i * 8],
+            s[i * 8 + 1],
+            s[i * 8 + 2],
+            s[i * 8 + 3],
+            s[i * 8 + 4],
+            s[i * 8 + 5],
+            s[i * 8 + 6],
+            s[i * 8 + 7],
         ]);
     }
     for i in (0..4).rev() {
