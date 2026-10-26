@@ -746,6 +746,41 @@ pub enum HookOutcome {
     },
 }
 
+/// Mount the DATA partition as /home on A/B generations, so the
+/// session's home (and anything the user keeps in it) lives outside
+/// the replaceable system slots, next to STATE. Best effort by
+/// design: a missing or unmountable DATA partition leaves the
+/// initramfs home in place and is reported, never a boot failure —
+/// home is user data, not part of the update trust path.
+fn mount_home() {
+    let Ok(partitions) = scan_partitions() else {
+        return;
+    };
+    let Ok(Some(data)) = find_partition(&partitions, DATA_PARTUUID) else {
+        return;
+    };
+    if let Ok(mounts) = fs::read_to_string("/proc/mounts")
+        && mounts.lines().any(|l| l.contains(" /home "))
+    {
+        return;
+    }
+    let status = Command::new("/bin/mount")
+        .args(["-t", "ext4", &data.device(), "/home"])
+        .status();
+    match status {
+        Ok(status) if status.success() => {
+            let home = Path::new("/home/synveil");
+            let _ = fs::create_dir_all(home);
+            let _ = Command::new("/bin/chown")
+                .args(["1000:1000", "/home/synveil"])
+                .status();
+            let _ = fs::set_permissions(home, fs::Permissions::from_mode(0o700));
+            marker("SYNVEIL_AB_HOME_MOUNTED");
+        }
+        _ => marker("SYNVEIL_AB_HOME_UNAVAILABLE"),
+    }
+}
+
 pub fn boot_hook() -> io::Result<HookOutcome> {
     if !Path::new(ENABLED_MARKER).is_file() {
         return Ok(HookOutcome::Disabled);
@@ -756,6 +791,7 @@ pub fn boot_hook() -> io::Result<HookOutcome> {
         return Ok(HookOutcome::Unavailable);
     }
     let layout = Layout::load()?;
+    mount_home();
     if !Path::new(CONTROL_PATH).is_file() {
         provision(&layout)?;
         return Ok(HookOutcome::Provisioned);
