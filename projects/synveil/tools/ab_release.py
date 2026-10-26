@@ -120,19 +120,39 @@ def verify_metadata(public_pem, metadata_bytes, signature):
 
 def build_media(payload, metadata, signature, out_image):
     """Write a GPT release disk: one ext4 partition with the three
-    release files at its root."""
+    release files at its root.
+
+    Output safety (review correction, 2026-10-26): the output image
+    and both staging paths are created EXCLUSIVELY. An existing
+    output — file, symlink, device, anything — is refused, never
+    truncated; an existing staging path is refused, never deleted;
+    the parent must be an existing real directory, not a symlink.
+    Callers that legitimately rebuild their own outputs remove them
+    first, explicitly, at the call site (tools/native_ab.py does).
+    On failure the staging paths created by this call are left in
+    place as evidence; the next call refuses until an operator
+    removes them."""
+    import shutil
     out_image = Path(out_image)
-    stage = out_image.parent / (out_image.stem + "-stage")
-    if stage.exists():
-        import shutil
-        shutil.rmtree(stage)
-    stage.mkdir(parents=True)
+    parent = out_image.parent
+    if parent.is_symlink() or not parent.is_dir():
+        raise ValueError(
+            f"release output parent is not an existing directory: {parent}")
+    if os.path.lexists(out_image):
+        raise ValueError(
+            f"release output already exists, refusing to overwrite: {out_image}")
+    stage = parent / (out_image.stem + "-stage")
+    fs_image = parent / (out_image.stem + "-fs.img")
+    for staging in (stage, fs_image):
+        if os.path.lexists(staging):
+            raise ValueError(
+                f"release staging path already exists, refusing to touch it: {staging}")
+    stage.mkdir()
     (stage / "synveil.release.json").write_bytes(
         json.dumps(metadata, indent=2).encode() + b"\n")
     (stage / "synveil.release.sig").write_bytes(signature)
-    import shutil
     shutil.copyfile(payload, stage / "synveil.release.bin")
-    with open(out_image, "wb") as handle:
+    with open(out_image, "xb") as handle:
         handle.truncate(MEDIA_SIZE_MB * 1024 * 1024)
     run(["sgdisk", "--clear",
          "--new=1:2048:0", "--typecode=1:8300",
@@ -141,8 +161,7 @@ def build_media(payload, metadata, signature, out_image):
     info = subprocess.check_output(["sgdisk", "-i", "1", str(out_image)], text=True)
     first = int([line for line in info.splitlines()
                  if "First sector:" in line][0].split(":", 1)[1].split()[0])
-    fs_image = out_image.parent / (out_image.stem + "-fs.img")
-    with open(fs_image, "wb") as handle:
+    with open(fs_image, "xb") as handle:
         handle.truncate((MEDIA_SIZE_MB - 2) * 1024 * 1024)
     run(["mkfs.ext4", "-F", "-q", "-L", "SYNVEIL_RELEASE", "-b", "4096", str(fs_image)])
     for name in ("synveil.release.json", "synveil.release.sig", "synveil.release.bin"):

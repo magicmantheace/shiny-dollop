@@ -344,6 +344,15 @@ def main():
     generations, recovery = build_generations(commit, public_hex, baseline_rootfs)
     disk = assemble_disk(generations, recovery)
     releases = {}
+    # build_media creates outputs exclusively and refuses existing
+    # paths; this build owns its output directory, so remove its own
+    # prior release outputs (and any staging leftovers) explicitly.
+    for old_label in ("release-v2", "release-v3", "release-v2-badsig"):
+        for suffix in (".img", "-fs.img"):
+            (OUT / f"{old_label}{suffix}").unlink(missing_ok=True)
+        stale_stage = OUT / f"{old_label}-stage"
+        if stale_stage.is_dir():
+            shutil.rmtree(stale_stage)
     for version, corrupt in ((2, False), (3, False), (2, True)):
         label = f"release-v{version}" + ("-badsig" if corrupt else "")
         releases[label] = ab_release.package(

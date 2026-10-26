@@ -88,5 +88,82 @@ class ReleaseCrosscheck(unittest.TestCase):
         self.assertEqual(len(self.public_hex), 64)
 
 
+class BuildMediaSafety(unittest.TestCase):
+    """Review correction (2026-10-26): build_media used to truncate
+    an existing output in place and delete a pre-existing staging
+    directory. Every refusal below must leave the victim's bytes
+    bit-identical."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.base = Path(self.tmp.name)
+        self.payload = self.base / "gen.efi"
+        self.payload.write_bytes(b"UKI-BYTES" * 1024)
+        self.metadata = {"schema": "synveil.ab-release/v2", "version": 2}
+        self.signature = b"\x01" * 64
+
+    def build(self, out):
+        return ab_release.build_media(
+            self.payload, self.metadata, self.signature, out)
+
+    def test_existing_output_refused_bytes_unchanged(self):
+        out = self.base / "rel.img"
+        out.write_bytes(b"VICTIM" * 1000)
+        with self.assertRaises(ValueError):
+            self.build(out)
+        self.assertEqual(out.read_bytes(), b"VICTIM" * 1000)
+
+    def test_symlink_output_refused_victim_unchanged(self):
+        victim = self.base / "victim.img"
+        victim.write_bytes(b"PRECIOUS" * 500)
+        out = self.base / "rel.img"
+        out.symlink_to(victim)
+        with self.assertRaises(ValueError):
+            self.build(out)
+        self.assertEqual(victim.read_bytes(), b"PRECIOUS" * 500)
+        self.assertTrue(out.is_symlink())
+
+    def test_existing_stage_dir_refused_never_deleted(self):
+        stage = self.base / "rel-stage"
+        stage.mkdir()
+        sentinel = stage / "sentinel.txt"
+        sentinel.write_text("do not delete")
+        with self.assertRaises(ValueError):
+            self.build(self.base / "rel.img")
+        self.assertEqual(sentinel.read_text(), "do not delete")
+        self.assertFalse((self.base / "rel.img").exists())
+
+    def test_existing_fs_staging_refused_bytes_unchanged(self):
+        fs = self.base / "rel-fs.img"
+        fs.write_bytes(b"STAGING" * 100)
+        with self.assertRaises(ValueError):
+            self.build(self.base / "rel.img")
+        self.assertEqual(fs.read_bytes(), b"STAGING" * 100)
+        self.assertFalse((self.base / "rel.img").exists())
+
+    def test_symlink_parent_refused(self):
+        real = self.base / "real"
+        real.mkdir()
+        link = self.base / "link"
+        link.symlink_to(real, target_is_directory=True)
+        with self.assertRaises(ValueError):
+            self.build(link / "rel.img")
+        self.assertEqual(list(real.iterdir()), [])
+
+    def test_missing_parent_refused(self):
+        with self.assertRaises(ValueError):
+            self.build(self.base / "nope" / "rel.img")
+
+    def test_fresh_output_builds(self):
+        out = self.build(self.base / "rel.img")
+        self.assertTrue(out.is_file())
+        self.assertEqual(out.stat().st_size,
+                         ab_release.MEDIA_SIZE_MB * 1024 * 1024)
+        # Staging paths created by the call are cleaned up on success.
+        self.assertFalse((self.base / "rel-stage").exists())
+        self.assertFalse((self.base / "rel-fs.img").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
