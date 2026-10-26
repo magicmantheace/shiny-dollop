@@ -1,19 +1,28 @@
-# Physical UEFI boot bring-up (developer-only)
+# Physical UEFI boot bring-up
 
-**Status (2026-10-25): Not ready for owner hardware testing.**
+**Status (2026-10-25): Ready for the owner's first boot test on a
+dedicated external SSD — not an install, and not yet physically
+validated.**
 
 Target: HP Pavilion TG01, Intel i5-10400F, RTX 3060 12 GB, 32 GB RAM,
 USB HID keyboard/mouse, UEFI firmware and Windows 11 on the internal disk.
 
 A single **joined image** now exists that boots (in QEMU) through
 graphical enrollment and login into a multiwindow Weston desktop,
-with state on a GPT state partition the image itself provides, and a
-hardware-profile build of that same image has been produced
-([validation record](validation/joined-124abbc/README.md)). None of
-this has been booted on physical hardware: the EFI binaries are
-unsigned, no removable-media preparation method has been reviewed,
-and HP firmware behavior is unverified. The image is **not** yet a
-safe standalone owner install.
+with state on a GPT state partition the image itself provides, and
+the hardware-profile build of that same image has now been
+boot-validated end to end in QEMU/OVMF — enrollment, login, Weston
+desktop, cold-reboot persistence, plus hard-power-cut and
+broken-state failure boots
+([validation record](validation/joined-hardware-124abbc/README.md)).
+The owner test-media package (`out/test-media/`: image, SHA256SUMS,
+guarded writer, [owner guide](OWNER_FIRST_BOOT_TEST.md)) is assembled
+and checksum-verified. The EFI binaries remain **unsigned** (Secure
+Boot handling, including the BitLocker caution, is in the owner
+guide), and HP firmware behavior is unverified until the owner's
+test. This is a disposable-media boot test; a safe standalone owner
+install additionally requires the ADR 0010 recovery program and the
+A/B milestone below.
 
 ## Exact separation of targets
 
@@ -74,8 +83,16 @@ a claim of boot success on the physical machine.
       graphical Settings Manager. No state/data persisted between those boots.
       This is **not** a native Synveil compositor, protected owner login,
       installed-system boot, hardware GPU test, or production release.
-- [ ] Correct `tty0` screen diagnostics and UEFI firmware framebuffer
+- [x] Correct `tty0` screen diagnostics and UEFI firmware framebuffer
       tested in a disposable QEMU UEFI graphical session.
+      Proven for the hardware-profile joined image (2026-10-25): in an
+      OVMF graphical session the acceptance recorded distinct live
+      text-console frames on the UEFI framebuffer before the greeter
+      took over, and the auth UI + Weston desktop rendered through
+      that framebuffer path at 1280×800 — see
+      [validation record](validation/joined-hardware-124abbc/README.md).
+      This is the emulated GOP framebuffer; the TG01's physical panel
+      path is covered by the physical-validation gate below.
 - [ ] Real multiwindow desktop with graphical login and owner enrollment;
       keyboard, pointer, launcher, terminal, file manager and settings.
       **QEMU-proven subset (2026-10-25, joined image @ 124abbc):**
@@ -84,6 +101,10 @@ a claim of boot success on the physical machine.
       window move/resize, weston-terminal, session-end relock, state
       persisted on the image-provided partition — see
       [validation record](validation/joined-124abbc/README.md).
+      The same acceptance now also passes on the **hardware-profile
+      image** (scanout-driven driver; power-cut and broken-state
+      failure boots included) — see
+      [validation record](validation/joined-hardware-124abbc/README.md).
       Still missing: launcher, file manager and settings applications;
       any physical-hardware boot.
 - [x] Non-root session; no unauthenticated serial or local root-shell bypass.
@@ -91,15 +112,62 @@ a claim of boot success on the physical machine.
       session runs as UID 1000 behind the seat lease, the production
       profile carries no developer-serial-recovery marker, and the
       serial console stays locked through enroll/login/relock.
+      Extended to the hardware-profile image the same day: its
+      initramfs inventory shows the auth-desktop marker and no
+      developer-serial-recovery marker, and across four QEMU runs
+      (including the broken-state boot) the serial capture contained
+      only firmware output — the guest has no serial console at all
+      (console=tty0) and the tty0 console stays locked.
       Physical-hardware confirmation remains outstanding.
 - [ ] Independent console/recovery path when the desktop/seat fails.
-- [ ] Signed or otherwise owner-verified release/image provenance, with
+      **Partially proven (2026-10-25):** bounded supervisor restarts
+      for seat and desktop, fail-closed relock on session end/seat
+      loss, recovery from a hard power cut mid-session, and fail-
+      closed degradation to a locked login when the state filesystem
+      is destroyed — all exercised on the hardware-profile image in
+      QEMU ([validation record](validation/joined-hardware-124abbc/README.md)).
+      The read-only `recovery-status` diagnostic mode (ADR 0010 tier
+      A) exists in the initramfs but is unreachable under this image's
+      fixed kernel command line, and the interactive owner recovery
+      of ADR 0010 tiers B–D is unimplemented and gated on an
+      owner-approved design. For this disposable test media the
+      documented recovery procedure is a media rewrite
+      ([owner guide](OWNER_FIRST_BOOT_TEST.md)). The gate stays open
+      for installed systems.
+- [x] Signed or otherwise owner-verified release/image provenance, with
       clear test-media identification and checksums.
-- [ ] Dedicated removable-media preparation method reviewed for correct
+      Owner-verified route (2026-10-25): the image is **unsigned**;
+      its SHA-256 is pinned in the committed
+      [validation record](validation/joined-hardware-124abbc/README.md)
+      and in the package's `PACKAGE.json`/`SHA256SUMS`
+      (`out/test-media/`, `sha256sum --check` verified). Test-media
+      identification is explicit in the package name, manifest warning
+      and owner guide. Signing remains a release-milestone item.
+- [x] Dedicated removable-media preparation method reviewed for correct
       device identity and destructive-operation confirmation.
+      Provided (2026-10-25): `tools/write-test-media.sh` pins the
+      expected digest from the validation record, accepts only whole
+      removable/USB disks (never partitions, never internal disks),
+      refuses mounted or system-hosting devices, displays model,
+      serial and size, requires typing the exact device name, and
+      verifies a full read-back digest after writing; its refusal
+      paths were executed in this environment. The reviewed Windows
+      path (digest check via certUtil, target identification in Disk
+      Management, balenaEtcher with automatic validation or Rufus in
+      DD mode) is in the [owner guide](OWNER_FIRST_BOOT_TEST.md).
 - [ ] Documented HP firmware compatibility, USB boot selection, network
       and RTX 3060 fallback limitations. Windows partitions must remain
       untouched, including firmware boot-order and ESP changes.
+      **Documentation written (2026-10-25)** in the
+      [owner guide](OWNER_FIRST_BOOT_TEST.md): one-time boot-menu
+      selection (Esc/F9) so the permanent boot order, ESP and Windows
+      partitions are untouched by construction; Secure Boot handling
+      with the BitLocker-recovery caution; RTX 3060 expectations (no
+      NVIDIA/nouveau driver in the kernel — firmware framebuffer via
+      simpledrm, software rendering, firmware-chosen resolution, the
+      10400F's inactive motherboard video outputs); no networking in
+      this test image. Firmware *compatibility* itself can only be
+      established by the physical test below.
 - [ ] Physical validation recorded **separately** from QEMU.
 
 UEFI Secure Boot may reject unsigned EFI-stub binaries. Changing Secure Boot

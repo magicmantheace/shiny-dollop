@@ -25,13 +25,18 @@ authorizes an install. The A/B layout and boot-health/rollback transaction
 must be independently tested with disposable media before physical use.
 See [ADR 0013](adr/0013-first-boot-desktop-priority.md).
 
-**First hands-on test remains blocked** by independent owner
-recovery, portable image delivery (a reviewed removable-media
-preparation method), hardware driver breadth, and physical
-validation. Production-safe first-user enrollment and a real window
-manager — previously on this list — are now implemented and proven
-in QEMU in the joined image described below; that proof is
-QEMU-only and does not itself authorize a physical install.
+**First hands-on boot test is now packaged** (see the
+hardware-profile section below): the hardware-profile joined image
+is boot-validated in QEMU, a reviewed removable-media preparation
+method exists, and the owner test package with instructions is
+assembled. What remains blocked is a first **install** — persistent
+use on hardware — which still requires the independent owner
+recovery program (ADR 0010), the A/B installation milestone, and
+physical validation on the target machine. Production-safe
+first-user enrollment and a real window manager — previously on the
+blocked list — are implemented and proven in QEMU in the joined
+image described below; that proof is QEMU-only and does not itself
+authorize a physical install.
 
 ## Joined authenticated Weston image (2026-10-25)
 
@@ -49,6 +54,29 @@ intended install arrangement. A hardware-profile build
 (`--boot-target hardware`) of the same image exists as a build
 artifact. Full evidence:
 [validation record](validation/joined-124abbc/README.md).
+
+## Hardware-profile boot validation and test package (2026-10-25)
+
+The hardware-profile build has since been **boot-validated in
+QEMU/OVMF end to end** by a scanout-driven acceptance
+(`tests/smoke-native-joined-hardware.py` — the hardware kernel's
+console is tty0, so the driver synchronizes on framebuffer content
+rather than serial markers): enrollment with a visibly rejected
+mismatch, wrong password denied after a cold reboot, the Weston
+desktop proof, session-end relock, recovery from a hard power cut
+mid-session, and a fail-closed locked login when the state
+filesystem is destroyed. The owner test-media package
+(`out/test-media/`: the image at SHA-256 `6b10b482…fc3`,
+`SHA256SUMS`, the guarded writer `tools/write-test-media.sh`, and
+the [owner first-boot test guide](OWNER_FIRST_BOOT_TEST.md)) is
+assembled and checksum-verified. The image is unsigned, carries no
+NVIDIA/nouveau driver (the TG01 display will run on the firmware
+framebuffer), and has never been booted on physical hardware; the
+guide covers Secure Boot handling with the BitLocker-recovery
+caution, one-time boot-menu selection that leaves the Windows disk,
+ESP and boot order untouched, and the step-by-step test script.
+Full evidence:
+[validation record](validation/joined-hardware-124abbc/README.md).
 
 ## Native authenticated Files browser (development)
 
