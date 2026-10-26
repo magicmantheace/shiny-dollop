@@ -14,8 +14,10 @@ chain-loading inside the guest, see docs/AB_UPDATER.md):
       user file in the DATA-backed home
   S1  stage signed v2 from release media; on reboot the entry
       generation's hook hands over (chain-load) to the v2 trial
-  S2  v2 trial boots, health confirmation promotes it; login,
-      desktop background change and all survival artifacts verified
+  S2  v2 trial boots, the agent's health checks pass, and the
+      operator confirms with the typed confirm action (two-key
+      confirmation, docs/AB_UPDATER.md); login, desktop background
+      change and all survival artifacts verified
   S3  owner-requested rollback to v1, trial + confirmation again
   S4  failing candidate v3: three unhealthy trial boots exhaust
       attempts, firmware falls back to v1, trial discarded
@@ -274,15 +276,114 @@ def next_frame(boot):
         boot.qmp, boot.dir, boot.frame_base + boot.frame_seq)
 
 
+# The update GUI's pixel identity (src/desktop-wayland/update-window.c):
+# a purple title bar, a paper-white body, and a state banner whose
+# color is the coarse on-screen state. The GUI smoke and the
+# terminal focus helper both locate the window by these colors.
+GUI_TITLE = (0x5B, 0x2E, 0x6E)
+GUI_CLOSE = (0xA8, 0x44, 0x55)
+GUI_PAPER = (0xF2, 0xF0, 0xEB)
+GUI_BANNERS = {
+    "normal": (0x2E, 0x7D, 0x4F),
+    "trial": (0xB0, 0x7A, 0x1E),
+    "error": (0xA8, 0x2A, 0x2A),
+    "disabled": (0x6E, 0x6E, 0x6E),
+    "down": (0x4A, 0x4A, 0x55),
+}
+# Button geometry inside the window (update-window.c): five buttons,
+# 128x36, 10px gaps from x=16, anchored 92px above the bottom edge.
+GUI_BUTTONS = ("stage", "restart", "confirm", "rollback", "refresh")
+
+
+def _px(data, width, x, y):
+    off = (y * width + x) * 3
+    return data[off], data[off + 1], data[off + 2]
+
+
+def _near(rgb, target, tol=4):
+    return all(abs(a - b) <= tol for a, b in zip(rgb, target))
+
+
+def gui_window_rect(width, height, data):
+    """Locate the update GUI window: (x, y, w, h) or None."""
+    for y in range(0, height - 200):
+        x = 0
+        while x < width:
+            if _near(_px(data, width, x, y), GUI_TITLE):
+                start = x
+                while x < width and _near(_px(data, width, x, y), GUI_TITLE):
+                    x += 1
+                if x - start >= 300:
+                    # The close box finishes the title bar's row.
+                    w = x - start
+                    probe = x
+                    while probe < width and _near(
+                            _px(data, width, probe, y), GUI_CLOSE):
+                        probe += 1
+                    if probe > x:
+                        w += probe - x
+                    # Height: the left edge stays paper/banner until
+                    # the window's bottom.
+                    interior = set(GUI_BANNERS.values()) | {GUI_PAPER}
+                    bottom = y
+                    for row in range(y + 1, height):
+                        if any(_near(_px(data, width, start + 2, row), c)
+                               for c in interior):
+                            bottom = row
+                        else:
+                            break
+                    return start, y, w, bottom - y + 1
+            else:
+                x += 1
+    return None
+
+
+def gui_banner_kind(width, height, data, rect):
+    """Sample the GUI's state banner: a GUI_BANNERS key or None."""
+    x, y, w, _h = rect
+    rgb = _px(data, width, x + w // 2, y + 30 + 26)
+    for kind, color in GUI_BANNERS.items():
+        if _near(rgb, color, tol=6):
+            return kind
+    return None
+
+
+def gui_click(boot, rect, index):
+    """Click button `index` of the GUI window, raising it first."""
+    x, y, w, h = rect
+    width, height, _data = next_frame(boot)
+    # A press on the title bar raises the window without moving it.
+    weston_smoke.pointer(boot.qmp, width, height, x + 60, y + 14, button=True)
+    weston_smoke.pointer(boot.qmp, width, height, x + 60, y + 14, button=False)
+    time.sleep(0.4)
+    bx = x + 16 + index * 138 + 64
+    by = y + h - 92 + 18
+    weston_smoke.pointer(boot.qmp, width, height, bx, by, button=True)
+    weston_smoke.pointer(boot.qmp, width, height, bx, by, button=False)
+    time.sleep(0.4)
+
+
+def close_gui_window(boot, rect):
+    x, y, w, _h = rect
+    width, height, _data = next_frame(boot)
+    weston_smoke.pointer(boot.qmp, width, height, x + w - 14, y + 14, button=True)
+    weston_smoke.pointer(boot.qmp, width, height, x + w - 14, y + 14, button=False)
+    time.sleep(0.8)
+
+
 def focus_terminal(boot, timeout=240):
     """Focus the session's terminal window, closing a covering
     window first if needed (the joined smoke's proven sequence).
 
-    The Weston session opens a dashboard/client window and a
-    terminal; the terminal interior is found by its dark canvas.
+    The Weston session opens a dashboard/client window, a terminal,
+    and (on A/B generations) the update GUI; the terminal interior
+    is found by its dark canvas. Covering windows are closed in
+    turn — the GUI first (it is auxiliary by design), then the
+    first window by its proven Escape close.
     """
     deadline = time.monotonic() + timeout
     closed_cover = False
+    closed_gui = False
     while time.monotonic() < deadline:
         try:
             frame = next_frame(boot)
@@ -299,6 +400,14 @@ def focus_terminal(boot, timeout=240):
             weston_smoke.pointer(boot.qmp, width, height, tx, ty, button=False)
             time.sleep(0.4)
             return True
+        if not closed_gui:
+            rect = gui_window_rect(width, height, data)
+            if rect:
+                close_gui_window(boot, rect)
+                closed_gui = True
+                time.sleep(1.0)
+                continue
+            closed_gui = True
         if not closed_cover:
             window = weston_smoke.original_window(width, height, data)
             if window:
@@ -495,7 +604,13 @@ def main():
             if ok:
                 ok = desktop_color_proof(boot, 2)
             if ok:
-                ok = boot.wait("SYNVEIL_AB_CONFIRMED ", 600, since=staged_at)
+                # Two-key confirmation: health passing is announced
+                # by the agent but promotes nothing on its own; the
+                # operator's typed confirm action does.
+                ok = boot.wait("SYNVEIL_AB_HEALTH_PASSED", 600, since=staged_at)
+            if ok:
+                ok = terminal_command(boot, "confirm",
+                                      "SYNVEIL_AB_CONFIRMED ", timeout=300)
         boot.quit()
         artifacts = state_artifacts(disk, work)
         control = artifacts["control"] or {}
@@ -529,7 +644,10 @@ def main():
             if ok:
                 ok = desktop_color_proof(boot, 1)
             if ok:
-                ok = boot.wait("SYNVEIL_AB_CONFIRMED ", 600, since=mark)
+                ok = boot.wait("SYNVEIL_AB_HEALTH_PASSED", 600, since=mark)
+            if ok:
+                ok = terminal_command(boot, "confirm",
+                                      "SYNVEIL_AB_CONFIRMED ", timeout=300)
         boot.quit()
         artifacts = state_artifacts(disk, work)
         control = artifacts["control"] or {}

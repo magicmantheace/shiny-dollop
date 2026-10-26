@@ -222,11 +222,12 @@ def type_test_secret(socket_path: Path, secret: str, *, timeout=15.0):
 
 
 
-# A/B update proof: the session terminal may receive only these five
+# A/B update proof: the session terminal may receive only these six
 # complete, fixed command lines, selected by id. The caller cannot
 # supply or alter any character of the text; the map is the allowlist.
 AB_COMMANDS = {
     "stage": "/usr/sbin/veil-ab request stage",
+    "confirm": "/usr/sbin/veil-ab request confirm",
     "rollback": "/usr/sbin/veil-ab request rollback",
     "status": "/usr/sbin/veil-ab request status",
     "reboot": "/usr/sbin/veil-ab request reboot",
