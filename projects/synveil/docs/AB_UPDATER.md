@@ -101,29 +101,48 @@ Selection instead works like this:
    paths, and the next boot from any other entry point expires the
    trial per rule 2 once attempts are spent.
 
-## Health confirmation
+## Health confirmation — two-key (health + owner)
 
-A trial generation confirms itself only when all of these are true
-in the running candidate: STATE mounted read-write and the control
-record re-read intact; the credential record parses under the same
-PHC machinery the verifier uses (a full password verification
-happens at the graphical login); veil-core answers a status probe
-on its socket; the Weston session is live (Wayland socket, Weston
-and the seat broker running); the running generation's stamp
-identity matches the trial record and the slot it occupies still
-hashes to the staged digest. Confirmation writes `confirmed =
-trial`, clears the trial, and appends a history entry — nothing
-else; there is no firmware state to promote or clear. Any failure:
-reboot unpromoted; attempts bound the retries; exhaustion leaves
-the confirmed generation in charge, and the failed candidate stays
-in its slot, marked in history, until an owner decision or a newer
-stage overwrites it.
+Confirmation takes two keys, and either one alone does nothing:
+
+1. **Health.** The agent's health checks must pass in the running
+   candidate: STATE mounted read-write and the control record
+   re-read intact; the credential record parses under the same PHC
+   machinery the verifier uses (a full password verification
+   happens at the graphical login); veil-core answers a status
+   probe on its socket; the Weston session is live (Wayland
+   socket, Weston and the seat broker running); the running
+   generation's stamp identity matches the trial record and the
+   slot it occupies still hashes to the staged digest. The agent
+   runs these automatically on a trial boot and records the
+   outcome (`SYNVEIL_AB_HEALTH_PASSED` / the failing check); it
+   never promotes on health alone.
+2. **Owner.** The owner then issues the typed `confirm` action —
+   the desktop update GUI's Confirm button, or `veil-ab request
+   confirm`. The action re-verifies that the running system is the
+   trial generation, that this boot's health outcome is *passed*,
+   and that the candidate slot still hashes to the trial record,
+   and only then promotes: `confirmed = trial`, the trial is
+   cleared, and a history entry is appended — nothing else; there
+   is no firmware state to promote or clear.
+
+Any health failure: reboot unpromoted; attempts bound the retries;
+exhaustion leaves the confirmed generation in charge, and the
+failed candidate stays in its slot, marked in history, until an
+owner decision or a newer stage overwrites it. A healthy trial the
+owner neither confirms nor rolls back is not silently promoted
+either: each further boot consumes another attempt, and
+exhaustion falls back the same way. (This two-key split is the
+owner Priority 2 amendment of 2026-10-26; Pass B's original design
+promoted on health alone. The host core `tools/ab_update.py`
+always modelled `confirm` as an explicit operator action — the
+guest now matches it.)
 
 ## Update transaction (running system)
 
 Performed by the update service through the existing typed privilege
-boundary (the desktop never gets a root shell; Priority 2 wires the
-GUI to these actions):
+boundary (the desktop never gets a root shell; the Priority 2 GUI
+below is wired to exactly these actions):
 
 1. Fetch release metadata + payload from the configured source
    (in the QEMU proof: a local release medium identified by
@@ -231,6 +250,39 @@ and this design does not claim otherwise. Interactive
 installed-system recovery beyond diagnostics remains ADR 0010's
 open program. Credentials, home, settings, and history survive
 every failure above because they were never inside a slot.
+
+## Graphical update controls (Priority 2)
+
+`synveil-update-gui` (`src/desktop-wayland/update-window.c`) is an
+ordinary unprivileged Wayland client in the authenticated session,
+launched by `weston-session` only on A/B generations (the
+`ab-system` marker gates it; a single-image session is unchanged).
+It is a face on the agent, nothing more:
+
+- Its only channel is the agent's typed socket
+  (`synveil.ab-agent/v1`; actions `status`, `stage`, `confirm`,
+  `rollback`, `reboot`). It sends fixed action words and nothing
+  else — there is no text input in the window, no command line, no
+  shell anywhere in the path, and the client runs as the session
+  user (it refuses to run as root).
+- Everything it shows comes from the agent's `status` reply at
+  request time: running generation, confirmed generation, trial
+  (with attempts remaining), this boot's health outcome, the slot
+  map, the publisher key (with the development-key fact on its
+  face), the update history, and an `available` probe that mounts
+  the release media read-only and runs the same signature
+  verification staging uses, so "an update is available" on screen
+  means a signed one is. It refreshes every few seconds and after
+  every action, and a refresh never overwrites an action's message.
+- Buttons are gated by the same state (Stage needs media attached
+  and no pending trial; Confirm needs the trial running with
+  health *passed*; Restart needs a trial waiting to boot), but the
+  gating is presentation only — the agent re-checks everything.
+- Refusals are shown as refusals: a bad signature, a
+  rollback-unsafe migration, a failed health check, or no media
+  appears on screen in the agent's own words under an error banner,
+  never as success, and the state rows continue to show the record
+  as it actually is.
 
 ## Fixtures vs installed operations
 
