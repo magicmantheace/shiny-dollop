@@ -201,10 +201,19 @@ def main():
             ok = enrolled
         if ok:
             ok = ab.login(boot, secret)
-        gui_seen = False
+        gui_window = False
+        gui_banner = False
         if ok:
-            gui_seen = find_gui(boot) is not None and \
-                wait_banner(boot, "normal", timeout=120)
+            # Generous budgets: the session's GUI appears only after
+            # the agent answers, and a loaded host slows the guest.
+            # (One G0 run missed the 240 s window-find while the
+            # GUI's own log later proved it had started; the two
+            # halves are recorded separately so a recurrence is
+            # diagnosable from the receipt alone.)
+            gui_window = find_gui(boot, timeout=420) is not None
+            if gui_window:
+                gui_banner = wait_banner(boot, "normal", timeout=180)
+        gui_seen = gui_window and gui_banner
         known_file_made = False
         if ok:
             known_file_made = ab.terminal_command(boot, "known-file")
@@ -223,7 +232,8 @@ def main():
               and bool(artifacts["credential_sha256"])
               and artifacts["known_file"] == ab.EXPECTED_KNOWN_FILE)
         record("G0-provision-enroll-gui-present", ok,
-               gui_window_seen=gui_seen,
+               gui_window_seen=gui_window,
+               gui_banner_normal=gui_banner,
                gui_log_ready="SYNVEIL_UPDATE_GUI_READY" in gui_log,
                gui_log_status="SYNVEIL_UPDATE_GUI_STATUS" in gui_log,
                credential_recorded=bool(artifacts["credential_sha256"]),
@@ -421,6 +431,8 @@ def validate_gui_results(results):
     if g0 is not None:
         if g0.get("gui_window_seen") is not True:
             violations.append("G0: GUI window not seen")
+        if g0.get("gui_banner_normal") is not True:
+            violations.append("G0: GUI banner never read normal")
         if g0.get("gui_log_ready") is not True or g0.get("gui_log_status") is not True:
             violations.append("G0: GUI session log evidence missing")
         if g0.get("credential_recorded") is not True:

@@ -81,6 +81,7 @@ def consistent_gui_results():
     return {
         "G0-provision-enroll-gui-present": {
             "pass": True, "gui_driven": True, "gui_window_seen": True,
+            "gui_banner_normal": True,
             "gui_log_ready": True, "gui_log_status": True,
             "credential_recorded": True,
             "known_file": ab.EXPECTED_KNOWN_FILE},
