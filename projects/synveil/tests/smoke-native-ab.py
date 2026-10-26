@@ -372,11 +372,25 @@ def state_artifacts(disk, workdir):
     state = extract_partition(disk, 4, workdir)
     data = extract_partition(disk, 5, workdir)
     control_raw = ext4_read(state, "/lib/synveil/ab-control.json")
+    control = None
+    if control_raw:
+        try:
+            control = json.loads(control_raw)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            # A just-quitted guest can leave debugfs reading a
+            # journal-dirty image; re-read once before giving up,
+            # and preserve the raw bytes as evidence either way.
+            time.sleep(2)
+            control_raw = ext4_read(state, "/lib/synveil/ab-control.json")
+            try:
+                control = json.loads(control_raw)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                (EVIDENCE / "ab-control-unparsed.bin").write_bytes(control_raw)
     pref = ext4_read(state, "/lib/synveil/desktop-pref.conf")
     credential = ext4_read(state, "/lib/synveil/auth/credential.phc")
     known = ext4_read(data, "/synveil/ab-known-file")
     return {
-        "control": json.loads(control_raw) if control_raw else None,
+        "control": control,
         "pref_sha256": hashlib.sha256(pref).hexdigest() if pref else None,
         "pref_text": pref.decode("utf-8", "replace") if pref else None,
         "credential_sha256": hashlib.sha256(credential).hexdigest() if credential else None,
