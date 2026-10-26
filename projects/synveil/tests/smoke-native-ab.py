@@ -258,7 +258,7 @@ def partition_offset(disk, number):
     first = int([line for line in info.splitlines()
                  if "First sector:" in line][0].split(":", 1)[1].split()[0])
     last = int([line for line in info.splitlines()
-                if "Last sector:" in line][0].split()[-1])
+                if "Last sector:" in line][0].split(":", 1)[1].split()[0])
     return first * 512, (last - first + 1) * 512
 
 
