@@ -187,18 +187,21 @@ class Boot:
 def login(boot, secret, timeout=420):
     """Wait for the graphical login, prove scanout, authenticate."""
     if not boot.wait("SYNVEIL_LOGIN_READY", timeout):
+        save_failure_frame(boot, "login-ready")
         return False
     for _ in range(10):
         if capture_test_scanout(boot.qmp, boot.dir / "scanout.ppm", timeout=2):
             break
         time.sleep(0.3)
     else:
+        save_failure_frame(boot, "login-scanout")
         return False
     try:
         type_test_secret(boot.qmp, secret, timeout=18)
     except (QMPError, OSError, ValueError):
         return False
     if not boot.wait("SYNVEIL_GRAPHICAL_AUTH_ACTIVE", 120):
+        save_failure_frame(boot, "login-auth")
         return False
     time.sleep(5)  # let the tile dashboard present before key input
     return True
@@ -230,6 +233,7 @@ def desktop_color_proof(boot, version, timeout=120):
         if fraction(target) >= 0.03 and fraction(target) >= 4 * max(fraction(other), 0.001):
             return True
         time.sleep(0.5)
+    save_failure_frame(boot, f"color-v{version}")
     return False
 
 
