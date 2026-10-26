@@ -261,11 +261,21 @@ def prune(raw, staging, readelf):
                                 "usr/share/info/", "usr/share/locale/")):
             continue
         in_kept_libs = path in keep
+        # The browser's own tree carries non-ELF runtime resources
+        # (icudtl.dat, *.pak, snapshot blobs, locales, the
+        # SwiftShader ICD json) the DT_NEEDED graph cannot see;
+        # excluding the lib prefixes from data copying dropped
+        # them and the browser died at ICU init. Non-ELF files
+        # under usr/lib/chromium/ are data, copied wholesale.
+        in_browser_data = relative.startswith("usr/lib/chromium/") \
+            and not path.is_symlink() \
+            and _elf_needed(readelf, path) is None
         in_data = any(relative.startswith(prefix)
                       for prefix in assets.DATA
                       if prefix not in ("usr/lib/chromium/",
                                         "usr/lib/x86_64-linux-gnu/")) \
-            or relative in assets.BINARIES or relative in assets.GENERATED
+            or relative in assets.BINARIES or relative in assets.GENERATED \
+            or in_browser_data
         if not (in_kept_libs or in_data):
             continue
         dest = staging / relative
