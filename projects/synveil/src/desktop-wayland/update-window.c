@@ -1148,6 +1148,14 @@ static long long now_ms(void) {
     return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
 
+/* Marker lines are the session log's evidence; make them durable
+ * promptly, not whenever the page cache happens to flush — the
+ * session can end by power loss (and the acceptance quits QEMU). */
+static void emit_durable(void) {
+    fflush(stdout);
+    fsync(fileno(stdout));
+}
+
 static void print_status_marker(const struct app *a) {
     const struct snapshot *s = &a->snap;
     printf("SYNVEIL_UPDATE_GUI_STATUS running=%lld confirmed=%lld trial=%lld "
@@ -1157,13 +1165,13 @@ static void print_status_marker(const struct app *a) {
            s->have_trial ? s->trial_version : -1,
            s->health_phase[0] ? s->health_phase : "none",
            banner_name(banner_of(a)));
-    fflush(stdout);
+    emit_durable();
 }
 
 static void activate_button(struct app *a, int i) {
     const char *action = BTN_ACTIONS[i];
     printf("SYNVEIL_UPDATE_GUI_CLICK action=%s\n", action);
-    fflush(stdout);
+    emit_durable();
     a->busy = 1;
     copy_str(a->busy_action, sizeof(a->busy_action), action);
     a->redraw = 1;
@@ -1178,7 +1186,7 @@ static void apply_job(struct app *a, const struct job *job) {
     printf("SYNVEIL_UPDATE_GUI_ACTION action=%s ok=%d%s%s\n", action,
            job->ok ? 1 : 0, job->error[0] ? " error=" : "",
            job->error[0] ? one_line : "");
-    fflush(stdout);
+    emit_durable();
     if (!strcmp(action, "status")) {
         /* A refresh must not clear the busy state of an action the
          * owner started; jobs complete in submission order, so a
@@ -1192,7 +1200,7 @@ static void apply_job(struct app *a, const struct job *job) {
             if (!a->ready_printed) {
                 a->ready_printed = 1;
                 puts("SYNVEIL_UPDATE_GUI_READY");
-                fflush(stdout);
+                emit_durable();
             }
             print_status_marker(a);
         } else {

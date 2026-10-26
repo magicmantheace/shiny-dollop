@@ -322,9 +322,9 @@ def gui_window_rect(width, height, data):
                         probe += 1
                     if probe > x:
                         w += probe - x
-                    # Height: the left edge stays paper/banner until
-                    # the window's bottom.
-                    interior = set(GUI_BANNERS.values()) | {GUI_PAPER}
+                    # Height: the left edge stays title/banner/paper
+                    # until the window's bottom.
+                    interior = set(GUI_BANNERS.values()) | {GUI_PAPER, GUI_TITLE}
                     bottom = y
                     for row in range(y + 1, height):
                         if any(_near(_px(data, width, start + 2, row), c)
