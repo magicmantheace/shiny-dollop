@@ -582,7 +582,8 @@ def main():
         ok = boot.wait("SYNVEIL_AB_CONFIRMED_BOOT", args.timeout) and login(boot, secret)
         if ok:
             ok = terminal_command(boot, "stage", "SYNVEIL_AB_ACTION_FAILED", timeout=420)
-            ok = ok and boot.seen("release signature verification failed")
+            ok = ok and boot.seen("SYNVEIL_AB_ACTION_FAILED action=stage "
+                                  "error=release signature verification failed")
             ok = ok and not boot.seen("SYNVEIL_AB_STAGED")
         boot.quit()
         artifacts = state_artifacts(disk, work)
@@ -601,20 +602,9 @@ def main():
         if ok:
             # Drive the stage from the terminal, but cut power the
             # moment the copy begins.
-            frame = None
-            for attempt in range(40):
-                try:
-                    frame = weston_smoke.screenshot(boot.qmp, boot.dir, 200 + attempt)
-                    tx, ty = weston_smoke.terminal_point(*frame)
-                    break
-                except (ValueError, RuntimeError, OSError):
-                    time.sleep(0.5)
-            if frame is None:
+            if not focus_terminal(boot):
                 ok = False
             else:
-                weston_smoke.pointer(boot.qmp, frame[0], frame[1], tx, ty, button=True)
-                weston_smoke.pointer(boot.qmp, frame[0], frame[1], tx, ty, button=False)
-                time.sleep(0.4)
                 cutter = threading.Thread(target=lambda: (
                     boot.wait("SYNVEIL_AB_STAGE_COPYING", 300), boot.quit()))
                 cutter.start()
