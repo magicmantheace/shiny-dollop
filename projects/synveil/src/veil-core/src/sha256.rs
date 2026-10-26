@@ -20,8 +20,7 @@ const K: [u32; 64] = [
 ];
 
 const H0: [u32; 8] = [
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
 ];
 
 /// Streaming SHA-256 state. Buffers at most one 64-byte block.
@@ -40,7 +39,12 @@ impl Default for Sha256 {
 
 impl Sha256 {
     pub fn new() -> Self {
-        Self { state: H0, block: [0u8; 64], block_len: 0, total_len: 0 }
+        Self {
+            state: H0,
+            block: [0u8; 64],
+            block_len: 0,
+            total_len: 0,
+        }
     }
 
     pub fn update(&mut self, mut input: &[u8]) {
@@ -90,7 +94,10 @@ impl Sha256 {
         let mut w = [0u32; 64];
         for i in 0..16 {
             w[i] = u32::from_be_bytes([
-                block[i * 4], block[i * 4 + 1], block[i * 4 + 2], block[i * 4 + 3],
+                block[i * 4],
+                block[i * 4 + 1],
+                block[i * 4 + 2],
+                block[i * 4 + 3],
             ]);
         }
         for i in 16..64 {
@@ -102,8 +109,14 @@ impl Sha256 {
                 .wrapping_add(s1);
         }
         let (mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut h) = (
-            self.state[0], self.state[1], self.state[2], self.state[3],
-            self.state[4], self.state[5], self.state[6], self.state[7],
+            self.state[0],
+            self.state[1],
+            self.state[2],
+            self.state[3],
+            self.state[4],
+            self.state[5],
+            self.state[6],
+            self.state[7],
         );
         for i in 0..64 {
             let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
