@@ -214,7 +214,15 @@ def main():
         artifacts = replayed_state_artifacts(disk, work)
         gui_log = data_read(disk, work, "/synveil/update-gui.log")
         gui_log = gui_log.decode("utf-8", "replace") if gui_log else ""
-        record("G0-provision-enroll-gui-present", ok and gui_seen,
+        # Semantic gate (review correction, 2026-10-26): the GUI
+        # evidence and the baseline artifacts are pass conditions,
+        # not decorations — a missing GUI log or known file fails.
+        ok = (ok and gui_seen
+              and "SYNVEIL_UPDATE_GUI_READY" in gui_log
+              and "SYNVEIL_UPDATE_GUI_STATUS" in gui_log
+              and bool(artifacts["credential_sha256"])
+              and artifacts["known_file"] == ab.EXPECTED_KNOWN_FILE)
+        record("G0-provision-enroll-gui-present", ok,
                gui_window_seen=gui_seen,
                gui_log_ready="SYNVEIL_UPDATE_GUI_READY" in gui_log,
                gui_log_status="SYNVEIL_UPDATE_GUI_STATUS" in gui_log,
@@ -265,13 +273,21 @@ def main():
         control = artifacts["control"] or {}
         gui_log = data_read(disk, work, "/synveil/update-gui.log")
         gui_log = gui_log.decode("utf-8", "replace") if gui_log else ""
+        gui_clicks = {name: f"SYNVEIL_UPDATE_GUI_CLICK action={name}" in gui_log
+                      for name in ("stage", "reboot", "confirm")}
+        gui_actions_ok = {
+            name: f"SYNVEIL_UPDATE_GUI_ACTION action={name} ok=1" in gui_log
+            for name in ("stage", "reboot", "confirm")}
+        # Semantic gate: confirmed generation, strict survival, and
+        # the GUI's own click/action evidence are all required.
+        ok = (ok and ab.confirmed_matches(control, 2)
+              and ab.strict_survival(artifacts, baseline)
+              and all(gui_clicks.values())
+              and all(gui_actions_ok.values()))
         record("G1-gui-stage-trial-confirm", ok,
                confirmed=(control.get("confirmed") or {}),
-               gui_clicks={name: f"SYNVEIL_UPDATE_GUI_CLICK action={name}" in gui_log
-                           for name in ("stage", "reboot", "confirm")},
-               gui_actions_ok={
-                   name: f"SYNVEIL_UPDATE_GUI_ACTION action={name} ok=1" in gui_log
-                   for name in ("stage", "reboot", "confirm")},
+               gui_clicks=gui_clicks,
+               gui_actions_ok=gui_actions_ok,
                survival={
                    "credential_same": artifacts["credential_sha256"] == baseline["credential_sha256"],
                    "known_file_same": artifacts["known_file"] == baseline["known_file"],
@@ -312,6 +328,8 @@ def main():
         boot.quit()
         artifacts = replayed_state_artifacts(disk, work)
         control = artifacts["control"] or {}
+        ok = (ok and ab.confirmed_matches(control, 1)
+              and ab.strict_survival(artifacts, baseline))
         record("G2-gui-rollback-confirm", ok,
                confirmed=(control.get("confirmed") or {}),
                survival={
@@ -345,6 +363,8 @@ def main():
         boot.quit()
         artifacts = replayed_state_artifacts(disk, work)
         control = artifacts["control"] or {}
+        ok = (ok and control.get("trial") is None
+              and ab.confirmed_matches(control, 1))
         record("G3-gui-badsig-refused", ok,
                trial=control.get("trial"),
                confirmed=(control.get("confirmed") or {}))
@@ -355,12 +375,85 @@ def main():
         entry["pass"] for entry in results.values()) else 1)
 
 
+def validate_gui_results(results):
+    """Re-derive the GUI verdict from the recorded fields alone
+    (review correction, 2026-10-26): a results dict whose recorded
+    confirmed generation, survival flags or GUI click/action
+    evidence contradict the scenario expectations yields
+    violations, and finish() emits no demonstrated claim. The first
+    GUI run's receipt is the canonical bad example: G1 'confirmed'
+    recording version 1, G0 known_file null, the confirm click
+    absent — all under pass flags. Exercised without QEMU by
+    tests/smoke-gates.py."""
+    violations = []
+
+    def need(name):
+        entry = results.get(name)
+        if entry is None:
+            violations.append(f"{name}: scenario missing")
+            return None
+        if entry.get("pass") is not True:
+            violations.append(f"{name}: pass flag is not true")
+        return entry
+
+    def confirmed_ok(name, entry, version):
+        if entry is None:
+            return
+        slot, generation_id = ab.GENERATION_SLOTS[version]
+        confirmed = entry.get("confirmed") or {}
+        if (confirmed.get("version") != version
+                or confirmed.get("slot") != slot
+                or confirmed.get("generation_id") != generation_id):
+            violations.append(
+                f"{name}: confirmed is {confirmed.get('version')}/"
+                f"{confirmed.get('slot')}/{confirmed.get('generation_id')}, "
+                f"expected {version}/{slot}/{generation_id}")
+
+    def survival_ok(name, entry):
+        if entry is None:
+            return
+        survival = entry.get("survival") or {}
+        for key in ("credential_same", "known_file_same"):
+            if survival.get(key) is not True:
+                violations.append(f"{name}: survival.{key} is not true")
+
+    g0 = need("G0-provision-enroll-gui-present")
+    if g0 is not None:
+        if g0.get("gui_window_seen") is not True:
+            violations.append("G0: GUI window not seen")
+        if g0.get("gui_log_ready") is not True or g0.get("gui_log_status") is not True:
+            violations.append("G0: GUI session log evidence missing")
+        if g0.get("credential_recorded") is not True:
+            violations.append("G0: credential not recorded")
+        if g0.get("known_file") != ab.EXPECTED_KNOWN_FILE:
+            violations.append("G0: known file missing or wrong content")
+    g1 = need("G1-gui-stage-trial-confirm")
+    confirmed_ok("G1-gui-stage-trial-confirm", g1, 2)
+    survival_ok("G1-gui-stage-trial-confirm", g1)
+    if g1 is not None:
+        for section in ("gui_clicks", "gui_actions_ok"):
+            values = g1.get(section) or {}
+            for action in ("stage", "reboot", "confirm"):
+                if values.get(action) is not True:
+                    violations.append(f"G1: {section}.{action} is not true")
+    g2 = need("G2-gui-rollback-confirm")
+    confirmed_ok("G2-gui-rollback-confirm", g2, 1)
+    survival_ok("G2-gui-rollback-confirm", g2)
+    g3 = need("G3-gui-badsig-refused")
+    confirmed_ok("G3-gui-badsig-refused", g3, 1)
+    if g3 is not None and g3.get("trial") is not None:
+        violations.append("G3: trial present after refused stage")
+    return violations
+
+
 def finish(build_receipt, results, code):
     try:
         source_commit = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     except (subprocess.CalledProcessError, OSError):
         source_commit = build_receipt["source_commit"]
+    violations = validate_gui_results(results)
+    demonstrated = code == 0 and not violations
     receipt = {
         "schema": "synveil.ab-gui-qemu-proof/v1",
         "source_commit": source_commit,
@@ -370,21 +463,19 @@ def finish(build_receipt, results, code):
                         for v, g in build_receipt["generations"].items()},
         "publisher": build_receipt["publisher"],
         "scenarios": results,
+        "gate_violations": violations,
         "gui_driven_scenarios": ["G1-gui-stage-trial-confirm",
                                  "G2-gui-rollback-confirm",
                                  "G3-gui-badsig-refused"],
         "agent_driven_scenarios": "tests/smoke-native-ab.py (nine scenarios)",
-        "graphical_update_controls_demonstrated": all(
-            results.get(name, {}).get("pass", False) for name in (
-                "G1-gui-stage-trial-confirm", "G2-gui-rollback-confirm",
-                "G3-gui-badsig-refused")),
+        "graphical_update_controls_demonstrated": demonstrated,
         "firmware_variables_written": False,
         "physical_hardware_tested": False,
     }
     (OUT / "gui-smoke-receipt.json").write_text(
         json.dumps(receipt, indent=2) + "\n")
-    print("SYNVEIL_AB_GUI_QEMU_PROOF_" + ("PASS" if code == 0 else "INCOMPLETE"))
-    return code
+    print("SYNVEIL_AB_GUI_QEMU_PROOF_" + ("PASS" if demonstrated else "INCOMPLETE"))
+    return 0 if demonstrated else 1
 
 
 if __name__ == "__main__":

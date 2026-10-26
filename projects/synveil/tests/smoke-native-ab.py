@@ -476,25 +476,38 @@ def ext4_read(image, path):
     return result.stdout
 
 
+EXPECTED_KNOWN_FILE = "synveil-ab-proof-file\n"
+GENERATION_SLOTS = {1: ("A", "synveil-gen-v1"), 2: ("B", "synveil-gen-v2")}
+
+
+def replayed_image(image):
+    """Copy a partition image and replay its ext4 journal, so a
+    post-quit read sees the guest's final state. A QEMU quit leaves
+    the last seconds of writes in the journal; plain debugfs then
+    returns a stale control record (or garbage) even though the
+    guest's serial markers prove the writes happened. The Pass B
+    receipt recorded exactly that staleness — S2/S3 confirmed
+    values inverted by one scenario — and the old gate never
+    checked the values (review correction, 2026-10-26). The replay
+    runs on a scratch copy; the evidence disk is never modified."""
+    target = image.with_suffix(".replayed.img")
+    shutil.copyfile(image, target)
+    subprocess.run(["e2fsck", "-y", str(target)], capture_output=True)
+    return target
+
+
 def state_artifacts(disk, workdir):
-    """Host-side view of STATE (partition 4) and DATA (partition 5)."""
-    state = extract_partition(disk, 4, workdir)
-    data = extract_partition(disk, 5, workdir)
+    """Host-side view of STATE (partition 4) and DATA (partition 5),
+    read from journal-replayed copies."""
+    state = replayed_image(extract_partition(disk, 4, workdir))
+    data = replayed_image(extract_partition(disk, 5, workdir))
     control_raw = ext4_read(state, "/lib/synveil/ab-control.json")
     control = None
     if control_raw:
         try:
             control = json.loads(control_raw)
         except (json.JSONDecodeError, UnicodeDecodeError):
-            # A just-quitted guest can leave debugfs reading a
-            # journal-dirty image; re-read once before giving up,
-            # and preserve the raw bytes as evidence either way.
-            time.sleep(2)
-            control_raw = ext4_read(state, "/lib/synveil/ab-control.json")
-            try:
-                control = json.loads(control_raw)
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                (EVIDENCE / "ab-control-unparsed.bin").write_bytes(control_raw)
+            (EVIDENCE / "ab-control-unparsed.bin").write_bytes(control_raw)
     pref = ext4_read(state, "/lib/synveil/desktop-pref.conf")
     credential = ext4_read(state, "/lib/synveil/auth/credential.phc")
     known = ext4_read(data, "/synveil/ab-known-file")
@@ -505,6 +518,104 @@ def state_artifacts(disk, workdir):
         "credential_sha256": hashlib.sha256(credential).hexdigest() if credential else None,
         "known_file": known.decode("utf-8", "replace") if known else None,
     }
+
+
+def confirmed_matches(control, version):
+    """The control record's confirmed entry is exactly the expected
+    generation: version, slot and generation id all agree."""
+    slot, generation_id = GENERATION_SLOTS[version]
+    confirmed = (control or {}).get("confirmed") or {}
+    return (confirmed.get("version") == version
+            and confirmed.get("slot") == slot
+            and confirmed.get("generation_id") == generation_id)
+
+
+def strict_survival(artifacts, baseline):
+    """Credential and known file survived, with both sides present:
+    a missing artifact on either side is a failure, never a match
+    (None == None passed the old gate)."""
+    return (bool(artifacts["credential_sha256"])
+            and bool(baseline["credential_sha256"])
+            and artifacts["credential_sha256"] == baseline["credential_sha256"]
+            and artifacts["known_file"] == EXPECTED_KNOWN_FILE
+            and baseline["known_file"] == EXPECTED_KNOWN_FILE)
+
+
+def validate_results(results):
+    """Re-derive the verdict from the recorded fields alone.
+
+    finish() trusts nothing the scenarios claimed: a results dict
+    whose recorded values contradict the scenario expectations —
+    the defective Pass B receipt is the canonical example (S2
+    'v2 confirmed' recording version 1/slot A, S0 known_file null,
+    all pass flags true) — produces violations here, and no
+    headline claim is emitted. Exercised without QEMU by
+    tests/smoke-gates.py."""
+    violations = []
+
+    def need(name):
+        entry = results.get(name)
+        if entry is None:
+            violations.append(f"{name}: scenario missing")
+            return None
+        if entry.get("pass") is not True:
+            violations.append(f"{name}: pass flag is not true")
+        return entry
+
+    def confirmed_ok(name, entry, version):
+        if entry is None:
+            return
+        slot, generation_id = GENERATION_SLOTS[version]
+        confirmed = entry.get("confirmed") or {}
+        if (confirmed.get("version") != version
+                or confirmed.get("slot") != slot
+                or confirmed.get("generation_id") != generation_id):
+            violations.append(
+                f"{name}: confirmed is {confirmed.get('version')}/"
+                f"{confirmed.get('slot')}/{confirmed.get('generation_id')}, "
+                f"expected {version}/{slot}/{generation_id}")
+
+    def survival_ok(name, entry):
+        if entry is None:
+            return
+        survival = entry.get("survival") or {}
+        for key in ("credential_same", "known_file_same"):
+            if survival.get(key) is not True:
+                violations.append(f"{name}: survival.{key} is not true")
+
+    s0 = need("S0-provision-enroll")
+    if s0 is not None:
+        if s0.get("credential_recorded") is not True:
+            violations.append("S0-provision-enroll: credential not recorded")
+        if s0.get("known_file") != EXPECTED_KNOWN_FILE:
+            violations.append(
+                f"S0-provision-enroll: known_file is {s0.get('known_file')!r}, "
+                f"expected {EXPECTED_KNOWN_FILE!r}")
+        if s0.get("home_mounted") is not True:
+            violations.append("S0-provision-enroll: home not mounted from DATA")
+    need("S1-stage-v2")
+    s2 = need("S2-trial-v2-confirmed")
+    confirmed_ok("S2-trial-v2-confirmed", s2, 2)
+    survival_ok("S2-trial-v2-confirmed", s2)
+    s3 = need("S3-owner-rollback-v1")
+    confirmed_ok("S3-owner-rollback-v1", s3, 1)
+    survival_ok("S3-owner-rollback-v1", s3)
+    s4 = need("S4-failing-candidate-fallback")
+    confirmed_ok("S4-failing-candidate-fallback", s4, 1)
+    survival_ok("S4-failing-candidate-fallback", s4)
+    if s4 is not None and s4.get("trial_after_fallback") is not None:
+        violations.append("S4-failing-candidate-fallback: trial not cleared")
+    s5 = need("S5-invalid-signature-refused")
+    confirmed_ok("S5-invalid-signature-refused", s5, 1)
+    if s5 is not None and s5.get("trial") is not None:
+        violations.append("S5-invalid-signature-refused: trial present")
+    s6 = need("S6-interrupted-stage")
+    confirmed_ok("S6-interrupted-stage", s6, 1)
+    s6b = need("S6b-stage-after-interrupt")
+    if s6b is not None and s6b.get("trial") is not None:
+        violations.append("S6b-stage-after-interrupt: trial present")
+    need("S7-corrupt-slots-fail-closed")
+    return violations
 
 
 def main():
@@ -571,6 +682,11 @@ def main():
             time.sleep(1)
         boot.quit()
         artifacts = state_artifacts(disk, work)
+        # Semantic gate: the artifacts S0 claims must actually be
+        # on STATE/DATA with the exact expected content.
+        ok = (ok and home_mounted
+              and bool(artifacts["credential_sha256"])
+              and artifacts["known_file"] == EXPECTED_KNOWN_FILE)
         record("S0-provision-enroll", ok,
                home_mounted=home_mounted,
                setting_changed=setting_changed,
@@ -614,6 +730,8 @@ def main():
         boot.quit()
         artifacts = state_artifacts(disk, work)
         control = artifacts["control"] or {}
+        ok = (ok and confirmed_matches(control, 2)
+              and strict_survival(artifacts, baseline))
         record("S2-trial-v2-confirmed", ok,
                confirmed=(control.get("confirmed") or {}),
                survival={
@@ -651,6 +769,8 @@ def main():
         boot.quit()
         artifacts = state_artifacts(disk, work)
         control = artifacts["control"] or {}
+        ok = (ok and confirmed_matches(control, 1)
+              and strict_survival(artifacts, baseline))
         record("S3-owner-rollback-v1", ok,
                confirmed=(control.get("confirmed") or {}),
                survival={
@@ -683,6 +803,9 @@ def main():
         boot.quit()
         artifacts = state_artifacts(disk, work)
         control = artifacts["control"] or {}
+        ok = (ok and confirmed_matches(control, 1)
+              and control.get("trial") is None
+              and strict_survival(artifacts, baseline))
         record("S4-failing-candidate-fallback", ok,
                confirmed=(control.get("confirmed") or {}),
                trial_after_fallback=control.get("trial"),
@@ -706,6 +829,8 @@ def main():
         boot.quit()
         artifacts = state_artifacts(disk, work)
         control = artifacts["control"] or {}
+        ok = (ok and control.get("trial") is None
+              and confirmed_matches(control, 1))
         record("S5-invalid-signature-refused", ok,
                trial=control.get("trial"),
                confirmed=(control.get("confirmed") or {}))
@@ -734,6 +859,7 @@ def main():
                 ok = not boot.seen("SYNVEIL_AB_STAGED")
         artifacts = state_artifacts(disk, work)
         control = artifacts["control"] or {}
+        ok = ok and confirmed_matches(control, 1)
         record("S6-interrupted-stage", ok,
                trial=control.get("trial"),
                confirmed=(control.get("confirmed") or {}))
@@ -756,6 +882,7 @@ def main():
         boot.quit()
         artifacts = state_artifacts(disk, work)
         control = artifacts["control"] or {}
+        ok = ok and control.get("trial") is None
         record("S6b-stage-after-interrupt", ok, trial=control.get("trial"))
         if not ok:
             return finish(build_receipt, results, 1)
@@ -799,6 +926,11 @@ def finish(build_receipt, results, code):
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     except (subprocess.CalledProcessError, OSError):
         source_commit = build_receipt["source_commit"]
+    # The verdict is re-derived from the recorded fields, never
+    # from the caller's code alone: inconsistent receipts cannot
+    # pass (review correction, 2026-10-26).
+    violations = validate_results(results)
+    demonstrated = code == 0 and not violations
     receipt = {
         "schema": "synveil.ab-qemu-proof/v1",
         "source_commit": source_commit,
@@ -808,17 +940,15 @@ def finish(build_receipt, results, code):
                         for v, g in build_receipt["generations"].items()},
         "publisher": build_receipt["publisher"],
         "scenarios": results,
-        "bootable_update_rollback_demonstrated": all(
-            results.get(name, {}).get("pass", False) for name in (
-                "S1-stage-v2", "S2-trial-v2-confirmed", "S3-owner-rollback-v1",
-                "S4-failing-candidate-fallback")),
+        "gate_violations": violations,
+        "bootable_update_rollback_demonstrated": demonstrated,
         "https_browsing_in_synveil": False,
         "persistent_downloads_in_synveil": False,
         "physical_hardware_tested": False,
     }
     (OUT / "smoke-receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
-    print("SYNVEIL_AB_QEMU_PROOF_" + ("PASS" if code == 0 else "INCOMPLETE"))
-    return code
+    print("SYNVEIL_AB_QEMU_PROOF_" + ("PASS" if demonstrated else "INCOMPLETE"))
+    return 0 if demonstrated else 1
 
 
 if __name__ == "__main__":
