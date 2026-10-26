@@ -81,7 +81,7 @@ KERNEL_CMDLINE="console=ttyS0,115200n8 earlycon=uart,io,0x3f8,115200 rdinit=/ini
 if [[ "$BOOT_TARGET" == hardware ]]; then
     # An HP Pavilion need not expose the QEMU COM1 console. A real virtual
     # console is required to see early boot diagnostics via UEFI GOP.
-    KERNEL_CMDLINE="console=tty0 console=ttyS0,115200n8 rdinit=/init panic=-1 loglevel=7"
+    KERNEL_CMDLINE="console=tty0 rdinit=/init panic=-1 loglevel=6"
 fi
 if [[ "$RECOVERY_STATUS_TEST" == 1 ]]; then
     KERNEL_CMDLINE="$KERNEL_CMDLINE synveil.recovery=status"
