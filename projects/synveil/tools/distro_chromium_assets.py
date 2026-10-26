@@ -35,14 +35,18 @@ DATA = (
     'usr/lib/chromium/',
     'usr/lib/x86_64-linux-gnu/',
     'usr/share/ca-certificates/',
-    'usr/share/fontconfig/',
     'usr/share/fonts/',
     'usr/share/glib-2.0/',
     'usr/share/icons/',
     'usr/share/mime/',
     'usr/share/vulkan/',
-    'usr/share/X11/',
-    'etc/fonts/',
+    # Deliberately absent: etc/fonts, usr/share/fontconfig and
+    # usr/share/X11 (xkb data). Font configuration and keymap
+    # data are system data owned by the baseline image (the
+    # Weston stage's fontconfig/xkb, at different versions than
+    # Debian's); the payload's copies collided with the
+    # baseline's on 250 paths (checked 2026-10-26) and Chromium
+    # uses the system's as-is.
 )
 GENERATED = frozenset((
     # Concatenated from the sealed mozilla bundle at stage build
