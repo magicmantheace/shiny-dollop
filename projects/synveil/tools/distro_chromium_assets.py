@@ -32,6 +32,8 @@ BINARIES = frozenset((
     'usr/bin/certutil',
 ))
 DATA = (
+    'etc/chromium.d/',
+    'etc/chromium/',
     'usr/lib/chromium/',
     'usr/lib/x86_64-linux-gnu/',
     'usr/share/ca-certificates/',
