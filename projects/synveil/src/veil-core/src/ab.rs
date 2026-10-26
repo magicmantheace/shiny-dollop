@@ -1217,7 +1217,11 @@ pub fn health_confirm() -> io::Result<&'static str> {
         ));
         return Ok("health-failed");
     }
-    let deadline = std::time::Instant::now() + Duration::from_secs(180);
+    // Generous under emulation: the session can only appear after a
+    // graphical login, and a slow first login must not fail a healthy
+    // candidate. A genuinely unhealthy candidate still fails every
+    // check for the whole window, on each of its attempts.
+    let deadline = std::time::Instant::now() + Duration::from_secs(300);
     let mut identity_checked = false;
     loop {
         let mounts = fs::read_to_string("/proc/mounts").unwrap_or_default();
