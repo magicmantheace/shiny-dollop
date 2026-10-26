@@ -2,6 +2,17 @@
 
 **Status (2026-10-25): Ready for the owner's first boot test — not an install, not yet physically validated.**
 
+**Networking/browser scope note (2026-10-26):** the A/B proof disk
+(not this test-media image) gained guest networking and a graphical
+browser, demonstrated **in QEMU only** — QEMU user networking
+(slirp) with a `virtio-net-pci` device; see
+[BROWSER.md](BROWSER.md) and the
+[browser proof record](validation/browser-qemu-proof-2026-10-26/README.md).
+The owner test-media image described below still contains **no
+networking**, and the TG01's network hardware, drivers, and
+firmware remain **unverified**. Nothing in the QEMU browser proof
+changes this document's physical-boot status.
+
 **Review resolution (2026-10-25):** an independent review found the
 earlier "owner test-ready" conclusion premature and held the status
 at "Not ready" until four points closed with evidence. They have now

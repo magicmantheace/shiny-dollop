@@ -947,15 +947,15 @@ def main():
         print("disk trust bundle does not match the TLS fixture CA — "
               "rebuild the proof disk (see --prepare-tls output)")
         return 1
-    if build_receipt.get("disk_sha256") != ab.sha256(DISK):
+    if build_receipt["disk"]["sha256"] != ab.sha256(DISK):
         print("disk image does not match its build receipt")
         return 1
-    releases = {entry["version"]: entry["path"]
-                for entry in build_receipt["releases"]
-                if entry["flavor"] == "functional"}
+    releases = {entry["version"]: entry["media"]
+                for entry in build_receipt["releases"].values()
+                if not entry["corrupt_signature"]}
     build_info = {
         "source_commit": build_receipt["source_commit"],
-        "disk_sha256": build_receipt["disk_sha256"],
+        "disk_sha256": build_receipt["disk"]["sha256"],
         "browser_test_ca_sha256": browser_record.get("test_ca_sha256"),
         "browser_stage_validation_sha256":
             browser_record.get("stage_validation_sha256"),
