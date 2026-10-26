@@ -1,19 +1,19 @@
 {
   "schema": "synveil.ab-gui-qemu-proof/v1",
-  "source_commit": "8167cedd214c8b615ac6fdc93dbae817e02fc5f3",
-  "build_receipt_commit": "8167cedd214c8b615ac6fdc93dbae817e02fc5f3",
-  "disk_sha256": "fbfac53425f90ab465ad75217c09be90bde015019c4ca78f09fe9efbb3e20a4a",
+  "source_commit": "55d9db88aecc96fdc07d0d695e2855148a69ca4c",
+  "build_receipt_commit": "55d9db88aecc96fdc07d0d695e2855148a69ca4c",
+  "disk_sha256": "19ca7a06bef9dc3284025c60305f755efb6a4898617e6a7499685b5c46b1c647",
   "generations": {
     "1": {
-      "uki_sha256": "b9ec0652053412d431fd37afb701481487c6c1389ade2a8761447582a0a44757",
-      "bytes": 61166592
+      "uki_sha256": "86c2b7ec7dfa54eeb7cf742ebe0577acf41e4268047c3de6f9e7b9fdeac759b6",
+      "bytes": 61170688
     },
     "2": {
-      "uki_sha256": "c21b90b62f71f0dcefb8582ccf9f5d73d24b2151c6c5d959eada53f0441cee39",
-      "bytes": 61166592
+      "uki_sha256": "3eb862f94d37cb219d34380d3ca6c62c4b0238428d90bf4c257fc93b7cb6d165",
+      "bytes": 61162496
     },
     "3": {
-      "uki_sha256": "7e962c493ec338c7eb1084afe06dcba14725d686e790e72bffe878bf847d7327",
+      "uki_sha256": "b9b5d34738e9719bd86f5629466bc19246ac6d48cf0733699fc33dcdb8d5660d",
       "bytes": 60503040
     }
   },
@@ -37,10 +37,10 @@
       "pass": true,
       "gui_driven": true,
       "confirmed": {
-        "bytes": 61166592,
+        "bytes": 61162496,
         "generation_id": "synveil-gen-v2",
         "min_reader_state_format": 1,
-        "sha256": "c21b90b62f71f0dcefb8582ccf9f5d73d24b2151c6c5d959eada53f0441cee39",
+        "sha256": "3eb862f94d37cb219d34380d3ca6c62c4b0238428d90bf4c257fc93b7cb6d165",
         "slot": "B",
         "state_format": 1,
         "version": 2
@@ -64,10 +64,10 @@
       "pass": true,
       "gui_driven": true,
       "confirmed": {
-        "bytes": 61166592,
+        "bytes": 61170688,
         "generation_id": "synveil-gen-v1",
         "min_reader_state_format": 1,
-        "sha256": "b9ec0652053412d431fd37afb701481487c6c1389ade2a8761447582a0a44757",
+        "sha256": "86c2b7ec7dfa54eeb7cf742ebe0577acf41e4268047c3de6f9e7b9fdeac759b6",
         "slot": "A",
         "state_format": 1,
         "version": 1
@@ -82,10 +82,10 @@
       "gui_driven": true,
       "trial": null,
       "confirmed": {
-        "bytes": 61166592,
+        "bytes": 61170688,
         "generation_id": "synveil-gen-v1",
         "min_reader_state_format": 1,
-        "sha256": "b9ec0652053412d431fd37afb701481487c6c1389ade2a8761447582a0a44757",
+        "sha256": "86c2b7ec7dfa54eeb7cf742ebe0577acf41e4268047c3de6f9e7b9fdeac759b6",
         "slot": "A",
         "state_format": 1,
         "version": 1

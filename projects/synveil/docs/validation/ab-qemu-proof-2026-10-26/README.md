@@ -28,25 +28,30 @@ is untouched by this work).
 ## Identities
 
 - Proof artifacts (disk + generations) built from source commit
-  `8167cedd214c8b615ac6fdc93dbae817e02fc5f3`
+  `55d9db88aecc96fdc07d0d695e2855148a69ca4c`
   (`build-receipt.json` in this directory is the builder's own
-  receipt). The proof drivers used for the runs in this record
-  are at `05c12d6` (agent driver; host-only changes after the
-  build: the known-file fixture ends with `sync`) and `ae4403a`
-  (GUI driver budgets) — no guest code changed after `8167ced`.
+  receipt). The artifacts were first regenerated at `8167ced`
+  after the gate correction, then **rebuilt and both proofs
+  re-run at `55d9db8`** — the corrected head itself — after the
+  host's `gawk` build dependency was restored (the rebuild had
+  been blocked by its absence; `build/scripts/doctor.sh` now
+  passes in full). Commits between `8167ced` and `55d9db8` are
+  documentation and this record only; no guest code changed.
+  The receipts and logs in this directory are from the
+  `55d9db8` runs.
 - Proof disk: 1,115,684,864 bytes, SHA-256
-  `fbfac53425f90ab465ad75217c09be90bde015019c4ca78f09fe9efbb3e20a4a`.
+  `19ca7a06bef9dc3284025c60305f755efb6a4898617e6a7499685b5c46b1c647`.
 - Generations (UKI = kernel EFI-stub bzImage with embedded
   initramfs; identity stamped at build time in
   `/etc/synveil/generation.json` and the slot's `gen.json`):
-  - v1 `synveil-gen-v1`: 61,166,592 bytes, SHA-256
-    `b9ec0652053412d431fd37afb701481487c6c1389ade2a8761447582a0a44757`
+  - v1 `synveil-gen-v1`: 61,170,688 bytes, SHA-256
+    `86c2b7ec7dfa54eeb7cf742ebe0577acf41e4268047c3de6f9e7b9fdeac759b6`
     (Weston background `0xFF101820`)
-  - v2 `synveil-gen-v2`: 61,166,592 bytes, SHA-256
-    `c21b90b62f71f0dcefb8582ccf9f5d73d24b2151c6c5d959eada53f0441cee39`
+  - v2 `synveil-gen-v2`: 61,162,496 bytes, SHA-256
+    `3eb862f94d37cb219d34380d3ca6c62c4b0238428d90bf4c257fc93b7cb6d165`
     (background `0xFF0B3D2E` — the observable change)
   - v3 `synveil-gen-v3`: 60,503,040 bytes, SHA-256
-    `7e962c493ec338c7eb1084afe06dcba14725d686e790e72bffe878bf847d7327`
+    `b9b5d34738e9719bd86f5629466bc19246ac6d48cf0733699fc33dcdb8d5660d`
     (background `0xFF3D0B0B`; `veil-seat` replaced by an exit-1
     stub so the *real* health path fails it — no check weakened)
 - Publisher trust: key id `synveil-dev-2026-01`, **development

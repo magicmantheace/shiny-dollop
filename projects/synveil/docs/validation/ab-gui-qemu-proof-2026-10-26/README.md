@@ -15,19 +15,21 @@ shipped test image (SHA-256 `6b10b482…`) is untouched.
 ## Identities
 
 - Proof artifacts built from source commit
-  `8167cedd214c8b615ac6fdc93dbae817e02fc5f3` (builder's receipt:
-  `build-receipt.json` in this directory). The GUI driver used
-  for this run is at `ae4403a` (host-only: longer window-find
-  budget, split receipt fields) — no guest code changed after
-  `8167ced`.
+  `55d9db88aecc96fdc07d0d695e2855148a69ca4c` (builder's receipt:
+  `build-receipt.json` in this directory) — the corrected head
+  itself. (First regenerated at `8167ced` after the gate
+  correction, then rebuilt and re-run at `55d9db8` once the
+  host's `gawk` build dependency was restored; the commits
+  between them are documentation only, no guest code changed.
+  The receipt and logs here are from the `55d9db8` run.)
 - Proof disk: 1,115,684,864 bytes, SHA-256
-  `fbfac53425f90ab465ad75217c09be90bde015019c4ca78f09fe9efbb3e20a4a`.
+  `19ca7a06bef9dc3284025c60305f755efb6a4898617e6a7499685b5c46b1c647`.
 - Generations: v1 `synveil-gen-v1` UKI SHA-256
-  `b9ec0652053412d431fd37afb701481487c6c1389ade2a8761447582a0a44757`;
+  `86c2b7ec7dfa54eeb7cf742ebe0577acf41e4268047c3de6f9e7b9fdeac759b6`;
   v2 `synveil-gen-v2` UKI SHA-256
-  `c21b90b62f71f0dcefb8582ccf9f5d73d24b2151c6c5d959eada53f0441cee39`;
+  `3eb862f94d37cb219d34380d3ca6c62c4b0238428d90bf4c257fc93b7cb6d165`;
   v3 `synveil-gen-v3` UKI SHA-256
-  `7e962c493ec338c7eb1084afe06dcba14725d686e790e72bffe878bf847d7327`.
+  `b9b5d34738e9719bd86f5629466bc19246ac6d48cf0733699fc33dcdb8d5660d`.
 - Publisher trust: key id `synveil-dev-2026-01`, **development
   only**; the private key is only in the git-ignored
   `out/ab-proof/trust/` — never in Git, images, or this record.
