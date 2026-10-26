@@ -224,22 +224,37 @@ CA_SHA = "a" * 64
 CRED_SHA = "c" * 64
 
 
+SANDBOX_GOOD = (
+    "SYNVEIL_SANDBOX_RENDERER user_ns=user:[4026532001] "
+    "session_user_ns=user:[4026531837] seccomp=2 pid=431\n"
+    "SYNVEIL_SANDBOX_RENDERER user_ns=user:[4026532102] "
+    "session_user_ns=user:[4026531837] seccomp=2 pid=977\n"
+    "SYNVEIL_SANDBOX_RENDERER user_ns=user:[4026532255] "
+    "session_user_ns=user:[4026531837] seccomp=2 pid=1204\n")
+
+
 def browser_facts(confirmed):
     return {
         "control": {"confirmed": dict(confirmed)},
         "credential_sha256": CRED_SHA,
         "known_file": ab.EXPECTED_KNOWN_FILE,
         "downloads_listing": ["payload.bin", "payload.sha256",
+                              "payload (1).bin",
                               "payload2.bin", "payload2.sha256"],
         "payload_sha256": browser.PAYLOAD_SHA256,
         "payload_size": browser.PAYLOAD_SIZE,
         "payload_guest_sha256": browser.PAYLOAD_SHA256,
+        "payload1_sha256": browser.PAYLOAD_SHA256,
+        "payload1_size": browser.PAYLOAD_SIZE,
         "payload2_sha256": browser.PAYLOAD2_SHA256,
         "payload2_size": browser.PAYLOAD_SIZE,
         "payload2_guest_sha256": browser.PAYLOAD2_SHA256,
         "big_size": None,
-        "profile_choices":
-            "downloads_directory:/home/synveil/Downloads\n",
+        "big_partial_size": 12345,
+        "profile_preferences":
+            '{"download":{"default_directory":'
+            '"/home/synveil/Downloads"}}',
+        "sandbox_status": SANDBOX_GOOD,
         "browser_started_count": 3,
         "files_entry_lines": 9,
         "files_payload_scans": 3,
@@ -270,9 +285,10 @@ def consistent_browser_results():
         "tls": {"ca_sha256": CA_SHA},
         "server_log": log,
         "B0": {"network_ready": True, "page_proof": True, "at": 15},
-        "B1": {"dialog_save": True, "artifacts": browser_facts(CONF_V1),
-               "at": 25},
-        "B2": {"overwrite_dialog_seen": True,
+        "B1": {"download_started": True,
+               "artifacts": browser_facts(CONF_V1), "at": 25},
+        "B2": {"second_download": True,
+               "artifacts": browser_facts(CONF_V1),
                "payload_sha256_after": browser.PAYLOAD_SHA256, "at": 35},
         "B3": {"browser_alive_after": True,
                "artifacts": browser_facts(CONF_V1), "at": 45},
@@ -341,9 +357,25 @@ class BrowserGate(unittest.TestCase):
         self.assertFalse(ok)
         self.assertTrue(any(f.startswith("B2") for f in failures), failures)
 
-    def test_no_overwrite_dialog_rejected(self):
+    def test_no_uniquified_collision_copy_rejected(self):
         results = consistent_browser_results()
-        results["B2"]["overwrite_dialog_seen"] = False
+        results["B2"]["artifacts"]["payload1_sha256"] = None
+        ok, failures = self.validate(results)
+        self.assertFalse(ok)
+        self.assertTrue(any(f.startswith("B2") for f in failures), failures)
+
+    def test_unsandboxed_renderer_rejected(self):
+        results = consistent_browser_results()
+        results["B1"]["artifacts"]["sandbox_status"] = (
+            "SYNVEIL_SANDBOX_RENDERER user_ns=user:[4026531837] "
+            "session_user_ns=user:[4026531837] seccomp=0 pid=431\n")
+        ok, failures = self.validate(results)
+        self.assertFalse(ok)
+        self.assertTrue(any("sandbox" in f for f in failures), failures)
+
+    def test_sandbox_records_missing_rejected(self):
+        results = consistent_browser_results()
+        results["B7"]["artifacts"]["sandbox_status"] = ""
         ok, failures = self.validate(results)
         self.assertFalse(ok)
 
@@ -356,8 +388,8 @@ class BrowserGate(unittest.TestCase):
 
     def test_profile_outside_home_rejected(self):
         results = consistent_browser_results()
-        results["B6"]["artifacts"]["profile_choices"] = \
-            "downloads_directory:/tmp\n"
+        results["B6"]["artifacts"]["profile_preferences"] = \
+            '{"download":{"default_directory":"/tmp"}}'
         ok, failures = self.validate(results)
         self.assertFalse(ok)
         self.assertTrue(any(f.startswith("B6") for f in failures), failures)

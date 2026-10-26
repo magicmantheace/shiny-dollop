@@ -31,28 +31,34 @@ Scenarios (one receipt, verdicts re-derived by validate_results):
   B0  provision + enroll + login -> SYNVEIL_NETWORK_READY, the
       browser autostarts from the desktop launcher path and loads
       the start page over verified HTTPS (server saw GET /; the
-      page's proof color is on screen)
-  B1  click the payload link -> Save in the download dialog ->
-      payload.bin lands in ~/Downloads with the fixture digest
-      (digest computed INSIDE the guest, file bytes read back from
-      the disk image host-side); the browser profile (.netsurf)
-      exists on the persistent DATA partition
-  B2  collision: download payload.bin again -> the overwrite
-      dialog appears -> Cancel -> the original file's digest is
-      unchanged (no silent overwrite)
-  B3  insufficient storage: the 192 MiB payload exceeds the DATA
-      partition's free space -> no complete big.bin remains, an
-      error surfaces, the browser stays alive (page proof again)
+      page's proof color is on screen). The launcher's sandbox
+      probe has already recorded a renderer living in its own
+      user namespace with seccomp filtering on (kernel evidence
+      from /proc — the sandbox is a hard gate, never a flag)
+  B1  click the payload link -> payload.bin downloads directly
+      into ~/Downloads with the fixture digest (digest computed
+      INSIDE the guest, file bytes read back from the disk image
+      host-side); the Chromium profile exists on the persistent
+      DATA partition with its download directory pinned there
+  B2  collision: download payload.bin again -> Chromium
+      uniquifies to 'payload (1).bin'; the original file's digest
+      is unchanged (no silent overwrite, ever)
+  B3  insufficient storage: the 448 MiB payload exceeds the DATA
+      partition's free space -> no complete big.bin remains and
+      the browser stays alive (page proof again)
   B4  bad TLS: follow the :8444 link -> zero GETs reach the bad
-      server (verification refused the handshake) and the good
-      page is left behind; Back returns to the good page
+      server (verification refused the handshake), the
+      interstitial replaces the good page; Back returns to it
   B5  cold reboot -> login -> page loads again (GET count grows),
       in-guest digest still matches, the files window's scan lists
       payload.bin (graphical file access evidence, read back from
       its session log on DATA)
-  B6  A/B update to v2 (agent path) -> confirm -> downloads and
-      profile survive; payload2.bin downloads and verifies on v2
-  B7  A/B rollback to v1 -> confirm -> both payloads still verify
+  B6  A/B update to v2 (agent path) -> confirm -> downloads,
+      profile and sandbox records survive; payload2.bin downloads
+      and verifies on v2
+  B7  A/B rollback to v1 -> confirm -> both payloads still
+      verify, and the cumulative sandbox record holds at least
+      three sandboxed-renderer entries (one per browser start)
 
 The gate re-derives every verdict from recorded fields: server
 request counts per port/path, digests read from the disk image,
@@ -109,11 +115,11 @@ LINK_PAYLOAD = (0xE0, 0x7B, 0x24)
 LINK_PAYLOAD2 = (0x27, 0xAE, 0x60)
 LINK_BIG = (0x7D, 0x3C, 0x98)
 LINK_BAD = (0xC0, 0x39, 0x2B)
-FOCUS_RING = (0x35, 0x84, 0xE4)
 FILES_TITLE = (0x1D, 0x5C, 0x57)
 
 PAYLOAD_SIZE = 256 * 1024
-BIG_SIZE = 192 * 1024 * 1024  # exceeds the 128 MiB DATA partition
+BIG_SIZE = 448 * 1024 * 1024  # exceeds the 384 MiB DATA partition's
+# free space once a browser profile exists — the download must fail
 
 
 def payload_bytes(tag):
@@ -297,7 +303,9 @@ def start_servers(tls_dir, log):
 class NetBoot(ab.Boot):
     """The A/B proof Boot with QEMU user networking instead of
     `-net none`: slirp gives the guest an address by DHCP and routes
-    10.0.2.2 to this host, where the fixture servers listen."""
+    10.0.2.2 to this host, where the fixture servers listen. The
+    browser generations also need real RAM (uncompressed UKI plus
+    a Chromium process tree): 768M becomes 3072M."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -307,6 +315,9 @@ class NetBoot(ab.Boot):
             if self.argv[index] == "-net" and self.argv[index + 1] == "none":
                 argv += ["-netdev", "user,id=synveil_net",
                          "-device", "virtio-net-pci,netdev=synveil_net"]
+                index += 2
+            elif self.argv[index] == "-m":
+                argv += ["-m", "3072M"]
                 index += 2
             else:
                 argv.append(self.argv[index])
@@ -405,114 +416,43 @@ def click_link(boot, color, tag):
     return False
 
 
-def _changed_bbox(before, after):
-    bw, bh, bdata = before
-    aw, ah, adata = after
-    if (bw, bh) != (aw, ah):
-        return None
-    min_x, min_y, max_x, max_y = bw, bh, -1, -1
-    for y in range(bh):
-        for x in range(bw):
-            if ab._px(bdata, bw, x, y) != ab._px(adata, aw, x, y):
-                min_x = min(min_x, x)
-                max_x = max(max_x, x)
-                min_y = min(min_y, y)
-                max_y = max(max_y, y)
-    if max_x < 0:
-        return None
-    return (min_x, min_y, max_x - min_x + 1, max_y - min_y + 1)
+INTERSTITIAL_BLUE = (0x1A, 0x73, 0xE8)
 
 
-def wait_dialog(boot, before, timeout=120):
-    """A modal GTK dialog appears as a fresh opaque rectangle:
-    find it as the bounding box of pixels changed since `before`,
-    once it is stable across two consecutive frames."""
-    deadline = time.monotonic() + timeout
-    previous = None
+def back_from_interstitial(boot):
+    """Leave Chromium's certificate-error interstitial: click its
+    blue 'Back to safety' button when it can be located by color,
+    else use the keyboard history shortcut."""
+    deadline = time.monotonic() + 60
     while time.monotonic() < deadline:
         try:
             frame = ab.next_frame(boot)
         except (ValueError, OSError):
             time.sleep(0.5)
             continue
-        rect = _changed_bbox(before, frame)
-        if rect and 150 <= rect[2] <= 900 and 100 <= rect[3] <= 600:
-            if previous and all(abs(a - b) <= 6
-                                 for a, b in zip(rect, previous)):
-                return rect
-            previous = rect
-        time.sleep(0.6)
-    ab.save_failure_frame(boot, "dialog-wait")
-    return None
-
-
-def dialog_focus_cycle(boot, rect):
-    """Tab through the dialog's buttons, recording each focused
-    button's focus-ring location. Returns the distinct focused
-    button centers in left-to-right order (the visual order)."""
-    centers = []
-    for _ in range(5):
-        try:
-            frame = ab.next_frame(boot)
-        except (ValueError, OSError):
-            break
-        ring = color_block(*frame, FOCUS_RING, tol=26, min_hits=12)
-        if ring:
-            cx, cy = ring["center"]
-            x, y, w, h = rect
-            if x - 8 <= cx <= x + w + 8 and y + h - 90 <= cy <= y + h + 8:
-                if all(abs(cx - px) > 18 or abs(cy - py) > 12
-                       for px, py in centers):
-                    centers.append((cx, cy))
-        try:
-            send_keys(boot.qmp, ("tab",), timeout=5,
-                      allowed=frozenset({"tab"}))
-        except (QMPError, OSError, ValueError):
-            break
-        time.sleep(0.45)
-    return sorted(centers)
-
-
-def dialog_press(boot, rect, index_from_left, count):
-    """Focus the button `index_from_left` of `count` (visual order)
-    via Tab cycling and activate it with Return."""
-    centers = dialog_focus_cycle(boot, rect)
-    if len(centers) < count:
-        ab.save_failure_frame(boot, "dialog-focus")
-        return False
-    target = centers[index_from_left]
-    # Cycle until the ring is back on the target, then activate.
-    for _ in range(count + 2):
-        try:
-            frame = ab.next_frame(boot)
-        except (ValueError, OSError):
-            return False
-        ring = color_block(*frame, FOCUS_RING, tol=26, min_hits=12)
-        if ring and abs(ring["center"][0] - target[0]) <= 18 \
-                and abs(ring["center"][1] - target[1]) <= 12:
-            try:
-                send_keys(boot.qmp, ("ret",), timeout=5)
-            except (QMPError, OSError, ValueError):
-                return False
-            time.sleep(0.6)
+        block = color_block(*frame, INTERSTITIAL_BLUE, tol=30,
+                            min_hits=300)
+        if block:
+            click(boot, *block["center"])
+            time.sleep(1.0)
             return True
-        try:
-            send_keys(boot.qmp, ("tab",), timeout=5,
-                      allowed=frozenset({"tab"}))
-        except (QMPError, OSError, ValueError):
-            return False
-        time.sleep(0.45)
-    ab.save_failure_frame(boot, "dialog-press")
-    return False
-
-
-def save_dialog_save(boot, before):
-    """The download start dialog: buttons Save | Cancel | Save As
-    (add order in the pinned source); press Save (index 0 of 3)."""
-    rect = wait_dialog(boot, before)
-    if not rect:
+        time.sleep(0.5)
+    try:
+        send_keys(boot.qmp, ("alt+left",), timeout=5,
+                  allowed=frozenset({"alt+left"}))
+        time.sleep(1.0)
+        return True
+    except (QMPError, OSError, ValueError):
         return False
-    return dialog_press(boot, rect, 0, 3)
+
+
+def wait_download_get(log, port, path, count, timeout=240):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if log.count(port, path) >= count:
+            return True
+        time.sleep(0.5)
+    return False
 
 
 def files_window_rect(width, height, data):
@@ -615,18 +555,6 @@ def close_browser_window(boot):
     return page_absent(boot, timeout=30)
 
 
-def browser_back(boot):
-    rect = _BROWSER_RECT.get(id(boot)) or remember_browser_rect(boot)
-    if not rect:
-        return False
-    x, y, _w, _h = rect
-    # Toolbar row: below titlebar (~28) and menubar (~26); the
-    # Back button is the toolbar's first item.
-    click(boot, x + 24, y + 28 + 26 + 20)
-    time.sleep(1.0)
-    return True
-
-
 def ext4_list(image, path):
     proc = subprocess.run(["debugfs", "-R", f"ls -p {path}", str(image)],
                           capture_output=True, text=True)
@@ -662,9 +590,12 @@ def browser_artifacts(disk, workdir):
 
     downloads = ext4_list(image, "/synveil/Downloads")
     payload = read("/synveil/Downloads/payload.bin")
+    payload1 = read("/synveil/Downloads/payload (1).bin")
     payload2 = read("/synveil/Downloads/payload2.bin")
     big = read("/synveil/Downloads/big.bin")
-    choices = read("/synveil/.netsurf/Choices")
+    big_partial = read("/synveil/Downloads/big.bin.crdownload")
+    preferences = read("/synveil/.config/chromium/Default/Preferences")
+    sandbox = read("/synveil/sandbox-probe-status.txt")
     files_log = read("/synveil/files-window.log")
     browser_log = read("/synveil/browser.log")
     files_entries = 0
@@ -685,13 +616,19 @@ def browser_artifacts(disk, workdir):
         "payload_size": len(payload) if payload is not None else None,
         "payload_guest_sha256": _first_token(
             read("/synveil/Downloads/payload.sha256")),
+        "payload1_sha256": _digest(payload1),
+        "payload1_size": len(payload1) if payload1 is not None else None,
         "payload2_sha256": _digest(payload2),
         "payload2_size": len(payload2) if payload2 is not None else None,
         "payload2_guest_sha256": _first_token(
             read("/synveil/Downloads/payload2.sha256")),
         "big_size": len(big) if big is not None else None,
-        "profile_choices": choices.decode("utf-8", "replace")
-        if choices is not None else None,
+        "big_partial_size": len(big_partial)
+        if big_partial is not None else None,
+        "profile_preferences": preferences.decode("utf-8", "replace")
+        if preferences is not None else None,
+        "sandbox_status": sandbox.decode("utf-8", "replace")
+        if sandbox is not None else None,
         "browser_started_count": browser_log.decode("utf-8", "replace")
         .count("SYNVEIL_BROWSER_STARTED") if browser_log else 0,
         "files_entry_lines": files_entries,
@@ -757,10 +694,30 @@ def validate_browser_results(results):
         if not facts.get("credential_sha256") \
                 or facts.get("credential_sha256") != baseline_credential:
             failures.append(f"{scenario}: credential did not survive")
-        choices = facts.get("profile_choices") or ""
-        if "downloads_directory:/home/synveil/Downloads" not in choices:
+        prefs = facts.get("profile_preferences") or ""
+        if "/home/synveil/Downloads" not in prefs:
             failures.append(f"{scenario}: browser profile missing or "
-                            "downloads directory not the persistent home")
+                            "download directory not the persistent home")
+
+    def sandbox_ok(scenario, minimum):
+        facts = need(scenario, "artifacts") or {}
+        good = 0
+        for line in (facts.get("sandbox_status") or "").splitlines():
+            if not line.startswith("SYNVEIL_SANDBOX_RENDERER user_ns="):
+                continue
+            fields = dict(part.split("=", 1) for part in line.split()
+                          if "=" in part)
+            if fields.get("seccomp") == "2" \
+                    and fields.get("user_ns") \
+                    and fields.get("user_ns") != fields.get(
+                        "session_user_ns"):
+                good += 1
+        if good < minimum:
+            failures.append(
+                f"{scenario}: only {good} sandboxed renderer records "
+                f"(need {minimum}) — a renderer in the session's own "
+                "user namespace or without seccomp is NOT a sandbox")
+        return good
 
     b0 = results.get("B0", {})
     if not b0.get("network_ready"):
@@ -776,25 +733,28 @@ def validate_browser_results(results):
         failures.append("B1: no baseline credential recorded")
     digest_pair("B1", "payload", PAYLOAD_SHA256)
     survival("B1", baseline_credential)
+    sandbox_ok("B1", 1)
 
     b2 = results.get("B2", {})
-    if not b2.get("overwrite_dialog_seen"):
-        failures.append("B2: overwrite dialog never appeared — the "
-                        "collision path is unproven")
     if _gets(entries, GOOD_PORT, "/payload.bin",
              until=b2.get("at")) < 2:
         failures.append("B2: the second payload fetch never happened")
-    # B2's readback is B1's disk state only if taken after the
-    # collision; the driver records its own post-collision digest:
+    facts2 = b2.get("artifacts") or {}
+    if facts2.get("payload1_sha256") != PAYLOAD_SHA256 \
+            or facts2.get("payload1_size") != PAYLOAD_SIZE:
+        failures.append("B2: the colliding download was not preserved "
+                        "as 'payload (1).bin' with the fixture digest — "
+                        "Chromium uniquifies rather than overwriting")
     if b2.get("payload_sha256_after") != PAYLOAD_SHA256:
-        failures.append("B2: payload digest changed after cancelling "
-                        "the overwrite — a silent overwrite occurred")
+        failures.append("B2: the original payload changed after the "
+                        "collision — a silent overwrite occurred")
 
     b3 = results.get("B3", {})
     if _gets(entries, GOOD_PORT, "/big.bin", until=b3.get("at")) < 1:
         failures.append("B3: the big payload was never requested")
     facts3 = b3.get("artifacts") or {}
-    if facts3.get("big_size") == BIG_SIZE:
+    if facts3.get("big_size") == BIG_SIZE \
+            or facts3.get("big_partial_size") == BIG_SIZE:
         failures.append("B3: a complete big.bin exists — the "
                         "insufficient-storage path is unproven")
     if not b3.get("browser_alive_after"):
@@ -844,6 +804,7 @@ def validate_browser_results(results):
     digest_pair("B7", "payload", PAYLOAD_SHA256)
     digest_pair("B7", "payload2", PAYLOAD2_SHA256)
     survival("B7", baseline_credential)
+    sandbox_ok("B7", 3)
 
     for scenario in ("B1", "B5", "B6", "B7"):
         facts = need(scenario, "artifacts") or {}
@@ -959,7 +920,7 @@ def main():
         "browser_test_ca_sha256": browser_record.get("test_ca_sha256"),
         "browser_stage_validation_sha256":
             browser_record.get("stage_validation_sha256"),
-        "netsurf_version": browser_record.get("netsurf_version"),
+        "chromium_version": browser_record.get("chromium_version"),
         "generations": {str(v): g["uki_sha256"]
                         for v, g in build_receipt["generations"].items()},
     }
@@ -1015,36 +976,31 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
                 remember_browser_rect(boot)
             record("B0", network_ready=bool(network and logged_in),
                    page_proof=bool(page))
-            # B1: first download.
-            before = ab.next_frame(boot)
+            # B1: first download (Chromium downloads directly to
+            # ~/Downloads — no dialog; evidence is the file itself).
             got = click_link(boot, LINK_PAYLOAD, "payload") \
-                and save_dialog_save(boot, before)
+                and wait_download_get(log, GOOD_PORT, "/payload.bin", 1)
             if got:
-                deadline = time.monotonic() + 240
-                while log.count(GOOD_PORT, "/payload.bin") < 1 \
-                        and time.monotonic() < deadline:
-                    time.sleep(0.5)
-                time.sleep(8)
-            record("B1", dialog_save=bool(got))
-            # B2: collision -> overwrite dialog -> Cancel.
-            seen_overwrite = False
+                time.sleep(10)
+            record("B1", download_started=bool(got))
+            # B2: collision — Chromium must uniquify, never
+            # overwrite: 'payload (1).bin' appears alongside the
+            # untouched original (verified at readback).
+            got2 = False
             if ensure_page(boot):
-                before = ab.next_frame(boot)
-                if click_link(boot, LINK_PAYLOAD, "payload-again"):
-                    rect = wait_dialog(boot, before)
-                    if rect:
-                        seen_overwrite = dialog_press(boot, rect, 0, 2)
-                        time.sleep(3)
-            record("B2", overwrite_dialog_seen=bool(seen_overwrite))
-            # B3: insufficient storage.
+                got2 = click_link(boot, LINK_PAYLOAD, "payload-again") \
+                    and wait_download_get(log, GOOD_PORT, "/payload.bin", 2)
+                if got2:
+                    time.sleep(10)
+            record("B2", second_download=bool(got2))
+            # B3: insufficient storage — the 448 MiB payload cannot
+            # fit the DATA partition; the download must fail and
+            # the browser must stay alive.
             alive = False
             if ensure_page(boot):
-                before = ab.next_frame(boot)
                 if click_link(boot, LINK_BIG, "big") \
-                        and save_dialog_save(boot, before):
-                    rect = wait_dialog(boot, before, timeout=900)
-                    if rect:
-                        dialog_press(boot, rect, 0, 1)
+                        and wait_download_get(log, GOOD_PORT, "/big.bin", 1):
+                    time.sleep(120)
                     alive = page_proof(boot, timeout=120)
             record("B3", browser_alive_after=bool(alive))
             # B4: bad TLS endpoint.
@@ -1052,7 +1008,7 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
             if ensure_page(boot):
                 if click_link(boot, LINK_BAD, "bad"):
                     page_left = page_absent(boot, timeout=180)
-                    if browser_back(boot):
+                    if back_from_interstitial(boot):
                         back_restored = page_proof(boot, timeout=120)
                         if back_restored:
                             remember_browser_rect(boot)
@@ -1075,6 +1031,7 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
             boot.quit()
         facts1 = browser_artifacts(DISK, workdir / "readback1")
         results["B1"]["artifacts"] = facts1
+        results["B2"]["artifacts"] = facts1
         results["B2"]["payload_sha256_after"] = facts1["payload_sha256"]
         results["B3"]["artifacts"] = facts1
         results["B5"]["artifacts"] = facts1
@@ -1101,17 +1058,12 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
                 remember_browser_rect(boot)
             got2 = False
             if page:
-                before = ab.next_frame(boot)
                 got2 = click_link(boot, LINK_PAYLOAD2, "payload2") \
-                    and save_dialog_save(boot, before)
+                    and wait_download_get(log, GOOD_PORT, "/payload2.bin", 1)
                 if got2:
-                    deadline = time.monotonic() + 240
-                    while log.count(GOOD_PORT, "/payload2.bin") < 1 \
-                            and time.monotonic() < deadline:
-                        time.sleep(0.5)
-                    time.sleep(8)
+                    time.sleep(10)
             record("B6", staged=bool(staged), healthy=bool(healthy),
-                   page_proof=bool(page), dialog_save=bool(got2))
+                   page_proof=bool(page), download_started=bool(got2))
             close_browser_window(boot)
             refresh_files_window(boot)
             terminal_command(boot, "dl-sha256")
