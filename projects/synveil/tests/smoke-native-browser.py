@@ -925,6 +925,9 @@ def main():
                         for v, g in build_receipt["generations"].items()},
     }
     EVIDENCE.mkdir(parents=True, exist_ok=True)
+    # The QMP scanout helper refuses group/other-accessible output
+    # directories; the workspace umask (0007) would leave 0770.
+    os.chmod(EVIDENCE, 0o700)
     workdir = OUT / "browser-work"
     if workdir.exists():
         shutil.rmtree(workdir)
