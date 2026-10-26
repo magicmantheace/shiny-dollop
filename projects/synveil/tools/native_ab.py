@@ -40,7 +40,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import ab_release
-import native_browser_assets as browser_assets
+import distro_chromium_assets as assets
 import native_joined as joined
 
 OUT = ROOT / "out" / "ab-proof"
@@ -177,30 +177,31 @@ def overlay_generation(rootfs, spec, commit, public_hex):
 
 
 def browser_stage():
-    """Verify the browser stage's identity and return
-    (target_tree, assets, validation_receipt). Same discipline as
-    the joined build's Weston stage check: the stage is only ever
-    consumed through its sealed, digest-verified asset list."""
-    bout = ROOT / "out" / "native-browser"
+    """Verify the distro-Chromium stage's identity and return
+    (staging_tree, assets, validation_receipt). Same discipline
+    as the joined build's Weston stage check: the stage is only
+    ever consumed through its sealed, digest-verified asset list
+    (tools/distro_chromium.py)."""
+    bout = ROOT / "out" / "distro-chromium"
     receipt = json.loads(joined.regular(bout / "validation.json").read_text())
-    if (receipt.get("schema") != "synveil.native-browser-stage/v1" or
+    if (receipt.get("schema") != "synveil.distro-chromium-stage/v1" or
             receipt.get("target") != joined.ffi.TARGET):
-        raise ValueError("native browser stage identity mismatch")
-    target = bout / "build" / "target"
-    selected = browser_assets.verified(
-        target, bout / "runtime-assets.json",
-        receipt.get("runtime_assets_sha256"))
-    return target, selected, receipt
+        raise ValueError("distro chromium stage identity mismatch")
+    staging = bout / "staging"
+    entries = json.loads(joined.regular(bout / "assets.json").read_text())
+    if assets.seal_digest(entries) != receipt.get("assets_sha256"):
+        raise ValueError("distro chromium seal digest mismatch")
+    if not assets.verified(staging, entries):
+        raise ValueError("distro chromium staging does not match its seal")
+    return staging, entries, receipt
 
 
 def copy_browser_asset(source, destination, name, identity):
-    """joined.copy_asset's rules with the browser asset policy:
-    never replace a file the generation rootfs already owns unless
-    the bytes are identical (shared components built by the same
-    recipes and toolchain — e.g. libwayland — must agree exactly,
-    and then the file is already there and nothing is copied)."""
+    """Sealed-payload copy with the standing rule: never replace
+    a file the generation rootfs already owns unless the bytes
+    are identical. Packaged modes are applied from the seal."""
     relative = Path(name)
-    if not browser_assets.allowed(name):
+    if not assets.allowed(name):
         raise ValueError("forbidden browser asset")
     target = destination / relative
     parent = destination
@@ -210,14 +211,16 @@ def copy_browser_asset(source, destination, name, identity):
             raise ValueError("asset destination parent is a symlink")
         parent.mkdir(exist_ok=True)
     if identity["kind"] == "symlink":
-        browser_assets.safe_link(name, identity["target"])
-        if target.is_symlink() and target.readlink() == identity["target"]:
+        if target.is_symlink() and \
+                target.readlink().as_posix() == identity["target"]:
             return "identical"
         if target.exists() or target.is_symlink():
             raise ValueError("refusing to replace rootfs entry: " + name)
         target.symlink_to(identity["target"])
         return "copied"
     data = (source / relative).read_bytes()
+    if hashlib.sha256(data).hexdigest() != identity["sha256"]:
+        raise ValueError("sealed asset bytes changed: " + name)
     if target.exists() or target.is_symlink():
         if target.is_file() and not target.is_symlink() and \
                 target.read_bytes() == data:
@@ -225,23 +228,26 @@ def copy_browser_asset(source, destination, name, identity):
         raise ValueError("refusing to replace rootfs file: " + name)
     with target.open("xb") as output:
         output.write(data)
-    target.chmod(0o755 if identity["executable"] else 0o644)
+    target.chmod(int(identity["mode"], 8))
     return "copied"
 
 
 def check_link_closure(rootfs, tools, added):
     """Every DT_NEEDED soname of every ELF the browser stage added
     must resolve inside the finished generation rootfs (baseline
-    files + copied assets together). A library the loader cannot
-    find is a browser that fails at exec — catch it at build time,
-    on the host, where the failure is cheap."""
+    files + copied assets together, subdirectories included —
+    e.g. PulseAudio's private library directory). A library the
+    loader cannot find is a browser that fails at exec — catch
+    it at build time, on the host, where the failure is cheap."""
     libdirs = [rootfs / "usr/lib", rootfs / "usr/lib64",
                rootfs / "lib", rootfs / "lib64",
-               rootfs / "usr/lib/weston"]
+               rootfs / "usr/lib/weston",
+               rootfs / "usr/lib/x86_64-linux-gnu",
+               rootfs / "usr/lib/chromium"]
     present = set()
     for folder in libdirs:
         if folder.is_dir():
-            for entry in folder.iterdir():
+            for entry in folder.rglob("*"):
                 present.add(entry.name)
     missing = {}
     checked = 0
@@ -293,26 +299,22 @@ def browser_icon_png():
 
 def overlay_browser(rootfs, stage, *, test_ca, test_host, start_url):
     """Install the Priority 3/4 payload into one generation rootfs:
-    networking scripts, the sealed browser assets, the launcher
+    networking scripts, the sealed Chromium assets, the launcher
     wrapper and panel entry, the session markers, and — only when
-    the caller provisions them for a proof build — the test CA
-    bundle and test endpoint. Returns the build-record section.
-    Production builds pass no test material: the bundle path then
-    simply does not exist in the image (no roots are claimed) and
-    the browser opens on its own start page."""
+    the caller provisions them for a proof build — the test CA and
+    test endpoint. Returns the build-record section. Production
+    builds pass no test material: the trust bundle is then exactly
+    the distribution's sealed bundle, and the browser opens on
+    the start page the build was given (or its own default)."""
     target, selected, stage_receipt = stage
     tools, _sysroot = joined.ffi.target_tools()
     counts = {"copied": 0, "identical": 0}
     added = []
     for name, identity in sorted(selected.items()):
-        if name not in browser_assets.ALIASES:
-            outcome = copy_browser_asset(target, rootfs, name, identity)
-            counts[outcome] += 1
-            if outcome == "copied" and identity["kind"] == "file":
-                added.append(name)
-    for name in sorted(browser_assets.ALIASES & selected.keys()):
-        counts[copy_browser_asset(target, rootfs, name,
-                                  selected[name])] += 1
+        outcome = copy_browser_asset(target, rootfs, name, identity)
+        counts[outcome] += 1
+        if outcome == "copied" and identity["kind"] == "file":
+            added.append(name)
     closure_files = check_link_closure(rootfs, tools, added)
 
     runtime = rootfs / "usr/libexec/synveil"
@@ -348,10 +350,12 @@ def overlay_browser(rootfs, stage, *, test_ca, test_host, start_url):
     hosts.chmod(0o644)
     record = {
         "stage_schema": stage_receipt["schema"],
-        "stage_validation_sha256": sha256(ROOT / "out" / "native-browser"
+        "stage_validation_sha256": sha256(ROOT / "out" / "distro-chromium"
                                           / "validation.json"),
-        "netsurf_version": stage_receipt["netsurf_version"],
-        "components": stage_receipt["components"],
+        "chromium_version": stage_receipt["chromium_version"],
+        "deb_packages": stage_receipt["deb_packages"],
+        "payload_files": stage_receipt["payload_files"],
+        "payload_bytes": stage_receipt["payload_bytes"],
         "assets_copied": counts["copied"],
         "assets_identical_to_baseline": counts["identical"],
         "link_closure_files_checked": closure_files,
@@ -360,22 +364,29 @@ def overlay_browser(rootfs, stage, *, test_ca, test_host, start_url):
         "start_url": None,
     }
     if test_ca is not None:
-        bundle = Path(test_ca).read_bytes()
-        certs = rootfs / "etc/ssl/certs"
-        certs.mkdir(parents=True, exist_ok=True)
-        for name in ("ca-certificates.crt", "cert.pem"):
-            entry = certs / name
-            with entry.open("xb") as handle:
-                handle.write(bundle)
-            entry.chmod(0o644)
+        # Proof provisioning, documented as such: the run-local
+        # test CA is APPENDED to the sealed distribution bundle
+        # (the generations then trust the distribution roots plus
+        # this one CA) and shipped alone for the launcher's NSS
+        # seed. The CA file itself is never committed; the build
+        # receipt records its sha256 and the driver refuses a
+        # mismatch.
+        ca_bytes = Path(test_ca).read_bytes()
         digest = subprocess.run(
             ["openssl", "x509", "-hash", "-noout"],
-            input=bundle, capture_output=True)
+            input=ca_bytes, capture_output=True)
         if digest.returncode != 0:
             raise ValueError("test CA is not a parseable certificate")
-        link = certs / (digest.stdout.decode().strip() + ".0")
-        link.symlink_to("ca-certificates.crt")
-        record["test_ca_sha256"] = hashlib.sha256(bundle).hexdigest()
+        bundle = rootfs / "etc/ssl/certs/ca-certificates.crt"
+        with bundle.open("ab") as handle:
+            handle.write(ca_bytes)
+        share = rootfs / "usr/share/synveil"
+        share.mkdir(parents=True, exist_ok=True)
+        proof_ca = share / "proof-ca.pem"
+        with proof_ca.open("xb") as handle:
+            handle.write(ca_bytes)
+        proof_ca.chmod(0o644)
+        record["test_ca_sha256"] = hashlib.sha256(ca_bytes).hexdigest()
     if test_host:
         record["test_host"] = {"address": test_host[0], "name": test_host[1]}
     if start_url:
@@ -570,11 +581,21 @@ def main():
     parser.add_argument("--browser-start-url",
                         help="URL the session's browser opens at start")
     args = parser.parse_args()
-    global OUT, TRUST_DIR
+    global OUT, TRUST_DIR, ESP_SIZE_MB, SLOT_SIZE_MB, DATA_SIZE_MB, \
+        RECOVERY_SIZE_MB
     browser = None
     if args.browser:
         OUT = ROOT / "out" / "browser-proof"
         TRUST_DIR = OUT / "trust"
+        # The Chromium payload grows a generation rootfs from
+        # ~124 MB to ~560 MB (uncompressed cpio UKI): the browser
+        # proof disk's ESP/slots/recovery must hold a whole UKI
+        # each, and DATA gains room for a real browser profile.
+        # The plain A/B proof keeps its established layout.
+        ESP_SIZE_MB = 768
+        SLOT_SIZE_MB = 768
+        DATA_SIZE_MB = 384
+        RECOVERY_SIZE_MB = 768
         browser = {
             "stage": browser_stage(),
             "test_ca": args.browser_test_ca,
