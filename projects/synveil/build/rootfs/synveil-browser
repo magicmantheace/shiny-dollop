@@ -1,0 +1,67 @@
+#!/bin/sh
+# SPDX-License-Identifier: MPL-2.0
+# The session's browser launcher (owner Priority 3). An ordinary
+# unprivileged wrapper: it prepares the two things NetSurf needs
+# from its environment and then execs it as the session user.
+#
+# - GDK_BACKEND is pinned to Wayland: this image has no X server
+#   or XWayland, and a silent fallback attempt would only confuse.
+# - The profile lives in $HOME/.netsurf (NetSurf's own default),
+#   which on A/B generations is the DATA-backed persistent home —
+#   outside every replaceable generation. First run seeds a
+#   minimal Choices file: the downloads directory is stated
+#   explicitly (it is also NetSurf's computed default) and the
+#   disc cache is bounded so a profile cannot crowd out the data
+#   partition. An existing Choices file is the owner's and is
+#   never rewritten.
+# - ~/Downloads is created if missing: the download manager
+#   reports an error for a missing directory instead of inventing
+#   one, and "downloads land in ~/Downloads" should not depend on
+#   some other component having made it first.
+# - TLS verification is libcurl's default and is NOT touched here:
+#   no option, environment variable or flag in this launcher
+#   weakens it.
+PATH=/bin:/usr/bin
+export PATH
+export GDK_BACKEND=wayland
+export NO_AT_BRIDGE=1
+
+if [ "$(id -u)" != 1000 ]; then
+    echo "synveil-browser: refused unexpected session identity"
+    exit 1
+fi
+if [ -z "${HOME:-}" ] || [ ! -d "$HOME" ]; then
+    echo "synveil-browser: no home directory"
+    exit 1
+fi
+
+mkdir -p "$HOME/Downloads" || {
+    echo "synveil-browser: cannot create Downloads directory"
+    exit 1
+}
+chmod 0700 "$HOME/Downloads" 2>/dev/null || true
+
+if [ ! -f "$HOME/.netsurf/Choices" ]; then
+    mkdir -p "$HOME/.netsurf" || {
+        echo "synveil-browser: cannot create profile directory"
+        exit 1
+    }
+    printf '%s\n' \
+        "downloads_directory:$HOME/Downloads" \
+        "disc_cache_size:16777216" \
+        > "$HOME/.netsurf/Choices" || {
+        echo "synveil-browser: cannot seed profile Choices"
+        exit 1
+    }
+fi
+
+start_url=""
+if [ -f /etc/synveil/browser-start-url ]; then
+    start_url=$(cat /etc/synveil/browser-start-url)
+fi
+
+echo "SYNVEIL_BROWSER_STARTED url=${start_url:-about:blank}"
+if [ -n "$start_url" ]; then
+    exec /usr/bin/netsurf-gtk3 "$start_url"
+fi
+exec /usr/bin/netsurf-gtk3
