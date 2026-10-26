@@ -12,7 +12,13 @@ Image identity (verify before writing, and again if anything looks
 off): `synveil-test-media` package, image SHA-256
 `6b10b482239ca3e771bd20d85a5f4e0dc414a00fc34334408eb134b150bacfc3`,
 source commit `124abbc`, build target `hardware`. Validation evidence:
-[joined-hardware record](validation/joined-hardware-124abbc/README.md).
+[joined-hardware record](validation/joined-hardware-124abbc/README.md),
+extended by the
+[review-resolution record](validation/review-resolution-2026-10-25/README.md)
+(writer backing-device refusal tests; the desktop also proven through
+simpledrm on the firmware framebuffer, and the complete image booted
+from emulated USB storage — both in QEMU; physical hardware remains
+untested).
 
 ## Before you start
 
@@ -133,10 +139,37 @@ note which.
 - **Password loss = rewrite the media.** There is deliberately no
   password-reset or recovery shell in this image (see ADR 0010). The
   SSD holds only a disposable test credential, so recovery from any
-  failure is: rewrite the media and start over. Nothing on the
-  Windows disk can be affected by anything the test image does: it
-  never writes outside its own SSD, and its state lives on the
-  partition the image itself provides.
+  failure of *this test* is: rewrite the media and start over.
+  Rewriting disposable media is **not** an installed-system recovery
+  mechanism — it works here only because the media is disposable;
+  ADR 0010's independent recovery for an installed system remains
+  unimplemented.
+- **What protects the Windows installation — specifically, not
+  absolutely.** (1) The running test image contains no tool that
+  writes to a disk: no formatter, partitioner or EFI-variable tool
+  exists in the image, its root filesystem is the initramfs in RAM,
+  and the only partition it ever mounts for writing is the state
+  partition the image itself provides, found by its fixed GPT
+  identity (PARTUUID/PARTNAME), never by guessing a device name.
+  (2) Booting uses the one-time boot menu (Esc/F9): the firmware's
+  permanent boot order, the Windows ESP and Windows Boot Manager are
+  not modified by the test or by the image. (3) The one destructive
+  step is the media write, before any boot. On Linux the packaged
+  writer pins the image digest, requires a whole, removable,
+  USB-attached target disk, refuses any disk that backs a mounted
+  filesystem or swap — tracing through device-mapper (LUKS/LVM) to
+  the underlying disk and failing closed when it cannot tell —
+  requires typing the exact device name, and verifies the write by
+  reading it back (refusal tests: `tests/write-test-media.py`). On
+  Windows the protection is procedural, not enforced by software:
+  verify the digest with certUtil, identify the target in Disk
+  Management, unplug other USB storage, and double-check the target
+  in Etcher/Rufus before confirming — a write to the wrong disk
+  there would erase that disk, so the identification step matters.
+  (4) The image is unsigned, so Secure Boot must be disabled for
+  the test — a firmware change *you* make and later revert; it can
+  make Windows ask for its BitLocker recovery key (see "Before you
+  start").
 
 ## After the test
 

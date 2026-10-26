@@ -77,6 +77,14 @@ caution, one-time boot-menu selection that leaves the Windows disk,
 ESP and boot order untouched, and the step-by-step test script.
 Full evidence:
 [validation record](validation/joined-hardware-124abbc/README.md).
+An independent review of that pass raised four points (writer
+backing-device tracing, the actual DRM driver vs the simpledrm path,
+complete-image USB boot evidence, and precise recovery/Windows-safety
+wording); their resolution, with evidence, is recorded in the
+[review-resolution record](validation/review-resolution-2026-10-25/README.md).
+None of it changes the install blockers above: independent owner
+recovery (ADR 0010) remains unimplemented, and rewriting disposable
+test media is not a substitute for it.
 
 ## Native authenticated Files browser (development)
 

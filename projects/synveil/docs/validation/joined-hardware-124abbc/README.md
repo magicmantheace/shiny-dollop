@@ -100,14 +100,25 @@ The environment also lost its apt layer mid-pass (QEMU vanished);
 
 ## Honest limits
 
+> **Correction (2026-10-25, review-resolution pass):** the original
+> text of this section said the simpledrm path was "exercised here".
+> It was not: this pass ran on virtio-vga, and a diagnostic twin
+> later proved the driver in use was **virtio_gpu** (DRM minor 0,
+> fbcon primary), with simpledrm present only as a secondary
+> placeholder. The simpledrm path and the full-image USB boot have
+> since been exercised for real — see
+> [`../review-resolution-2026-10-25/README.md`](../review-resolution-2026-10-25/README.md).
+> The sentence below is corrected accordingly.
+
 - **No physical hardware was tested.** QEMU's GOP framebuffer via
   virtio-vga stands in for the RTX 3060's firmware GOP. The hardware
   kernel carries **no nouveau and no NVIDIA driver**
   (`CONFIG_DRM_NOUVEAU` unset): on the TG01 the display will run on
   the firmware framebuffer through simpledrm with software
-  rendering, at the firmware-chosen resolution. That path is
-  expected to work — it is the same simpledrm path exercised here —
-  but HP firmware behavior, the 3060's GOP mode and USB HID/storage
+  rendering, at the firmware-chosen resolution. That path was **not**
+  exercised by this record (the acceptance ran on virtio_gpu); it
+  has since been exercised in the review-resolution record above.
+  HP firmware behavior, the 3060's GOP mode and USB HID/storage
   timing on the real machine are all unproven.
 - Storage here was virtio-blk. The late-enumeration USB state proof
   (ADR 0019) was run on the authenticated image family sharing this

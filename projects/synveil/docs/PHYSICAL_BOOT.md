@@ -1,25 +1,24 @@
 # Physical UEFI boot bring-up
 
-**Status (2026-10-25): Not ready for owner hardware testing.**
+**Status (2026-10-25): Ready for the owner's first boot test — not an install, not yet physically validated.**
 
-**Review hold (2026-10-25):** an independent review of the pass that
-produced the test-media package found the earlier "owner test-ready"
-conclusion premature. Four points must close with evidence before
-any test-ready status is restored: (1) the test-media writer's
-mounted-device check used device-name prefixes and can miss
-encrypted, LVM or other device-mapper volumes backed by the selected
-disk — it must trace backing-device relationships, fail closed on
-uncertainty, and gain refusal tests; (2) the hardware-image QEMU
-acceptance ran on virtio-vga/virtio_gpu, which does not establish
-that Weston runs through simpledrm (the intended RTX 3060 firmware-
-framebuffer fallback) — the driver actually used must be identified
-and the simpledrm path exercised separately; (3) the joined hardware
-image was accepted on virtio storage and must also boot complete
-from emulated USB storage with the full acceptance sequence; (4)
-recovery and Windows-safety wording must state only the specific
-protections implemented and tested (rewriting disposable test media
-is not independent installed-system recovery). Physical RTX 3060
-compatibility remains explicitly unverified regardless.
+**Review resolution (2026-10-25):** an independent review found the
+earlier "owner test-ready" conclusion premature and held the status
+at "Not ready" until four points closed with evidence. They have now
+closed — (1) the test-media writer traces backing-device
+relationships (device-mapper/LVM/LUKS, md, loop) for every mount and
+swap source, fails closed on uncertainty, and carries 15 fixture
+refusal tests; (2) the driver used by the original acceptance was
+identified as virtio_gpu (diagnostic-twin serial evidence), and the
+full acceptance was re-run with the display on simpledrm (standard
+VGA, no virtio GPU); (3) the complete joined hardware image was
+booted from emulated USB storage through the full acceptance
+sequence; (4) recovery and Windows-safety wording now states only
+the specific protections implemented and tested, and keeps explicit
+that rewriting disposable test media is not independent
+installed-system recovery. Full record:
+[review-resolution record](validation/review-resolution-2026-10-25/README.md).
+Physical RTX 3060 compatibility remains explicitly unverified.
 
 Target: HP Pavilion TG01, Intel i5-10400F, RTX 3060 12 GB, 32 GB RAM,
 USB HID keyboard/mouse, UEFI firmware and Windows 11 on the internal disk.
@@ -110,6 +109,13 @@ a claim of boot success on the physical machine.
       [validation record](validation/joined-hardware-124abbc/README.md).
       This is the emulated GOP framebuffer; the TG01's physical panel
       path is covered by the physical-validation gate below.
+      **Extended (2026-10-25, review resolution):** the original
+      acceptance's display driver was identified as virtio_gpu
+      (diagnostic-twin evidence), and the full acceptance was re-run
+      with the display on **simpledrm** (standard VGA — the firmware-
+      framebuffer path the RTX 3060 will use) and again with the
+      complete image booted from **emulated USB storage**; both pass
+      ([record](validation/review-resolution-2026-10-25/README.md)).
 - [ ] Real multiwindow desktop with graphical login and owner enrollment;
       keyboard, pointer, launcher, terminal, file manager and settings.
       **QEMU-proven subset (2026-10-25, joined image @ 124abbc):**
@@ -172,6 +178,15 @@ a claim of boot success on the physical machine.
       path (digest check via certUtil, target identification in Disk
       Management, balenaEtcher with automatic validation or Rufus in
       DD mode) is in the [owner guide](OWNER_FIRST_BOOT_TEST.md).
+      **Hardened (2026-10-25, review resolution):** the in-use check
+      no longer compares device-name prefixes — it traces every
+      mounted filesystem and swap device through sysfs
+      backing-device relationships (device-mapper slaves for
+      LUKS/LVM, md components, loop backing files) to the whole
+      disks behind them and fails closed when a chain cannot be
+      determined; 15 fixture tests cover the refusal cases,
+      including LUKS/LVM volumes backed by the selected disk
+      ([record](validation/review-resolution-2026-10-25/README.md)).
 - [ ] Documented HP firmware compatibility, USB boot selection, network
       and RTX 3060 fallback limitations. Windows partitions must remain
       untouched, including firmware boot-order and ESP changes.
