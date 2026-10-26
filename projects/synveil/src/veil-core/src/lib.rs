@@ -21,7 +21,6 @@ mod audit_json;
 pub mod audit_retention;
 pub mod credential;
 pub mod ed25519;
-pub mod efi;
 pub mod observer;
 pub mod seat;
 pub mod secret;

@@ -4,14 +4,16 @@
 
 Drives the disk assembled by tools/native_ab.py through the full
 proof sequence from docs/AB_UPDATER.md, on a private copy of the
-disk with a persistent OVMF variable store (the stock qemu.sh
-wrapper copies VARS per boot, which cannot carry BootNext across
-reboots; this driver keeps one VARS file per scenario run):
+disk with a persistent OVMF variable store (one VARS file per
+scenario run, kept across the run's boots; the updater itself
+writes no firmware variables — slot selection is by kexec
+chain-loading inside the guest, see docs/AB_UPDATER.md):
 
   S0  provision on first boot, graphical enrollment + login,
       a user setting change (if the greeter exposes it), a known
       user file in the DATA-backed home
-  S1  stage signed v2 from release media, reboot on BootNext
+  S1  stage signed v2 from release media; on reboot the entry
+      generation's hook hands over (chain-load) to the v2 trial
   S2  v2 trial boots, health confirmation promotes it; login,
       desktop background change and all survival artifacts verified
   S3  owner-requested rollback to v1, trial + confirmation again
@@ -20,8 +22,9 @@ reboots; this driver keeps one VARS file per scenario run):
   S5  corrupted-signature release refused; confirmed slot untouched
   S6  power cut mid-staging: no trial recorded, v1 intact, and a
       later stage still succeeds (left pending, then discarded)
-  S7  both slots corrupted on a branch copy: the ESP recovery
-      entry boots the recovery diagnostics instead
+  S7  slot images corrupted on a branch copy while the ESP
+      fallback copy stays intact: the hook's digest check fails
+      closed into the recovery diagnostics, no system boots
 
 Every scenario writes its serial log under out/ab-proof/smoke-
 evidence/ and the run writes a machine-readable receipt
@@ -379,7 +382,11 @@ def main():
         if ok:
             staged_at = len(boot.lines)
             terminal_command(boot, "reboot")
-            ok = boot.wait("SYNVEIL_AB_TRIAL_BOOT", args.timeout, since=staged_at)
+            # The reboot loads the entry generation (fallback = v1);
+            # its hook accounts the trial and chain-loads v2.
+            ok = boot.wait("SYNVEIL_AB_TRIAL_HANDOVER", args.timeout, since=staged_at)
+            if ok:
+                ok = boot.wait("SYNVEIL_AB_TRIAL_BOOT", args.timeout, since=staged_at)
             if ok:
                 ok = login(boot, secret)
             if ok:
@@ -439,23 +446,21 @@ def main():
         if ok:
             mark = len(boot.lines)
             terminal_command(boot, "reboot")
-            ok = boot.wait_count("SYNVEIL_AB_HEALTH_FAILED", 3, 2400)
+            ok = boot.wait_count("SYNVEIL_AB_HEALTH_FAILED", 3, 3000)
             if ok:
                 ok = boot.wait("SYNVEIL_AB_TRIAL_EXHAUSTED", 600, since=mark)
             if ok:
-                # The fallback boot is the confirmed generation with
-                # the exhausted trial still on record.
-                ok = boot.wait("SYNVEIL_AB_TRIAL_PENDING", args.timeout, since=mark)
+                # Exhaustion clears the trial in the entry
+                # generation's hook; the confirmed generation boots.
+                ok = boot.wait("SYNVEIL_AB_CONFIRMED_BOOT", args.timeout, since=mark)
             if ok:
                 ok = login(boot, secret)
-            if ok:
-                ok = terminal_command(boot, "rollback", "SYNVEIL_AB_ROLLBACK", timeout=180)
         boot.quit()
         artifacts = state_artifacts(disk, work)
         control = artifacts["control"] or {}
         record("S4-failing-candidate-fallback", ok,
                confirmed=(control.get("confirmed") or {}),
-               trial_after_discard=control.get("trial"),
+               trial_after_fallback=control.get("trial"),
                survival={
                    "credential_same": artifacts["credential_sha256"] == baseline["credential_sha256"],
                    "known_file_same": artifacts["known_file"] == baseline["known_file"],
@@ -538,17 +543,16 @@ def main():
         if not ok:
             return finish(build_receipt, results, 1)
 
-        # ---- S7: both slots corrupt -> ESP recovery entry (branch copy)
+        # ---- S7: slot images corrupt -> fail closed to diagnostics
         branch = work / "synveil-ab-recovery.img"
         shutil.copyfile(disk, branch)
-        for number, version in ((2, 1), (3, 2)):
+        for number in (2, 3):
             part = extract_partition(branch, number, work)
             target = Path(work) / f"slot{number}-gen.json"
-            raw = subprocess.run(["mdir", "-i", str(part), "::/EFI/synveil"],
-                                 capture_output=True, text=True)
-            # Overwrite gen.efi with zeros of the same length.
-            listing = subprocess.run(["mcopy", "-i", str(part), "::/EFI/synveil/gen.json", str(target)],
-                                     capture_output=True)
+            subprocess.run(["mcopy", "-i", str(part), "::/EFI/synveil/gen.json",
+                            str(target)], capture_output=True)
+            if not target.is_file():
+                continue  # empty slot: nothing to corrupt
             identity = json.loads(target.read_text())
             zeros = Path(work) / f"zeros{number}.bin"
             zeros.write_bytes(b"\0" * identity["bytes"])
@@ -560,10 +564,13 @@ def main():
                 shutil.copyfileobj(source, dest)
         boot = Boot(work, "s7-recovery", branch, vars_file)
         boot.start(secret)
-        ok = boot.wait("SYNVEIL_RECOVERY_STATUS_V1", 600)
+        # The ESP fallback copy of v1 still loads, but its hook must
+        # refuse to run the corrupt confirmed slot as the system.
+        ok = boot.wait("SYNVEIL_AB_FAIL_CLOSED", 600)
+        ok = ok and boot.wait("SYNVEIL_RECOVERY_STATUS_V1", 120)
         ok = ok and not boot.seen("SYNVEIL_LOGIN_READY")
         boot.quit()
-        record("S7-both-slots-recovery", ok)
+        record("S7-corrupt-slots-fail-closed", ok)
 
     return finish(build_receipt, results, 0 if all(
         entry["pass"] for entry in results.values()) else 1)

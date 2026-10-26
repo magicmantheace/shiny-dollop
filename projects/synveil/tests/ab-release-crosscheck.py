@@ -55,7 +55,7 @@ class ReleaseCrosscheck(unittest.TestCase):
         return directory
 
     def test_packager_output_verifies_in_host_core(self):
-        metadata = ab_release.build_metadata(self.payload, 2)
+        metadata = ab_release.build_metadata(self.payload, 2, "crosscheck-gen-2")
         metadata_bytes = json.dumps(metadata, indent=2).encode() + b"\n"
         signature = ab_release.sign_metadata(self.private, metadata_bytes)
         directory = self.stage_dir(metadata, signature)
@@ -67,7 +67,7 @@ class ReleaseCrosscheck(unittest.TestCase):
         self.assertEqual(data["sha256"], metadata["sha256"])
 
     def test_corrupt_signature_rejected_by_host_core(self):
-        metadata = ab_release.build_metadata(self.payload, 2)
+        metadata = ab_release.build_metadata(self.payload, 2, "crosscheck-gen-2")
         metadata_bytes = json.dumps(metadata, indent=2).encode() + b"\n"
         signature = bytearray(ab_release.sign_metadata(self.private, metadata_bytes))
         signature[10] ^= 0x01

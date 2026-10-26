@@ -192,7 +192,8 @@ def validate_control(c, slots):
                 or set(trial) != {"slot", "version", "bytes", "sha256",
                                   "state_format", "generation_id",
                                   "min_reader_state_format",
-                                  "attempts", "awaiting_health"}):
+                                  "attempts", "awaiting_health",
+                                  "chain_in_flight"}):
             raise UpdateError("invalid trial record")
         _generation({k: trial[k] for k in
                      ("slot", "version", "bytes", "sha256", "state_format",
@@ -201,7 +202,8 @@ def validate_control(c, slots):
         if (trial["slot"] == confirmed["slot"]
                 or not _is_int(trial["attempts"])
                 or not 0 <= trial["attempts"] <= TRIAL_ATTEMPTS
-                or type(trial["awaiting_health"]) is not bool):
+                or type(trial["awaiting_health"]) is not bool
+                or type(trial["chain_in_flight"]) is not bool):
             raise UpdateError("invalid trial values")
     history = c["history"]
     if (not isinstance(history, list) or len(history) > MAX_HISTORY
@@ -361,7 +363,8 @@ def operate(directory, trust_dir, name, action, *, interrupt=None, now=None):
                          "generation_id": release["generation_id"],
                          "min_reader_state_format":
                              release["min_reader_state_format"],
-                         "attempts": TRIAL_ATTEMPTS, "awaiting_health": False}
+                         "attempts": TRIAL_ATTEMPTS, "awaiting_health": False,
+                         "chain_in_flight": False}
                 state["trial"] = trial
                 # The slot map records what each slot currently holds.
                 state["slots"][inactive] = {
@@ -444,7 +447,8 @@ def operate(directory, trust_dir, name, action, *, interrupt=None, now=None):
                     "rollback refused: retained generation cannot read "
                     "the current state format")
             state["trial"] = {**retained, "attempts": TRIAL_ATTEMPTS,
-                              "awaiting_health": False}
+                              "awaiting_health": False,
+                              "chain_in_flight": False}
             _history(state, "rollback", other, retained["version"], now, "trial")
             atomic_control(control_path, state)
             return {"selected_slot": other, "reason": "owner-rollback-trial",

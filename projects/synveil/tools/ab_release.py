@@ -63,9 +63,9 @@ def ensure_keypair(trust_dir):
     return private, public_hex
 
 
-def build_metadata(payload, version, key_id=KEY_ID, state_format=1,
-                   min_reader_state_format=1, rollback_breaking=False,
-                   issued_at=None, expires_at=None):
+def build_metadata(payload, version, generation_id, key_id=KEY_ID,
+                   state_format=1, min_reader_state_format=1,
+                   rollback_breaking=False, issued_at=None, expires_at=None):
     payload = Path(payload)
     now = int(time.time())
     return {
@@ -73,6 +73,7 @@ def build_metadata(payload, version, key_id=KEY_ID, state_format=1,
         "version": version,
         "bytes": payload.stat().st_size,
         "sha256": sha256(payload),
+        "generation_id": generation_id,
         "key_id": key_id,
         "issued_at": issued_at if issued_at is not None else now - 3600,
         "expires_at": expires_at if expires_at is not None else now + 30 * 86400,
@@ -155,9 +156,10 @@ def build_media(payload, metadata, signature, out_image):
     return out_image
 
 
-def package(payload, version, trust_dir, out_image, corrupt_signature=False, **meta_kwargs):
+def package(payload, version, generation_id, trust_dir, out_image,
+            corrupt_signature=False, **meta_kwargs):
     private, _public_hex = ensure_keypair(trust_dir)
-    metadata = build_metadata(payload, version, **meta_kwargs)
+    metadata = build_metadata(payload, version, generation_id, **meta_kwargs)
     metadata_bytes = json.dumps(metadata, indent=2).encode() + b"\n"
     signature = sign_metadata(private, metadata_bytes)
     public_pem = Path(trust_dir) / "publisher.pub.pem"
@@ -170,6 +172,7 @@ def package(payload, version, trust_dir, out_image, corrupt_signature=False, **m
         "media": str(out_image),
         "media_sha256": sha256(out_image),
         "version": version,
+        "generation_id": generation_id,
         "payload_sha256": metadata["sha256"],
         "payload_bytes": metadata["bytes"],
         "key_id": metadata["key_id"],
@@ -181,10 +184,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--payload", required=True)
     parser.add_argument("--version", type=int, required=True)
+    parser.add_argument("--generation-id", required=True)
     parser.add_argument("--trust-dir", required=True)
     parser.add_argument("--out", required=True)
     parser.add_argument("--corrupt-signature", action="store_true")
     args = parser.parse_args()
-    receipt = package(args.payload, args.version, args.trust_dir, args.out,
-                      corrupt_signature=args.corrupt_signature)
+    receipt = package(args.payload, args.version, args.generation_id,
+                      args.trust_dir, args.out, corrupt_signature=args.corrupt_signature)
     print(json.dumps(receipt, indent=2))

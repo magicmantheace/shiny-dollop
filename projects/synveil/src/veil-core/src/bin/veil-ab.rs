@@ -31,12 +31,10 @@ fn main() -> ExitCode {
 }
 
 fn boot_hook() -> ExitCode {
+    // Trial exhaustion, hand-over and fail-closed holds are all
+    // resolved inside the hook itself (chain-load or an in-place
+    // recovery hold); returning here means boot may proceed.
     match ab::boot_hook() {
-        Ok(ab::HookOutcome::TrialExhausted { .. }) => {
-            // Attempt accounting already persisted. Fail closed to
-            // the firmware-confirmed slot before services start.
-            ab::reboot_now();
-        }
         Ok(_) => ExitCode::SUCCESS,
         Err(error) => {
             // Fail closed but do not wedge the machine: the

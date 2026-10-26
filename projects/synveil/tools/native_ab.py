@@ -17,6 +17,12 @@ physical device. The publisher private key is created under
 out/ab-proof/trust/ (git-ignored) by tools/ab_release.py and never
 enters an image; generations carry only the public key.
 
+Boot selection needs no firmware writes: the ESP fallback file is
+a plain copy of generation A, and whichever generation the
+firmware loads, its init hook converges to the desired slot by
+chain-loading it with kexec_file_load (CONFIG_KEXEC_FILE=y).
+BootOrder, BootNext and Boot#### are never written.
+
 The generations are installed-system images, not test fixtures:
 the same overlay and agent would ship in a real A/B install. The
 host fixture core (tools/ab_update.py) remains a separate,
@@ -53,9 +59,12 @@ DATA_SIZE_MB = 64
 RECOVERY_SIZE_MB = 160
 
 GENERATIONS = [
-    {"version": 1, "background": "0xFF101820", "seat_stub": False},
-    {"version": 2, "background": "0xFF0B3D2E", "seat_stub": False},
-    {"version": 3, "background": "0xFF3D0B0B", "seat_stub": True},
+    {"version": 1, "background": "0xFF101820", "seat_stub": False,
+     "generation_id": "synveil-gen-v1"},
+    {"version": 2, "background": "0xFF0B3D2E", "seat_stub": False,
+     "generation_id": "synveil-gen-v2"},
+    {"version": 3, "background": "0xFF3D0B0B", "seat_stub": True,
+     "generation_id": "synveil-gen-v3"},
 ]
 
 INIT_HOOK_AFTER_STATE = """
@@ -141,6 +150,7 @@ def overlay_generation(rootfs, spec, commit, public_hex):
         "version": spec["version"],
         "commit": commit,
         "state_format": 1,
+        "generation_id": spec["generation_id"],
     }, indent=2) + "\n")
     (config / "generation.json").chmod(0o644)
     launcher = rootfs / "usr/libexec/synveil/start-update"
@@ -196,6 +206,7 @@ def build_generations(commit, public_hex, baseline_rootfs):
         uki = build_kernel(gdir, rootfs)
         generations[spec["version"]] = {
             "version": spec["version"],
+            "generation_id": spec["generation_id"],
             "uki": str(uki),
             "uki_sha256": sha256(uki),
             "uki_bytes": uki.stat().st_size,
@@ -259,6 +270,8 @@ def slot_identity(slot, generation):
         "bytes": generation["uki_bytes"],
         "sha256": generation["uki_sha256"],
         "state_format": generation["state_format"],
+        "generation_id": generation["generation_id"],
+        "min_reader_state_format": 1,
     }
 
 
@@ -334,8 +347,9 @@ def main():
     for version, corrupt in ((2, False), (3, False), (2, True)):
         label = f"release-v{version}" + ("-badsig" if corrupt else "")
         releases[label] = ab_release.package(
-            generations[version]["uki"], version, TRUST_DIR, OUT / f"{label}.img",
-            corrupt_signature=corrupt)
+            generations[version]["uki"], version,
+            generations[version]["generation_id"],
+            TRUST_DIR, OUT / f"{label}.img", corrupt_signature=corrupt)
         print(f"SYNVEIL_AB_RELEASE_BUILT {label}")
     receipt = {
         "schema": "synveil.ab-proof-build/v1",

@@ -4,8 +4,18 @@
 //! The transaction policy mirrors tools/ab_update.py and shares its
 //! control-record schema (synveil.ab-control/v2), but this module is
 //! the installed-system implementation: it operates on the real GPT
-//! slot partitions, writes real UEFI variables through crate::efi,
-//! and its results are never interchangeable with the host fixture.
+//! slot partitions, and its results are never interchangeable with
+//! the host fixture.
+//!
+//! Boot selection lives entirely inside Synveil's own boot path:
+//! this module NEVER writes UEFI variables (no BootOrder, BootNext
+//! or Boot#### writes — firmware-variable changes require the
+//! owner's explicit authorization, which the updater does not
+//! hold). Whichever generation the firmware loads, its init hook
+//! converges to the desired slot (trial first, else confirmed) by
+//! chain-loading that slot's image with kexec_file_load, after the
+//! attempt accounting is durable. Firmware boot order and other
+//! systems' entries are untouched by construction.
 //!
 //! Trust: the publisher key is pinned at build time in
 //! /etc/synveil/publisher.json (provisioned with the generation,
@@ -15,13 +25,12 @@
 //! Safety invariants held here:
 //! * the running/confirmed slot partition is never opened for writing;
 //! * the trial record is persisted (atomic rename + fsync) BEFORE
-//!   BootNext is set, and BootNext is set only after the staged
-//!   slot's bytes are re-read and re-hashed from the slot itself;
+//!   any chain-load transfer, and a slot is chain-loaded only after
+//!   its bytes are re-read and re-hashed from the slot itself;
 //! * attempt accounting happens in the init hook, before services;
 //! * any uncertainty about layout, records or digests fails closed.
 
 use crate::ed25519;
-use crate::efi;
 use crate::sha256::{Sha256, hex};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -37,7 +46,6 @@ pub const CONTROL_SCHEMA: &str = "synveil.ab-control/v2";
 pub const RELEASE_SCHEMA: &str = "synveil.ab-release/v2";
 pub const TRUST_SCHEMA: &str = "synveil.ab-trust/v1";
 pub const STAMP_SCHEMA: &str = "synveil.generation/v1";
-pub const EFI_RECORD_SCHEMA: &str = "synveil.ab-efi/v1";
 pub const SLOT_IDENTITY_SCHEMA: &str = "synveil.slot-generation/v1";
 
 pub const ESP_PARTUUID: &str = "ab000000-0000-4000-8000-0000000000e5";
@@ -52,7 +60,6 @@ pub const ENABLED_MARKER: &str = "/etc/synveil/ab-system";
 pub const TRUST_PATH: &str = "/etc/synveil/publisher.json";
 pub const STAMP_PATH: &str = "/etc/synveil/generation.json";
 pub const CONTROL_PATH: &str = "/var/lib/synveil/ab-control.json";
-pub const EFI_RECORD_PATH: &str = "/var/lib/synveil/ab-efi.json";
 pub const RUNTIME_DIR: &str = "/run/synveil-ab";
 pub const SOCKET_PATH: &str = "/run/synveil-ab/agent.sock";
 pub const GEN_EFI_PATH: &str = "EFI/synveil/gen.efi";
@@ -99,14 +106,6 @@ impl Partition {
     }
     pub fn device(&self) -> String {
         format!("/dev/{}", self.devname)
-    }
-    pub fn gpt(&self) -> io::Result<efi::GptPartition> {
-        Ok(efi::GptPartition {
-            number: self.number,
-            start_lba: self.start_lba,
-            size_lba: self.size_lba,
-            guid_bytes: efi::guid_bytes(&self.partuuid)?,
-        })
     }
 }
 
@@ -246,6 +245,8 @@ pub struct Generation {
     pub bytes: u64,
     pub sha256: String,
     pub state_format: u64,
+    pub generation_id: String,
+    pub min_reader_state_format: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -256,8 +257,14 @@ pub struct Trial {
     pub bytes: u64,
     pub sha256: String,
     pub state_format: u64,
+    pub generation_id: String,
+    pub min_reader_state_format: u64,
     pub attempts: u32,
     pub awaiting_health: bool,
+    /// Set by the init hook when it has already accounted this
+    /// trial boot and is chain-loading the trial image, so the
+    /// trial generation's own hook does not account it twice.
+    pub chain_in_flight: bool,
 }
 
 impl Trial {
@@ -268,6 +275,8 @@ impl Trial {
             bytes: self.bytes,
             sha256: self.sha256.clone(),
             state_format: self.state_format,
+            generation_id: self.generation_id.clone(),
+            min_reader_state_format: self.min_reader_state_format,
         }
     }
 }
@@ -331,6 +340,18 @@ impl Control {
             }
             if g.state_format < 1 {
                 return Err(err("invalid generation state format"));
+            }
+            if g.generation_id.is_empty()
+                || g.generation_id.len() > 64
+                || !g
+                    .generation_id
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-')
+            {
+                return Err(err("invalid generation id"));
+            }
+            if g.min_reader_state_format < 1 || g.min_reader_state_format > g.state_format {
+                return Err(err("invalid generation reader floor"));
             }
             Ok(())
         };
@@ -406,57 +427,6 @@ pub fn save_control(control: &Control) -> io::Result<()> {
     atomic_write_json(Path::new(CONTROL_PATH), &value)
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct EfiRecord {
-    pub schema: String,
-    pub entries: EfiEntries,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct EfiEntries {
-    #[serde(rename = "A")]
-    pub a: u16,
-    #[serde(rename = "B")]
-    pub b: u16,
-    pub recovery: u16,
-}
-
-impl EfiRecord {
-    pub fn slot_of(&self, entry: u16) -> Option<&'static str> {
-        if entry == self.entries.a {
-            Some("A")
-        } else if entry == self.entries.b {
-            Some("B")
-        } else {
-            None
-        }
-    }
-    pub fn entry_of(&self, slot: &str) -> u16 {
-        if slot == "A" {
-            self.entries.a
-        } else {
-            self.entries.b
-        }
-    }
-}
-
-pub fn load_efi_record() -> io::Result<EfiRecord> {
-    let raw = fs::read_to_string(EFI_RECORD_PATH)?;
-    let record: EfiRecord =
-        serde_json::from_str(&raw).map_err(|_| err("EFI record does not parse"))?;
-    if record.schema != EFI_RECORD_SCHEMA {
-        return Err(err("invalid EFI record schema"));
-    }
-    Ok(record)
-}
-
-pub fn save_efi_record(record: &EfiRecord) -> io::Result<()> {
-    let value = serde_json::to_value(record).map_err(|_| err("record encode failed"))?;
-    atomic_write_json(Path::new(EFI_RECORD_PATH), &value)
-}
-
 // ---------------------------------------------------------------------
 // Trust anchor and generation stamp (both provisioned at build time)
 
@@ -509,13 +479,23 @@ pub struct Stamp {
     pub version: u64,
     pub commit: String,
     pub state_format: u64,
+    pub generation_id: String,
 }
 
 pub fn load_stamp() -> io::Result<Stamp> {
     let raw = fs::read_to_string(STAMP_PATH)?;
     let stamp: Stamp =
         serde_json::from_str(&raw).map_err(|_| err("generation stamp does not parse"))?;
-    if stamp.schema != STAMP_SCHEMA || stamp.version < 1 || stamp.state_format < 1 {
+    if stamp.schema != STAMP_SCHEMA
+        || stamp.version < 1
+        || stamp.state_format < 1
+        || stamp.generation_id.is_empty()
+        || stamp.generation_id.len() > 64
+        || !stamp
+            .generation_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-')
+    {
         return Err(err("invalid generation stamp"));
     }
     Ok(stamp)
@@ -533,6 +513,22 @@ pub struct SlotIdentity {
     pub bytes: u64,
     pub sha256: String,
     pub state_format: u64,
+    pub generation_id: String,
+    pub min_reader_state_format: u64,
+}
+
+impl SlotIdentity {
+    pub fn generation(&self) -> Generation {
+        Generation {
+            slot: self.slot.clone(),
+            version: self.version,
+            bytes: self.bytes,
+            sha256: self.sha256.clone(),
+            state_format: self.state_format,
+            generation_id: self.generation_id.clone(),
+            min_reader_state_format: self.min_reader_state_format,
+        }
+    }
 }
 
 pub fn digest_file(path: &Path) -> io::Result<(String, u64)> {
@@ -576,132 +572,21 @@ pub fn hash_slot_image(layout: &Layout, slot: &str) -> io::Result<(String, u64)>
 // ---------------------------------------------------------------------
 // Provisioning (first boot of an assembled A/B disk)
 
-fn entry_description(id: u16) -> io::Result<Option<String>> {
-    let Some(raw) = efi::read_variable(&format!("Boot{id:04X}"))? else {
-        return Ok(None);
-    };
-    if raw.len() < 6 {
-        return Ok(None);
-    }
-    let list_len = u16::from_le_bytes([raw[4], raw[5]]) as usize;
-    let desc_end = 6 + list_len;
-    if raw.len() < desc_end {
-        return Ok(None);
-    }
-    let units: Vec<u16> = raw[6..]
-        .as_chunks::<2>()
-        .0
-        .iter()
-        .map(|c| u16::from_le_bytes(*c))
-        .take_while(|u| *u != 0)
-        .collect();
-    Ok(Some(String::from_utf16_lossy(&units)))
-}
-
-fn find_or_create_entry(
-    description: &str,
-    partition: &Partition,
-    path: &str,
-    used: &mut Vec<u16>,
-) -> io::Result<u16> {
-    for id in efi::existing_boot_entries()? {
-        if entry_description(id)?.as_deref() == Some(description) {
-            if !used.contains(&id) {
-                used.push(id);
-            }
-            return Ok(id);
-        }
-    }
-    let mut id = 0u16;
-    while used.contains(&id) || efi::existing_boot_entries()?.contains(&id) {
-        id += 1;
-    }
-    let option = efi::load_option(description, &partition.gpt()?, path);
-    efi::write_boot_entry(id, &option)?;
-    used.push(id);
-    Ok(id)
-}
-
-/// Order: our three entries first (confirmed slot, other slot,
-/// recovery), then any foreign entries the firmware already had.
-fn write_boot_order(efi_record: &EfiRecord, confirmed_slot: &str) -> io::Result<()> {
-    let ours = [
-        efi_record.entry_of(confirmed_slot),
-        efi_record.entry_of(if confirmed_slot == "A" { "B" } else { "A" }),
-        efi_record.entries.recovery,
-    ];
-    let mut order: Vec<u16> = ours.to_vec();
-    for existing in efi::boot_order()? {
-        if !order.contains(&existing) {
-            order.push(existing);
-        }
-    }
-    efi::set_boot_order(&order)
-}
-
-pub fn provision(layout: &Layout) -> io::Result<Control> {
-    let stamp = load_stamp()?;
+pub fn provision(layout: &Layout, stamp: &Stamp) -> io::Result<Control> {
+    // The assembled disk's only pre-provisioned generation is slot
+    // A's; the running image must be that generation. Its identity
+    // comes from the build-time stamp matched against slot A's
+    // on-disk identity record — never from firmware state.
     let identity_a = read_slot_identity(layout, "A")?
         .ok_or_else(|| err("slot A holds no generation identity"))?;
-    if identity_a.version != stamp.version {
+    if identity_a.generation_id != stamp.generation_id || identity_a.version != stamp.version {
         return Err(err(
             "running generation does not match slot A at provisioning",
         ));
     }
     let identity_b = read_slot_identity(layout, "B")?;
-    efi::ensure_efivars()?;
-    let slot_path = format!("\\{}", GEN_EFI_PATH.replace('/', "\\"));
-    let mut used = Vec::new();
-    let entry_a = find_or_create_entry("Synveil System A", &layout.slot_a, &slot_path, &mut used)?;
-    let entry_b = find_or_create_entry("Synveil System B", &layout.slot_b, &slot_path, &mut used)?;
-    let entry_r = find_or_create_entry(
-        "Synveil Recovery",
-        &layout.esp,
-        "\\EFI\\BOOT\\BOOTX64.EFI",
-        &mut used,
-    )?;
-    let efi_record = EfiRecord {
-        schema: EFI_RECORD_SCHEMA.to_string(),
-        entries: EfiEntries {
-            a: entry_a,
-            b: entry_b,
-            recovery: entry_r,
-        },
-    };
-    // Retire the provisioning fallback: the ESP default file becomes
-    // the recovery-status UKI the assembly staged beside it. The
-    // running image is already loaded; replacing the file is safe.
-    {
-        let esp = Mount::attach(&layout.esp, "vfat", "esp", false)?;
-        let staged = esp.path().join("EFI/synveil/recovery.efi");
-        let fallback = esp.path().join("EFI/BOOT/BOOTX64.EFI");
-        if staged.is_file() {
-            let tmp = esp.path().join("EFI/BOOT/BOOTX64.EFI.new");
-            fs::copy(&staged, &tmp)?;
-            fs::File::open(&tmp)?.sync_all()?;
-            fs::rename(&tmp, &fallback)?;
-            fs::remove_file(&staged)?;
-            sync_dir(&esp.path().join("EFI/BOOT"))?;
-        } else if !fallback.is_file() {
-            return Err(err(
-                "ESP holds neither a staged recovery image nor a fallback",
-            ));
-        }
-    }
-    let gen_a = Generation {
-        slot: "A".into(),
-        version: identity_a.version,
-        bytes: identity_a.bytes,
-        sha256: identity_a.sha256.clone(),
-        state_format: identity_a.state_format,
-    };
-    let gen_b = identity_b.map(|i| Generation {
-        slot: "B".into(),
-        version: i.version,
-        bytes: i.bytes,
-        sha256: i.sha256,
-        state_format: i.state_format,
-    });
+    let gen_a = identity_a.generation();
+    let gen_b = identity_b.map(|i| i.generation());
     let mut control = Control {
         schema: CONTROL_SCHEMA.into(),
         confirmed: gen_a.clone(),
@@ -714,13 +599,110 @@ pub fn provision(layout: &Layout) -> io::Result<Control> {
     };
     control.push_history("provision", "A", identity_a.version, "confirmed");
     save_control(&control)?;
-    save_efi_record(&efi_record)?;
-    write_boot_order(&efi_record, "A")?;
     marker(&format!(
-        "SYNVEIL_AB_PROVISIONED slot=A version={} entries=A:{} B:{} recovery:{}",
-        identity_a.version, entry_a, entry_b, entry_r
+        "SYNVEIL_AB_PROVISIONED slot=A version={} generation_id={}",
+        identity_a.version, identity_a.generation_id
     ));
     Ok(control)
+}
+
+// ---------------------------------------------------------------------
+// Chain loading (kexec): the only slot-selection mechanism. The
+// running generation loads the desired slot's image into the kernel
+// and reboots into it; no firmware state is read or written.
+
+#[cfg(target_arch = "x86_64")]
+unsafe fn syscall5(nr: i64, a1: u64, a2: u64, a3: u64, a4: u64, a5: u64) -> i64 {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "syscall",
+            inlateout("rax") nr => ret,
+            in("rdi") a1,
+            in("rsi") a2,
+            in("rdx") a3,
+            in("r10") a4,
+            in("r8") a5,
+            lateout("rcx") _,
+            lateout("r11") _,
+            options(nostack)
+        );
+    }
+    ret
+}
+
+const KEXEC_FILE_NO_INITRAMFS: u64 = 0x4;
+const LINUX_REBOOT_MAGIC1: u64 = 0xfee1_dead;
+const LINUX_REBOOT_MAGIC2: u64 = 0x2812_1969;
+const LINUX_REBOOT_CMD_KEXEC: u64 = 0x4558_4543;
+
+/// Verify the target slot's bytes against the record, load them as
+/// the next kernel, and reboot into them. Returns only on failure:
+/// a successful call never comes back.
+pub fn chain_load(layout: &Layout, generation: &Generation) -> io::Result<()> {
+    let mount = Mount::attach(layout.slot(&generation.slot), "vfat", "chain", true)?;
+    let image = mount.path().join(GEN_EFI_PATH);
+    let (digest, size) = digest_file(&image)?;
+    if digest != generation.sha256 || size != generation.bytes {
+        return Err(err("chain target digest mismatch; refusing transfer"));
+    }
+    marker(&format!(
+        "SYNVEIL_AB_CHAIN_LOAD slot={} version={} generation_id={}",
+        generation.slot, generation.version, generation.generation_id
+    ));
+    #[cfg(target_arch = "x86_64")]
+    {
+        use std::os::unix::io::AsRawFd;
+        let file = fs::File::open(&image)?;
+        // The generation kernels carry CMDLINE_OVERRIDE, so the
+        // passed command line is ignored; pass the running one for
+        // want of anything better defined.
+        let cmdline = fs::read("/proc/cmdline").unwrap_or_default();
+        let rc = unsafe {
+            syscall5(
+                320, // kexec_file_load
+                file.as_raw_fd() as u64,
+                0,
+                cmdline.len() as u64,
+                cmdline.as_ptr() as u64,
+                KEXEC_FILE_NO_INITRAMFS,
+            )
+        };
+        if rc != 0 {
+            return Err(io::Error::from_raw_os_error((-rc) as i32));
+        }
+        let _ = Command::new("/bin/sync").status();
+        let rc = unsafe {
+            syscall5(
+                169, // reboot
+                LINUX_REBOOT_MAGIC1,
+                LINUX_REBOOT_MAGIC2,
+                LINUX_REBOOT_CMD_KEXEC,
+                0,
+                0,
+            )
+        };
+        Err(io::Error::from_raw_os_error((-rc) as i32))
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        Err(err("chain loading requires x86_64"))
+    }
+}
+
+/// Fail closed: run the read-only recovery diagnostics if present,
+/// then hold forever. The wrong system never runs, no service
+/// starts, and nothing is written anywhere.
+pub fn fail_closed(reason: &str) -> ! {
+    marker(&format!("SYNVEIL_AB_FAIL_CLOSED reason={reason}"));
+    let recovery = Path::new("/usr/libexec/synveil/recovery-status");
+    if recovery.is_file() {
+        let _ = Command::new(recovery).status();
+    }
+    marker("SYNVEIL_AB_RECOVERY_HOLD");
+    loop {
+        std::thread::sleep(Duration::from_secs(3600));
+    }
 }
 
 // ---------------------------------------------------------------------
@@ -737,12 +719,6 @@ pub enum HookOutcome {
         slot: String,
         version: u64,
         attempts_left: u32,
-    },
-    TrialPending {
-        slot: String,
-    },
-    TrialExhausted {
-        slot: String,
     },
 }
 
@@ -781,6 +757,45 @@ fn mount_home() {
     }
 }
 
+/// Verify the running generation's own slot bytes against its
+/// record before it is allowed to become the running system. A
+/// mismatch fails closed into the recovery diagnostics: a corrupt
+/// confirmed (or trial) image never starts services.
+fn verify_running_slot(layout: &Layout, generation: &Generation) -> io::Result<()> {
+    let (digest, size) = hash_slot_image(layout, &generation.slot)?;
+    if digest != generation.sha256 || size != generation.bytes {
+        fail_closed("running-generation-digest-mismatch")
+    }
+    Ok(())
+}
+
+/// Chain to `generation`, or deal with the failure: if we are the
+/// confirmed generation ourselves, staying is correct; anything
+/// else would run the wrong system, so fail closed.
+fn chain_or_stay(
+    layout: &Layout,
+    control: &Control,
+    running_id: &str,
+    target: &Generation,
+) -> io::Result<HookOutcome> {
+    match chain_load(layout, target) {
+        Ok(()) => unreachable!("chain_load returns only on failure"),
+        Err(error) => {
+            marker(&format!(
+                "SYNVEIL_AB_CHAIN_FAILED slot={} error={error}",
+                target.slot
+            ));
+            if running_id == control.confirmed.generation_id {
+                Ok(HookOutcome::ConfirmedBoot {
+                    slot: control.confirmed.slot.clone(),
+                })
+            } else {
+                fail_closed("chain-failed-on-non-confirmed-generation")
+            }
+        }
+    }
+}
+
 pub fn boot_hook() -> io::Result<HookOutcome> {
     if !Path::new(ENABLED_MARKER).is_file() {
         return Ok(HookOutcome::Disabled);
@@ -792,65 +807,124 @@ pub fn boot_hook() -> io::Result<HookOutcome> {
     }
     let layout = Layout::load()?;
     mount_home();
+    let stamp = load_stamp()?;
     if !Path::new(CONTROL_PATH).is_file() {
-        provision(&layout)?;
+        provision(&layout, &stamp)?;
         return Ok(HookOutcome::Provisioned);
     }
-    let control = load_control(&layout)?;
-    let efi_record = load_efi_record()?;
-    efi::ensure_efivars()?;
-    let current = efi::boot_current()?;
-    let booted = current.and_then(|id| efi_record.slot_of(id));
-    match (&control.trial, booted) {
-        (Some(trial), Some(slot)) if slot == trial.slot => {
-            if trial.attempts == 0 {
-                marker(&format!(
-                    "SYNVEIL_AB_TRIAL_EXHAUSTED slot={} version={}",
-                    trial.slot, trial.version
-                ));
-                return Ok(HookOutcome::TrialExhausted {
-                    slot: slot.to_string(),
-                });
-            }
+    let mut control = load_control(&layout)?;
+    let running = stamp.generation_id.clone();
+
+    // An exhausted trial (attempts spent) completes its fallback
+    // here whenever this boot is not the trial generation itself:
+    // the record is cleared before anything else. (The trial
+    // generation's own final-attempt boot is handled below.)
+    if let Some(trial) = &control.trial
+        && trial.attempts == 0
+        && running != trial.generation_id
+    {
+        let exhausted = trial.clone();
+        control.trial = None;
+        control.push_history(
+            "trial-exhausted",
+            &exhausted.slot,
+            exhausted.version,
+            "fallback",
+        );
+        save_control(&control)?;
+        marker(&format!(
+            "SYNVEIL_AB_TRIAL_EXHAUSTED slot={} version={}",
+            exhausted.slot, exhausted.version
+        ));
+    }
+
+    let Some(trial) = control.trial.clone() else {
+        // No trial: the confirmed generation must run.
+        if running == control.confirmed.generation_id {
+            verify_running_slot(&layout, &control.confirmed.clone())?;
+            marker(&format!(
+                "SYNVEIL_AB_CONFIRMED_BOOT slot={} version={}",
+                control.confirmed.slot, control.confirmed.version
+            ));
+            return Ok(HookOutcome::ConfirmedBoot {
+                slot: control.confirmed.slot.clone(),
+            });
+        }
+        let target = control.confirmed.clone();
+        return chain_or_stay(&layout, &control, &running, &target);
+    };
+
+    if running == trial.generation_id {
+        // We ARE the trial generation.
+        if trial.chain_in_flight {
+            // The chaining generation already accounted this boot
+            // before the transfer; just clear the flag.
+            verify_running_slot(&layout, &trial.generation())?;
             let mut control = control;
             let trial = control.trial.as_mut().expect("trial present");
-            trial.attempts -= 1;
-            trial.awaiting_health = true;
+            trial.chain_in_flight = false;
             let left = trial.attempts;
             let version = trial.version;
+            let slot = trial.slot.clone();
             save_control(&control)?;
             marker(&format!(
                 "SYNVEIL_AB_TRIAL_BOOT slot={slot} version={version} attempts_left={left}"
             ));
-            Ok(HookOutcome::TrialBoot {
-                slot: slot.to_string(),
+            return Ok(HookOutcome::TrialBoot {
+                slot,
                 version,
                 attempts_left: left,
-            })
+            });
         }
-        (Some(trial), _) => {
+        if trial.attempts == 0 {
+            // Directly booted with no attempts left: expire and hand
+            // over to the confirmed generation.
+            let mut control = control;
+            control.trial = None;
+            control.push_history("trial-exhausted", &trial.slot, trial.version, "fallback");
+            save_control(&control)?;
             marker(&format!(
-                "SYNVEIL_AB_TRIAL_PENDING slot={} version={}",
+                "SYNVEIL_AB_TRIAL_EXHAUSTED slot={} version={}",
                 trial.slot, trial.version
             ));
-            Ok(HookOutcome::TrialPending {
-                slot: trial.slot.clone(),
-            })
+            let target = control.confirmed.clone();
+            return chain_or_stay(&layout, &control, &running, &target);
         }
-        (None, Some(slot)) => {
-            marker(&format!(
-                "SYNVEIL_AB_CONFIRMED_BOOT slot={} version={}",
-                slot, control.confirmed.version
-            ));
-            Ok(HookOutcome::ConfirmedBoot {
-                slot: slot.to_string(),
-            })
-        }
-        (None, None) => {
-            marker("SYNVEIL_AB_BOOT_ENTRY_UNKNOWN");
-            Ok(HookOutcome::Unavailable)
-        }
+        // Direct boot of the trial (e.g. an owner menu pick): account
+        // it here, before services, like any trial boot.
+        verify_running_slot(&layout, &trial.generation())?;
+        let mut control = control;
+        let trial = control.trial.as_mut().expect("trial present");
+        trial.attempts -= 1;
+        trial.awaiting_health = true;
+        let left = trial.attempts;
+        let version = trial.version;
+        let slot = trial.slot.clone();
+        save_control(&control)?;
+        marker(&format!(
+            "SYNVEIL_AB_TRIAL_BOOT slot={slot} version={version} attempts_left={left}"
+        ));
+        return Ok(HookOutcome::TrialBoot {
+            slot,
+            version,
+            attempts_left: left,
+        });
     }
+
+    // A trial is pending and we are not it: account the boot and
+    // hand over. The record is durable BEFORE the transfer.
+    {
+        let trial = control.trial.as_mut().expect("trial present");
+        trial.attempts -= 1;
+        trial.awaiting_health = true;
+        trial.chain_in_flight = true;
+    }
+    save_control(&control)?;
+    marker(&format!(
+        "SYNVEIL_AB_TRIAL_HANDOVER slot={} version={} attempts_left={}",
+        trial.slot, trial.version, trial.attempts
+    ));
+    chain_or_stay(&layout, &control, &running, &trial.generation())
 }
 
 /// Reboot immediately (used for trial exhaustion, before services).
@@ -872,6 +946,7 @@ struct ReleaseManifest {
     version: u64,
     bytes: u64,
     sha256: String,
+    generation_id: String,
     key_id: String,
     issued_at: i64,
     expires_at: i64,
@@ -899,6 +974,12 @@ fn verify_release(dir: &Path, trust: &Trust, at: i64) -> io::Result<(ReleaseMani
         || manifest.sha256.len() != 64
         || !manifest.sha256.chars().all(|c| c.is_ascii_hexdigit())
         || manifest.key_id != trust.key_id
+        || manifest.generation_id.is_empty()
+        || manifest.generation_id.len() > 64
+        || !manifest
+            .generation_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-')
         || manifest.state_format < 1
         || manifest.min_reader_state_format < 1
         || manifest.min_reader_state_format > manifest.state_format
@@ -957,6 +1038,17 @@ pub fn stage() -> io::Result<Value> {
     if manifest.state_format < control.confirmed.state_format {
         return Err(err("migration refused: candidate would strand newer state"));
     }
+    // Rollback direction (the Pass A defect): after the candidate
+    // runs, STATE will be at the candidate's format, and the
+    // confirmed generation — the rollback target — must still be
+    // able to read it.
+    if !(control.confirmed.min_reader_state_format <= manifest.state_format
+        && manifest.state_format <= control.confirmed.state_format)
+    {
+        return Err(err(
+            "migration refused: confirmed generation could not read state after candidate writes (rollback unsafe)",
+        ));
+    }
     let payload = media_mount.path().join("synveil.release.bin");
     let (payload_digest, payload_size) = digest_file(&payload)?;
     if payload_digest != manifest.sha256 || payload_size != manifest.bytes {
@@ -994,6 +1086,8 @@ pub fn stage() -> io::Result<Value> {
             bytes: manifest.bytes,
             sha256: manifest.sha256.clone(),
             state_format: manifest.state_format,
+            generation_id: manifest.generation_id.clone(),
+            min_reader_state_format: manifest.min_reader_state_format,
         };
         let text = serde_json::to_string_pretty(&identity)
             .map_err(|_| err("slot identity encode failed"))?;
@@ -1009,22 +1103,26 @@ pub fn stage() -> io::Result<Value> {
         return Err(err("inactive-slot write verification failed"));
     }
     let mut control = control;
-    control.trial = Some(Trial {
+    let trial = Trial {
         slot: inactive.into(),
         version: manifest.version,
         bytes: manifest.bytes,
         sha256: manifest.sha256.clone(),
         state_format: manifest.state_format,
+        generation_id: manifest.generation_id.clone(),
+        min_reader_state_format: manifest.min_reader_state_format,
         attempts: TRIAL_ATTEMPTS,
         awaiting_health: false,
-    });
+        chain_in_flight: false,
+    };
+    // The slot map records what each slot currently holds.
+    control.slots.set(trial.generation());
+    control.trial = Some(trial);
     control.push_history("stage", inactive, manifest.version, "trial");
     save_control(&control)?;
-    // Accounting is durable; only now may firmware be pointed at the
-    // candidate, as a one-shot.
-    let efi_record = load_efi_record()?;
-    efi::ensure_efivars()?;
-    efi::set_boot_next(efi_record.entry_of(inactive))?;
+    // Accounting is durable. Nothing is pointed at the candidate:
+    // the next boot's init hook sees the trial record and
+    // chain-loads it (see boot_hook).
     marker(&format!(
         "SYNVEIL_AB_STAGED slot={inactive} version={} key_id={} development={}",
         manifest.version, trust.key_id, trust.development
@@ -1042,13 +1140,18 @@ pub fn stage() -> io::Result<Value> {
 pub fn rollback() -> io::Result<Value> {
     let layout = Layout::load()?;
     let mut control = load_control(&layout)?;
-    let efi_record = load_efi_record()?;
-    efi::ensure_efivars()?;
     if control.trial.is_some() {
         let trial = control.trial.take().expect("trial present");
-        if efi::boot_next()? == Some(efi_record.entry_of(&trial.slot)) {
-            let path = Path::new(efi::EFIVARS_DIR).join(format!("BootNext-{}", efi::GLOBAL_GUID));
-            let _ = fs::remove_file(path);
+        // A trial that already booted may have written STATE at its
+        // own format; discarding it is safe only if the confirmed
+        // generation can read that format.
+        if trial.awaiting_health
+            && !(control.confirmed.min_reader_state_format <= trial.state_format
+                && trial.state_format <= control.confirmed.state_format)
+        {
+            return Err(err(
+                "rollback refused: trial may have advanced state beyond the confirmed generation's readable range",
+            ));
         }
         let confirmed = control.confirmed.clone();
         control.push_history(
@@ -1075,19 +1178,30 @@ pub fn rollback() -> io::Result<Value> {
     if digest != retained.sha256 || size != retained.bytes {
         return Err(err("retained generation is corrupt; rollback refused"));
     }
+    // The retained generation must be able to read STATE as the
+    // confirmed generation leaves it.
+    if !(retained.min_reader_state_format <= control.confirmed.state_format
+        && control.confirmed.state_format <= retained.state_format)
+    {
+        return Err(err(
+            "rollback refused: retained generation cannot read the current state format",
+        ));
+    }
     control.trial = Some(Trial {
         slot: retained.slot.clone(),
         version: retained.version,
         bytes: retained.bytes,
         sha256: retained.sha256.clone(),
         state_format: retained.state_format,
+        generation_id: retained.generation_id.clone(),
+        min_reader_state_format: retained.min_reader_state_format,
         attempts: TRIAL_ATTEMPTS,
         awaiting_health: false,
+        chain_in_flight: false,
     });
     let version = retained.version;
     control.push_history("rollback", other, version, "trial");
     save_control(&control)?;
-    efi::set_boot_next(efi_record.entry_of(other))?;
     marker(&format!(
         "SYNVEIL_AB_ROLLBACK result=trial slot={other} version={version}"
     ));
@@ -1098,22 +1212,31 @@ pub fn status() -> io::Result<Value> {
     let stamp = load_stamp().ok();
     let trust = load_trust().ok();
     let layout = Layout::load();
-    let (control, efi_record) = match &layout {
-        Ok(layout) => (load_control(layout).ok(), load_efi_record().ok()),
-        Err(_) => (None, None),
+    let control = match &layout {
+        Ok(layout) => load_control(layout).ok(),
+        Err(_) => None,
     };
-    let booted = match (efi::ensure_efivars(), &efi_record) {
-        (Ok(()), Some(record)) => efi::boot_current()
-            .ok()
-            .flatten()
-            .and_then(|id| record.slot_of(id))
-            .map(str::to_string),
+    let booted = match (&stamp, &control) {
+        (Some(stamp), Some(control)) => {
+            if stamp.generation_id == control.confirmed.generation_id {
+                Some(control.confirmed.slot.clone())
+            } else if control
+                .trial
+                .as_ref()
+                .is_some_and(|t| t.generation_id == stamp.generation_id)
+            {
+                control.trial.as_ref().map(|t| t.slot.clone())
+            } else {
+                Some("entry".to_string())
+            }
+        }
         _ => None,
     };
     Ok(json!({
         "enabled": Path::new(ENABLED_MARKER).is_file(),
         "running": stamp.map(|s| json!({"version": s.version, "commit": s.commit,
-                                        "state_format": s.state_format})),
+                                        "state_format": s.state_format,
+                                        "generation_id": s.generation_id})),
         "publisher": trust.map(|t| json!({"key_id": t.key_id, "development": t.development})),
         "booted_slot": booted,
         "confirmed": control.as_ref().map(|c| serde_json::to_value(&c.confirmed).unwrap_or(Value::Null)),
@@ -1200,16 +1323,15 @@ pub fn health_confirm() -> io::Result<&'static str> {
     if !trial.awaiting_health {
         return Ok("trial-not-booted");
     }
-    let efi_record = load_efi_record()?;
-    efi::ensure_efivars()?;
-    let booted = efi::boot_current()?.and_then(|id| efi_record.slot_of(id));
-    if booted != Some(trial.slot.as_str()) {
+    // The running generation identifies itself by its build-time
+    // stamp; no firmware state is consulted.
+    let stamp = load_stamp()?;
+    if stamp.generation_id != trial.generation_id {
         return Ok("trial-not-booted");
     }
     // The running generation must be the staged one: its stamp
     // agrees with the trial record, and the slot it booted from
     // still hashes to the staged digest.
-    let stamp = load_stamp()?;
     if stamp.version != trial.version {
         marker(&format!(
             "SYNVEIL_AB_HEALTH_FAILED check=identity stamp_version={} trial_version={}",
@@ -1266,11 +1388,6 @@ pub fn health_confirm() -> io::Result<&'static str> {
     control.confirmed = promoted.clone();
     control.push_history("confirm", &promoted.slot, promoted.version, "confirmed");
     save_control(&control)?;
-    write_boot_order(&efi_record, &promoted.slot)?;
-    if efi::boot_next()? == Some(efi_record.entry_of(&promoted.slot)) {
-        let path = Path::new(efi::EFIVARS_DIR).join(format!("BootNext-{}", efi::GLOBAL_GUID));
-        let _ = fs::remove_file(path);
-    }
     marker(&format!(
         "SYNVEIL_AB_CONFIRMED slot={} version={}",
         promoted.slot, promoted.version
