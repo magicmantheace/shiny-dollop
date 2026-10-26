@@ -15,6 +15,16 @@ and login bands differ from each other and are stable across
 repaints), never by pinned hashes, so the test does not depend on a
 particular GOP resolution or font rasterization.
 
+Two device variants are supported via --variant: "virtio" (the
+original acceptance configuration: virtio-vga + virtio-blk) and
+combinations selecting the firmware-framebuffer display path
+(--graphics vga: standard VGA, for which the hardware kernel has no
+native DRM driver, so the display runs through simpledrm on the EFI
+framebuffer) and/or USB boot storage (--image-usb: the whole image
+attached over emulated USB storage). Each variant writes its own
+guest-validation JSON and evidence directory; the default variant
+keeps the historical file names.
+
 Three boots of private copies of the hardware image:
 
 1. Fresh: early-boot frames must show a live tty0 text console on the
@@ -77,6 +87,11 @@ _spec2.loader.exec_module(joined_smoke)
 
 IMAGE_DIR = ROOT / "out" / "native-joined-hardware"
 STATE_PARTUUID = "7c9e2d41-8b3a-4f5e-a6d1-2e8c4b7f9053"
+
+# QEMU device configuration for this run, set by main() from
+# --graphics/--image-usb before any Guest is constructed.
+QEMU_GRAPHICS = "virtio"
+QEMU_IMAGE_USB = False
 
 # auth_render colors (src/veil-display/main.c): background, top band,
 # muted text (subtitle and the denied/retry line).
@@ -159,6 +174,8 @@ class Guest:
                if not key.startswith("SYNVEIL_")}
         env.update(SYNVEIL_OUT_DIR=str(self.work),
                    SYNVEIL_QEMU_VIDEO="1",
+                   SYNVEIL_QEMU_GRAPHICS=QEMU_GRAPHICS,
+                   SYNVEIL_QEMU_IMAGE_USB="1" if QEMU_IMAGE_USB else "0",
                    SYNVEIL_QEMU_DISPLAY="none", SYNVEIL_QEMU_NETWORK="0",
                    SYNVEIL_QEMU_MEMORY="768M",
                    SYNVEIL_QEMU_IMAGE_WRITABLE="1",
@@ -442,9 +459,27 @@ def boot_three_broken_state(work, evidence_dir, secret, login_screen, timeout):
 
 
 def main() -> int:
+    global QEMU_GRAPHICS, QEMU_IMAGE_USB
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--timeout", type=float, default=420)
+    parser.add_argument("--graphics", choices=("virtio", "vga"),
+                        default="virtio",
+                        help="QEMU display device: virtio-vga (default) "
+                             "or standard VGA (simpledrm path)")
+    parser.add_argument("--image-usb", action="store_true",
+                        help="attach the whole boot image over emulated "
+                             "USB storage instead of virtio-blk")
+    parser.add_argument("--variant", default=None,
+                        help="label for this configuration's evidence "
+                             "files (default: derived from the options)")
     args = parser.parse_args()
+    QEMU_GRAPHICS = args.graphics
+    QEMU_IMAGE_USB = args.image_usb
+    variant = args.variant or (
+        "virtio" if args.graphics == "virtio" and not args.image_usb
+        else "-".join(part for part in
+                      (args.graphics if args.graphics != "virtio" else "",
+                       "usb" if args.image_usb else "") if part))
     if os.geteuid() == 0:
         parser.error("hardware joined smoke requires a non-root runner")
     if args.timeout < 180:
@@ -457,7 +492,9 @@ def main() -> int:
             hashlib.sha256(source_image.read_bytes()).hexdigest()
             != proof.get("image_sha256")):
         parser.error("hardware joined image missing or changed since build")
-    evidence_dir = IMAGE_DIR / "smoke-evidence"
+    evidence_dir = IMAGE_DIR / (
+        "smoke-evidence" if variant == "virtio"
+        else f"smoke-evidence-{variant}")
     evidence_dir.mkdir(exist_ok=True)
     secret = secrets.token_hex(16)
     wrong = secret[:-1] + ("0" if secret[-1] != "0" else "1")
@@ -485,12 +522,39 @@ def main() -> int:
         corrupt_state_partition(broken_image)
         boot_three_broken_state(broken, evidence_dir, secret,
                                 facts["login_screen"], args.timeout)
+    if args.graphics == "vga":
+        graphics_note = (
+            "QEMU standard VGA GOP stands in for the TG01 RTX 3060 "
+            "firmware GOP. The hardware kernel has no native driver "
+            "for this adapter (CONFIG_DRM_BOCHS unset, no virtio GPU "
+            "present), so the display ran through simpledrm on the "
+            "EFI framebuffer; physical RTX 3060 behavior is unproven")
+    else:
+        graphics_note = (
+            "QEMU GOP framebuffer via virtio-vga stands in for the "
+            "TG01 RTX 3060 firmware GOP; the kernel has no nouveau or "
+            "NVIDIA driver, so physical display behavior is unproven")
+    if args.image_usb:
+        storage_note = (
+            "The complete image booted from emulated USB storage "
+            "(qemu-xhci + usb-storage); the owner's physical USB SSD "
+            "and HP firmware USB boot behavior are unproven")
+    else:
+        storage_note = (
+            "virtio-blk stands in for the owner's USB SSD; this "
+            "image's boot from emulated USB storage is recorded by "
+            "the usb variant of this acceptance")
     result = {
         "schema": "synveil.native-joined-hardware-guest/v1",
         "source_commit": subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "image_sha256": proof["image_sha256"],
         "boot_target": "hardware",
+        "variant": variant,
+        "qemu_graphics_device": "VGA" if args.graphics == "vga"
+                                else "virtio-vga",
+        "qemu_boot_storage": "usb-storage" if args.image_usb
+                             else "virtio-blk-pci",
         "qemu_uefi_graphical_session": True,
         "framebuffer_resolution": facts["resolution"],
         "tty0_console_frames_before_greeter":
@@ -510,17 +574,15 @@ def main() -> int:
             "enroll": facts["enroll_screen"], "login": facts["login_screen"]},
         "physical_hardware_tested": False,
         "qemu_only_limitations": [
-            "QEMU GOP framebuffer via virtio-vga stands in for the "
-            "TG01 RTX 3060 firmware GOP; the kernel has no nouveau or "
-            "NVIDIA driver, so physical display behavior is unproven",
-            "virtio-blk stands in for the owner's USB SSD; USB storage "
-            "enumeration of this image is proven separately (ADR 0019 "
-            "USB state proof on the authenticated image family)",
+            graphics_note,
+            storage_note,
             "USB keyboard/tablet are QEMU devices; TG01 HID behavior "
             "is unproven",
         ],
     }
-    (IMAGE_DIR / "guest-validation.json").write_text(
+    result_name = ("guest-validation.json" if variant == "virtio"
+                   else f"guest-validation-{variant}.json")
+    (IMAGE_DIR / result_name).write_text(
         json.dumps(result, indent=2) + "\n")
     print("SYNVEIL_NATIVE_JOINED_HARDWARE_QEMU_ENROLL_LOGIN_WESTON_PASS")
     return 0
