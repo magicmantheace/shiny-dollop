@@ -979,10 +979,14 @@ def enroll_first_user(boot, secret):
 def _run_boots(results, record, log, workdir, vars_template, secret,
                releases):
     if True:
+        # Work on a copy: a guest boot mutates STATE/DATA, and the
+        # committed build receipt hashes the pristine image.
+        disk = workdir / "synveil-ab-run.img"
+        shutil.copyfile(DISK, disk)
         # ---------------- Boot 1: B0-B5 ----------------
         vars1 = workdir / "vars1.bin"
         shutil.copyfile(vars_template, vars1)
-        boot = NetBoot(workdir, "browser1", DISK, vars1)
+        boot = NetBoot(workdir, "browser1", disk, vars1)
         boot.start(secret)
         try:
             network = boot.wait("SYNVEIL_NETWORK_READY", 600)
@@ -1054,7 +1058,7 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
                        page_proof=False)
         finally:
             boot.quit()
-        facts1 = browser_artifacts(DISK, workdir / "readback1")
+        facts1 = browser_artifacts(disk, workdir / "readback1")
         results["B1"]["artifacts"] = facts1
         results["B2"]["artifacts"] = facts1
         results["B2"]["payload_sha256_after"] = facts1["payload_sha256"]
@@ -1064,7 +1068,7 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
         # ---------------- Boot 2: B6 (update to v2) ----------------
         vars2 = workdir / "vars2.bin"
         shutil.copyfile(vars_template, vars2)
-        boot = NetBoot(workdir, "browser2", DISK, vars2,
+        boot = NetBoot(workdir, "browser2", disk, vars2,
                        extra_drives=[releases[2]])
         boot.start(secret)
         try:
@@ -1098,12 +1102,12 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
         finally:
             boot.quit()
         results["B6"]["artifacts"] = browser_artifacts(
-            DISK, workdir / "readback2")
+            disk, workdir / "readback2")
 
         # ---------------- Boot 3: B7 (rollback to v1) ----------------
         vars3 = workdir / "vars3.bin"
         shutil.copyfile(vars_template, vars3)
-        boot = NetBoot(workdir, "browser3", DISK, vars3)
+        boot = NetBoot(workdir, "browser3", disk, vars3)
         boot.start(secret)
         try:
             ab.login(boot, secret)
@@ -1127,7 +1131,7 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
         finally:
             boot.quit()
         results["B7"]["artifacts"] = browser_artifacts(
-            DISK, workdir / "readback3")
+            disk, workdir / "readback3")
 
 
 if __name__ == "__main__":
