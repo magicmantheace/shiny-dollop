@@ -29,6 +29,14 @@
 //!   its bytes are re-read and re-hashed from the slot itself;
 //! * attempt accounting happens in the init hook, before services;
 //! * any uncertainty about layout, records or digests fails closed.
+//!
+//! Confirmation is two-key (owner Priority 2 amendment,
+//! docs/AB_UPDATER.md): the agent's health checks must pass on the
+//! booted trial AND the owner must issue the typed `confirm` action
+//! (the desktop update GUI, or `veil-ab request confirm`). Passing
+//! health alone never promotes a generation; a healthy trial the
+//! owner neither confirms nor rolls back consumes one attempt per
+//! boot and falls back when its attempts are spent.
 
 use crate::ed25519;
 use crate::sha256::{Sha256, hex};
@@ -1249,8 +1257,43 @@ pub fn status() -> io::Result<Value> {
         "confirmed": control.as_ref().map(|c| serde_json::to_value(&c.confirmed).unwrap_or(Value::Null)),
         "trial": control.as_ref().and_then(|c| c.trial.as_ref())
             .map(|t| serde_json::to_value(t).unwrap_or(Value::Null)),
+        "slots": control.as_ref().map(|c| serde_json::to_value(&c.slots).unwrap_or(Value::Null)),
+        "health": health_json(),
+        "available": available_release(),
         "history": control.as_ref().map(|c| serde_json::to_value(&c.history).unwrap_or(Value::Null)),
     }))
+}
+
+/// Probe the release medium (if attached) for the status report:
+/// the offered generation and whether its signature verifies
+/// against the pinned publisher key. Verification here is the same
+/// verify_release the stage action uses — metadata signature and
+/// validity window only; the payload digest is checked at stage
+/// time, before anything is written. A probe failure is reported
+/// as data, never as a status failure.
+fn available_release() -> Value {
+    let Ok(partitions) = scan_partitions() else {
+        return json!({"attached": false});
+    };
+    let Ok(Some(media)) = find_partition(&partitions, RELEASE_PARTUUID) else {
+        return json!({"attached": false});
+    };
+    let Ok(trust) = load_trust() else {
+        return json!({"attached": true, "error": "publisher trust unavailable"});
+    };
+    let Ok(mount) = Mount::attach(&media, "ext4", "release-probe", true) else {
+        return json!({"attached": true, "error": "release media unreadable"});
+    };
+    match verify_release(mount.path(), &trust, now()) {
+        Ok((manifest, _raw)) => json!({
+            "attached": true,
+            "version": manifest.version,
+            "generation_id": manifest.generation_id,
+            "bytes": manifest.bytes,
+            "signature": "valid",
+        }),
+        Err(error) => json!({"attached": true, "error": error.to_string()}),
+    }
 }
 
 // ---------------------------------------------------------------------
@@ -1320,33 +1363,74 @@ fn probe_session() -> bool {
     weston && seat
 }
 
-/// If this boot is a trial awaiting health, run the health checks
-/// and confirm on success. Returns a short outcome token; the
-/// caller reboots on "health-failed".
-pub fn health_confirm() -> io::Result<&'static str> {
-    let layout = Layout::load()?;
-    let control = load_control(&layout)?;
-    let Some(trial) = &control.trial else {
-        return Ok("no-trial");
+/// Health outcome for this boot's trial, assessed once by the
+/// agent's health thread and consulted by the `confirm` action.
+/// Promotion is two-key: health passing here is necessary but never
+/// sufficient — the owner confirms (see the module docs).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum HealthPhase {
+    /// No trial is being assessed on this boot.
+    None,
+    Checking,
+    Passed,
+    Failed,
+}
+
+static HEALTH_PHASE: std::sync::Mutex<HealthPhase> = std::sync::Mutex::new(HealthPhase::None);
+static HEALTH_CHECK: std::sync::Mutex<Option<&'static str>> = std::sync::Mutex::new(None);
+
+fn set_health(phase: HealthPhase, check: Option<&'static str>) {
+    if let Ok(mut slot) = HEALTH_PHASE.lock() {
+        *slot = phase;
+    }
+    if let Ok(mut slot) = HEALTH_CHECK.lock() {
+        *slot = check;
+    }
+}
+
+fn health_state() -> (HealthPhase, Option<&'static str>) {
+    let phase = HEALTH_PHASE
+        .lock()
+        .map(|slot| *slot)
+        .unwrap_or(HealthPhase::None);
+    let check = HEALTH_CHECK.lock().map(|slot| *slot).unwrap_or(None);
+    (phase, check)
+}
+
+fn health_json() -> Value {
+    let (phase, check) = health_state();
+    json!({
+        "phase": match phase {
+            HealthPhase::None => "none",
+            HealthPhase::Checking => "checking",
+            HealthPhase::Passed => "passed",
+            HealthPhase::Failed => "failed",
+        },
+        "check": check,
+    })
+}
+
+enum HealthChecks {
+    Passed,
+    Failed(&'static str),
+}
+
+/// Run the trial health checks (STATE read-write, credential record
+/// parses, veil-core answers, graphical session live, booted slot
+/// still hashes to the staged digest). The running generation must
+/// be the staged one: its build-time stamp agrees with the trial
+/// record — no firmware state is consulted.
+fn run_health_checks(layout: &Layout, trial: &Trial) -> HealthChecks {
+    let stamp = match load_stamp() {
+        Ok(stamp) => stamp,
+        Err(_) => return HealthChecks::Failed("identity"),
     };
-    if !trial.awaiting_health {
-        return Ok("trial-not-booted");
-    }
-    // The running generation identifies itself by its build-time
-    // stamp; no firmware state is consulted.
-    let stamp = load_stamp()?;
-    if stamp.generation_id != trial.generation_id {
-        return Ok("trial-not-booted");
-    }
-    // The running generation must be the staged one: its stamp
-    // agrees with the trial record, and the slot it booted from
-    // still hashes to the staged digest.
-    if stamp.version != trial.version {
+    if stamp.version != trial.version || stamp.generation_id != trial.generation_id {
         marker(&format!(
             "SYNVEIL_AB_HEALTH_FAILED check=identity stamp_version={} trial_version={}",
             stamp.version, trial.version
         ));
-        return Ok("health-failed");
+        return HealthChecks::Failed("identity");
     }
     // Generous under emulation: the session can only appear after a
     // graphical login, and a slow first login must not fail a healthy
@@ -1371,7 +1455,7 @@ pub fn health_confirm() -> io::Result<&'static str> {
         } else if !probe_session() {
             failing = Some("session");
         } else if !identity_checked {
-            match hash_slot_image(&layout, &trial.slot) {
+            match hash_slot_image(layout, &trial.slot) {
                 Ok((digest, size)) if digest == trial.sha256 && size == trial.bytes => {
                     identity_checked = true;
                 }
@@ -1379,18 +1463,106 @@ pub fn health_confirm() -> io::Result<&'static str> {
             }
         }
         if failing.is_none() && identity_checked {
-            break;
+            return HealthChecks::Passed;
         }
         if std::time::Instant::now() > deadline {
             marker(&format!(
                 "SYNVEIL_AB_HEALTH_FAILED check={}",
                 failing.unwrap_or("timeout")
             ));
-            return Ok("health-failed");
+            return HealthChecks::Failed(failing.unwrap_or("timeout"));
         }
         std::thread::sleep(Duration::from_secs(2));
     }
-    let mut control = control;
+}
+
+/// If this boot is a trial awaiting health, run the health checks
+/// and record the outcome for the owner's `confirm` action. Returns
+/// a short outcome token; the caller reboots on "health-failed".
+/// A passing trial is NOT promoted here — promotion is the owner's
+/// explicit act (module docs, docs/AB_UPDATER.md).
+pub fn health_assessment() -> io::Result<&'static str> {
+    let layout = Layout::load()?;
+    let control = load_control(&layout)?;
+    let Some(trial) = &control.trial else {
+        return Ok("no-trial");
+    };
+    if !trial.awaiting_health {
+        return Ok("trial-not-booted");
+    }
+    // The running generation identifies itself by its build-time
+    // stamp; no firmware state is consulted.
+    let stamp = load_stamp()?;
+    if stamp.generation_id != trial.generation_id {
+        return Ok("trial-not-booted");
+    }
+    set_health(HealthPhase::Checking, None);
+    match run_health_checks(&layout, trial) {
+        HealthChecks::Passed => {
+            set_health(HealthPhase::Passed, None);
+            marker(&format!(
+                "SYNVEIL_AB_HEALTH_PASSED slot={} version={} awaiting=owner-confirm",
+                trial.slot, trial.version
+            ));
+            Ok("awaiting-confirm")
+        }
+        HealthChecks::Failed(check) => {
+            set_health(HealthPhase::Failed, Some(check));
+            Ok("health-failed")
+        }
+    }
+}
+
+/// Owner confirmation of a booted trial (typed action `confirm`).
+/// Promotes the trial to confirmed only when this boot's health
+/// checks passed, the running system IS the trial generation, and
+/// the candidate's slot bytes still hash to the trial record at
+/// confirm time. Every refusal names its reason; nothing here can
+/// promote an unhealthy or substituted candidate.
+pub fn confirm() -> io::Result<Value> {
+    let layout = Layout::load()?;
+    let control = load_control(&layout)?;
+    let Some(trial) = control.trial.clone() else {
+        return Err(err("no trial update to confirm"));
+    };
+    if !trial.awaiting_health {
+        return Err(err("the trial has not booted yet; restart to try it first"));
+    }
+    let stamp = load_stamp()?;
+    if stamp.generation_id != trial.generation_id {
+        return Err(err("the running system is not the trial generation"));
+    }
+    match health_state() {
+        (HealthPhase::Passed, _) => {}
+        (HealthPhase::Checking, _) => {
+            return Err(err("health checks are still running for this trial"));
+        }
+        (HealthPhase::Failed, check) => {
+            return Err(err(&format!(
+                "health checks failed for this trial (check: {}); it cannot be confirmed",
+                check.unwrap_or("unknown")
+            )));
+        }
+        (HealthPhase::None, _) => {
+            return Err(err("health checks have not passed for this trial"));
+        }
+    }
+    let (digest, size) = hash_slot_image(&layout, &trial.slot)?;
+    if digest != trial.sha256 || size != trial.bytes {
+        return Err(err(
+            "candidate slot digest mismatch; confirmation refused",
+        ));
+    }
+    // Reload so a record changed since the assessment is never
+    // overwritten blind: the trial on disk must still be the one
+    // whose health passed.
+    let mut control = load_control(&layout)?;
+    match &control.trial {
+        Some(current)
+            if current.generation_id == trial.generation_id
+                && current.sha256 == trial.sha256 => {}
+        _ => return Err(err("the trial record changed; confirmation refused")),
+    }
     let trial = control.trial.take().expect("trial present");
     let promoted = trial.generation();
     control.slots.set(promoted.clone());
@@ -1401,13 +1573,18 @@ pub fn health_confirm() -> io::Result<&'static str> {
         "SYNVEIL_AB_CONFIRMED slot={} version={}",
         promoted.slot, promoted.version
     ));
-    Ok("confirmed")
+    Ok(json!({
+        "confirmed_slot": promoted.slot,
+        "version": promoted.version,
+        "generation_id": promoted.generation_id,
+    }))
 }
 
 // ---------------------------------------------------------------------
 // Agent daemon + client (typed privilege boundary, schema
 // synveil.ab-agent/v1: newline-delimited JSON over a unix socket
-// owned by root, group synveil, mode 0660)
+// owned by root, group synveil, mode 0660; actions: status, stage,
+// confirm, rollback, reboot — nothing else exists)
 
 pub const AGENT_SCHEMA: &str = "synveil.ab-agent/v1";
 const MAX_REQUEST_BYTES: usize = 4096;
@@ -1416,6 +1593,7 @@ fn dispatch(action: &str) -> Value {
     let result = match action {
         "status" => status(),
         "stage" => stage(),
+        "confirm" => confirm(),
         "rollback" => rollback(),
         "reboot" => {
             std::thread::spawn(|| {
@@ -1447,7 +1625,7 @@ pub fn serve() -> io::Result<()> {
     if socket.exists() {
         fs::remove_file(socket)?;
     }
-    let health = std::thread::spawn(health_confirm);
+    let health = std::thread::spawn(health_assessment);
     let listener = UnixListener::bind(socket)?;
     fs::set_permissions(socket, fs::Permissions::from_mode(0o660))?;
     let _ = Command::new("/bin/chown")

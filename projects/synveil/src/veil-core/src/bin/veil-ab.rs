@@ -5,10 +5,10 @@
 //!   veil-ab boot-hook   init hook: provisioning + trial attempt
 //!                       accounting BEFORE services start; reboots
 //!                       immediately when a trial is exhausted.
-//!   veil-ab serve       update agent daemon: health confirmation
+//!   veil-ab serve       update agent daemon: health assessment
 //!                       for a booted trial, then the typed-action
 //!                       socket (synveil.ab-agent/v1).
-//!   veil-ab request <status|stage|rollback|reboot>
+//!   veil-ab request <status|stage|confirm|rollback|reboot>
 //!                       session-side client over that socket.
 //!
 //! On systems without /etc/synveil/ab-system every mode is inert:
@@ -24,7 +24,7 @@ fn main() -> ExitCode {
         Some("serve") if args.len() == 1 => serve(),
         Some("request") if args.len() == 2 => request(&args[1]),
         _ => {
-            eprintln!("usage: veil-ab <boot-hook|serve|request <status|stage|rollback|reboot>>");
+            eprintln!("usage: veil-ab <boot-hook|serve|request <status|stage|confirm|rollback|reboot>>");
             ExitCode::FAILURE
         }
     }
@@ -58,9 +58,9 @@ fn serve() -> ExitCode {
 
 fn request(action: &str) -> ExitCode {
     match action {
-        "status" | "stage" | "rollback" | "reboot" => {}
+        "status" | "stage" | "confirm" | "rollback" | "reboot" => {}
         _ => {
-            eprintln!("usage: veil-ab request <status|stage|rollback|reboot>");
+            eprintln!("usage: veil-ab request <status|stage|confirm|rollback|reboot>");
             return ExitCode::FAILURE;
         }
     }
