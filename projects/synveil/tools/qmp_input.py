@@ -235,7 +235,7 @@ AB_COMMANDS = {
 
 _AB_CHAR_KEYS = {c: c for c in "abcdefghijklmnopqrstuvwxyz0123456789"}
 _AB_CHAR_KEYS.update({" ": "spc", "/": "slash", "-": "minus", ".": "dot",
-                      "_": "shift_l+minus", ">": "shift_l+dot"})
+                      "_": "shift+minus", ">": "shift+dot"})
 
 
 def type_ab_command(socket_path: Path, command_id: str, *, timeout=30.0):
