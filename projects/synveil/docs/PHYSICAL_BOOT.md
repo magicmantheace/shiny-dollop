@@ -1,8 +1,25 @@
 # Physical UEFI boot bring-up
 
-**Status (2026-10-25): Ready for the owner's first boot test on a
-dedicated external SSD — not an install, and not yet physically
-validated.**
+**Status (2026-10-25): Not ready for owner hardware testing.**
+
+**Review hold (2026-10-25):** an independent review of the pass that
+produced the test-media package found the earlier "owner test-ready"
+conclusion premature. Four points must close with evidence before
+any test-ready status is restored: (1) the test-media writer's
+mounted-device check used device-name prefixes and can miss
+encrypted, LVM or other device-mapper volumes backed by the selected
+disk — it must trace backing-device relationships, fail closed on
+uncertainty, and gain refusal tests; (2) the hardware-image QEMU
+acceptance ran on virtio-vga/virtio_gpu, which does not establish
+that Weston runs through simpledrm (the intended RTX 3060 firmware-
+framebuffer fallback) — the driver actually used must be identified
+and the simpledrm path exercised separately; (3) the joined hardware
+image was accepted on virtio storage and must also boot complete
+from emulated USB storage with the full acceptance sequence; (4)
+recovery and Windows-safety wording must state only the specific
+protections implemented and tested (rewriting disposable test media
+is not independent installed-system recovery). Physical RTX 3060
+compatibility remains explicitly unverified regardless.
 
 Target: HP Pavilion TG01, Intel i5-10400F, RTX 3060 12 GB, 32 GB RAM,
 USB HID keyboard/mouse, UEFI firmware and Windows 11 on the internal disk.
