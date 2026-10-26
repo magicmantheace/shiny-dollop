@@ -932,6 +932,7 @@ def main():
     if workdir.exists():
         shutil.rmtree(workdir)
     workdir.mkdir(parents=True)
+    os.chmod(workdir, 0o700)  # boot.dir: scanout privacy check too
     log = RequestLog()
     servers = start_servers(TLS_DIR, log)
     results = {}
