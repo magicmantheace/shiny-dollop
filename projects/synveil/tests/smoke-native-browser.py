@@ -96,7 +96,7 @@ weston_smoke = ab.weston_smoke
 OUT = ROOT / "out" / "browser-proof"
 EVIDENCE = OUT / "browser-evidence"
 TLS_DIR = OUT / "tls-fixture"
-DISK = OUT / "synveil-ab-disk.img"
+DISK = OUT / "synveil-ab.img"
 BUILD_RECEIPT = OUT / "build-receipt.json"
 ab.EVIDENCE = EVIDENCE  # Boot logs land with this proof's evidence
 
