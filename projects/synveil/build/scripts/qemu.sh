@@ -78,12 +78,6 @@ QEMU_ARGS=(
     -no-reboot
     -drive "if=none,id=synveil_disk,file=$IMAGE,format=raw,readonly=$IMAGE_READONLY"
 )
-if [[ "$IMAGE_USB" == 1 ]]; then
-    QEMU_ARGS+=(-device "usb-storage,drive=synveil_disk,bootindex=1")
-else
-    QEMU_ARGS+=(-device "virtio-blk-pci,drive=synveil_disk,bootindex=1")
-fi
-
 if [[ -n "$QMP_SOCKET" ]]; then
     QEMU_ARGS+=(-qmp "unix:$QMP_SOCKET,server=on,wait=off")
 fi
@@ -104,6 +98,14 @@ if [[ "$DISPLAY_BACKEND" != none || "$VIDEO" == 1 ]]; then
 elif [[ "$IMAGE_USB" == 1 ]]; then
     # A USB boot disk needs its controller even in the headless profile.
     QEMU_ARGS+=(-device qemu-xhci)
+fi
+# The boot-disk device is emitted only after the graphics/input block:
+# usb-storage resolves its bus at device-creation time, so the qemu-xhci
+# controller must already exist in the argument list.
+if [[ "$IMAGE_USB" == 1 ]]; then
+    QEMU_ARGS+=(-device "usb-storage,drive=synveil_disk,bootindex=1")
+else
+    QEMU_ARGS+=(-device "virtio-blk-pci,drive=synveil_disk,bootindex=1")
 fi
 if [[ "$NETWORK" == 1 ]]; then
     QEMU_ARGS+=(-netdev user,id=synveil_net -device virtio-net-pci,netdev=synveil_net)
