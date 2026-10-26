@@ -185,8 +185,16 @@ class Boot:
 
 
 def login(boot, secret, timeout=420):
-    """Wait for the graphical login, prove scanout, authenticate."""
-    if not boot.wait("SYNVEIL_LOGIN_READY", timeout):
+    """Wait for the graphical login, prove scanout, authenticate.
+
+    All marker waits are anchored at entry: one Boot object spans
+    several guest boots (reboots stay inside one QEMU process), so
+    an unanchored wait would be satisfied by the PREVIOUS boot's
+    LOGIN_READY / AUTH_ACTIVE lines and the secret would be typed
+    into a guest that has not reached its greeter yet.
+    """
+    anchor = len(boot.lines)
+    if not boot.wait("SYNVEIL_LOGIN_READY", timeout, since=anchor):
         save_failure_frame(boot, "login-ready")
         return False
     for _ in range(10):
@@ -200,9 +208,18 @@ def login(boot, secret, timeout=420):
         type_test_secret(boot.qmp, secret, timeout=18)
     except (QMPError, OSError, ValueError):
         return False
-    if not boot.wait("SYNVEIL_GRAPHICAL_AUTH_ACTIVE", 120):
-        save_failure_frame(boot, "login-auth")
-        return False
+    if not boot.wait("SYNVEIL_GRAPHICAL_AUTH_ACTIVE", 60, since=anchor):
+        # The first type may have raced the greeter's input focus;
+        # the prompt is certainly up now (LOGIN_READY was seen in
+        # this boot cycle), so type the secret once more.
+        try:
+            type_test_secret(boot.qmp, secret, timeout=18)
+        except (QMPError, OSError, ValueError):
+            save_failure_frame(boot, "login-auth")
+            return False
+        if not boot.wait("SYNVEIL_GRAPHICAL_AUTH_ACTIVE", 60, since=anchor):
+            save_failure_frame(boot, "login-auth")
+            return False
     time.sleep(5)  # let the tile dashboard present before key input
     return True
 
