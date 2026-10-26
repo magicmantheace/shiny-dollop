@@ -196,7 +196,10 @@ def login(boot, secret, timeout=420):
         type_test_secret(boot.qmp, secret, timeout=18)
     except (QMPError, OSError, ValueError):
         return False
-    return boot.wait("SYNVEIL_GRAPHICAL_AUTH_ACTIVE", 120)
+    if not boot.wait("SYNVEIL_GRAPHICAL_AUTH_ACTIVE", 120):
+        return False
+    time.sleep(5)  # let the tile dashboard present before key input
+    return True
 
 
 def desktop_color_proof(boot, version, timeout=120):
@@ -228,29 +231,47 @@ def desktop_color_proof(boot, version, timeout=120):
     return False
 
 
-def terminal_command(boot, command_id, wait_marker=None, timeout=300):
-    """Click the session terminal and run one fixed A/B command."""
-    frame = None
-    for attempt in range(40):
-        try:
-            frame = weston_smoke.screenshot(boot.qmp, boot.dir, 100 + attempt)
-            tx, ty = weston_smoke.terminal_point(*frame)
-            break
-        except (ValueError, RuntimeError, OSError):
-            time.sleep(0.5)
-    else:
-        return False
-    weston_smoke.pointer(boot.qmp, frame[0], frame[1], tx, ty, button=True)
-    weston_smoke.pointer(boot.qmp, frame[0], frame[1], tx, ty, button=False)
-    time.sleep(0.4)
+def save_failure_frame(boot, tag):
+    """Preserve one scanout frame in the evidence dir for diagnosis."""
     try:
+        width, height, data = weston_smoke.screenshot(
+            boot.qmp, boot.dir, 900 + len(boot.lines) % 50)
+        ppm = EVIDENCE / f"{boot.name}-{tag}.ppm"
+        with ppm.open("wb") as handle:
+            handle.write(f"P6\n{width} {height}\n255\n".encode())
+            handle.write(bytes(data))
+    except Exception:
+        pass
+
+
+def terminal_command(boot, command_id, wait_marker=None, timeout=300):
+    """Open the dashboard's terminal tile and run one fixed command.
+
+    The authenticated session is the veil-display tile dashboard;
+    the terminal is reached by the fixed key navigation in
+    qmp_input.open_user_terminal (the same helper the project's
+    other session smokes use), never by mouse coordinates.
+    """
+    try:
+        open_user_terminal(boot.qmp, timeout=15)
+        time.sleep(1.0)
         type_ab_command(boot.qmp, command_id, timeout=30)
     except (QMPError, OSError, ValueError):
+        save_failure_frame(boot, f"cmd-{command_id}-input")
         return False
     if wait_marker is None:
         time.sleep(2)
-        return True
-    return boot.wait(wait_marker, timeout)
+        ok = True
+    else:
+        ok = boot.wait(wait_marker, timeout)
+    if not ok:
+        save_failure_frame(boot, f"cmd-{command_id}-wait")
+    try:
+        exit_user_terminal(boot.qmp, timeout=10)
+    except (QMPError, OSError, ValueError):
+        pass
+    time.sleep(0.5)
+    return ok
 
 
 def partition_offset(disk, number):
@@ -300,6 +321,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--timeout", type=float, default=600,
                         help="per-boot marker timeout budget")
+    parser.add_argument("--stop-after", default=None,
+                        help="diagnostic: stop after the named scenario")
     args = parser.parse_args()
     if os.geteuid() == 0:
         parser.error("A/B smoke requires a non-root runner")
@@ -342,20 +365,25 @@ def main():
             ok = enrolled
         setting_changed = False
         if ok:
-            # The display greeter may expose the veil-display menu's
-            # settings toggles (contrast + pointer size, persisted to
-            # STATE as desktop-pref.conf). Attempt them once at the
-            # login screen and record honestly whether the save
-            # marker appeared; the flow continues either way.
+            ok = login(boot, secret)
+        if ok:
+            # Change a display setting from the authenticated
+            # dashboard (veil-display menu toggles, persisted under
+            # the home directory on DATA). The save marker is the
+            # gate: without it there is no saved setting to prove
+            # survival with later.
             try:
-                settings_toggle(boot.qmp, timeout=8)
+                settings_toggle(boot.qmp, timeout=15)
             except (QMPError, OSError, ValueError):
                 pass
-            setting_changed = boot.wait("SYNVEIL_SETTINGS_SAVED", 8)
-            ok = login(boot, secret)
+            setting_changed = boot.wait("SYNVEIL_SETTINGS_SAVED", 30)
+            ok = setting_changed
+            if not ok:
+                save_failure_frame(boot, "settings")
         known_file_made = False
         if ok:
             known_file_made = terminal_command(boot, "known-file")
+            ok = known_file_made
             time.sleep(1)
         boot.quit()
         artifacts = state_artifacts(disk, work)
@@ -406,6 +434,8 @@ def main():
         if not ok:
             return finish(build_receipt, results, 1)
         after_update = artifacts
+        if args.stop_after == "S2":
+            return finish(build_receipt, results, 0)
 
         # ---- S3: owner rollback to v1
         boot = Boot(work, "s3-rollback-v1", disk, vars_file)
@@ -577,10 +607,14 @@ def main():
 
 
 def finish(build_receipt, results, code):
+    try:
+        source_commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    except (subprocess.CalledProcessError, OSError):
+        source_commit = build_receipt["source_commit"]
     receipt = {
         "schema": "synveil.ab-qemu-proof/v1",
-        "source_commit": subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+        "source_commit": source_commit,
         "build_receipt_commit": build_receipt["source_commit"],
         "disk_sha256": build_receipt["disk"]["sha256"],
         "generations": {v: {"uki_sha256": g["uki_sha256"], "bytes": g["uki_bytes"]}
