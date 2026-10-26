@@ -1290,10 +1290,12 @@ fn probe_core() -> bool {
 
 fn probe_session() -> bool {
     let runtime = Path::new("/run/user/1000");
+    // The session's Wayland socket is named by weston-session
+    // (WAYLAND_DISPLAY=synveil-0); there is no wayland-* socket.
     let wayland = fs::read_dir(runtime)
         .map(|entries| {
             entries.flatten().any(|e| {
-                e.file_name().to_string_lossy().starts_with("wayland-")
+                e.file_name() == "synveil-0"
                     && e.file_type().map(|t| t.is_socket()).unwrap_or(false)
             })
         })
