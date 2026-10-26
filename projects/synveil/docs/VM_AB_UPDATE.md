@@ -61,3 +61,19 @@ actual QEMU boots of these A/B slots, rollback-safe data migrations, confirmed
 kernel/userspace service health, owner authentication, signed production
 trust, physical storage safety or Windows/BitLocker compatibility. None of
 those gates may be marked complete based on this prototype.
+
+## v2 transaction core (2026-10-25)
+
+The bootable-updater design in [AB_UPDATER.md](AB_UPDATER.md) evolves
+this fixture's transaction core into `tools/ab_update.py` (schema
+`synveil.ab-control/v2`), keeping the same file-only safety envelope:
+the publisher key is pinned from a separately provisioned trust
+directory (a release carrying its own trust material is refused),
+metadata carries a validity window and a state-format migration
+window, replay/downgrade offers are refused, owner rollback to a
+retained generation is a first-class action, history is kept in the
+control record, and a both-slots-unusable outcome is reported
+distinctly. Host tests: `python3 tests/ab-update.py` (15 tests). The
+guest side — UEFI BootNext selection, early-init attempt accounting,
+health confirmation, and the QEMU boot proof — is the next pass and
+is **not** established by the host core.
