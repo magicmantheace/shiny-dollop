@@ -581,6 +581,9 @@ def browser_artifacts(disk, workdir):
     """Read the persistent DATA partition back host-side: A/B
     control facts (via the A/B driver's reader) plus everything
     the browser proof leaves behind."""
+    # extract_partition writes into these dirs without creating them.
+    Path(workdir).mkdir(parents=True, exist_ok=True)
+    (Path(workdir) / "browser").mkdir(exist_ok=True)
     facts = ab.state_artifacts(disk, workdir)
     data_copy = ab.extract_partition(disk, 5, Path(workdir) / "browser")
     image = ab.replayed_image(data_copy)

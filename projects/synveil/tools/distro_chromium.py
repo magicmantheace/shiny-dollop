@@ -299,6 +299,7 @@ def generate_derived(staging):
     with bundle.open("wb") as out:
         for cert in sorted(mozilla.glob("*.crt")):
             out.write(cert.read_bytes())
+    bundle.chmod(0o644)  # the browser (uid 1000) must read its trust bundle
     notes.append("ca-certificates.crt generated from the sealed "
                  "mozilla bundle (sorted concatenation)")
     schemas = staging / "usr/share/glib-2.0/schemas"
@@ -310,6 +311,9 @@ def generate_derived(staging):
             raise ValueError("no glib-compile-schemas available for "
                              "the payload schema cache")
         run([str(tool), str(schemas)])
+        compiled = schemas / "gschemas.compiled"
+        if compiled.is_file():
+            compiled.chmod(0o644)
         notes.append("gschemas.compiled generated for the payload")
     return notes
 
@@ -330,6 +334,15 @@ def build():
     entries = assets.seal(staging)
     if len(entries) < 200:
         raise ValueError(f"payload seal implausibly small: {len(entries)}")
+    # The payload is system data the unprivileged browser reads:
+    # nothing in it may be sealed without other-read (a generated
+    # bundle once landed 0660 under the workspace umask and the
+    # browser could not read its own trust store).
+    unreadable = [name for name, e in entries.items()
+                  if e["kind"] == "file" and not int(e["mode"], 8) & 0o004]
+    if unreadable:
+        raise ValueError("payload files not world-readable: "
+                         + ", ".join(sorted(unreadable)[:5]))
     payload_bytes = sum(e.get("size", 0) for e in entries.values())
     (OUT / "assets.json").write_text(
         json.dumps(entries, indent=1, sort_keys=True) + "\n")

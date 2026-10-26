@@ -210,6 +210,10 @@ def copy_browser_asset(source, destination, name, identity):
         if parent.is_symlink():
             raise ValueError("asset destination parent is a symlink")
         parent.mkdir(exist_ok=True)
+        # The workspace umask (0007) would leave 0770 root:root
+        # parents the browser's uid cannot traverse (this exact
+        # failure hid /etc/chromium.d from the launcher wrapper).
+        parent.chmod(0o755)
     if identity["kind"] == "symlink":
         if target.is_symlink() and \
                 target.readlink().as_posix() == identity["target"]:
@@ -382,6 +386,7 @@ def overlay_browser(rootfs, stage, *, test_ca, test_host, start_url):
             handle.write(ca_bytes)
         share = rootfs / "usr/share/synveil"
         share.mkdir(parents=True, exist_ok=True)
+        share.chmod(0o755)
         proof_ca = share / "proof-ca.pem"
         with proof_ca.open("xb") as handle:
             handle.write(ca_bytes)
