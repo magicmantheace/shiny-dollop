@@ -93,8 +93,13 @@ is untouched by this work).
 
 ## Scenarios (all on the one proof disk, in order)
 
-Machine-readable detail: `smoke-receipt.json`. Raw serial logs:
-one file per boot below (S1+S2 share a boot by design).
+Machine-readable detail: `smoke-receipt.json` (per-scenario
+pass/fail plus the extracted control records and survival
+hashes). Raw serial logs (one per boot; S1+S2 share a boot by
+design) are retained with the build outputs under
+`out/ab-proof/final-run/` — the project's `.gitignore` excludes
+`*.log` from Git, so this record commits the receipts and
+quotes the decisive marker lines in the table and text.
 
 | Scenario | Result | What it proves |
 |---|---|---|
