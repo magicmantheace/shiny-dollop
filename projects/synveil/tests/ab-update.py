@@ -53,7 +53,7 @@ class ABUpdateTests(unittest.TestCase):
 
     def sign(self, *, version, payload=None, key_id=KEY_ID, priv=None,
              issued=NOW - 100, expires=NOW + 10000, state_format=1,
-             min_reader=1, rollback_breaking=False):
+             min_reader=1, rollback_breaking=False, generation_id=None):
         if payload is not None:
             self.payload = payload
         (self.dir / (self.name + ".release.bin")).write_bytes(self.payload)
@@ -63,7 +63,8 @@ class ABUpdateTests(unittest.TestCase):
              "key_id": key_id, "issued_at": issued, "expires_at": expires,
              "state_format": state_format,
              "min_reader_state_format": min_reader,
-             "rollback_breaking": rollback_breaking}
+             "rollback_breaking": rollback_breaking,
+             "generation_id": generation_id or f"fixture-gen-{version}"}
         manifest = self.dir / (self.name + ".release.json")
         manifest.write_text(json.dumps(m, sort_keys=True))
         subprocess.run(["openssl", "pkeyutl", "-sign",
@@ -183,9 +184,14 @@ class ABUpdateTests(unittest.TestCase):
         with self.assertRaisesRegex(upd.UpdateError, "rollback-breaking"):
             self.stage()
 
-    def test_compatible_state_bump_stages(self):
+    def test_state_bump_refused_until_rollback_safe(self):
+        # Pre-correction this staged; the independent review of
+        # 66c50b6 showed that acceptance was the defect: the
+        # candidate would write state format 2, which the confirmed
+        # format-1 generation — the rollback target — cannot read.
         self.sign(version=2, state_format=2, min_reader=1)
-        self.assertEqual(self.stage()["staged_slot"], "B")
+        with self.assertRaisesRegex(upd.UpdateError, "rollback unsafe"):
+            self.stage()
 
     # -- owner rollback ---------------------------------------------
     def test_owner_rollback_to_retained_generation(self):
@@ -212,6 +218,40 @@ class ABUpdateTests(unittest.TestCase):
                          "both-slots-unusable")
         with self.assertRaisesRegex(upd.UpdateError, "corruption"):
             self.stage()
+
+
+
+    # -- bidirectional migration (Pass A review correction) ---------
+    def test_candidate_writing_newer_state_format_refused(self):
+        # The reviewer reproduction: candidate writes state format 2
+        # while the confirmed generation's readable ceiling is 1, so
+        # rollback after the candidate ran would strand STATE.
+        self.sign(version=2, state_format=2, min_reader=1)
+        with self.assertRaisesRegex(upd.UpdateError, "rollback unsafe"):
+            self.stage()
+        self.assertIsNone(self.state()["trial"])
+
+    def test_rollback_refused_when_retained_cannot_read_state(self):
+        # Reach a two-generation world normally, then model the
+        # confirmed generation having advanced STATE to format 2
+        # (its readable range [1,2]); the retained format-1
+        # generation cannot read that state, so rollback must refuse.
+        self.stage()
+        self.act("boot-trial")
+        self.act("confirm")  # confirmed B v2; A v1 retained
+        state = self.state()
+        state["confirmed"]["state_format"] = 2
+        state["slots"]["B"]["state_format"] = 2
+        self.control.write_text(json.dumps(state))
+        with self.assertRaisesRegex(upd.UpdateError,
+                                    "retained generation cannot read"):
+            self.act("rollback")
+
+    def test_stage_records_slot_map(self):
+        self.stage()
+        self.assertEqual(self.state()["slots"]["B"]["version"], 2)
+        self.assertEqual(self.state()["slots"]["B"]["generation_id"],
+                         "fixture-gen-2")
 
 
 if __name__ == "__main__":

@@ -52,6 +52,11 @@ MAX_HISTORY = 32
 TRIAL_ATTEMPTS = 3
 
 
+def _generation_id_valid(value):
+    return (isinstance(value, str) and 1 <= len(value) <= 64
+            and all(c.isalnum() or c == "-" for c in value))
+
+
 def _is_int(value):
     return type(value) is int
 
@@ -91,7 +96,8 @@ def signed_release(directory, name, trust, now):
     data = json.loads(raw, object_pairs_hook=pairs_unique)
     fields = {"schema", "version", "bytes", "sha256", "key_id",
               "issued_at", "expires_at", "state_format",
-              "min_reader_state_format", "rollback_breaking"}
+              "min_reader_state_format", "rollback_breaking",
+              "generation_id"}
     if (not isinstance(data, dict) or set(data) != fields
             or data["schema"] != RELEASE_SCHEMA
             or not _is_int(data["version"]) or data["version"] < 1
@@ -102,7 +108,8 @@ def signed_release(directory, name, trust, now):
             or not _is_int(data["state_format"]) or data["state_format"] < 1
             or not _is_int(data["min_reader_state_format"])
             or not 1 <= data["min_reader_state_format"] <= data["state_format"]
-            or type(data["rollback_breaking"]) is not bool):
+            or type(data["rollback_breaking"]) is not bool
+            or not _generation_id_valid(data["generation_id"])):
         raise UpdateError("invalid release manifest")
     if now < data["issued_at"]:
         raise UpdateError("release metadata not yet valid")
@@ -142,7 +149,8 @@ def _generation(record, slots, *, with_state_format):
     if not isinstance(record, dict):
         raise UpdateError("invalid generation record")
     keys = {"slot", "version", "bytes", "sha256"} | (
-        {"state_format"} if with_state_format else set())
+        {"state_format", "generation_id", "min_reader_state_format"}
+        if with_state_format else set())
     if set(record) != keys:
         raise UpdateError("invalid generation record fields")
     if (record["slot"] not in ("A", "B")
@@ -150,8 +158,13 @@ def _generation(record, slots, *, with_state_format):
             or not _is_int(record["bytes"])
             or not 0 < record["bytes"] <= slots["SYSTEM_" + record["slot"]][1]
             or not digest_valid(record["sha256"])
-            or (with_state_format and (not _is_int(record["state_format"])
-                                        or record["state_format"] < 1))):
+            or (with_state_format and (
+                not _is_int(record["state_format"])
+                or record["state_format"] < 1
+                or not _generation_id_valid(record["generation_id"])
+                or not _is_int(record["min_reader_state_format"])
+                or not 1 <= record["min_reader_state_format"]
+                <= record["state_format"]))):
         raise UpdateError("invalid generation record values")
     return record
 
@@ -177,10 +190,13 @@ def validate_control(c, slots):
     if trial is not None:
         if (not isinstance(trial, dict)
                 or set(trial) != {"slot", "version", "bytes", "sha256",
-                                  "state_format", "attempts", "awaiting_health"}):
+                                  "state_format", "generation_id",
+                                  "min_reader_state_format",
+                                  "attempts", "awaiting_health"}):
             raise UpdateError("invalid trial record")
         _generation({k: trial[k] for k in
-                     ("slot", "version", "bytes", "sha256", "state_format")},
+                     ("slot", "version", "bytes", "sha256", "state_format",
+                      "generation_id", "min_reader_state_format")},
                     slots, with_state_format=True)
         if (trial["slot"] == confirmed["slot"]
                 or not _is_int(trial["attempts"])
@@ -245,7 +261,9 @@ def operate(directory, trust_dir, name, action, *, interrupt=None, now=None):
                     pos += len(chunk)
                 os.fsync(fd)
                 baseline = {"slot": "A", "version": 1, "bytes": length,
-                            "sha256": digest.hexdigest(), "state_format": 1}
+                            "sha256": digest.hexdigest(), "state_format": 1,
+                            "generation_id": name + "-gen-1",
+                            "min_reader_state_format": 1}
                 if not check_region(fd, (off, capacity), baseline):
                     raise UpdateError("baseline byte verification failed")
                 state = {"schema": CONTROL_SCHEMA, "confirmed": baseline,
@@ -298,6 +316,17 @@ def operate(directory, trust_dir, name, action, *, interrupt=None, now=None):
                 if release["state_format"] < confirmed["state_format"]:
                     raise UpdateError(
                         "migration refused: candidate would strand newer state")
+                # Rollback direction (the Pass A defect): after the
+                # candidate runs, STATE will be at the candidate's
+                # format, and the confirmed generation — the rollback
+                # target — must still be able to read it. Its readable
+                # range is [min_reader_state_format, state_format].
+                if not (confirmed["min_reader_state_format"]
+                        <= release["state_format"]
+                        <= confirmed["state_format"]):
+                    raise UpdateError(
+                        "migration refused: confirmed generation could not "
+                        "read state after candidate writes (rollback unsafe)")
                 inactive = "B" if confirmed["slot"] == "A" else "A"
                 offset, capacity = slots["SYSTEM_" + inactive]
                 if release["bytes"] > capacity:
@@ -329,8 +358,16 @@ def operate(directory, trust_dir, name, action, *, interrupt=None, now=None):
                 trial = {"slot": inactive, "version": release["version"],
                          "bytes": release["bytes"], "sha256": release["sha256"],
                          "state_format": release["state_format"],
+                         "generation_id": release["generation_id"],
+                         "min_reader_state_format":
+                             release["min_reader_state_format"],
                          "attempts": TRIAL_ATTEMPTS, "awaiting_health": False}
                 state["trial"] = trial
+                # The slot map records what each slot currently holds.
+                state["slots"][inactive] = {
+                    k: trial[k] for k in
+                    ("slot", "version", "bytes", "sha256", "state_format",
+                     "generation_id", "min_reader_state_format")}
                 _history(state, "stage", inactive, release["version"], now, "trial")
                 atomic_control(control_path, state)
                 if interrupt == "after-state-sync":
@@ -363,7 +400,8 @@ def operate(directory, trust_dir, name, action, *, interrupt=None, now=None):
             if not check_region(fd, slots["SYSTEM_" + trial["slot"]], trial):
                 raise UpdateError("cannot confirm corrupted candidate")
             promoted = {k: trial[k] for k in
-                        ("slot", "version", "bytes", "sha256", "state_format")}
+                        ("slot", "version", "bytes", "sha256", "state_format",
+                         "generation_id", "min_reader_state_format")}
             state["confirmed"] = promoted
             state["slots"][promoted["slot"]] = dict(promoted)
             state["trial"] = None
@@ -374,6 +412,17 @@ def operate(directory, trust_dir, name, action, *, interrupt=None, now=None):
                     "note": "operator-fixture-only, no guest health evidence"}
         if action == "rollback":
             if state["trial"] is not None:
+                trial = state["trial"]
+                # A trial that already booted may have written STATE
+                # at its own format; discarding it is safe only if the
+                # confirmed generation can read that format.
+                if trial["awaiting_health"] and not (
+                        confirmed["min_reader_state_format"]
+                        <= trial["state_format"]
+                        <= confirmed["state_format"]):
+                    raise UpdateError(
+                        "rollback refused: trial may have advanced state "
+                        "beyond the confirmed generation's readable range")
                 state["trial"] = None
                 _history(state, "rollback", confirmed["slot"],
                          confirmed["version"], now, "trial-discarded")
@@ -386,6 +435,14 @@ def operate(directory, trust_dir, name, action, *, interrupt=None, now=None):
                 raise UpdateError("no retained generation to roll back to")
             if not check_region(fd, slots["SYSTEM_" + other], retained):
                 raise UpdateError("retained generation is corrupt; rollback refused")
+            # The retained generation must be able to read STATE as
+            # the confirmed generation leaves it.
+            if not (retained["min_reader_state_format"]
+                    <= confirmed["state_format"]
+                    <= retained["state_format"]):
+                raise UpdateError(
+                    "rollback refused: retained generation cannot read "
+                    "the current state format")
             state["trial"] = {**retained, "attempts": TRIAL_ATTEMPTS,
                               "awaiting_health": False}
             _history(state, "rollback", other, retained["version"], now, "trial")
