@@ -656,8 +656,15 @@ pub fn chain_load(layout: &Layout, generation: &Generation) -> io::Result<()> {
         let file = fs::File::open(&image)?;
         // The generation kernels carry CMDLINE_OVERRIDE, so the
         // passed command line is ignored; pass the running one for
-        // want of anything better defined.
-        let cmdline = fs::read("/proc/cmdline").unwrap_or_default();
+        // want of anything better defined. kexec_file_load still
+        // validates it: the buffer must be NUL-terminated with the
+        // length including the NUL (kernel/kexec_file.c), which
+        // /proc/cmdline is not — terminate it explicitly.
+        let mut cmdline = fs::read("/proc/cmdline").unwrap_or_default();
+        while matches!(cmdline.last(), Some(b'\n' | b' ' | b'\0')) {
+            cmdline.pop();
+        }
+        cmdline.push(0);
         let rc = unsafe {
             syscall5(
                 320, // kexec_file_load
