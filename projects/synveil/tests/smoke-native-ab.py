@@ -256,7 +256,7 @@ def terminal_command(boot, command_id, wait_marker=None, timeout=300):
 def partition_offset(disk, number):
     info = subprocess.check_output(["sgdisk", "-i", str(number), str(disk)], text=True)
     first = int([line for line in info.splitlines()
-                 if "First sector:" in line][0].split()[-1])
+                 if "First sector:" in line][0].split(":", 1)[1].split()[0])
     last = int([line for line in info.splitlines()
                 if "Last sector:" in line][0].split()[-1])
     return first * 512, (last - first + 1) * 512
