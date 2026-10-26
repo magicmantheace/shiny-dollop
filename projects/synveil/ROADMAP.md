@@ -11,7 +11,11 @@
 > - [ ] Login plus real multiwindow compositor/panel/launcher/terminal/files/settings.
 > - [ ] Dedicated external SSD install with isolated A/B and persistent data.
 > - [ ] Signed inactive-slot update with interrupted-update and rollback tests.
-> - [ ] Owner-approved graphical update controls.
+> - [x] Owner-approved graphical update controls. (QEMU-demonstrated
+>   2026-10-26 in the authenticated Weston desktop — stage → trial
+>   reboot → owner confirm, and rollback, driven through the GUI;
+>   see `docs/validation/ab-gui-qemu-proof-2026-10-26/`. Physical
+>   validation still pending with the TG01 boot item above.)
 >
 > **Current scope:** The source-built native Synveil kernel/EFI image and
 > separate opt-in hardware profile have passed *build* validation but are

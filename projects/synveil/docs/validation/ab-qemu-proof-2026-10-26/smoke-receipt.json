@@ -1,20 +1,20 @@
 {
   "schema": "synveil.ab-qemu-proof/v1",
-  "source_commit": "99cca31ba53d1590e06bb5c5b2fba956848aec55",
-  "build_receipt_commit": "99cca31ba53d1590e06bb5c5b2fba956848aec55",
-  "disk_sha256": "67fd79bfcf2d41f9089455e796d8a450581e3efec8197f6859b7c1129b6eb9d3",
+  "source_commit": "8167cedd214c8b615ac6fdc93dbae817e02fc5f3",
+  "build_receipt_commit": "8167cedd214c8b615ac6fdc93dbae817e02fc5f3",
+  "disk_sha256": "fbfac53425f90ab465ad75217c09be90bde015019c4ca78f09fe9efbb3e20a4a",
   "generations": {
     "1": {
-      "uki_sha256": "bb2024de1afdf7e750d0d45ac75af8f95522065bba60b3a39c137147b80bd600",
-      "bytes": 61146112
+      "uki_sha256": "b9ec0652053412d431fd37afb701481487c6c1389ade2a8761447582a0a44757",
+      "bytes": 61166592
     },
     "2": {
-      "uki_sha256": "b030f1a5b2a89efc924b13ca6c6fb16b617b5ed097433405fe012c6990eed0c4",
-      "bytes": 61146112
+      "uki_sha256": "c21b90b62f71f0dcefb8582ccf9f5d73d24b2151c6c5d959eada53f0441cee39",
+      "bytes": 61166592
     },
     "3": {
-      "uki_sha256": "bae005989b564509cc3dbd133f393232abd9f9799243741b78f931eb973397a5",
-      "bytes": 60478464
+      "uki_sha256": "7e962c493ec338c7eb1084afe06dcba14725d686e790e72bffe878bf847d7327",
+      "bytes": 60503040
     }
   },
   "publisher": {
@@ -29,7 +29,7 @@
       "setting_changed": false,
       "pref_text": null,
       "credential_recorded": true,
-      "known_file": null
+      "known_file": "synveil-ab-proof-file\n"
     },
     "S1-stage-v2": {
       "pass": true
@@ -37,27 +37,10 @@
     "S2-trial-v2-confirmed": {
       "pass": true,
       "confirmed": {
-        "bytes": 61146112,
-        "generation_id": "synveil-gen-v1",
-        "min_reader_state_format": 1,
-        "sha256": "bb2024de1afdf7e750d0d45ac75af8f95522065bba60b3a39c137147b80bd600",
-        "slot": "A",
-        "state_format": 1,
-        "version": 1
-      },
-      "survival": {
-        "credential_same": true,
-        "pref_same": true,
-        "known_file_same": true
-      }
-    },
-    "S3-owner-rollback-v1": {
-      "pass": true,
-      "confirmed": {
-        "bytes": 61146112,
+        "bytes": 61166592,
         "generation_id": "synveil-gen-v2",
         "min_reader_state_format": 1,
-        "sha256": "b030f1a5b2a89efc924b13ca6c6fb16b617b5ed097433405fe012c6990eed0c4",
+        "sha256": "c21b90b62f71f0dcefb8582ccf9f5d73d24b2151c6c5d959eada53f0441cee39",
         "slot": "B",
         "state_format": 1,
         "version": 2
@@ -68,13 +51,30 @@
         "known_file_same": true
       }
     },
+    "S3-owner-rollback-v1": {
+      "pass": true,
+      "confirmed": {
+        "bytes": 61166592,
+        "generation_id": "synveil-gen-v1",
+        "min_reader_state_format": 1,
+        "sha256": "b9ec0652053412d431fd37afb701481487c6c1389ade2a8761447582a0a44757",
+        "slot": "A",
+        "state_format": 1,
+        "version": 1
+      },
+      "survival": {
+        "credential_same": true,
+        "pref_same": true,
+        "known_file_same": true
+      }
+    },
     "S4-failing-candidate-fallback": {
       "pass": true,
       "confirmed": {
-        "bytes": 61146112,
+        "bytes": 61166592,
         "generation_id": "synveil-gen-v1",
         "min_reader_state_format": 1,
-        "sha256": "bb2024de1afdf7e750d0d45ac75af8f95522065bba60b3a39c137147b80bd600",
+        "sha256": "b9ec0652053412d431fd37afb701481487c6c1389ade2a8761447582a0a44757",
         "slot": "A",
         "state_format": 1,
         "version": 1
@@ -89,10 +89,10 @@
       "pass": true,
       "trial": null,
       "confirmed": {
-        "bytes": 61146112,
+        "bytes": 61166592,
         "generation_id": "synveil-gen-v1",
         "min_reader_state_format": 1,
-        "sha256": "bb2024de1afdf7e750d0d45ac75af8f95522065bba60b3a39c137147b80bd600",
+        "sha256": "b9ec0652053412d431fd37afb701481487c6c1389ade2a8761447582a0a44757",
         "slot": "A",
         "state_format": 1,
         "version": 1
@@ -102,10 +102,10 @@
       "pass": true,
       "trial": null,
       "confirmed": {
-        "bytes": 61146112,
+        "bytes": 61166592,
         "generation_id": "synveil-gen-v1",
         "min_reader_state_format": 1,
-        "sha256": "bb2024de1afdf7e750d0d45ac75af8f95522065bba60b3a39c137147b80bd600",
+        "sha256": "b9ec0652053412d431fd37afb701481487c6c1389ade2a8761447582a0a44757",
         "slot": "A",
         "state_format": 1,
         "version": 1
@@ -119,6 +119,7 @@
       "pass": true
     }
   },
+  "gate_violations": [],
   "bootable_update_rollback_demonstrated": true,
   "https_browsing_in_synveil": false,
   "persistent_downloads_in_synveil": false,

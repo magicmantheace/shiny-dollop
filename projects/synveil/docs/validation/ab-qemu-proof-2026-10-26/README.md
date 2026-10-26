@@ -9,28 +9,44 @@ image; the shipped image, SHA-256
 `6b10b482239ca3e771bd20d85a5f4e0dc414a00fc34334408eb134b150bacfc3`,
 is untouched by this work).
 
+> **CORRECTION (2026-10-26, later the same day).** The receipt
+> originally committed with this record was **defective**: it
+> recorded S2 "v2 confirmed" with confirmed version **1**/slot A
+> and S3 "rollback to v1" with version **2**/slot B (exactly
+> inverted), S0's known file as **null**, and still claimed
+> `bootable_update_rollback_demonstrated: true` — the driver's
+> success gate trusted the scenarios' own pass flags without
+> checking that the extracted control records matched what each
+> scenario claimed. An independent review caught it. The gate
+> has been rewritten (see "Gate correction" below), the
+> artifacts rebuilt, and **both proofs re-run end-to-end**; the
+> receipt, build receipt, and scenario logs in this directory
+> are the regenerated ones, and every recorded field below was
+> re-verified against them. The original claim was withdrawn
+> until this regeneration completed.
+
 ## Identities
 
 - Proof artifacts (disk + generations) built from source commit
-  `99cca31ba53d1590e06bb5c5b2fba956848aec55`
+  `8167cedd214c8b615ac6fdc93dbae817e02fc5f3`
   (`build-receipt.json` in this directory is the builder's own
-  receipt). Later commits up to `a784616` changed only the proof
-  driver (`tests/smoke-native-ab.py`) and its interaction model —
-  no guest code, so the built artifacts stand as built at
-  `99cca31`.
+  receipt). The proof drivers used for the runs in this record
+  are at `05c12d6` (agent driver; host-only changes after the
+  build: the known-file fixture ends with `sync`) and `ae4403a`
+  (GUI driver budgets) — no guest code changed after `8167ced`.
 - Proof disk: 1,115,684,864 bytes, SHA-256
-  `67fd79bfcf2d41f9089455e796d8a450581e3efec8197f6859b7c1129b6eb9d3`.
+  `fbfac53425f90ab465ad75217c09be90bde015019c4ca78f09fe9efbb3e20a4a`.
 - Generations (UKI = kernel EFI-stub bzImage with embedded
   initramfs; identity stamped at build time in
   `/etc/synveil/generation.json` and the slot's `gen.json`):
-  - v1 `synveil-gen-v1`: 61,146,112 bytes, SHA-256
-    `bb2024de1afdf7e750d0d45ac75af8f95522065bba60b3a39c137147b80bd600`
+  - v1 `synveil-gen-v1`: 61,166,592 bytes, SHA-256
+    `b9ec0652053412d431fd37afb701481487c6c1389ade2a8761447582a0a44757`
     (Weston background `0xFF101820`)
-  - v2 `synveil-gen-v2`: 61,146,112 bytes, SHA-256
-    `b030f1a5b2a89efc924b13ca6c6fb16b617b5ed097433405fe012c6990eed0c4`
+  - v2 `synveil-gen-v2`: 61,166,592 bytes, SHA-256
+    `c21b90b62f71f0dcefb8582ccf9f5d73d24b2151c6c5d959eada53f0441cee39`
     (background `0xFF0B3D2E` — the observable change)
-  - v3 `synveil-gen-v3`: 60,478,464 bytes, SHA-256
-    `bae005989b564509cc3dbd133f393232abd9f9799243741b78f931eb973397a5`
+  - v3 `synveil-gen-v3`: 60,503,040 bytes, SHA-256
+    `7e962c493ec338c7eb1084afe06dcba14725d686e790e72bffe878bf847d7327`
     (background `0xFF3D0B0B`; `veil-seat` replaced by an exit-1
     stub so the *real* health path fails it — no check weakened)
 - Publisher trust: key id `synveil-dev-2026-01`, **development
@@ -96,10 +112,8 @@ is untouched by this work).
 Machine-readable detail: `smoke-receipt.json` (per-scenario
 pass/fail plus the extracted control records and survival
 hashes). Raw serial logs (one per boot; S1+S2 share a boot by
-design) are retained with the build outputs under
-`out/ab-proof/final-run/` — the project's `.gitignore` excludes
-`*.log` from Git, so this record commits the receipts and
-quotes the decisive marker lines in the table and text.
+design) are committed alongside this README and retained with
+the build outputs under `out/ab-proof/smoke-evidence/`.
 
 | Scenario | Result | What it proves |
 |---|---|---|
@@ -113,19 +127,18 @@ quotes the decisive marker lines in the table and text.
 | S6b stage after interrupt | PASS | The system still boots its confirmed generation, a fresh stage of v2 succeeds, and an owner rollback decision discards the pending (never-booted) trial |
 | S7 corrupt slots fail closed | PASS | On a branch copy of the disk, both slot images' `gen.efi` are zeroed while the ESP fallback copy is intact; the hook's digest check refuses (`SYNVEIL_AB_CHAIN_FAILED` on the entry generation, then the fail-closed path prints `SYNVEIL_AB_FAIL_CLOSED` + recovery diagnostics `SYNVEIL_RECOVERY_STATUS_V1`); `SYNVEIL_LOGIN_READY` never appears — no wrong system runs |
 
-## Saved-setting leg — NOT demonstrated (honest limitation)
+## Saved-setting leg — survival gated, change still not demonstrated
 
 Adam's sequence asks that a saved setting survive update and
-rollback. The proof records the desktop preference file's hash
-from STATE at every scenario, but the QEMU boot target's profile
-exposes **no user-facing settings surface** through which a
-setting can be changed: the greeter's arrows are inert (proven
-by pixel-identical captured frames) and the Weston session in
-this milestone has no settings UI. S0 therefore gates on the
-credential + known file only, and the setting-survival leg is
-recorded as **not demonstrated**, not silently dropped. It
-becomes demonstrable when a settings surface ships (Priority 2
-era) and should be re-run then.
+rollback. The regenerated proof now **gates** on it: S2 and S3
+require `pref_same` (the desktop preference file's hash from
+STATE identical before and after) alongside credential and
+known-file survival, and both pass. What remains **not
+demonstrated** is a setting *changed by the user* surviving:
+the desktop still exposes no user-facing settings surface
+through which a setting can be changed (the greeter's arrows
+are inert, proven by pixel-identical captured frames), so the
+preference file that survives is the enrollment-time one.
 
 ## Both-slots-dead recovery — what S7 does and does not claim
 
@@ -162,13 +175,57 @@ in git log `66c50b6..a784616`):
 5. `Boot.seen()` is prefix-based; S5's mid-line substring check
    could never pass (the guest refusal itself was correct).
 
+## Gate correction (2026-10-26, later) — what was wrong and what changed
+
+The independent review of the original Pass B head found four
+defects; all four are fixed and the fixes are part of this
+record:
+
+1. **Proof success gate defective** (above). Both drivers now
+   re-derive every verdict from the recorded artifacts:
+   confirmed version+slot+generation must equal the scenario's
+   expectation (`2/B/synveil-gen-v2` after the update,
+   `1/A/synveil-gen-v1` after rollback/fallback/refusals);
+   survival requires real artifacts on **both** sides (a file
+   missing on both sides fails — `None == None` no longer
+   passes); STATE/DATA reads run on journal-replayed copies
+   (`e2fsck -y` on a copy; the evidence disk is never modified);
+   `finish()` writes `gate_violations` into the receipt and
+   returns non-zero if any exist. `tests/smoke-gates.py`
+   (12 tests, no QEMU) proves the validators reject the exact
+   original defect pattern, fabricated-consistent receipts
+   pass, and missing/false fields fail (`ff17803`).
+2. **`tools/ab_release.py::build_media()` truncated existing
+   outputs.** It now refuses an existing output of any kind,
+   an existing staging path, a symlink parent, and a missing
+   parent — all before creating anything; outputs use
+   exclusive creation. `tests/ab-release-crosscheck.py` proves
+   refusal leaves bytes unchanged (7 new tests, 10/10 total)
+   (`d46a8c5`).
+3. **`cargo fmt --all --check` failed** at the reviewed head;
+   fixed (`6866c35`), check clean, `cargo test` green.
+4. **The saved boot proof predated the owner-confirmation +
+   GUI changes.** Both proofs were re-run at the corrected
+   head on the rebuilt artifacts; this record and the GUI
+   record (`docs/validation/ab-gui-qemu-proof-2026-10-26/`)
+   hold the regenerated receipts.
+
+Two further evidence bugs were found by the corrected gate
+during regeneration and fixed: the known-file fixture wrote
+without `sync`, so the file could sit at 0 bytes in the guest
+page cache when QEMU quit (fixture now syncs, `05c12d6`), and
+`weston-session` deleted the update GUI's log at every session
+start, erasing the stage session's evidence at the trial
+reboot (log is now cumulative with an offset-aware readiness
+check, `8167ced`).
+
 ## Not in this pass
 
 - HTTPS browsing + persistent downloads inside Synveil: **NO**
   (Priorities 3–4, not attempted here).
-- Graphical update controls: **not built** (Priority 2). What
-  exists for it: the agent's typed socket protocol
-  (`synveil.ab-agent/v1`, actions status/stage/rollback/reboot)
-  already runs as root behind a 0660 root:synveil socket; a
-  desktop client needs no protocol change.
+- Graphical update controls: **demonstrated** — see
+  `docs/validation/ab-gui-qemu-proof-2026-10-26/` (same disk,
+  same build; the core path stage → trial reboot → confirm and
+  a rollback were driven through the GUI in the authenticated
+  desktop).
 - Physical boot of the A/B disk: not attempted; QEMU TCG only.
