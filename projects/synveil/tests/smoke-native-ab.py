@@ -458,7 +458,7 @@ def main():
             if ok:
                 ok = desktop_color_proof(boot, 2)
             if ok:
-                ok = boot.wait("SYNVEIL_AB_CONFIRMED", 420)
+                ok = boot.wait("SYNVEIL_AB_CONFIRMED ", 600, since=staged_at)
         boot.quit()
         artifacts = state_artifacts(disk, work)
         control = artifacts["control"] or {}
@@ -480,7 +480,9 @@ def main():
         boot.start(secret)
         ok = boot.wait("SYNVEIL_AB_CONFIRMED_BOOT", args.timeout) and login(boot, secret)
         if ok:
-            ok = terminal_command(boot, "rollback", "SYNVEIL_AB_ROLLBACK", timeout=180)
+            ok = terminal_command(boot, "rollback",
+                                  "SYNVEIL_AB_ROLLBACK result=trial slot=",
+                                  timeout=180)
         if ok:
             mark = len(boot.lines)
             terminal_command(boot, "reboot")
@@ -490,7 +492,7 @@ def main():
             if ok:
                 ok = desktop_color_proof(boot, 1)
             if ok:
-                ok = boot.wait("SYNVEIL_AB_CONFIRMED", 420)
+                ok = boot.wait("SYNVEIL_AB_CONFIRMED ", 600, since=mark)
         boot.quit()
         artifacts = state_artifacts(disk, work)
         control = artifacts["control"] or {}
@@ -603,7 +605,9 @@ def main():
         if ok:
             ok = terminal_command(boot, "stage", "SYNVEIL_AB_STAGED", timeout=420)
         if ok:
-            ok = terminal_command(boot, "rollback", "SYNVEIL_AB_ROLLBACK", timeout=180)
+            ok = terminal_command(boot, "rollback",
+                                  "SYNVEIL_AB_ROLLBACK result=trial-discarded",
+                                  timeout=180)
         boot.quit()
         artifacts = state_artifacts(disk, work)
         control = artifacts["control"] or {}
