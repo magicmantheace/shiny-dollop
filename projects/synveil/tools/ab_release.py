@@ -140,7 +140,7 @@ def build_media(payload, metadata, signature, out_image):
          "--partition-guid=1:" + RELEASE_PARTUUID, str(out_image)])
     info = subprocess.check_output(["sgdisk", "-i", "1", str(out_image)], text=True)
     first = int([line for line in info.splitlines()
-                 if "First sector:" in line][0].split()[-1])
+                 if "First sector:" in line][0].split(":", 1)[1].split()[0])
     fs_image = out_image.parent / (out_image.stem + "-fs.img")
     with open(fs_image, "wb") as handle:
         handle.truncate((MEDIA_SIZE_MB - 2) * 1024 * 1024)
