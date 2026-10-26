@@ -24,7 +24,9 @@ fn main() -> ExitCode {
         Some("serve") if args.len() == 1 => serve(),
         Some("request") if args.len() == 2 => request(&args[1]),
         _ => {
-            eprintln!("usage: veil-ab <boot-hook|serve|request <status|stage|confirm|rollback|reboot>>");
+            eprintln!(
+                "usage: veil-ab <boot-hook|serve|request <status|stage|confirm|rollback|reboot>>"
+            );
             ExitCode::FAILURE
         }
     }

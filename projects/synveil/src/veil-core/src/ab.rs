@@ -1549,9 +1549,7 @@ pub fn confirm() -> io::Result<Value> {
     }
     let (digest, size) = hash_slot_image(&layout, &trial.slot)?;
     if digest != trial.sha256 || size != trial.bytes {
-        return Err(err(
-            "candidate slot digest mismatch; confirmation refused",
-        ));
+        return Err(err("candidate slot digest mismatch; confirmation refused"));
     }
     // Reload so a record changed since the assessment is never
     // overwritten blind: the trial on disk must still be the one
@@ -1559,8 +1557,7 @@ pub fn confirm() -> io::Result<Value> {
     let mut control = load_control(&layout)?;
     match &control.trial {
         Some(current)
-            if current.generation_id == trial.generation_id
-                && current.sha256 == trial.sha256 => {}
+            if current.generation_id == trial.generation_id && current.sha256 == trial.sha256 => {}
         _ => return Err(err("the trial record changed; confirmation refused")),
     }
     let trial = control.trial.take().expect("trial present");
