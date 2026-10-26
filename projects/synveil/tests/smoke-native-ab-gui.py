@@ -110,8 +110,47 @@ def click_until(boot, button, marker, timeout=420, since=0):
     return boot.seen(marker, since=since)
 
 
+def replayed_image(image):
+    """Copy a partition image and replay its ext4 journal, so a
+    post-quit read sees the guest's final state. A QEMU quit leaves
+    the last seconds of writes in the journal; plain debugfs reads
+    then return a stale control record (or unparseable bytes) even
+    though the guest's serial markers prove the writes happened —
+    the same hazard tests/smoke-native-ab.py's reader comments on.
+    The replay runs on a scratch copy; the evidence disk is never
+    modified."""
+    target = image.with_suffix(".replayed.img")
+    shutil.copyfile(image, target)
+    subprocess.run(["e2fsck", "-y", str(target)], capture_output=True)
+    return target
+
+
+def replayed_state_artifacts(disk, workdir):
+    """ab.state_artifacts, but read from journal-replayed images."""
+    state = replayed_image(ab.extract_partition(disk, 4, workdir))
+    data = replayed_image(ab.extract_partition(disk, 5, workdir))
+    control_raw = ab.ext4_read(state, "/lib/synveil/ab-control.json")
+    control = None
+    if control_raw:
+        try:
+            control = json.loads(control_raw)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            control = None
+    pref = ab.ext4_read(state, "/lib/synveil/desktop-pref.conf")
+    credential = ab.ext4_read(state, "/lib/synveil/auth/credential.phc")
+    known = ab.ext4_read(data, "/synveil/ab-known-file")
+    import hashlib
+    return {
+        "control": control,
+        "pref_sha256": hashlib.sha256(pref).hexdigest() if pref else None,
+        "pref_text": pref.decode("utf-8", "replace") if pref else None,
+        "credential_sha256": hashlib.sha256(credential).hexdigest() if credential else None,
+        "known_file": known.decode("utf-8", "replace") if known else None,
+    }
+
+
 def data_read(disk, workdir, path):
-    data = ab.extract_partition(disk, 5, workdir)
+    data = replayed_image(ab.extract_partition(disk, 5, workdir))
     return ab.ext4_read(data, path)
 
 
@@ -172,7 +211,7 @@ def main():
             ok = known_file_made
             time.sleep(1)
         boot.quit()
-        artifacts = ab.state_artifacts(disk, work)
+        artifacts = replayed_state_artifacts(disk, work)
         gui_log = data_read(disk, work, "/synveil/update-gui.log")
         gui_log = gui_log.decode("utf-8", "replace") if gui_log else ""
         record("G0-provision-enroll-gui-present", ok and gui_seen,
@@ -222,7 +261,7 @@ def main():
         if ok:
             ok = wait_banner(boot, "normal", timeout=180)
         boot.quit()
-        artifacts = ab.state_artifacts(disk, work)
+        artifacts = replayed_state_artifacts(disk, work)
         control = artifacts["control"] or {}
         gui_log = data_read(disk, work, "/synveil/update-gui.log")
         gui_log = gui_log.decode("utf-8", "replace") if gui_log else ""
@@ -271,7 +310,7 @@ def main():
         if ok:
             ok = wait_banner(boot, "normal", timeout=180)
         boot.quit()
-        artifacts = ab.state_artifacts(disk, work)
+        artifacts = replayed_state_artifacts(disk, work)
         control = artifacts["control"] or {}
         record("G2-gui-rollback-confirm", ok,
                confirmed=(control.get("confirmed") or {}),
@@ -304,7 +343,7 @@ def main():
         if ok:
             ok = not boot.seen("SYNVEIL_AB_STAGED", since=mark)
         boot.quit()
-        artifacts = ab.state_artifacts(disk, work)
+        artifacts = replayed_state_artifacts(disk, work)
         control = artifacts["control"] or {}
         record("G3-gui-badsig-refused", ok,
                trial=control.get("trial"),
