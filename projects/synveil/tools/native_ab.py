@@ -255,7 +255,7 @@ def fat_partition_image(size_mb, files):
 def write_partition(disk, number, source_image):
     info = subprocess.check_output(["sgdisk", "-i", str(number), str(disk)], text=True)
     first = int([line for line in info.splitlines()
-                 if "First sector:" in line][0].split()[-1])
+                 if "First sector:" in line][0].split(":", 1)[1].split()[0])
     with open(source_image, "rb") as source, open(disk, "r+b") as target:
         target.seek(first * 512)
         shutil.copyfileobj(source, target)
@@ -312,7 +312,7 @@ def assemble_disk(generations, recovery):
     # State: a fresh, empty filesystem, exactly like the joined image.
     info = subprocess.check_output(["sgdisk", "-i", "4", str(disk)], text=True)
     first = int([line for line in info.splitlines()
-                 if "First sector:" in line][0].split()[-1])
+                 if "First sector:" in line][0].split(":", 1)[1].split()[0])
     run(["mkfs.ext4", "-F", "-q", "-L", "SYNVEIL_STATE", "-b", "4096",
          "-E", f"offset={first * 512}", str(disk), str(STATE_SIZE_MB * 256)])
     write_partition(disk, 5, _ext4_image(DATA_SIZE_MB))
