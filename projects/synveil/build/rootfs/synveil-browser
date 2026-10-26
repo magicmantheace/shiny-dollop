@@ -58,7 +58,8 @@ fi
 [ -f "$PROFILE/First Run" ] || : > "$PROFILE/First Run"
 
 if [ -f /usr/share/synveil/proof-ca.pem ] && [ ! -d "$HOME/.pki/nssdb" ]; then
-    mkdir -p "$HOME/.pki"
+    # certutil creates the database FILES but not the directory.
+    mkdir -p "$HOME/.pki/nssdb"
     certutil -N --empty-password -d "sql:$HOME/.pki/nssdb" \
         >/dev/null 2>&1
     certutil -A -t CT,C,c -n synveil-proof-ca \
