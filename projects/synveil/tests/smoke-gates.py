@@ -39,6 +39,8 @@ def load_module(name, filename):
 ab = load_module("smoke_native_ab", "smoke-native-ab.py")
 gui = load_module("smoke_native_ab_gui", "smoke-native-ab-gui.py")
 
+browser = load_module("smoke_native_browser", "smoke-native-browser.py")
+
 CONF_V1 = {"version": 1, "slot": "A", "generation_id": "synveil-gen-v1"}
 CONF_V2 = {"version": 2, "slot": "B", "generation_id": "synveil-gen-v2"}
 SURVIVAL = {"credential_same": True, "pref_same": True,
@@ -216,6 +218,187 @@ class GuiGate(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertTrue(receipt["graphical_update_controls_demonstrated"])
         self.assertEqual(receipt["gate_violations"], [])
+
+
+CA_SHA = "a" * 64
+CRED_SHA = "c" * 64
+
+
+def browser_facts(confirmed):
+    return {
+        "control": {"confirmed": dict(confirmed)},
+        "credential_sha256": CRED_SHA,
+        "known_file": ab.EXPECTED_KNOWN_FILE,
+        "downloads_listing": ["payload.bin", "payload.sha256",
+                              "payload2.bin", "payload2.sha256"],
+        "payload_sha256": browser.PAYLOAD_SHA256,
+        "payload_size": browser.PAYLOAD_SIZE,
+        "payload_guest_sha256": browser.PAYLOAD_SHA256,
+        "payload2_sha256": browser.PAYLOAD2_SHA256,
+        "payload2_size": browser.PAYLOAD_SIZE,
+        "payload2_guest_sha256": browser.PAYLOAD2_SHA256,
+        "big_size": None,
+        "profile_choices":
+            "downloads_directory:/home/synveil/Downloads\n",
+        "browser_started_count": 3,
+        "files_entry_lines": 9,
+        "files_payload_scans": 3,
+        "files_payload2_scans": 2,
+    }
+
+
+def _get(t, port, path):
+    return {"kind": "GET", "port": port, "path": path, "t": t}
+
+
+def consistent_browser_results():
+    log = [
+        _get(10, browser.GOOD_PORT, "/"),
+        _get(20, browser.GOOD_PORT, "/payload.bin"),
+        _get(30, browser.GOOD_PORT, "/payload.bin"),
+        _get(40, browser.GOOD_PORT, "/big.bin"),
+        {"kind": "handshake-error", "port": browser.BAD_PORT, "t": 50},
+        _get(60, browser.GOOD_PORT, "/"),
+        _get(70, browser.GOOD_PORT, "/"),
+        _get(80, browser.GOOD_PORT, "/"),
+        _get(85, browser.GOOD_PORT, "/payload2.bin"),
+        _get(90, browser.GOOD_PORT, "/"),
+        _get(100, browser.GOOD_PORT, "/"),
+    ]
+    return {
+        "build": {"browser_test_ca_sha256": CA_SHA},
+        "tls": {"ca_sha256": CA_SHA},
+        "server_log": log,
+        "B0": {"network_ready": True, "page_proof": True, "at": 15},
+        "B1": {"dialog_save": True, "artifacts": browser_facts(CONF_V1),
+               "at": 25},
+        "B2": {"overwrite_dialog_seen": True,
+               "payload_sha256_after": browser.PAYLOAD_SHA256, "at": 35},
+        "B3": {"browser_alive_after": True,
+               "artifacts": browser_facts(CONF_V1), "at": 45},
+        "B4": {"page_left": True, "back_restored": True, "at": 55},
+        "B5": {"artifacts": browser_facts(CONF_V1), "at": 65},
+        "B6": {"artifacts": browser_facts(CONF_V2), "at": 88},
+        "B7": {"artifacts": browser_facts(CONF_V1), "at": 105},
+    }
+
+
+BROWSER_BUILD_INFO = {"source_commit": "0" * 40, "disk_sha256": "0" * 64,
+                      "browser_test_ca_sha256": CA_SHA}
+BROWSER_TLS_INFO = {"ca_sha256": CA_SHA, "host_name": browser.HOST_NAME,
+                    "host_ip": browser.HOST_IP,
+                    "good_port": browser.GOOD_PORT,
+                    "bad_port": browser.BAD_PORT}
+
+
+class BrowserGate(unittest.TestCase):
+    def validate(self, results):
+        ok, failures = browser.validate_browser_results(results)
+        return ok, failures
+
+    def test_consistent_results_validate_clean(self):
+        ok, failures = self.validate(consistent_browser_results())
+        self.assertTrue(ok, failures)
+        self.assertEqual(failures, [])
+
+    def test_bad_ca_get_rejected(self):
+        results = consistent_browser_results()
+        results["server_log"].append(
+            _get(52, browser.BAD_PORT, "/"))
+        ok, failures = self.validate(results)
+        self.assertFalse(ok)
+        self.assertTrue(any("bad-CA" in f for f in failures), failures)
+
+    def test_missing_handshake_refusal_rejected(self):
+        results = consistent_browser_results()
+        results["server_log"] = [
+            e for e in results["server_log"]
+            if e["kind"] != "handshake-error"]
+        ok, failures = self.validate(results)
+        self.assertFalse(ok)
+        self.assertTrue(any(f.startswith("B4") for f in failures), failures)
+
+    def test_rollback_losing_download_rejected(self):
+        results = consistent_browser_results()
+        results["B7"]["artifacts"]["payload_sha256"] = None
+        results["B7"]["artifacts"]["payload_guest_sha256"] = None
+        ok, failures = self.validate(results)
+        self.assertFalse(ok)
+        self.assertTrue(any(f.startswith("B7") for f in failures), failures)
+
+    def test_update_not_confirmed_rejected(self):
+        results = consistent_browser_results()
+        results["B6"]["artifacts"]["control"] = {
+            "confirmed": dict(CONF_V1)}
+        ok, failures = self.validate(results)
+        self.assertFalse(ok)
+        self.assertTrue(any(f.startswith("B6") for f in failures), failures)
+
+    def test_silent_overwrite_rejected(self):
+        results = consistent_browser_results()
+        results["B2"]["payload_sha256_after"] = "0" * 64
+        ok, failures = self.validate(results)
+        self.assertFalse(ok)
+        self.assertTrue(any(f.startswith("B2") for f in failures), failures)
+
+    def test_no_overwrite_dialog_rejected(self):
+        results = consistent_browser_results()
+        results["B2"]["overwrite_dialog_seen"] = False
+        ok, failures = self.validate(results)
+        self.assertFalse(ok)
+
+    def test_complete_big_file_rejected(self):
+        results = consistent_browser_results()
+        results["B3"]["artifacts"]["big_size"] = browser.BIG_SIZE
+        ok, failures = self.validate(results)
+        self.assertFalse(ok)
+        self.assertTrue(any(f.startswith("B3") for f in failures), failures)
+
+    def test_profile_outside_home_rejected(self):
+        results = consistent_browser_results()
+        results["B6"]["artifacts"]["profile_choices"] = \
+            "downloads_directory:/tmp\n"
+        ok, failures = self.validate(results)
+        self.assertFalse(ok)
+        self.assertTrue(any(f.startswith("B6") for f in failures), failures)
+
+    def test_trust_bundle_mismatch_rejected(self):
+        results = consistent_browser_results()
+        results["build"]["browser_test_ca_sha256"] = "b" * 64
+        ok, failures = self.validate(results)
+        self.assertFalse(ok)
+
+    def test_finish_cannot_certify_inconsistent_results(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            original = browser.OUT
+            browser.OUT = Path(tmp)
+            try:
+                bad = consistent_browser_results()
+                bad["B7"]["artifacts"]["payload2_sha256"] = None
+                code = browser.finish(BROWSER_BUILD_INFO, BROWSER_TLS_INFO,
+                                      bad, 0)
+                receipt = json.loads(
+                    (Path(tmp) / "browser-receipt.json").read_text())
+            finally:
+                browser.OUT = original
+        self.assertEqual(code, 1)
+        self.assertFalse(receipt["demonstrated"])
+        self.assertTrue(receipt["gate"]["failures"])
+
+    def test_finish_certifies_consistent_results(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            original = browser.OUT
+            browser.OUT = Path(tmp)
+            try:
+                code = browser.finish(BROWSER_BUILD_INFO, BROWSER_TLS_INFO,
+                                      consistent_browser_results(), 0)
+                receipt = json.loads(
+                    (Path(tmp) / "browser-receipt.json").read_text())
+            finally:
+                browser.OUT = original
+        self.assertEqual(code, 0)
+        self.assertTrue(receipt["demonstrated"])
+        self.assertEqual(receipt["gate"]["failures"], [])
 
 
 if __name__ == "__main__":

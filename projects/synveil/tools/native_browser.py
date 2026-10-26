@@ -85,6 +85,12 @@ def configuration(toolchain, overrides):
         # still only the build-time EGL/GLES provider (see module
         # docstring); the image never renders through it.
         'BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_SOFTPIPE=y',
+        # host-vim (a NetSurf build dependency, used only for its
+        # xxd host tool) configures --with-tlib=ncurses, but only
+        # libncursesw is installed by the host ncurses build; see
+        # build() for the compat symlink step. Nothing in this
+        # stage uses ncurses in the guest.
+        '# BR2_PACKAGE_NCURSES_WCHAR is not set',
     ]
     return "\n".join(lines) + "\n"
 
@@ -208,6 +214,20 @@ def build(*, resume=False):
     env["LC_ALL"] = "C"
     run(base + ["BR2_DEFCONFIG=" + str(config), "defconfig"], env=env)
     check_configuration((build_dir / ".config").read_text(), ffi.TOOLCHAIN)
+    # host-vim (built later, only for its xxd host tool) configures
+    # with --with-tlib=ncurses, but buildroot's host-ncurses options
+    # install only the wide library (--without-normal with widec on
+    # by default), so vim's link test fails with "cannot find
+    # -lncurses" (observed 2026-10-26). Build host-ncurses first and
+    # add the plain-name symlink its own target-ncurses install
+    # creates for the staging dir; the wide library exports every
+    # symbol vim's test needs, and nothing else in this stage links
+    # host ncurses. (A package-override `+=` does not reach the
+    # host package's configure line — verified empirically.)
+    run(base + ["host-ncurses"], env=env)
+    host_lib = build_dir / "host/lib/libncurses.so"
+    if not host_lib.exists():
+        host_lib.symlink_to("libncursesw.so")
     # Deliberately invoke the package only, never `all`,
     # `target-finalize`, or images.
     run(base + ["-j4", "netsurf"], env=env)
