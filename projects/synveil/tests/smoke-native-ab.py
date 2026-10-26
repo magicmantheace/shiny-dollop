@@ -679,7 +679,7 @@ def main():
         if ok:
             known_file_made = terminal_command(boot, "known-file")
             ok = known_file_made
-            time.sleep(1)
+            time.sleep(5)  # let the fixture's sync land before quit
         boot.quit()
         artifacts = state_artifacts(disk, work)
         # Semantic gate: the artifacts S0 claims must actually be

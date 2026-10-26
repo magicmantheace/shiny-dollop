@@ -231,12 +231,16 @@ AB_COMMANDS = {
     "rollback": "/usr/sbin/veil-ab request rollback",
     "status": "/usr/sbin/veil-ab request status",
     "reboot": "/usr/sbin/veil-ab request reboot",
-    "known-file": "echo synveil-ab-proof-file > /home/synveil/ab-known-file",
+    # The trailing sync matters: the proof reads the file back from
+    # the disk image after a hard QEMU quit, and an unsynced write
+    # can sit in the guest page cache past the quit (observed as a
+    # 0-byte file after journal replay, 2026-10-26).
+    "known-file": "echo synveil-ab-proof-file > /home/synveil/ab-known-file; sync",
 }
 
 _AB_CHAR_KEYS = {c: c for c in "abcdefghijklmnopqrstuvwxyz0123456789"}
 _AB_CHAR_KEYS.update({" ": "spc", "/": "slash", "-": "minus", ".": "dot",
-                      "_": "shift+minus", ">": "shift+dot"})
+                      "_": "shift+minus", ">": "shift+dot", ";": "semicolon"})
 
 
 def type_ab_command(socket_path: Path, command_id: str, *, timeout=30.0):

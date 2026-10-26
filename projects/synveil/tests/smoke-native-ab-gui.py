@@ -209,7 +209,7 @@ def main():
         if ok:
             known_file_made = ab.terminal_command(boot, "known-file")
             ok = known_file_made
-            time.sleep(1)
+            time.sleep(5)  # let the fixture's sync land before quit
         boot.quit()
         artifacts = replayed_state_artifacts(disk, work)
         gui_log = data_read(disk, work, "/synveil/update-gui.log")
