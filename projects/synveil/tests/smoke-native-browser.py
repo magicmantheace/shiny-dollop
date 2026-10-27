@@ -684,29 +684,46 @@ def _first_token(raw):
 
 # No-phone-home evidence (owner requirement): proof builds run
 # Chromium with --log-net-log into ~/net-logs; the readback
-# enumerates every remote endpoint the browser actually
-# contacted — hostnames from url/host fields, literal sockets
-# from remote_endpoint/address fields. Only the fixture may
-# appear: the good and bad fixture ports, and the slirp DNS
-# transport (the NAMES it carries are judged by the host list).
-NETLOG_ALLOWED_HOSTS = {"test.synveil.invalid", "localhost"}
+# enumerates the browser's actual EGRESS from the log:
+#   * dns_hosts — names carried by real DNS wire transactions
+#     (qname / hostname+query_type event params). The shipped
+#     image null-routes the vendor phone-home names in
+#     /etc/hosts, so a name the browser still tries internally
+#     never becomes a DNS query; only names that would leave
+#     the machine appear here.
+#   * sockets — literal remote endpoints (remote_endpoint /
+#     address event params). Loopback is where null-routed
+#     attempts die; anything else must be the fixture.
+#   * attempted_hosts — hosts named by URL requests, recorded
+#     for disclosure in the receipt (a stock Chromium 156 still
+#     TRIES its component-update and account fetches internally
+#     even with every disabling policy loaded — see
+#     docs/BROWSER.md); the gate judges egress, not attempts.
+NETLOG_ALLOWED_DNS = {"test.synveil.invalid", "localhost"}
 NETLOG_ALLOWED_SOCKETS = {"10.0.2.2:8443", "10.0.2.2:8444",
                           "10.0.2.3:53"}
 
 
 def _netlog_extract(blob):
     text = blob.decode("utf-8", "replace")
-    hosts = set()
+    dns_hosts = set()
+    for match in re.finditer(r'"qname":\s*"([a-zA-Z0-9.-]+)"', text):
+        dns_hosts.add(match.group(1).lower().rstrip("."))
     for match in re.finditer(
-            r'"(?:url|host)":\s*"(?:[a-zA-Z][a-zA-Z0-9+.-]*://)?'
+            r'"hostname":\s*"([a-zA-Z0-9.-]+)",\s*"query_type"',
+            text):
+        dns_hosts.add(match.group(1).lower().rstrip("."))
+    attempted = set()
+    for match in re.finditer(
+            r'"url":\s*"(?:[a-zA-Z][a-zA-Z0-9+.-]*://)?'
             r'([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', text):
-        hosts.add(match.group(1).lower().rstrip("."))
+        attempted.add(match.group(1).lower().rstrip("."))
     sockets = set()
     for match in re.finditer(
             r'"(?:remote_endpoint|address)":\s*"'
             r'(\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})"', text):
         sockets.add(f"{match.group(1)}:{int(match.group(2))}")
-    return hosts, sockets
+    return dns_hosts, sockets, attempted
 
 
 def browser_artifacts(disk, workdir):
@@ -793,17 +810,19 @@ def browser_artifacts(disk, workdir):
     netlog_names = sorted(name for name in
                           ext4_list(image, "/synveil/net-logs")
                           if name.endswith(".json"))
-    netlog_hosts, netlog_sockets = set(), set()
+    netlog_dns, netlog_sockets, netlog_attempted = set(), set(), set()
     for name in netlog_names:
         blob = read(f"/synveil/net-logs/{name}")
         if blob:
-            hosts, sockets = _netlog_extract(blob)
-            netlog_hosts |= hosts
+            dns, sockets, attempted = _netlog_extract(blob)
+            netlog_dns |= dns
             netlog_sockets |= sockets
+            netlog_attempted |= attempted
     facts.update({
         "netlog_files": len(netlog_names),
-        "netlog_hosts": sorted(netlog_hosts),
+        "netlog_dns_hosts": sorted(netlog_dns),
         "netlog_sockets": sorted(netlog_sockets),
+        "netlog_attempted_hosts": sorted(netlog_attempted),
     })
     return facts
 
@@ -875,19 +894,23 @@ def validate_browser_results(results):
             failures.append(
                 f"{scenario}: no Chromium net log on DATA — the "
                 "no-phone-home property (no component updates, "
-                "no variations fetch, no telemetry) is unproven "
-                "for this boot")
+                "no variations fetch, no telemetry leaving the "
+                "machine) is unproven for this boot")
             return
-        for host in facts.get("netlog_hosts") or []:
-            if host not in NETLOG_ALLOWED_HOSTS:
+        for host in facts.get("netlog_dns_hosts") or []:
+            if host not in NETLOG_ALLOWED_DNS:
                 failures.append(
-                    f"{scenario}: browser contacted unexpected "
-                    f"host {host} — phone-home not disabled")
+                    f"{scenario}: a DNS query for {host} left "
+                    "the guest — phone-home not contained")
         for sock in facts.get("netlog_sockets") or []:
-            if sock not in NETLOG_ALLOWED_SOCKETS:
-                failures.append(
-                    f"{scenario}: browser opened a socket to "
-                    f"unexpected endpoint {sock}")
+            if sock in NETLOG_ALLOWED_SOCKETS:
+                continue
+            if sock.rsplit(":", 1)[0] == "127.0.0.1":
+                continue  # null-routed attempt dying on loopback
+            failures.append(
+                f"{scenario}: browser opened a socket to "
+                f"unexpected endpoint {sock} — an outbound "
+                "connection to a non-fixture address")
 
     def sandbox_ok(scenario, minimum):
         facts = need(scenario, "artifacts") or {}

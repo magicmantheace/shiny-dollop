@@ -301,6 +301,23 @@ def browser_icon_png():
             chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
 
 
+#: Vendor phone-home endpoints null-routed in every browser
+#: image (see overlay_browser's hosts assembly and
+#: docs/BROWSER.md, "No vendor calls").
+NULLED_PHONE_HOME_HOSTS = (
+    "update.googleapis.com",
+    "clients2.google.com",
+    "clientservices.googleapis.com",
+    "accounts.google.com",
+    "safebrowsing.googleapis.com",
+    "sb-ssl.google.com",
+    "ssl.gstatic.com",
+    "optimizationguide-pa.googleapis.com",
+    "translate.googleapis.com",
+    "edgedl.me.gvt1.com",
+)
+
+
 def overlay_browser(rootfs, stage, *, test_ca, test_host, start_url):
     """Install the Priority 3/4 payload into one generation rootfs:
     networking scripts, the sealed Chromium assets, the launcher
@@ -368,6 +385,26 @@ def overlay_browser(rootfs, stage, *, test_ca, test_host, start_url):
 
     hosts = rootfs / "etc/hosts"
     hosts_text = "127.0.0.1 localhost\n"
+    # Shipped privacy guarantee (owner requirement): the pure
+    # phone-home endpoints of the browser vendor are null-routed
+    # at the name layer of the OS itself, so no DNS query and no
+    # connection for them can ever leave the machine. Chromium's
+    # managed policies already disable the services that accept
+    # being disabled (network time, variations, Safe Browsing,
+    # sync, translate, suggestions); the component updater's
+    # data-component checks and the identity service's startup
+    # account fetch ignore ComponentUpdatesEnabled in a stock
+    # build (verified against Chromium 156: the requests fire
+    # with the policy loaded), so this layer is what makes the
+    # no-outbound-calls property absolute. Browser updates
+    # arrive only through Synveil's signed A/B releases. The
+    # trade-off is deliberate and documented in docs/BROWSER.md:
+    # these vendor service endpoints are unreachable from the
+    # guest at all (including accounts.google.com, whose
+    # unprompted ListAccounts fetch is the phone-home being
+    # stopped).
+    for name in NULLED_PHONE_HOME_HOSTS:
+        hosts_text += f"127.0.0.1 {name}\n"
     if test_host:
         hosts_text += f"{test_host[0]} {test_host[1]}\n"
     hosts.write_text(hosts_text)
@@ -385,6 +422,7 @@ def overlay_browser(rootfs, stage, *, test_ca, test_host, start_url):
         "link_closure_files_checked": closure_files,
         "privacy_policy_sha256": hashlib.sha256(
             policy_source.read_bytes()).hexdigest(),
+        "nulled_phone_home_hosts": list(NULLED_PHONE_HOME_HOSTS),
         "test_ca_sha256": None,
         "test_host": None,
         "start_url": None,

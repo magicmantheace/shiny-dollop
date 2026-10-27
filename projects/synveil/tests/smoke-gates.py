@@ -260,9 +260,12 @@ def browser_facts(confirmed):
         "files_payload_scans": 3,
         "files_payload2_scans": 2,
         "netlog_files": 2,
-        "netlog_hosts": ["test.synveil.invalid"],
+        "netlog_dns_hosts": ["test.synveil.invalid"],
         "netlog_sockets": ["10.0.2.2:8443", "10.0.2.2:8444",
-                           "10.0.2.3:53"],
+                           "10.0.2.3:53", "127.0.0.1:443"],
+        "netlog_attempted_hosts": ["accounts.google.com",
+                                   "test.synveil.invalid",
+                                   "update.googleapis.com"],
     }
 
 
@@ -321,13 +324,22 @@ class BrowserGate(unittest.TestCase):
         self.assertTrue(ok, failures)
         self.assertEqual(failures, [])
 
-    def test_phone_home_host_rejected(self):
+    def test_phone_home_dns_rejected(self):
         results = consistent_browser_results()
-        results["B6"]["artifacts"]["netlog_hosts"] = [
+        results["B6"]["artifacts"]["netlog_dns_hosts"] = [
             "test.synveil.invalid", "update.googleapis.com"]
         ok, failures = self.validate(results)
         self.assertFalse(ok)
-        self.assertTrue(any("phone-home" in f for f in failures),
+        self.assertTrue(any("DNS query" in f for f in failures),
+                        failures)
+
+    def test_phone_home_socket_rejected(self):
+        results = consistent_browser_results()
+        results["B1"]["artifacts"]["netlog_sockets"] = [
+            "10.0.2.2:8443", "142.250.80.4:443"]
+        ok, failures = self.validate(results)
+        self.assertFalse(ok)
+        self.assertTrue(any("socket" in f for f in failures),
                         failures)
 
     def test_missing_netlog_rejected(self):
