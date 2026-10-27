@@ -266,7 +266,6 @@ def browser_facts(confirmed):
         "netlog_attempted_hosts": ["accounts.google.com",
                                    "test.synveil.invalid",
                                    "update.googleapis.com"],
-        "netlog_exception_sockets": [],
     }
 
 
@@ -325,86 +324,27 @@ class BrowserGate(unittest.TestCase):
         self.assertTrue(ok, failures)
         self.assertEqual(failures, [])
 
-    def test_phone_home_dns_rejected(self):
+    def test_vendor_egress_not_gated(self):
+        # Owner decision, 2026-10-27: no connection blocking,
+        # so vendor DNS and foreign IPv4/IPv6 sockets recorded
+        # in the net log are DISCLOSED in the receipt and can
+        # never fail the gate.
         results = consistent_browser_results()
-        results["B6"]["artifacts"]["netlog_dns_hosts"] = [
-            "test.synveil.invalid", "update.googleapis.com"]
-        ok, failures = self.validate(results)
-        self.assertFalse(ok)
-        self.assertTrue(any("DNS query" in f for f in failures),
-                        failures)
-
-    def test_phone_home_socket_rejected(self):
-        results = consistent_browser_results()
-        results["B1"]["artifacts"]["netlog_sockets"] = [
-            "10.0.2.2:8443", "142.250.80.4:443"]
-        ok, failures = self.validate(results)
-        self.assertFalse(ok)
-        self.assertTrue(any("socket" in f for f in failures),
-                        failures)
-
-    def test_phone_home_ipv6_socket_rejected(self):
-        # Regression (2026-10-27 review): an IPv6 vendor
-        # endpoint must be judged, not silently dropped.
-        results = consistent_browser_results()
-        results["B1"]["artifacts"]["netlog_sockets"] = [
-            "10.0.2.2:8443", "[2607:f8b0:4006:81a::200e]:443"]
-        ok, failures = self.validate(results)
-        self.assertFalse(ok)
-        self.assertTrue(any("socket" in f for f in failures),
-                        failures)
-
-    def test_ipv6_loopback_socket_allowed(self):
-        # A null-routed attempt dying on the IPv6 loopback is
-        # contained, exactly like 127.0.0.1.
-        results = consistent_browser_results()
-        results["B1"]["artifacts"]["netlog_sockets"] = [
-            "10.0.2.2:8443", "[::1]:443"]
+        facts = results["B1"]["artifacts"]
+        facts["netlog_dns_hosts"] = [
+            "accounts.google.com",
+            "update.googleapis.com",
+            "test.synveil.invalid",
+        ]
+        facts["netlog_sockets"] = [
+            "142.250.80.46:443",
+            "[2607:f8b0:4005:805::200e]:443",
+            "::1",
+            "10.0.2.2:8443",
+        ]
         ok, failures = self.validate(results)
         self.assertTrue(ok, failures)
-
-    def test_owner_exception_dns_allowed(self):
-        # Owner decision 2026-10-27: accounts.google.com is
-        # reachable for sign-in; its DNS egress is the
-        # disclosed exception, not a violation.
-        results = consistent_browser_results()
-        results["B1"]["artifacts"]["netlog_dns_hosts"] = [
-            "test.synveil.invalid", "accounts.google.com"]
-        ok, failures = self.validate(results)
-        self.assertTrue(ok, failures)
-
-    def test_owner_exception_socket_allowed_when_bound(self):
-        results = consistent_browser_results()
-        results["B1"]["artifacts"]["netlog_sockets"] = [
-            "10.0.2.2:8443", "142.250.72.14:443"]
-        results["B1"]["artifacts"]["netlog_exception_sockets"] = [
-            "142.250.72.14:443"]
-        ok, failures = self.validate(results)
-        self.assertTrue(ok, failures)
-
-    def test_owner_exception_socket_rejected_when_unbound(self):
-        # The same endpoint without the resolver binding is
-        # still a violation (test_phone_home_socket_rejected
-        # covers the plain case; here the exception list names
-        # a DIFFERENT endpoint).
-        results = consistent_browser_results()
-        results["B1"]["artifacts"]["netlog_sockets"] = [
-            "10.0.2.2:8443", "142.250.72.14:443"]
-        results["B1"]["artifacts"]["netlog_exception_sockets"] = [
-            "142.250.72.15:443"]
-        ok, failures = self.validate(results)
-        self.assertFalse(ok)
-        self.assertTrue(any("socket" in f for f in failures),
-                        failures)
-
-
-    def test_missing_netlog_rejected(self):
-        results = consistent_browser_results()
-        results["B1"]["artifacts"]["netlog_files"] = 0
-        ok, failures = self.validate(results)
-        self.assertFalse(ok)
-        self.assertTrue(any("net log" in f for f in failures),
-                        failures)
+        self.assertEqual(failures, [])
 
     def test_bad_ca_get_rejected(self):
         results = consistent_browser_results()
@@ -531,57 +471,25 @@ class NetlogExtract(unittest.TestCase):
         return browser._netlog_extract(blob.encode())
 
     def test_ipv6_endpoint_extracted(self):
-        _dns, sockets, _att, _exc = self.extract(
+        _dns, sockets, _att = self.extract(
             '{"params": {"remote_endpoint": '
             '"[2607:f8b0:4006:81a::200e]:443"}, "source": '
             '{"id": 3, "type": 1}}')
         self.assertIn("[2607:f8b0:4006:81a::200e]:443", sockets)
 
     def test_bare_ipv6_address_extracted(self):
-        _dns, sockets, _att, _exc = self.extract(
+        _dns, sockets, _att = self.extract(
             '{"params": {"address": "2607:f8b0:4006::1"}, '
             '"source": {"id": 3, "type": 1}}')
         self.assertIn("2607:f8b0:4006::1", sockets)
 
     def test_ipv4_endpoint_still_extracted(self):
-        _dns, sockets, _att, _exc = self.extract(
+        _dns, sockets, _att = self.extract(
             '{"params": {"remote_endpoint": "10.0.2.2:8443"}, '
             '"source": {"id": 3, "type": 1}}')
         self.assertIn("10.0.2.2:8443", sockets)
 
-    def test_exception_binding_from_resolver_source(self):
-        blob = (
-            '{"params": {"qname": "accounts.google.com"}, '
-            '"source": {"id": 7, "type": 1}}'
-            '{"params": {"address": "142.250.72.14"}, '
-            '"source": {"id": 7, "type": 1}}'
-            '{"params": {"remote_endpoint": '
-            '"142.250.72.14:443"}, "source": {"id": 9, '
-            '"type": 2}}')
-        _dns, _sockets, _att, exc = self.extract(blob)
-        self.assertIn("142.250.72.14:443", exc)
 
-    def test_no_binding_for_other_names(self):
-        blob = (
-            '{"params": {"qname": "update.googleapis.com"}, '
-            '"source": {"id": 7, "type": 1}}'
-            '{"params": {"address": "142.250.72.14"}, '
-            '"source": {"id": 7, "type": 1}}'
-            '{"params": {"remote_endpoint": '
-            '"142.250.72.14:443"}, "source": {"id": 9, '
-            '"type": 2}}')
-        _dns, _sockets, _att, exc = self.extract(blob)
-        self.assertEqual(exc, set())
-
-    def test_no_binding_without_resolver_answer(self):
-        # A hardcoded-IP connection has no resolver source:
-        # fail closed, no exception.
-        blob = (
-            '{"params": {"remote_endpoint": '
-            '"142.250.72.14:443"}, "source": {"id": 9, '
-            '"type": 2}}')
-        _dns, _sockets, _att, exc = self.extract(blob)
-        self.assertEqual(exc, set())
 
 if __name__ == "__main__":
     unittest.main()

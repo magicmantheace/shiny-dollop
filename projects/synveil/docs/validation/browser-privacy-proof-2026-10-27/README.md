@@ -134,3 +134,17 @@ including fixtures.
   resolver source. Test media built after this decision
   carries the change; see
   `docs/validation/test-media-2026-10-27/`.
+- **Superseded in full (2026-10-27, later the same day):**
+  the owner directed that no connections be blocked at all
+  ("I don't want you blocking connections at all"). The
+  entire regime this record measured — the hosts
+  null-routing, the managed privacy policy, and the
+  blocking launcher flags/profile seed — was removed from
+  the shipped browser; the vendor-egress gate condition
+  was removed with it (net-log egress is now disclosed in
+  receipts, never gated), and the accounts exception above
+  became moot. The shipped browser is stock-configured;
+  see docs/BROWSER.md, "Stock configuration — no
+  connection blocking". This record describes a superseded
+  image only; the test-media package was rebuilt from the
+  post-removal head.

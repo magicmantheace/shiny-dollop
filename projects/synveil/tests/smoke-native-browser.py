@@ -682,89 +682,29 @@ def _first_token(raw):
     return parts[0] if parts else None
 
 
-# Privacy evidence: proof builds run Chromium with
-# --log-net-log into ~/net-logs; the readback enumerates the
-# browser's actual EGRESS from the log:
-#   * dns_hosts — names carried by real DNS wire transactions
-#     (qname / hostname+query_type event params). The shipped
-#     image null-routes the vendor phone-home names in
-#     /etc/hosts, so a name the browser still tries internally
-#     never becomes a DNS query; only names that would leave
-#     the machine appear here.
-#   * sockets — literal remote endpoints (remote_endpoint /
-#     address event params), IPv4 and IPv6. Loopback is where
-#     null-routed attempts die; anything else must be the
-#     fixture or the disclosed exception below.
-#   * attempted_hosts — hosts named by URL requests, recorded
-#     for disclosure in the receipt (a stock Chromium 156 still
-#     TRIES its component-update and account fetches internally
-#     even with every disabling policy loaded — see
-#     docs/BROWSER.md); the gate judges egress, not attempts.
-#   * exception_sockets — endpoints attributable to the
-#     owner-authorized exception name (below): an endpoint
-#     whose address the SAME log records as a host-resolver
-#     answer for that name, through the resolver source that
-#     queried it, and for no other queried name. Anything not
-#     attributable stays a violation; the binding is
-#     fail-closed (no source, no binding, no exception).
-NETLOG_ALLOWED_DNS = {"test.synveil.invalid", "localhost"}
-#: Owner decision, 2026-10-27: accounts.google.com stays
-#: reachable so Google sign-in works in the browser. It is
-#: the single disclosed exception to the null-routing; every
-#: other vendor endpoint remains blocked in the image and
-#: rejected here.
-NETLOG_OWNER_EXCEPTION_DNS = {"accounts.google.com"}
-NETLOG_ALLOWED_SOCKETS = {"10.0.2.2:8443", "10.0.2.2:8444",
-                          "10.0.2.3:53"}
-
-
-def _sock_host(sock):
-    """Host part of a recorded endpoint: '1.2.3.4:443' ->
-    '1.2.3.4', '[2001:db8::1]:443' -> '2001:db8::1', a bare
-    IPv6 address -> itself."""
-    if sock.startswith("["):
-        return sock[1:sock.index("]")]
-    if sock.count(":") == 1:
-        return sock.rsplit(":", 1)[0]
-    return sock
-
-
-def _source_id_near(text, pos):
-    """The net-log source id of the event object around pos.
-    Each event carries "source": {"id": N, ...}; take the
-    nearest one within a window on both sides. Heuristic by
-    construction — used ONLY to bind resolver answers to the
-    name their own source queried (the exception path); when
-    no source id is found nearby, no binding exists."""
-    lo = max(0, pos - 600)
-    window = text[lo:pos + 600]
-    best = None
-    for match in re.finditer(r'"source":\s*\{\s*"id":\s*(\d+)',
-                             window):
-        dist = abs(lo + match.start() - pos)
-        if best is None or dist < best[0]:
-            best = (dist, int(match.group(1)))
-    return best[1] if best else None
+# Net-log readback (informational): proof builds run
+# Chromium with --log-net-log into ~/net-logs; the readback
+# enumerates the browser's actual egress into the receipt —
+# dns_hosts (names carried by real DNS wire transactions),
+# sockets (literal remote endpoints, IPv4 and IPv6), and
+# attempted_hosts (hosts named by URL requests). Since the
+# owner's 2026-10-27 decision removed all connection
+# blocking, egress is DISCLOSED, never gated: no value in
+# these sets can fail a run. (The parser covers IPv6 as well
+# as IPv4 since the 2026-10-27 review correction — an
+# IPv4-only version silently dropped IPv6 endpoints from
+# this record.)
 
 
 def _netlog_extract(blob):
     text = blob.decode("utf-8", "replace")
     dns_hosts = set()
-    name_sources = {}
     for match in re.finditer(r'"qname":\s*"([a-zA-Z0-9.-]+)"', text):
-        name = match.group(1).lower().rstrip(".")
-        dns_hosts.add(name)
-        source = _source_id_near(text, match.start())
-        if source is not None:
-            name_sources.setdefault(name, set()).add(source)
+        dns_hosts.add(match.group(1).lower().rstrip("."))
     for match in re.finditer(
             r'"hostname":\s*"([a-zA-Z0-9.-]+)",\s*"query_type"',
             text):
-        name = match.group(1).lower().rstrip(".")
-        dns_hosts.add(name)
-        source = _source_id_near(text, match.start())
-        if source is not None:
-            name_sources.setdefault(name, set()).add(source)
+        dns_hosts.add(match.group(1).lower().rstrip("."))
     attempted = set()
     for match in re.finditer(
             r'"url":\s*"(?:[a-zA-Z][a-zA-Z0-9+.-]*://)?'
@@ -775,12 +715,7 @@ def _netlog_extract(blob):
             r'"(?:remote_endpoint|address)":\s*"'
             r'(\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})"', text):
         sockets.add(f"{match.group(1)}:{int(match.group(2))}")
-    # IPv6 endpoints are written bracketed with a port. The
-    # pre-2026-10-27 parser matched only the IPv4 form above,
-    # so IPv6 egress was silently dropped from the evidence
-    # (independent review, 2026-10-27); both forms are
-    # extracted now, and tests/smoke-gates.py carries the
-    # negative regression fixtures.
+    # IPv6 endpoints are written bracketed with a port.
     for match in re.finditer(
             r'"(?:remote_endpoint|address)":\s*"'
             r'\[([0-9a-fA-F:]+)\]:(\d{1,5})"', text):
@@ -791,37 +726,7 @@ def _netlog_extract(blob):
             r'"address":\s*"([0-9a-fA-F]*:[0-9a-fA-F:]+)"',
             text):
         sockets.add(match.group(1).lower())
-    # Resolver answers by source, for the exception binding.
-    source_answers = {}
-    for match in re.finditer(
-            r'"address":\s*"(\d{1,3}(?:\.\d{1,3}){3})'
-            r'(?::\d{1,5})?"', text):
-        source = _source_id_near(text, match.start())
-        if source is not None:
-            source_answers.setdefault(source, set()).add(
-                match.group(1))
-    for match in re.finditer(
-            r'"address":\s*"(?:\[)?([0-9a-fA-F]*:[0-9a-fA-F:]+)'
-            r'(?:\])?(?::\d{1,5})?"', text):
-        source = _source_id_near(text, match.start())
-        if source is not None:
-            source_answers.setdefault(source, set()).add(
-                match.group(1).lower())
-    answers_by_name = {}
-    for name, sources in name_sources.items():
-        answers = set()
-        for source in sources:
-            answers |= source_answers.get(source, set())
-        answers_by_name[name] = answers
-    exception_ips = set()
-    for name in NETLOG_OWNER_EXCEPTION_DNS:
-        exception_ips |= answers_by_name.get(name, set())
-    for name, answers in answers_by_name.items():
-        if name not in NETLOG_OWNER_EXCEPTION_DNS:
-            exception_ips -= answers
-    exception_sockets = {sock for sock in sockets
-                         if _sock_host(sock) in exception_ips}
-    return dns_hosts, sockets, attempted, exception_sockets
+    return dns_hosts, sockets, attempted
 
 
 def browser_artifacts(disk, workdir):
@@ -909,22 +814,18 @@ def browser_artifacts(disk, workdir):
                           ext4_list(image, "/synveil/net-logs")
                           if name.endswith(".json"))
     netlog_dns, netlog_sockets, netlog_attempted = set(), set(), set()
-    netlog_exception = set()
     for name in netlog_names:
         blob = read(f"/synveil/net-logs/{name}")
         if blob:
-            dns, sockets, attempted, exception = \
-                _netlog_extract(blob)
+            dns, sockets, attempted = _netlog_extract(blob)
             netlog_dns |= dns
             netlog_sockets |= sockets
             netlog_attempted |= attempted
-            netlog_exception |= exception
     facts.update({
         "netlog_files": len(netlog_names),
         "netlog_dns_hosts": sorted(netlog_dns),
         "netlog_sockets": sorted(netlog_sockets),
         "netlog_attempted_hosts": sorted(netlog_attempted),
-        "netlog_exception_sockets": sorted(netlog_exception),
     })
     return facts
 
@@ -990,36 +891,6 @@ def validate_browser_results(results):
             failures.append(f"{scenario}: browser profile missing or "
                             "download directory not the persistent home")
 
-    def privacy_ok(scenario):
-        facts = need(scenario, "artifacts") or {}
-        if not facts.get("netlog_files"):
-            failures.append(
-                f"{scenario}: no Chromium net log on DATA — the "
-                "no-phone-home property (no component updates, "
-                "no variations fetch, no telemetry leaving the "
-                "machine) is unproven for this boot")
-            return
-        for host in facts.get("netlog_dns_hosts") or []:
-            if host in NETLOG_OWNER_EXCEPTION_DNS:
-                continue  # owner-authorized exception, disclosed
-            if host not in NETLOG_ALLOWED_DNS:
-                failures.append(
-                    f"{scenario}: a DNS query for {host} left "
-                    "the guest — phone-home not contained")
-        exception = set(facts.get("netlog_exception_sockets")
-                        or [])
-        for sock in facts.get("netlog_sockets") or []:
-            if sock in NETLOG_ALLOWED_SOCKETS:
-                continue
-            if sock in exception:
-                continue  # bound to the exception name, above
-            if _sock_host(sock) in ("127.0.0.1", "::1"):
-                continue  # null-routed attempt dying on loopback
-            failures.append(
-                f"{scenario}: browser opened a socket to "
-                f"unexpected endpoint {sock} — an outbound "
-                "connection to a non-fixture address")
-
     def sandbox_ok(scenario, minimum):
         facts = need(scenario, "artifacts") or {}
         good = 0
@@ -1054,7 +925,6 @@ def validate_browser_results(results):
         failures.append("B1: no baseline credential recorded")
     digest_pair("B1", "payload", PAYLOAD_SHA256)
     survival("B1", baseline_credential)
-    privacy_ok("B1")
     sandbox_ok("B1", 1)
 
     b2 = results.get("B2", {})
@@ -1100,7 +970,6 @@ def validate_browser_results(results):
         failures.append("B5: page did not load again after cold reboot")
     digest_pair("B5", "payload", PAYLOAD_SHA256)
     survival("B5", baseline_credential)
-    privacy_ok("B5")
     facts5 = b5.get("artifacts") or {}
     if facts5.get("files_payload_scans", 0) < 1:
         failures.append("B5: files window never listed payload.bin — "
@@ -1115,7 +984,6 @@ def validate_browser_results(results):
     digest_pair("B6", "payload", PAYLOAD_SHA256)
     digest_pair("B6", "payload2", PAYLOAD2_SHA256)
     survival("B6", baseline_credential)
-    privacy_ok("B6")
     if facts6.get("files_payload2_scans", 0) < 1:
         failures.append("B6: files window never listed payload2.bin")
 
@@ -1128,7 +996,6 @@ def validate_browser_results(results):
     digest_pair("B7", "payload", PAYLOAD_SHA256)
     digest_pair("B7", "payload2", PAYLOAD2_SHA256)
     survival("B7", baseline_credential)
-    privacy_ok("B7")
     sandbox_ok("B7", 3)
 
     for scenario in ("B1", "B5", "B6", "B7"):

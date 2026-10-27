@@ -310,27 +310,6 @@ def browser_icon_png():
             chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
 
 
-#: Vendor phone-home endpoints null-routed in every browser
-#: image (see overlay_browser's hosts assembly and
-#: docs/BROWSER.md, "No vendor calls"). accounts.google.com
-#: is deliberately NOT in this list: by the owner's decision
-#: of 2026-10-27 it stays reachable so Google sign-in works
-#: in the browser. It is the single disclosed exception; the
-#: privacy gate treats it as such (see
-#: tests/smoke-native-browser.py, NETLOG_OWNER_EXCEPTION_DNS).
-NULLED_PHONE_HOME_HOSTS = (
-    "update.googleapis.com",
-    "clients2.google.com",
-    "clientservices.googleapis.com",
-    "safebrowsing.googleapis.com",
-    "sb-ssl.google.com",
-    "ssl.gstatic.com",
-    "optimizationguide-pa.googleapis.com",
-    "translate.googleapis.com",
-    "edgedl.me.gvt1.com",
-)
-
-
 def overlay_browser(rootfs, stage, *, test_ca, test_host, start_url):
     """Install the Priority 3/4 payload into one generation rootfs:
     networking scripts, the sealed Chromium assets, the launcher
@@ -360,25 +339,9 @@ def overlay_browser(rootfs, stage, *, test_ca, test_host, start_url):
     shutil.copyfile(ROOT / "build/rootfs/synveil-browser", wrapper)
     wrapper.chmod(0o755)
 
-    # Shipped privacy configuration (owner requirement): the
-    # browser makes no outbound connections to the distribution
-    # or the vendor at runtime — no component updates, no
-    # variations/field-trial fetches, no telemetry. Browser
-    # updates arrive only through Synveil's own signed A/B
-    # releases. Installed as a Chromium managed policy for
-    # EVERY browser build (proof and production alike); the
-    # launcher's flags and the profile seed repeat the core of
-    # it as defense in depth.
-    policy_source = ROOT / "build/rootfs/chromium-policies.json"
-    policies = rootfs / "etc/chromium/policies/managed"
-    policies.mkdir(parents=True, exist_ok=True)
-    for parent in (rootfs / "etc/chromium/policies",
-                   rootfs / "etc/chromium"):
-        parent.chmod(0o755)
-    policies.chmod(0o755)
-    policy_file = policies / "synveil-privacy.json"
-    shutil.copyfile(policy_source, policy_file)
-    policy_file.chmod(0o644)
+    # No managed policy is installed: the browser ships
+    # stock-configured (owner decision, 2026-10-27 — the
+    # synveil-privacy managed policy was removed in full).
 
     config = rootfs / "etc/synveil"
     for marker in ("browser", "files-app"):
@@ -398,27 +361,11 @@ def overlay_browser(rootfs, stage, *, test_ca, test_host, start_url):
 
     hosts = rootfs / "etc/hosts"
     hosts_text = "127.0.0.1 localhost\n"
-    # Shipped privacy configuration: the pure phone-home
-    # endpoints of the browser vendor are null-routed at the
-    # name layer of the OS itself, so no DNS query and no
-    # connection for them can ever leave the machine. Chromium's
-    # managed policies already disable the services that accept
-    # being disabled (network time, variations, Safe Browsing,
-    # sync, translate, suggestions); the component updater's
-    # data-component checks ignore ComponentUpdatesEnabled in a
-    # stock build (verified against Chromium 156: the requests
-    # fire with the policy loaded), so this layer is what makes
-    # those endpoints unreachable. Browser updates arrive only
-    # through Synveil's signed A/B releases. The trade-off is
-    # deliberate and documented in docs/BROWSER.md. One
-    # disclosed exception, by the owner's decision of
-    # 2026-10-27: accounts.google.com is NOT null-routed, so
-    # Google sign-in works; its unprompted startup ListAccounts
-    # fetch therefore does leave the machine, and the privacy
-    # gate records it as the owner-authorized exception rather
-    # than a violation.
-    for name in NULLED_PHONE_HOME_HOSTS:
-        hosts_text += f"127.0.0.1 {name}\n"
+    # No name-layer connection blocking: the browser ships
+    # stock-configured (owner decision, 2026-10-27 — the
+    # earlier vendor null-routing regime was removed in
+    # full). The hosts file carries localhost and, for proof
+    # builds only, the fixture host below.
     if test_host:
         hosts_text += f"{test_host[0]} {test_host[1]}\n"
     hosts.write_text(hosts_text)
@@ -434,9 +381,6 @@ def overlay_browser(rootfs, stage, *, test_ca, test_host, start_url):
         "assets_copied": counts["copied"],
         "assets_identical_to_baseline": counts["identical"],
         "link_closure_files_checked": closure_files,
-        "privacy_policy_sha256": hashlib.sha256(
-            policy_source.read_bytes()).hexdigest(),
-        "nulled_phone_home_hosts": list(NULLED_PHONE_HOME_HOSTS),
         "test_ca_sha256": None,
         "test_host": None,
         "start_url": None,
