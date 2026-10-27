@@ -403,6 +403,23 @@ def chromium_readback(image: Path, scratch: Path) -> dict:
             dest.write(chunk)
             remaining -= len(chunk)
 
+    # The guest is stopped by SIGTERM, which can leave the
+    # partition's journal un-replayed and its metadata checksums
+    # stale in the extracted copy; debugfs then refuses to open
+    # it at all ("Filesystem not open") — an unreadable copy,
+    # not missing evidence (observed on the USB variant: the
+    # journal replay below recovered a complete browser log,
+    # profile and Downloads directory). Replay the journal on
+    # the extracted copy — the guest image itself is never
+    # modified — and fail distinctly if even that cannot open
+    # the filesystem.
+    fsck = subprocess.run(["e2fsck", "-y", str(part)],
+                          capture_output=True, text=True, timeout=300)
+    if fsck.returncode >= 4:
+        raise RuntimeError(
+            "DATA filesystem unreadable after journal replay: "
+            + (fsck.stdout + fsck.stderr)[-500:])
+
     def debugfs(request):
         result = subprocess.run(
             ["debugfs", "-R", request, str(part)],
@@ -412,12 +429,15 @@ def chromium_readback(image: Path, scratch: Path) -> dict:
     home = debugfs("ls -l /synveil")
     log = debugfs("cat /synveil/browser.log")
     profile = debugfs("ls /synveil/.config/chromium")
+    if "Filesystem not open" in home + log + profile:
+        raise RuntimeError(
+            "DATA filesystem did not open in debugfs after "
+            "journal replay")
     evidence = {
         "browser_log_on_data_partition": "browser.log" in home,
         "browser_started_markers_in_log":
             log.count("SYNVEIL_BROWSER_STARTED"),
-        "chromium_profile_present":
-            "File not found" not in profile and bool(profile.strip()),
+        "chromium_profile_present": "Default" in profile,
         "downloads_dir_present": "Downloads" in home,
     }
     if not evidence["browser_log_on_data_partition"] or \
@@ -858,6 +878,12 @@ def boot_two_reboot(work, evidence_dir, secret, wrong, login_screen, timeout):
                        lambda s: is_auth(s) and same_screen(s, login_screen),
                        120)
         guest.check_serial()
+        if AB_DESKTOP:
+            # Let the idle guest flush its writeback before the
+            # SIGTERM teardown, so the host-side DATA readback
+            # starts from the most settled image possible (its
+            # journal replay handles the rest).
+            time.sleep(10)
 
 
 def boot_three_broken_state(work, evidence_dir, secret, login_screen, timeout):
