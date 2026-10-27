@@ -27,6 +27,15 @@ The generations are installed-system images, not test fixtures:
 the same overlay and agent would ship in a real A/B install. The
 host fixture core (tools/ab_update.py) remains a separate,
 file-only model and is never mixed into these images.
+
+With --browser --boot-target hardware --out <dir> the same builder
+produces the owner test-media disk: the production browser overlay
+(no test CA, no test hosts, no fixture start page) on the hardware
+kernel (tty0 console, simpledrm framebuffer, USB/AHCI/NVMe
+storage). The qemu-target proof builds remain the update/browser
+acceptance route; the hardware disk is accepted by the framebuffer
+harness (tests/smoke-native-joined-hardware.py --ab-receipt).
+See docs/PHYSICAL_BOOT.md.
 """
 import argparse
 import hashlib
@@ -462,14 +471,14 @@ def overlay_browser(rootfs, stage, *, test_ca, test_host, start_url):
     return record
 
 
-def build_kernel(out_dir, rootfs, recovery=False):
+def build_kernel(out_dir, rootfs, recovery=False, boot_target="qemu"):
     """Pack rootfs into a cpio and relink the seed kernel into a UKI."""
     out_dir.mkdir(parents=True, exist_ok=True)
     tmp = out_dir / "tmp"
     tmp.mkdir(exist_ok=True)
     env = joined.base_env(out_dir, out_dir / "work")
     env.update(SYNVEIL_KERNEL_SEED_WORK=str(ROOT / "build/work"),
-               SYNVEIL_BOOT_TARGET="qemu", TMPDIR=str(tmp))
+               SYNVEIL_BOOT_TARGET=boot_target, TMPDIR=str(tmp))
     if recovery:
         env["SYNVEIL_KERNEL_TEST_RECOVERY_STATUS"] = "1"
     with (out_dir / "synveil-initramfs.cpio").open("wb") as archive:
@@ -480,7 +489,8 @@ def build_kernel(out_dir, rootfs, recovery=False):
     return out_dir / "synveil-x86_64.efi"
 
 
-def build_generations(commit, public_hex, baseline_rootfs, browser=None):
+def build_generations(commit, public_hex, baseline_rootfs, browser=None,
+                      boot_target="qemu"):
     generations = {}
     browser_record = None
     for spec in GENERATIONS:
@@ -498,7 +508,7 @@ def build_generations(commit, public_hex, baseline_rootfs, browser=None):
                                      start_url=browser["start_url"])
             if browser_record is None:
                 browser_record = record
-        uki = build_kernel(gdir, rootfs)
+        uki = build_kernel(gdir, rootfs, boot_target=boot_target)
         generations[spec["version"]] = {
             "version": spec["version"],
             "generation_id": spec["generation_id"],
@@ -517,7 +527,8 @@ def build_generations(commit, public_hex, baseline_rootfs, browser=None):
     rdir.mkdir(parents=True)
     rootfs = rdir / "rootfs"
     shutil.copytree(baseline_rootfs, rootfs, symlinks=True)
-    uki = build_kernel(rdir, rootfs, recovery=True)
+    uki = build_kernel(rdir, rootfs, recovery=True,
+                       boot_target=boot_target)
     recovery = {"uki": str(uki), "uki_sha256": sha256(uki),
                 "uki_bytes": uki.stat().st_size}
     print(f"SYNVEIL_AB_RECOVERY_BUILT sha256={recovery['uki_sha256']}")
@@ -645,13 +656,30 @@ def main():
                         help="extra /etc/hosts entry for the proof endpoint")
     parser.add_argument("--browser-start-url",
                         help="URL the session's browser opens at start")
+    parser.add_argument("--boot-target", choices=("qemu", "hardware"),
+                        default="qemu",
+                        help="kernel boot target for every generation "
+                             "and the recovery image: qemu (default; "
+                             "serial console, virtio) or hardware "
+                             "(tty0 console, simpledrm framebuffer, "
+                             "USB/AHCI/NVMe storage — the owner "
+                             "test-media kernel)")
+    parser.add_argument("--out", default=None,
+                        help="output directory (default: out/ab-proof, "
+                             "or out/browser-proof with --browser)")
     args = parser.parse_args()
     global OUT, TRUST_DIR, ESP_SIZE_MB, SLOT_SIZE_MB, DATA_SIZE_MB, \
         RECOVERY_SIZE_MB
     browser = None
-    if args.browser:
-        OUT = ROOT / "out" / "browser-proof"
+    if args.out:
+        OUT = Path(args.out)
+        if not OUT.is_absolute():
+            OUT = ROOT / OUT
         TRUST_DIR = OUT / "trust"
+    if args.browser:
+        if not args.out:
+            OUT = ROOT / "out" / "browser-proof"
+            TRUST_DIR = OUT / "trust"
         # The Chromium payload grows a generation rootfs from
         # ~124 MB to ~560 MB (uncompressed cpio UKI): the browser
         # proof disk's ESP/slots/recovery must hold a whole UKI
@@ -673,7 +701,8 @@ def main():
     _private, public_hex = ab_release.ensure_keypair(TRUST_DIR)
     baseline_rootfs = ensure_joined_baseline(args.rebuild_joined)
     generations, recovery, browser_record = build_generations(
-        commit, public_hex, baseline_rootfs, browser=browser)
+        commit, public_hex, baseline_rootfs, browser=browser,
+        boot_target=args.boot_target)
     disk = assemble_disk(generations, recovery)
     releases = {}
     # build_media creates outputs exclusively and refuses existing
@@ -695,6 +724,7 @@ def main():
     receipt = {
         "schema": "synveil.ab-proof-build/v1",
         "source_commit": commit,
+        "boot_target": args.boot_target,
         "publisher": {"key_id": ab_release.KEY_ID, "development": True,
                       "public_key_hex": public_hex},
         "generations": {str(k): v for k, v in generations.items()},

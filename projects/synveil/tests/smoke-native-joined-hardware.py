@@ -50,6 +50,19 @@ Serial output is captured for every boot: it may contain firmware
 or guest boot marker on serial fails the run — the production image
 has no serial console and no developer serial recovery.
 
+An A/B full-stack disk (tools/native_ab.py --browser
+--boot-target hardware — the owner test-media image) can be driven
+instead with --ab-receipt: boots 1-2 run unchanged against that
+disk (boot 3 is skipped via --skip-broken-state: on the A/B layout
+a destroyed STATE partition takes the recovery-diagnostics path,
+not this harness's locked-login path), and after the power-cut
+boot the run's own disk copy is read back host-side — the browser
+start markers in the DATA-backed home's browser.log and the
+persisted Chromium profile are the evidence that the browser
+really launched inside the packaged image and that its records
+survived the cold reboot and the power cut on the persistent
+volume.
+
 Nothing here validates physical hardware: QEMU's GOP framebuffer,
 virtio storage and USB input stand in for the TG01's RTX 3060 GOP,
 USB SSD and HID devices. The record states that explicitly.
@@ -92,6 +105,13 @@ STATE_PARTUUID = "7c9e2d41-8b3a-4f5e-a6d1-2e8c4b7f9053"
 # --graphics/--image-usb before any Guest is constructed.
 QEMU_GRAPHICS = "virtio"
 QEMU_IMAGE_USB = False
+QEMU_MEMORY = "768M"
+
+# DATA partition of the A/B layout (tools/native_ab.py): veil-ab
+# mounts it at /home, so the session user's home — browser.log,
+# the Chromium profile, Downloads — lives at its filesystem root
+# under synveil/.
+AB_DATA_PARTUUID = "ab000000-0000-4000-8000-0000000000da"
 
 # auth_render colors (src/veil-display/main.c): background, top band,
 # muted text (subtitle and the denied/retry line).
@@ -177,7 +197,7 @@ class Guest:
                    SYNVEIL_QEMU_GRAPHICS=QEMU_GRAPHICS,
                    SYNVEIL_QEMU_IMAGE_USB="1" if QEMU_IMAGE_USB else "0",
                    SYNVEIL_QEMU_DISPLAY="none", SYNVEIL_QEMU_NETWORK="0",
-                   SYNVEIL_QEMU_MEMORY="768M",
+                   SYNVEIL_QEMU_MEMORY=QEMU_MEMORY,
                    SYNVEIL_QEMU_IMAGE_WRITABLE="1",
                    SYNVEIL_QEMU_QMP_SOCKET=str(qmp))
         self.process = subprocess.Popen(
@@ -330,6 +350,79 @@ def corrupt_state_partition(image: Path):
         handle.write(b"\0" * 65536)
 
 
+def partition_span(image: Path, partuuid: str):
+    """(first_lba, last_lba) of the unique GPT partition carrying
+    this PARTUUID — the same parsing discipline as
+    corrupt_state_partition."""
+    with image.open("rb") as handle:
+        handle.seek(512)
+        header = handle.read(92)
+        if header[:8] != b"EFI PART":
+            raise RuntimeError("image has no GPT header")
+        entry_lba = int.from_bytes(header[72:80], "little")
+        entry_count = int.from_bytes(header[80:84], "little")
+        entry_size = int.from_bytes(header[84:88], "little")
+        target = uuid.UUID(partuuid).bytes_le
+        found = []
+        for index in range(entry_count):
+            handle.seek(entry_lba * 512 + index * entry_size)
+            entry = handle.read(entry_size)
+            if entry[16:32] == target:
+                found.append((int.from_bytes(entry[32:40], "little"),
+                              int.from_bytes(entry[40:48], "little")))
+    if len(found) != 1:
+        raise RuntimeError("partition not unique in image GPT: "
+                           + partuuid)
+    return found[0]
+
+
+def chromium_readback(image: Path, scratch: Path) -> dict:
+    """Host-side evidence that the browser really ran inside the
+    guest on THIS disk copy and that its records persisted on the
+    DATA partition across the run's cold reboot and power cut: the
+    session's browser log (in the DATA-backed home) carries the
+    wrapper's SYNVEIL_BROWSER_STARTED marker, the Chromium profile
+    directory exists, and the Downloads directory the wrapper
+    prepares is there. Raises unless the launch evidence is
+    present; the returned counts are recorded either way."""
+    first, last = partition_span(image, AB_DATA_PARTUUID)
+    part = scratch / "data-partition.img"
+    with image.open("rb") as source, part.open("wb") as dest:
+        source.seek(first * 512)
+        remaining = (last - first + 1) * 512
+        while remaining > 0:
+            chunk = source.read(min(remaining, 8 * 1024 * 1024))
+            if not chunk:
+                raise RuntimeError("short read extracting DATA")
+            dest.write(chunk)
+            remaining -= len(chunk)
+
+    def debugfs(request):
+        result = subprocess.run(
+            ["debugfs", "-R", request, str(part)],
+            capture_output=True, text=True, timeout=120)
+        return result.stdout + result.stderr
+
+    home = debugfs("ls -l /synveil")
+    log = debugfs("cat /synveil/browser.log")
+    profile = debugfs("ls /synveil/.config/chromium")
+    evidence = {
+        "browser_log_on_data_partition": "browser.log" in home,
+        "browser_started_markers_in_log":
+            log.count("SYNVEIL_BROWSER_STARTED"),
+        "chromium_profile_present":
+            "File not found" not in profile and bool(profile.strip()),
+        "downloads_dir_present": "Downloads" in home,
+    }
+    if not evidence["browser_log_on_data_partition"] or \
+            evidence["browser_started_markers_in_log"] < 1 or \
+            not evidence["chromium_profile_present"]:
+        raise RuntimeError(
+            "chromium readback found no browser-launch evidence on "
+            "the DATA partition: " + json.dumps(evidence))
+    return evidence
+
+
 def boot_one_fresh(work, evidence_dir, secret, wrong, timeout):
     """Boot 1: console evidence, enrollment, login, desktop, relock."""
     facts = {}
@@ -459,7 +552,7 @@ def boot_three_broken_state(work, evidence_dir, secret, login_screen, timeout):
 
 
 def main() -> int:
-    global QEMU_GRAPHICS, QEMU_IMAGE_USB
+    global QEMU_GRAPHICS, QEMU_IMAGE_USB, QEMU_MEMORY
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--timeout", type=float, default=420)
     parser.add_argument("--graphics", choices=("virtio", "vga"),
@@ -472,9 +565,28 @@ def main() -> int:
     parser.add_argument("--variant", default=None,
                         help="label for this configuration's evidence "
                              "files (default: derived from the options)")
+    parser.add_argument("--ab-receipt", default=None,
+                        help="build receipt of an A/B full-stack disk "
+                             "(tools/native_ab.py --browser "
+                             "--boot-target hardware): drive that disk "
+                             "instead of the joined hardware image")
+    parser.add_argument("--ab-image", default=None,
+                        help="disk image for --ab-receipt mode "
+                             "(default: the receipt's recorded path)")
+    parser.add_argument("--skip-broken-state", action="store_true",
+                        help="skip boot 3 (destroyed-state) — for "
+                             "images whose destroyed-state behavior "
+                             "follows a different design path than "
+                             "this harness's locked-login expectation")
+    parser.add_argument("--evidence-dir", default=None,
+                        help="directory for the serial logs and the "
+                             "result JSON (default: beside the image)")
+    parser.add_argument("--memory", default="768M",
+                        help="guest memory passed to qemu.sh")
     args = parser.parse_args()
     QEMU_GRAPHICS = args.graphics
     QEMU_IMAGE_USB = args.image_usb
+    QEMU_MEMORY = args.memory
     variant = args.variant or (
         "virtio" if args.graphics == "virtio" and not args.image_usb
         else "-".join(part for part in
@@ -484,18 +596,47 @@ def main() -> int:
         parser.error("hardware joined smoke requires a non-root runner")
     if args.timeout < 180:
         parser.error("timeout must be at least 180 seconds per boot")
-    proof = json.loads((IMAGE_DIR / "validation.json").read_text())
-    source_image = IMAGE_DIR / "synveil-x86_64.img"
-    if (proof.get("schema") != "synveil.native-joined-image/v1" or
-            proof.get("boot_target") != "hardware" or
-            source_image.is_symlink() or not source_image.is_file() or
-            hashlib.sha256(source_image.read_bytes()).hexdigest()
-            != proof.get("image_sha256")):
-        parser.error("hardware joined image missing or changed since build")
-    evidence_dir = IMAGE_DIR / (
-        "smoke-evidence" if variant == "virtio"
-        else f"smoke-evidence-{variant}")
-    evidence_dir.mkdir(exist_ok=True)
+    if args.ab_receipt:
+        receipt = json.loads(Path(args.ab_receipt).read_text())
+        if (receipt.get("schema") != "synveil.ab-proof-build/v1" or
+                receipt.get("boot_target") != "hardware" or
+                not receipt.get("browser")):
+            parser.error("--ab-receipt must name a hardware-target "
+                         "browser build receipt (tools/native_ab.py "
+                         "--browser --boot-target hardware)")
+        source_image = Path(args.ab_image or receipt["disk"]["path"])
+        image_sha256 = receipt["disk"]["sha256"]
+        source_commit = receipt["source_commit"]
+        image_kind = "ab-full-stack"
+        if (source_image.is_symlink() or not source_image.is_file()
+                or hashlib.sha256(source_image.read_bytes()).hexdigest()
+                != image_sha256):
+            parser.error("A/B disk image missing or changed since build")
+    else:
+        proof = json.loads((IMAGE_DIR / "validation.json").read_text())
+        source_image = IMAGE_DIR / "synveil-x86_64.img"
+        image_sha256 = proof.get("image_sha256")
+        source_commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        image_kind = "joined"
+        if (proof.get("schema") != "synveil.native-joined-image/v1" or
+                proof.get("boot_target") != "hardware" or
+                source_image.is_symlink() or not source_image.is_file()
+                or hashlib.sha256(source_image.read_bytes()).hexdigest()
+                != image_sha256):
+            parser.error(
+                "hardware joined image missing or changed since build")
+    if args.evidence_dir:
+        evidence_dir = Path(args.evidence_dir)
+    elif args.ab_receipt:
+        evidence_dir = source_image.parent / (
+            "smoke-evidence" if variant == "virtio"
+            else f"smoke-evidence-{variant}")
+    else:
+        evidence_dir = IMAGE_DIR / (
+            "smoke-evidence" if variant == "virtio"
+            else f"smoke-evidence-{variant}")
+    evidence_dir.mkdir(parents=True, exist_ok=True)
     secret = secrets.token_hex(16)
     wrong = secret[:-1] + ("0" if secret[-1] != "0" else "1")
     with tempfile.TemporaryDirectory(prefix="synveil-joined-hw-") as temp:
@@ -506,22 +647,26 @@ def main() -> int:
         with source_image.open("rb") as source, target.open("xb") as dest:
             shutil.copyfileobj(source, dest)
         if hashlib.sha256(target.read_bytes()).hexdigest() \
-                != proof["image_sha256"]:
+                != image_sha256:
             print("[synveil] hardware image copy digest mismatch")
             return 1
         facts = boot_one_fresh(work, evidence_dir, secret, wrong,
                                args.timeout)
         boot_two_reboot(work, evidence_dir, secret, wrong,
                         facts["login_screen"], args.timeout)
-        broken = base / "broken"
-        broken.mkdir()
-        broken_image = broken / "synveil-x86_64.img"
-        with source_image.open("rb") as source, \
-                broken_image.open("xb") as dest:
-            shutil.copyfileobj(source, dest)
-        corrupt_state_partition(broken_image)
-        boot_three_broken_state(broken, evidence_dir, secret,
-                                facts["login_screen"], args.timeout)
+        chromium = None
+        if args.ab_receipt:
+            chromium = chromium_readback(target, base)
+        if not args.skip_broken_state:
+            broken = base / "broken"
+            broken.mkdir()
+            broken_image = broken / "synveil-x86_64.img"
+            with source_image.open("rb") as source, \
+                    broken_image.open("xb") as dest:
+                shutil.copyfileobj(source, dest)
+            corrupt_state_partition(broken_image)
+            boot_three_broken_state(broken, evidence_dir, secret,
+                                    facts["login_screen"], args.timeout)
     if args.graphics == "vga":
         graphics_note = (
             "QEMU standard VGA GOP stands in for the TG01 RTX 3060 "
@@ -546,9 +691,9 @@ def main() -> int:
             "the usb variant of this acceptance")
     result = {
         "schema": "synveil.native-joined-hardware-guest/v1",
-        "source_commit": subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
-        "image_sha256": proof["image_sha256"],
+        "source_commit": source_commit,
+        "image_sha256": image_sha256,
+        "image_kind": image_kind,
         "boot_target": "hardware",
         "variant": variant,
         "qemu_graphics_device": "VGA" if args.graphics == "vga"
@@ -580,9 +725,19 @@ def main() -> int:
             "is unproven",
         ],
     }
+    if args.skip_broken_state:
+        del result["broken_state_fails_closed_to_locked_login"]
+        result["broken_state_boot"] = (
+            "skipped: on the A/B layout a destroyed STATE partition "
+            "takes the recovery-diagnostics path, not this harness's "
+            "locked-login path; not part of this pass's sequence")
+    if chromium is not None:
+        result["chromium_evidence"] = chromium
+        result["chromium_launched_and_persisted_on_data"] = True
     result_name = ("guest-validation.json" if variant == "virtio"
                    else f"guest-validation-{variant}.json")
-    (IMAGE_DIR / result_name).write_text(
+    result_dir = evidence_dir if args.ab_receipt else IMAGE_DIR
+    (result_dir / result_name).write_text(
         json.dumps(result, indent=2) + "\n")
     print("SYNVEIL_NATIVE_JOINED_HARDWARE_QEMU_ENROLL_LOGIN_WESTON_PASS")
     return 0
