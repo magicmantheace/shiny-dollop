@@ -568,6 +568,7 @@ def terminal_command(boot, command_id, wait_marker=None, timeout=300):
         ab.save_failure_frame(boot, f"cmd-{command_id}-focus")
         return False
     from qmp_input import type_ab_command
+    mark = len(boot.lines)
     try:
         type_ab_command(boot.qmp, command_id, timeout=30)
     except (QMPError, OSError, ValueError):
@@ -576,7 +577,7 @@ def terminal_command(boot, command_id, wait_marker=None, timeout=300):
     if wait_marker is None:
         time.sleep(2)
         return True
-    ok = boot.wait(wait_marker, timeout)
+    ok = boot.wait(wait_marker, timeout, since=mark)
     if not ok:
         ab.save_failure_frame(boot, f"cmd-{command_id}-wait")
     return ok
@@ -671,7 +672,27 @@ def browser_artifacts(disk, workdir):
     image = ab.replayed_image(data_copy)
 
     def read(path):
-        return ab.ext4_read(image, path)
+        data = ab.ext4_read(image, path)
+        if data:
+            return data
+        # debugfs splits its -R argument on whitespace, so a
+        # spaced name (the collision download 'payload (1).bin')
+        # reads back empty even though the guest file is intact
+        # (verified by inode on a real run disk: 262144 bytes,
+        # fixture digest). Resolve the exact name to an inode
+        # and cat that instead.
+        parent, _, name = path.rpartition("/")
+        out = subprocess.run(["debugfs", "-R", f"ls -l {parent}",
+                              str(image)], capture_output=True)
+        for line in out.stdout.decode("utf-8", "replace").splitlines():
+            parts = line.split(None, 7)
+            if len(parts) == 8 and parts[7] == name:
+                got = subprocess.run(
+                    ["debugfs", "-R", f"cat <{parts[0]}>", str(image)],
+                    capture_output=True)
+                if got.returncode == 0:
+                    return got.stdout
+        return data
 
     downloads = ext4_list(image, "/synveil/Downloads")
     payload = read("/synveil/Downloads/payload.bin")
@@ -1234,12 +1255,15 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
             record("B6", staged=bool(staged), healthy=bool(healthy),
                    page_proof=bool(page), download_started=bool(got2))
             close_browser_window(boot)
-            refresh_files_window(boot)
+            refreshed = refresh_files_window(boot)
+            close_files_window(boot)
             terminal_command_twice(boot, "dl-sha256")
             terminal_command_twice(boot, "dl2-sha256")
-            terminal_command_verified(
+            confirmed = terminal_command_verified(
                 boot, "confirm", "SYNVEIL_AB_CONFIRMED", probe=60,
                 timeout=300)
+            results["B6"]["files_refreshed"] = bool(refreshed)
+            results["B6"]["confirm_ok"] = bool(confirmed)
         finally:
             boot.quit()
         results["B6"]["artifacts"] = browser_artifacts(
@@ -1266,11 +1290,15 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
             record("B7", rollback_armed=bool(armed), healthy=bool(healthy),
                    page_proof=bool(page))
             close_browser_window(boot)
+            refreshed = refresh_files_window(boot)
+            close_files_window(boot)
             terminal_command_twice(boot, "dl-sha256")
             terminal_command_twice(boot, "dl2-sha256")
-            terminal_command_verified(
+            confirmed = terminal_command_verified(
                 boot, "confirm", "SYNVEIL_AB_CONFIRMED", probe=60,
                 timeout=300)
+            results["B7"]["files_refreshed"] = bool(refreshed)
+            results["B7"]["confirm_ok"] = bool(confirmed)
         finally:
             boot.quit()
         results["B7"]["artifacts"] = browser_artifacts(
