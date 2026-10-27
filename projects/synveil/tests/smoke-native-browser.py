@@ -577,12 +577,31 @@ def remember_browser_rect(boot):
 
 
 def close_browser_window(boot):
-    rect = _BROWSER_RECT.get(id(boot)) or remember_browser_rect(boot)
-    if not rect:
-        ab.save_failure_frame(boot, "browser-close-norect")
+    """Close Chromium's window: focus it with a page click, then
+    Ctrl+Shift+W (close window). The earlier pixel approach —
+    deriving the SSD close box from the viewport with estimated
+    chrome heights — put the click on the Weston panel for
+    Chromium's real geometry (tab strip + toolbar ≈ 90 px, not
+    the estimated 126), leaving the window open and the terminal
+    behind it unreachable."""
+    if not page_proof(boot, timeout=60):
+        ab.save_failure_frame(boot, "browser-close-nopage")
         return False
-    x, y, w, _h = rect
-    click(boot, x + w - 14, y + 14)
+    try:
+        frame = ab.next_frame(boot)
+        block = color_block(*frame, PAGE_BG)
+    except (ValueError, OSError):
+        block = None
+    if block:
+        bx, by, _bw, _bh = block["rect"]
+        click(boot, bx + 30, by + 30)  # page title area: focus only
+        time.sleep(0.6)
+    try:
+        send_keys(boot.qmp, ("ctrl+shift+w",), timeout=5,
+                  allowed=frozenset({"ctrl+shift+w"}))
+    except (QMPError, OSError, ValueError):
+        ab.save_failure_frame(boot, "browser-close-keys")
+        return False
     time.sleep(1.0)
     return page_absent(boot, timeout=30)
 
