@@ -86,6 +86,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from qmp_input import QMPError, send_keys, type_test_secret  # noqa: E402
+import qmp_input as _qmp  # noqa: E402
 
 _spec = importlib.util.spec_from_file_location(
     "smoke_native_ab", ROOT / "tests" / "smoke-native-ab.py")
@@ -402,6 +403,34 @@ def page_absent(boot, timeout=120):
     return False
 
 
+def send_chord(boot, *qcodes, timeout=20.0):
+    """Send a real key chord over QMP. The harness's send_keys
+    passes each string to _hold_keys as ONE qcode, so a combo
+    string like "ctrl+shift+w" is rejected by QEMU as an unknown
+    qcode (the earlier browser-close failures); chords are tuples
+    of individual qcodes held together, the shape _hold_keys (and
+    the qmp_input test-suite) actually uses."""
+    import socket as _socket
+    deadline = time.monotonic() + timeout
+    with _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM) as sock:
+        while True:
+            try:
+                sock.settimeout(max(0.1, min(1.0,
+                                             deadline - time.monotonic())))
+                sock.connect(str(boot.qmp))
+                break
+            except (FileNotFoundError, ConnectionRefusedError):
+                if time.monotonic() >= deadline:
+                    raise QMPError("QMP socket unavailable")
+                time.sleep(0.05)
+        sock.settimeout(max(0.1, deadline - time.monotonic()))
+        with sock.makefile("rb") as reader:
+            _qmp._read_reply(reader, greeting=True)
+            _qmp.emit_command(sock, reader,
+                              {"execute": "qmp_capabilities"})
+            _qmp._hold_keys(sock, reader, qcodes)
+
+
 def click_link(boot, color, tag):
     """Click the page's link block identified by its color."""
     deadline = time.monotonic() + 120
@@ -474,8 +503,7 @@ def back_from_interstitial(boot):
             return True
         time.sleep(0.5)
     try:
-        send_keys(boot.qmp, ("alt+left",), timeout=5,
-                  allowed=frozenset({"alt+left"}))
+        send_chord(boot, "alt", "left", timeout=10)
         time.sleep(1.0)
         return True
     except (QMPError, OSError, ValueError):
@@ -601,15 +629,10 @@ def close_browser_window(boot):
         click(boot, bx + 30, by + 30)  # page title area: focus only
         time.sleep(0.6)
     try:
-        send_keys(boot.qmp, ("ctrl+shift+w",), timeout=20,
-                  allowed=frozenset({"ctrl+shift+w"}))
+        send_chord(boot, "ctrl", "shift", "w")
     except (QMPError, OSError, ValueError):
-        try:
-            send_keys(boot.qmp, ("ctrl+shift+w",), timeout=20,
-                      allowed=frozenset({"ctrl+shift+w"}))
-        except (QMPError, OSError, ValueError):
-            ab.save_failure_frame(boot, "browser-close-keys")
-            return False
+        ab.save_failure_frame(boot, "browser-close-keys")
+        return False
     time.sleep(1.0)
     return page_absent(boot, timeout=30)
 
