@@ -1,0 +1,74 @@
+name: Prequential regret switching A-B-A-B
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/regret_switch_memory.py"
+      - "benchmarks/regret_switch_protocol.json"
+      - "benchmarks/regret_switch_benchmark.py"
+      - "tests/test_regret_switch.py"
+      - ".github/workflows/regret-switch.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regret-switch-frozen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Prequential scoring, harm and historical learning tests
+        run: python -m unittest tests.test_regret_switch tests.test_stochastic_prequential tests.test_multi_switch tests.test_adaptive_horizon -v
+      - name: Frozen development cohort
+        run: python -m benchmarks.regret_switch_benchmark --cohort development > regret-development.json
+      - name: Frozen additional cohort
+        run: python -m benchmarks.regret_switch_benchmark --cohort additional > regret-additional.json
+      - name: Report all successes, TEST damage, abstention and actor source costs
+        run: |
+          python - <<'PY'
+          import json
+          for path in ("regret-development.json","regret-additional.json"):
+              d=json.load(open(path,encoding="utf8"))
+              print("RESULT",path,"blind",d["blind"],
+                    "learner_training_actions",d["learner_training_actions"])
+              for phase in ("A","B1","return_A","B2"):
+                  evidence=[r["actor_training_costs"][phase] for r in d["rows"]]
+                  print("ACTOR",phase,
+                        {k:sum(x[k] for x in evidence) for k in
+                         ("observations","actual_harmful","actual_productive",
+                          "actual_neutral","label_flips","reported_harmful")})
+              for phase,checkpoints in (
+                  ("B1",(0,2,4,8,12,24,32,64)),
+                  ("return_A",(0,2,4,8,12,24,48)),
+                  ("B2",(0,2,4,8,12,24,32,64))):
+                  for n in checkpoints:
+                      trials=[r["stages"][phase][str(n)] for r in d["rows"]]
+                      print("CHECKPOINT",phase,n,
+                            "selected",[x["regret_selection"]["source"] for x in trials],
+                            "reason",[x["regret_selection"]["reason"] for x in trials],
+                            "conflict4",[x["regret_selection"]["source_conflicts_latest4"]
+                                         for x in trials])
+                      for method in ("regret_switch","prequential_ensemble",
+                                     "contrastive_multi","adaptive_horizon",
+                                     "fast_shock","recent8","recent32","frozen_A",
+                                     "untrained_random","always_abstain",
+                                     "privileged_expected_oracle"):
+                          scores=[x["scores"][method] for x in trials]
+                          print("SCORE",method,{k:sum(x[k] for x in scores)
+                                               for k in ("successes","harmful_actions",
+                                                         "abstained")})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: precommitted-regret-switch-comparative-results
+          path: |
+            regret-development.json
+            regret-additional.json
+          retention-days: 14

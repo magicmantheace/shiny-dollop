@@ -1,0 +1,98 @@
+{
+  "schema": "developmental-ai.regret-switch-protocol/v1",
+  "registered": "2026-10-23",
+  "freeze": "Commit this exact protocol BEFORE new learner, benchmark and tests; run both newly specified cohorts without revising thresholds afterward.",
+  "question": "Can a hard, predictive-regret-driven choice among a historical source, recent8 and recent32 outperform a soft mixture at eight post-switch feedback events without sacrificing return-to-old-rule and 32+ stability under actual stochastic outcomes?",
+  "environment": {
+    "generator": "Reuse exactly the StochasticWorld from stochastic_prequential_benchmark: original A, reversed B1, original A, reversed B2. Realized progress/damage effects flip at rate 1/8, public reports independently corrupt nonneutral TRAIN labels at 1/20. Same inlet/outlet keys, anonymous actions, authored numeric span range dynamics throughout. No new independent physics and no learner-visible stage labels.",
+    "train": "Independent random first-action actor per disposable TRAIN episode, 240 A then 64 B1, 48 A-return, 64 B2 with original seed-specific ranges 1000..1239,2000..2063,3000..3047,4000..4063; real actor harm and report flips tracked exactly once.",
+    "test": "Unmodified StochasticWorld with held-out TEST indices and true stochastic TEST outcomes. TEST is read-only: no model training from TEST interactions."
+  },
+  "candidate": {
+    "name": "RegretSwitchMemory",
+    "learned_models": "Immutable early 192-observation source (A), recent8, recent32. Existing hand-engineered max(feature values)-min statistic and Laplace-smoothing. All public outcome records retained and replayed.",
+    "scoring": "Compute prequential probabilities for the most recent eight observed events using candidate models fit strictly BEFORE the event: historical first192, previous8, previous32. All likelihood ratios/contradictions are based exclusively on publicly reported outcomes, not hidden physics.",
+    "fast_override": "If >=2 of latest4 outcome events have source predictor probability <0.125, immediately exclude source and choose a recent model. Intended rapid source conflict reaction.",
+    "source_recovery": "When source is not excluded, choose source if >=2 of latest4 events have source reported-outcome probability >=0.55 and at least 2 times the recent8 prequential predictor's probability. Otherwise if source prequential 8-event cumulative log-score > recent8 by 1.0, choose source; otherwise choose recent8. This can prematurely switch to source; quantify false recoveries.",
+    "long_choice": "If currently selecting recent, choose recent32 only if its 8-event prequential log-score exceeds recent8 by at least 1.0 AND at least 12 of the latest32 events have source observed-outcome probability <0.125; otherwise choose recent8.",
+    "choose": "Use one selected learned candidate to score each action with existing 3*p(progress)-10*p(damage) and deterministic action-ID tie break. No abstention in this candidate, compare explicit abstain baseline.",
+    "replay": "Strict same-key event validation, record only public features/progress/damage and checksum, deterministic restart; memory max 1000 observations. No simulator phase, true outcomes, future outcomes or action identities stored."
+  },
+  "frozen_seeds": {
+    "development": [
+      222003,
+      222021,
+      222039
+    ],
+    "additional": [
+      223001,
+      223017,
+      223041
+    ]
+  },
+  "checkpoints": {
+    "B1": [
+      0,
+      2,
+      4,
+      8,
+      12,
+      24,
+      32,
+      64
+    ],
+    "return_A": [
+      0,
+      2,
+      4,
+      8,
+      12,
+      24,
+      48
+    ],
+    "B2": [
+      0,
+      2,
+      4,
+      8,
+      12,
+      24,
+      32,
+      64
+    ]
+  },
+  "test": {
+    "episodes_per_seed_checkpoint": 16,
+    "B1_indices": "200000..200015",
+    "return_A_indices": "210000..210015",
+    "B2_indices": "220000..220015",
+    "repeated_indices_across_checkpoints": true
+  },
+  "comparisons": [
+    "regret_switch",
+    "prequential_ensemble",
+    "contrastive_multi",
+    "adaptive_horizon",
+    "fast_shock",
+    "recent8",
+    "recent32",
+    "frozen_A",
+    "untrained_random",
+    "always_abstain",
+    "privileged_expected_oracle"
+  ],
+  "targets": [
+    "At B1-8 and B2-8 >=35/96 successes each, with actual harmful actions explicitly reported.",
+    "At return_A-8 >=50/96 successes.",
+    "At B1-32 and B2-32 >=50/96 successes, disclose whether recent32 is better.",
+    "Compare all stage/checkpoint outcomes and source-actor costs; failures count, no promotion based on positive results."
+  ],
+  "limitations": [
+    "Thresholds, windows, utility weights and numeric representation chosen by developer; not learned domain discovery.",
+    "Some recent models used for decision-making fit evidence involved in their own choice, though prequential model-score fitting excludes each scored event.",
+    "Same authored underlying A/B inversion, not independent transfer nor unknown physics.",
+    "Real-world risk remains prohibitive; no safe first contact or external action authority.",
+    "No source authenticity; malicious or incorrect public reports can mislead.",
+    "Do not merge PR #2 or integrate AthenZ/Synveil; preserve existing D1-D10 and V2A/V2B roadmap order."
+  ]
+}

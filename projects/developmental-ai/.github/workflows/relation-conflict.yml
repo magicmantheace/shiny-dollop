@@ -1,0 +1,65 @@
+name: Predictive gate for adverse relational transfer
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/gated_relation_memory.py"
+      - "benchmarks/relation_conflict_protocol.json"
+      - "benchmarks/relation_conflict_benchmark.py"
+      - "tests/test_relation_conflict.py"
+      - ".github/workflows/relation-conflict.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-target-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Replay, causal boundaries and historical numeric learners
+        run: python -m unittest tests.test_relation_conflict tests.test_relation_transfer tests.test_variable_affordance tests.test_regime_retrieval -v
+      - name: Fresh precommitted development cohort
+        run: python -m benchmarks.relation_conflict_benchmark --cohort development > conflict-development.json
+      - name: Fresh precommitted additional cohort
+        run: python -m benchmarks.relation_conflict_benchmark --cohort additional > conflict-additional.json
+      - name: Report all positive and harmful negative transfer outcomes
+        run: |
+          python - <<'PY'
+          import json
+          for path in ("conflict-development.json","conflict-additional.json"):
+              data=json.load(open(path,encoding="utf-8"))
+              print("cohort",path,"blind",data["blind"],"learner_train_actions",data["learner_training_actions"])
+              for family in ("basin","lattice","prism","counterphase"):
+                  actor=[r["training_actor_costs"][family] for r in data["rows"]]
+                  print("actor",family,{k:sum(x[k] for x in actor) for k in
+                         ("observations","harmful","productive","neutral")})
+              for family in ("lattice","prism","counterphase"):
+                  for n in (0,4,8,16,24,64):
+                      items=[r["comparisons"][family][str(n)] for r in data["rows"]]
+                      print("TARGET",family,"observations",n,
+                            "gates",[v["target_gate"]["source"] for v in items],
+                            "margins",[v["target_gate"]["log_margin"] for v in items])
+                      for env in ("basin",family):
+                          for method in ("gated_relation","source_frozen_range",
+                                         "target_only_range","raw_schema_memory",
+                                         "untrained_random","always_abstain",
+                                         "privileged_oracle"):
+                              samples=[v["scores"][env][method] for v in items]
+                              print("SCORE",env,method,{k:sum(row[k] for row in samples)
+                                    for k in ("successes","harmful_actions","abstained")})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: negative-transfer-gate-evidence-and-training-harms
+          path: |
+            conflict-development.json
+            conflict-additional.json
+          retention-days: 14

@@ -1,0 +1,70 @@
+name: Adaptive memory horizons A-B-A
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/adaptive_horizon_memory.py"
+      - "benchmarks/adaptive_horizon_protocol.json"
+      - "benchmarks/adaptive_horizon_benchmark.py"
+      - "tests/test_adaptive_horizon.py"
+      - ".github/workflows/adaptive-horizon.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frozen-adaptive-horizon:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Regression and evidence replay tests
+        run: python -m unittest tests.test_adaptive_horizon tests.test_fast_shock tests.test_same_schema_switch tests.test_relation_conflict -v
+      - name: Precommitted development cohort
+        run: python -m benchmarks.adaptive_horizon_benchmark --cohort development > adaptive-development.json
+      - name: Precommitted additional cohort
+        run: python -m benchmarks.adaptive_horizon_benchmark --cohort additional > adaptive-additional.json
+      - name: Print all checkpoints and negative controls
+        run: |
+          python - <<'PY'
+          import json
+          for f in ("adaptive-development.json", "adaptive-additional.json"):
+              report=json.load(open(f,encoding="utf8"))
+              print("RESULT",f,"blind",report["blind"],"learner_training_actions",
+                    report["learner_training_actions"])
+              for stage in ("A","B","return_A"):
+                  actor=[x["training_actor_costs"][stage] for x in report["rows"]]
+                  print("ACTOR",stage,{k:sum(a[k] for a in actor)
+                      for k in ("observations","harmful","productive","neutral")})
+              for stage in ("B","return_A"):
+                  points=((0,2,4,6,8,12,16,24,32,48,64) if stage=="B"
+                          else (0,2,4,6,8,12,16,24,48))
+                  for n in points:
+                      rows=[x["stages"][stage][str(n)] for x in report["rows"]]
+                      print("CHECKPOINT",stage,n,"choices",
+                            [r["decisions"]["adaptive"]["source"] for r in rows],
+                            "shocks",
+                            [r["decisions"]["adaptive"]["latest_thirty_two_surprises"]
+                             for r in rows])
+                      for method in ("adaptive_horizon","fast_shock",
+                                     "legacy_disjoint_12plus4","recent8",
+                                     "recent32","frozen_A","cumulative_range",
+                                     "untrained_random","always_abstain","privileged_oracle"):
+                          trials=[row["scores"][method] for row in rows]
+                          print("SCORE",method,
+                            {k:sum(t[k] for t in trials)
+                             for k in ("successes","harmful_actions","abstained")})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: adaptive-horizon-frozen-full-outcomes
+          path: |
+            adaptive-development.json
+            adaptive-additional.json
+          retention-days: 14

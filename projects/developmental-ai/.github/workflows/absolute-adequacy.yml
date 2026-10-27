@@ -1,0 +1,65 @@
+name: Absolute public-outcome adequacy (focused)
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/novel_feature_world.py"
+      - "developmental_ai/absolute_adequacy.py"
+      - "benchmarks/absolute_adequacy_protocol.json"
+      - "benchmarks/absolute_adequacy_benchmark.py"
+      - "tests/test_absolute_adequacy.py"
+      - ".github/workflows/absolute-adequacy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  third-rule-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Test public-only adequacy, feasible task and deterministic replay
+        run: python -m unittest tests.test_absolute_adequacy -v
+      - name: Frozen development seed cohort
+        run: python -m benchmarks.absolute_adequacy_benchmark --cohort development > adequacy-development.json
+      - name: Frozen reserved seed cohort
+        run: python -m benchmarks.absolute_adequacy_benchmark --cohort reserved > adequacy-reserved.json
+      - name: Show EVERY policy and count calibration damage
+        run: |
+          python - <<'PY'
+          import json
+          for path in ("adequacy-development.json","adequacy-reserved.json"):
+              data=json.load(open(path,encoding="utf-8"))
+              print(path)
+              for world in ("normal_noisy","reversed_noisy","third_rule"):
+                  group={}
+                  for policy in ("adequacy8","relative8","recent8",
+                                 "source_only","changed_only","always_abstain","oracle"):
+                      rows=[r["scores"][world]["policies"][policy]
+                            for r in data["rows"]]
+                      group[policy]={
+                          "successes":sum(x["evaluation"]["successes"] for x in rows),
+                          "test_damage":sum(x["evaluation"]["hurt"] for x in rows),
+                          "stalled":sum(x["evaluation"]["stalled"] for x in rows),
+                          "choices":[x["decision"]["selected"] for x in rows]}
+                  group["calibration"]={
+                      "probes":sum(r["scores"][world]["calibration"]["probes"]
+                                   for r in data["rows"]),
+                      "harmful_actions":sum(r["scores"][world]["calibration"]["calibration_damage"]
+                                              for r in data["rows"])}
+                  print(world,json.dumps(group,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: adequacy-noisy-unknown-full-results
+          path: |
+            adequacy-development.json
+            adequacy-reserved.json
+          retention-days: 14

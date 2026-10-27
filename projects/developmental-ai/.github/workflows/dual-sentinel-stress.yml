@@ -1,0 +1,55 @@
+name: Two-sentinel unknown-context stress
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/dual_sentinel.py"
+      - "benchmarks/dual_sentinel_benchmark.py"
+      - "tests/test_dual_sentinel.py"
+      - ".github/workflows/dual-sentinel-stress.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  known-vs-unknown:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Sentinel test and public replay
+        run: python -m unittest tests.test_dual_sentinel -v
+      - name: Inspected development cohort
+        run: python -m benchmarks.dual_sentinel_benchmark --cohort development > sentinel-development.json
+      - name: Inspected additional cohort
+        run: python -m benchmarks.dual_sentinel_benchmark --cohort inspected-additional > sentinel-additional.json
+      - name: Compare task completion and harm without hiding abstentions
+        run: |
+          python - <<'PY'
+          import json
+          for path in ("sentinel-development.json","sentinel-additional.json"):
+              data=json.load(open(path,encoding="utf-8"))
+              print(path)
+              for variant in ("A","B","C"):
+                  summary={}
+                  for method in ("sentinel","no_cue","union","frozen_A","frozen_B","novel","privileged_oracle"):
+                      parts=[row["scores"][variant][method] for row in data["rows"]]
+                      summary[method]={key:sum(p[key] for p in parts)
+                                       for key in ("successes","spoilage","stalled")}
+                      if method=="sentinel":
+                          summary[method]["unknown"]=sum(p["unknown"] for p in parts)
+                  print(variant,json.dumps(summary,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: known-unknown-sentinel-tables
+          path: |
+            sentinel-development.json
+            sentinel-additional.json
+          retention-days: 14

@@ -1,0 +1,73 @@
+{
+  "schema": "developmental-ai.unseen-regime-audit/v1",
+  "date": "2026-10-21",
+  "status": "Committed before code and any C results",
+  "question": "Does A/B diagnostic inference outperform conservative union of A+B known risk tokens, and does either handle an entirely untrained C descriptor remap?",
+  "known_training": "80 A + 80 B unfiltered cargo episodes per seed; no C training",
+  "worlds": {
+    "A": "original mapped cargo",
+    "B": "swap stable numeric identifiers of spoil and wash",
+    "C": "start A; swap stable numeric identifiers of spoil and fuel; physics unchanged"
+  },
+  "scope": "Only two-byte simulator-engineered stable action identities; this is an unseen descriptor mapping, not independent physics or semantics.",
+  "runtime": "Numeric sensors + two-byte stable descriptors + rotated handles + accepted/blocked; remove regime cue and phase name from candidate input",
+  "methods": [
+    "previous_no_cue",
+    "union_known_risks",
+    "A_only",
+    "B_only",
+    "untrained_novel",
+    "privileged_oracle"
+  ],
+  "evaluation": {
+    "split": "test",
+    "indices": [
+      9000,
+      9059
+    ],
+    "episodes_per_world_per_seed": 60,
+    "worlds": [
+      "A",
+      "B",
+      "C"
+    ]
+  },
+  "seeds": {
+    "development": [
+      51001,
+      51013,
+      51031
+    ],
+    "additional_inspected": [
+      61001,
+      61013,
+      61031
+    ]
+  },
+  "controls": [
+    "Direct union of known risk identities, no probe",
+    "Previous active diagnostic, known A/B histories only",
+    "Frozen A or B",
+    "Untrained",
+    "Simulator-privileged true harmful action identity"
+  ],
+  "metrics": [
+    "success",
+    "spoiled",
+    "stalled",
+    "attempts",
+    "blocked",
+    "context_guess_accuracy_scoring_only",
+    "diagnostic_probe_count",
+    "risk_action_vetoes"
+  ],
+  "scientific_constraints": [
+    "All cohorts previously inspected; C created post hoc after A/B results",
+    "No result-driven seed changes",
+    "Union filter could block helpful safe actions in other systems",
+    "C hidden hazard has new token, so a binary A/B diagnostic cannot reliably identify it",
+    "A/B cannot be called novel-domain transfer",
+    "No real-world action authority; all algorithms experimental"
+  ],
+  "future": "Build learned action features and safe novelty detection with independent generators, precommitted fresh test cases."
+}

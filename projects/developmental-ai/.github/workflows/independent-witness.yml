@@ -1,0 +1,74 @@
+name: Independent witness recovery and actor-harm accounting
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/witness_recovery_memory.py"
+      - "benchmarks/independent_witness_protocol.json"
+      - "benchmarks/independent_witness_benchmark.py"
+      - "tests/test_independent_witness.py"
+      - ".github/workflows/independent-witness.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frozen-witness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Independent source, evidence validation and prior abstention regressions
+        run: python -m unittest tests.test_independent_witness tests.test_validated_abstention tests.test_gated_composition -v
+      - name: Frozen development seeds
+        run: python -m benchmarks.independent_witness_benchmark --cohort development > witness-development.json
+      - name: Frozen additional seeds
+        run: python -m benchmarks.independent_witness_benchmark --cohort additional > witness-additional.json
+      - name: Report learning value and full witness actor costs
+        run: |
+          python - <<'PY'
+          import json
+          for path in ("witness-development.json","witness-additional.json"):
+              report=json.load(open(path,encoding="utf8"))
+              print("RESULT",path,"blind",report["blind"],
+                    "learner_training_actions",report["learner_initiated_training_actions"])
+              for stage in ("source","conditional","return_source","xor"):
+                  costs=[r["base_training_actor_cost"][stage] for r in report["rows"]]
+                  print("BASE_ACTOR",stage,{k:sum(x[k] for x in costs) for k in
+                        ("observations","harmful","productive","neutral")})
+              for stage,points in (
+                  ("conditional",(0,8,16,32,64,96)),
+                  ("return_source",(0,8,16,32,64)),
+                  ("xor",(0,8,16,32,64,96))):
+                  for n in points:
+                      rows=[r["stages"][stage][str(n)] for r in report["rows"]]
+                      print("CHECKPOINT",stage,n,
+                            "batch_counts",[r["witness"]["witness_batches"] for r in rows],
+                            "adequate_before",[r["witness"]["initial_model_adequate"] for r in rows],
+                            "adequate_after",[r["witness"]["final_model_adequate"] for r in rows])
+                      witness=[r["witness"]["witness_cost"] for r in rows]
+                      print("WITNESS_ACTOR",stage,n,{k:sum(t[k] for t in witness)
+                            for k in ("observations","harmful","productive","neutral")})
+                      for method in ("witness_recovery","selective_no_witness",
+                                     "always_act_gated","frozen_source",
+                                     "always_abstain","privileged_known_xor",
+                                     "perfect_action_oracle"):
+                          result=[r["scores"][method] for r in rows]
+                          print("SCORE",method,{k:sum(t[k] for t in result)
+                                for k in ("successes","harmful_actions",
+                                          "abstained","attempted_tasks",
+                                          "executed_actions")})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: witness-recovery-frozen-cohorts
+          path: |
+            witness-development.json
+            witness-additional.json
+          retention-days: 14

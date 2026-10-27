@@ -1,0 +1,97 @@
+{
+  "schema": "developmental-ai.cross-rule-feature-hypotheses/v1",
+  "frozen_on": "2026-10-23",
+  "preregistered_before": "model, benchmark, regressions and any cohort scoring; no test-driven threshold tuning",
+  "question": "Does selection by prequential predictive log-likelihood among a fixed hypothesis library adapt from source span-physics to independently different checksum and ordered arithmetic rules without learner-visible world IDs, and avoid catastrophic obsolete source reliance?",
+  "world": {
+    "public": "Each episode exposes exactly the same inlet/outlet integer features in [0,9] and anonymous actions, action budget 6 / task goal 3, 5 guaranteed progress / 4 damage / 3 neutral actions under the CURRENT benchmark-private law. This engineered favorable action mixture is NOT natural-domain sampling.",
+    "private_physics": {
+      "source": "Range/max-minus-min feature; hidden per-seed target band {2,4,6}, progress if range k or k+1, damage if <=k-2 or >=k+3, remaining neutral.",
+      "checksum": "Independent arithmetic mapping r=(2*inlet + outlet + hidden_seed_salt)%5, progress r in {0,1}, damage r in {2,3}, neutral r==4; no inverted range.",
+      "ordered": "Different arithmetic mapping r=(inlet + 3*outlet + hidden_seed_salt)%7, progress r in {0,1}, damage r in {2,3,4}, neutral r in {5,6}; no inverted range."
+    },
+    "outcomes": "Deterministic simulator truth to isolate representation shift from earlier stochastic-label experiments. Random first-action actor observations are truthful this time. Do not claim noise tolerance.",
+    "sequence": [
+      "source 240 TRAIN episodes 1000..1239",
+      "checksum 96 TRAIN episodes 2000..2095",
+      "return_source 48 TRAIN episodes 3000..3047",
+      "ordered 96 TRAIN episodes 4000..4095"
+    ],
+    "no_leak": "The learner sees no simulator phase label, rule name, salt, band, private generator action partition, world or action IDs in its saved evidence. Actual TEST simulator score only."
+  },
+  "learner": {
+    "name": "FeatureHypothesisMemory",
+    "representation_library": "Four manually specified predictive alternatives: frozen source span model trained on first192; recent span, recent (2*a+b)%5, recent (a+3*b)%7, with a,b determined by alphabetically sorted public feature names. Salt is NOT known but per-bucket frequencies are learned from observations. This is selection within a fixed designer-supplied representation library, NOT learning new features or laws.",
+    "scoring": "Use last8 observed outcomes. For each outcome index i, fit recent models on immediately preceding at most 24 public observations, excluding outcome i; use smoothed class log likelihood of that event. Source frozen first192. No scored event enters its own predictor fit. 0.25 Laplace prior per outcome class per bucket.",
+    "selection": "Select the highest summed prequential log likelihood, exact ties favor frozen source, then span, then checksum, then ordered. No hidden rule names as selectors, no confidence threshold and no abstention. Class names in implementation are developer-defined hypothesis labels, NOT simulator label inputs.",
+    "action": "Fit selected recent transform on last24 observed outcomes, or use source first192; choose candidate maximizing 3*p(progress)-10*p(damage), tie by action handle. Test never trains. Retain append-only public events with SHA256 replay and same two sensor keys.",
+    "risk": "Wrong hypothesis can do serious harmful simulator actions and false source returns. Record failure including false hypothesis selection; do not promote."
+  },
+  "seeds": {
+    "development": [
+      232003,
+      232021,
+      232039
+    ],
+    "additional": [
+      233001,
+      233017,
+      233041
+    ]
+  },
+  "checkpoint_counts": {
+    "checksum": [
+      0,
+      4,
+      8,
+      16,
+      32,
+      64,
+      96
+    ],
+    "return_source": [
+      0,
+      4,
+      8,
+      16,
+      32,
+      48
+    ],
+    "ordered": [
+      0,
+      4,
+      8,
+      16,
+      32,
+      64,
+      96
+    ]
+  },
+  "test": {
+    "episodes_per_seed_checkpoint": 20,
+    "checksum_start": 230000,
+    "return_source_start": 240000,
+    "ordered_start": 250000,
+    "indices_repeated_across_checkpoints": true
+  },
+  "comparators": [
+    "hypothesis_selector",
+    "frozen_source_span",
+    "recent8_span",
+    "recent32_span",
+    "recent24_checksum",
+    "recent24_ordered",
+    "recent24_true_rule_privileged",
+    "untrained_random",
+    "always_abstain",
+    "privileged_action_oracle"
+  ],
+  "acceptance": "At checksum and ordered 32 TRAIN observations selector >=70/120 successes; at return_source 8 >=70/120; compare against privileged transform and fixed candidate counterparts and report harm, abstention, selected hypothesis, training-actor harm across all six seeds. No guarantee of success and no automatic promotion.",
+  "limitations": [
+    "All three physics rules and their feature formulas are manually authored and embedded in candidate library. Success would show choosing among these formulas, not emergent law discovery.",
+    "Task candidate set is artificially stratified into progress/damage/neutral.",
+    "No stochastic outcome/noisy-label robustness in this isolation study; previous noise failures remain.",
+    "No real-world action authority or safe first-contact; source SHA integrity is not authenticity.",
+    "No AthenZ/Synveil integration, default promotion, PR merge, or roadmap D1–D10/V2A/V2B changes."
+  ]
+}

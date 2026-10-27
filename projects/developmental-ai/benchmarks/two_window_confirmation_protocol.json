@@ -1,0 +1,90 @@
+{
+  "schema": "developmental-ai.two-window-rule-confirmation-protocol/v1",
+  "date": "2026-10-21",
+  "frozen_before_code": true,
+  "goal": "Test whether two independent four-observation public-outcome windows can detect a rule reversal before activating a learned model, compared with shorter stale calibration.",
+  "known_models": "Same separately trained normal collect train/0..79 and reversed route-reversed train/300..379 NumericOutcomeMemory.",
+  "calibration": {
+    "split": "train",
+    "indices": [
+      960,
+      967
+    ],
+    "windows": [
+      [
+        960,
+        963
+      ],
+      [
+        964,
+        967
+      ]
+    ],
+    "all_methods_use_public_observations": true,
+    "probe_method": "existing maximum predictive disagreement between two candidate learned models",
+    "stationary": [
+      "route",
+      "route-reversed"
+    ],
+    "shifts": [
+      "route->route-reversed",
+      "route-reversed->route"
+    ],
+    "reversal_between_windows": true
+  },
+  "selection": {
+    "each_window": "Use unchanged smoothed observed-outcome log likelihood and minimum 4 observations/margin >=2.0",
+    "confirmed8": "Agreeing windows select common model; disagreeing or uncertain => abstain",
+    "recent8": "Only second (last four) window decides",
+    "cumulative8": "All eight observations decide",
+    "early4": "Only first four, exactly previous early stop baseline"
+  },
+  "evaluation": {
+    "split": "test",
+    "indices": [
+      15100,
+      15159
+    ],
+    "episodes_per_seed": 60,
+    "actual_world": "last window rule",
+    "cohorts": {
+      "development": [
+        71001,
+        71013,
+        71031
+      ],
+      "inspected_additional": [
+        81001,
+        81013,
+        81031
+      ]
+    }
+  },
+  "controls": [
+    "first-window four-probe early commitment",
+    "cumulative eight-probe selector",
+    "most-recent four-observation selector",
+    "always abstain",
+    "privileged hidden-rule upper bound"
+  ],
+  "metrics": [
+    "success",
+    "harm_on_test",
+    "harm_in_all_calibration_windows",
+    "total_probe_count",
+    "abstention",
+    "selected_rule",
+    "changed_evidence_disagreement",
+    "source_memory_immutability",
+    "exact evidence replay"
+  ],
+  "constraints": [
+    "Every cohort/seed already inspected, not blind validation",
+    "Physics and numeric action features remain engineered; two known rules, no third unknown",
+    "Calibration in disposable train worlds, harmful actions must be reported",
+    "Model agreement does not prove stationary physics, may miss noisy reversals",
+    "Abstention counts task failure, not autonomous solution",
+    "No live OS/network actions, source model change, promotion or authenticated user permission",
+    "Original protocols and previous benchmark results immutable"
+  ]
+}

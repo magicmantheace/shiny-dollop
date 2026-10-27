@@ -1,0 +1,98 @@
+{
+  "schema": "developmental-ai.stochastic-prequential-protocol/v1",
+  "frozen_on": "2026-10-23",
+  "registered_before": "Implementation, test fixtures, GitHub Actions and scoring. Both fresh seed cohorts and the model formula fixed by this commit; no post-result parameter tuning.",
+  "research_question": "Does a prequential evidence-weighted ensemble combine fast change adaptation, long-term stable rule reuse, and genuine return recovery under stochastic same-schema outcomes, without misrepresenting source data as ground truth?",
+  "environment": {
+    "source": "Reuse SameSchemaWorld two public numerical keys inlet/outlet and anonymous actions, existing manually authored span-to-effect seed bands; physics A original, B inverted progress/damage; unchanged public frames, no hidden phase to learner.",
+    "true_stochastic_feedback": "Every actual non-neutral simulator action has probability 1/8 of progress/damage flip. Draw via deterministic sha256 of seed, split, per-episode ID, action ID and tick; deterministic reproducibility, pseudorandom across episodes/actions. Neutral true effect stays neutral. TEST is stochastic realized outcome too, not a clean deterministic evaluation.",
+    "reported_feedback": "An independent sha256 draw on seed/stage index flips nonneutral TRAIN observed progress/damage class with probability 1/20. Learner only receives possibly corrupt public report; scoring separately counts actual simulated actor harm and report flips. Never supply true effect or simulator regime to learner.",
+    "actor": "Independent hash-seeded random selection of a first action per disposable TRAIN episode, 240 source A, then 64 B1, 48 return A, 64 B2. Learner never chooses TRAIN actions.",
+    "tests": "New independent TEST episode indices per hidden phase; same TEST indices repeatedly scored at each checkpoint by each frozen policy, but do not train on outcomes."
+  },
+  "model": {
+    "name": "PrequentialEnsembleMemory",
+    "initial_anchor": "Train source model on oldest exactly 192 public TRAIN events; other candidates on immediately preceding 8 and 32 events.",
+    "loss": "For each of latest 8 incoming public events, compute p(observed progress/damage/neutral) under three models fitted only to examples strictly earlier than that event. The anchor always fits first 192. A recent candidate trained on preceding min(8 or 32, available) observations. Scores are summed natural log probabilities, **genuine prequential separation of each scoring outcome from its scoring model fit**, although the final action model trains on all current evidence.",
+    "weights": "At decision time softmax((prequential log-score + prior)/2.0) for archive, recent8, recent32 with fixed log-priors [-0.4,0.0,0.2] respectively. No hard switch or explicit stage labels. Note the ensemble continuously consults all candidates, so 'retained archive' does not guarantee correct return handling.",
+    "decision": "For each candidate public action, compute mixture p(progress), mixture p(damage) from three current fitted models, using same score = 3 * p(progress) - 10 * p(damage) and id tie break as existing RelationOutcomeMemory; no abstention. All actions are only inside simulator.",
+    "record": "Append-only public schema-validated events up to existing MAX_SAMPLES; restore by canonical hash and replay; no stage, seed, true world outcome, action handle or oracle in record."
+  },
+  "frozen_cohorts": {
+    "development": [
+      212003,
+      212021,
+      212039
+    ],
+    "additional": [
+      213001,
+      213017,
+      213041
+    ]
+  },
+  "training_indices": {
+    "A": "1000..1239",
+    "B1": "2000..2063",
+    "return_A": "3000..3047",
+    "B2": "4000..4063"
+  },
+  "checkpoints": {
+    "B1": [
+      0,
+      2,
+      4,
+      8,
+      12,
+      24,
+      32,
+      64
+    ],
+    "return_A": [
+      0,
+      2,
+      4,
+      8,
+      12,
+      24,
+      48
+    ],
+    "B2": [
+      0,
+      2,
+      4,
+      8,
+      12,
+      24,
+      32,
+      64
+    ]
+  },
+  "test": {
+    "B1_start": 160000,
+    "return_A_start": 170000,
+    "B2_start": 180000,
+    "episodes_per_checkpoint_seed": 16,
+    "same_index_reused_across_checkpoints": true
+  },
+  "methods": [
+    "prequential_ensemble",
+    "contrastive_multi",
+    "adaptive_horizon",
+    "fast_shock",
+    "recent8",
+    "recent32",
+    "frozen_A",
+    "untrained_random",
+    "always_abstain",
+    "privileged_expected_oracle"
+  ],
+  "gate": "Compare outcome success, harmful TEST actions, abstentions and TRAIN actual harmful actions. Relative goals: B1+ B2 after 8 feedback >=50/96 each and return-A after 8 >=75/96. Critically compare long-term 32/64 against recent32 and legacy; publish all outcomes including failure. Privileged oracle knows base expected mapping only, NOT realized random action flip, so its ceiling is below 100%.",
+  "limitations": [
+    "Physics inversion and numeric span feature statistic are engineered, not novel rule discovery.",
+    "Pseudorandom simulator outcomes are not independent real-world stochastic laws.",
+    "Models do not authenticate source evidence and cannot distinguish malicious or mistaken reports reliably.",
+    "The TEST outcomes are read-only and not learner-sourced TRAIN; source-actor harm is separately counted.",
+    "No claim of safe first contact; without new evidence, physics can change unpredictably.",
+    "No default controller promotion, merging draft PR, AthenZ/Synveil integration or roadmap reordering."
+  ]
+}

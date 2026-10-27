@@ -1,0 +1,65 @@
+name: Fast same-schema surprise and safety baselines
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/fast_shock_memory.py"
+      - "benchmarks/fast_shock_protocol.json"
+      - "benchmarks/fast_shock_benchmark.py"
+      - "tests/test_fast_shock.py"
+      - ".github/workflows/fast-shock.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fast-shock-study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Fast surprise, prior switch and historic learning tests
+        run: python -m unittest tests.test_fast_shock tests.test_same_schema_switch tests.test_relation_conflict tests.test_relation_transfer -v
+      - name: Precommitted development cohort
+        run: python -m benchmarks.fast_shock_benchmark --cohort development > fast-shock-development.json
+      - name: Precommitted additional cohort
+        run: python -m benchmarks.fast_shock_benchmark --cohort additional > fast-shock-additional.json
+      - name: Report successes, TEST harm, abstention and training acquisition harms
+        run: |
+          python - <<'PY'
+          import json
+          for path in ("fast-shock-development.json","fast-shock-additional.json"):
+              study=json.load(open(path,encoding="utf-8"))
+              print("RESULT",path,"blind",study["blind"],
+                    "learner_training_actions",study["learner_training_actions"])
+              for s in ("A","B","return_A"):
+                  actor=[r["training_actor"][s] for r in study["rows"]]
+                  print("TRAIN",s,{k:sum(v[k] for v in actor) for k in
+                        ("observations","harmful","productive","neutral")})
+              for s in ("B","return_A"):
+                  for count in ((0,2,4,6,8,12,16,24,32,48,64)
+                                if s=="B" else (0,2,4,6,8,12,16,24,48)):
+                      examples=[r["stages"][s][str(count)] for r in study["rows"]]
+                      print("EVAL",s,"observations",count,
+                            "selected",[r["fast_selection"]["source"] for r in examples],
+                            "surprise4",[r["fast_selection"]["last4_unexpected"] for r in examples])
+                      for method in ("fast_shock","legacy_disjoint_12plus4","recent8","recent32",
+                                     "frozen_A","cumulative_range","untrained_random",
+                                     "always_abstain","privileged_oracle"):
+                          outcomes=[a["scores"][method] for a in examples]
+                          print("SCORE",method,{k:sum(v[k] for v in outcomes)
+                                for k in ("successes","harmful_actions","abstained")})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fast-shock-paired-baseline-all-results
+          path: |
+            fast-shock-development.json
+            fast-shock-additional.json
+          retention-days: 14

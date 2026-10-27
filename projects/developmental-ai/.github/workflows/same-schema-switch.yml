@@ -1,0 +1,64 @@
+name: Same schema rule changes (A-B-A)
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/same_schema_switch_memory.py"
+      - "benchmarks/same_schema_switch_protocol.json"
+      - "benchmarks/same_schema_switch_benchmark.py"
+      - "tests/test_same_schema_switch.py"
+      - ".github/workflows/same-schema-switch.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  same-schema-reversal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Unit tests and earlier unmodified evidence learners
+        run: python -m unittest tests.test_same_schema_switch tests.test_relation_conflict tests.test_relation_transfer tests.test_variable_affordance -v
+      - name: Frozen development cohort
+        run: python -m benchmarks.same_schema_switch_benchmark --cohort development > same-schema-development.json
+      - name: Frozen additional cohort
+        run: python -m benchmarks.same_schema_switch_benchmark --cohort additional > same-schema-additional.json
+      - name: Explicitly report harm, abstention, source actor and recovery
+        run: |
+          python - <<'PY'
+          import json
+          for filename in ("same-schema-development.json","same-schema-additional.json"):
+              study=json.load(open(filename,encoding="utf8"))
+              print(filename,"blind:",study["blind"],"learner_actor_actions:",study["learner_training_actions"])
+              for stage in ("A","B","return_A"):
+                  costs=[r["actor_by_stage"][stage] for r in study["rows"]]
+                  print("actor",stage,{k:sum(x[k] for x in costs) for k in
+                        ("observations","harmful","productive","neutral")})
+              for phase in ("B","return_A"):
+                  points=(0,4,8,12,16,24,48,64) if phase=="B" else (0,4,8,12,16,24,48)
+                  for n in points:
+                      rows=[r["evaluations"][phase][str(n)] for r in study["rows"]]
+                      print("STAGE",phase,"feedback",n,
+                            "decisions",[x["selected_model"]["source"] for x in rows],
+                            "abstain_flags",[x["selected_model"]["abstain"] for x in rows])
+                      for method in ("adaptive_same_schema","frozen_A","cumulative_range",
+                                     "recent_8_range","recent_32_range","old_feature_signature_gate",
+                                     "untrained_random","always_abstain","privileged_oracle"):
+                          ms=[x["test"][method] for x in rows]
+                          print("SCORE",method,{k:sum(z[k] for z in ms)
+                                for k in ("successes","harmful_actions","abstained")})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: same-schema-complete-reversal-recovery-evidence
+          path: |
+            same-schema-development.json
+            same-schema-additional.json
+          retention-days: 14

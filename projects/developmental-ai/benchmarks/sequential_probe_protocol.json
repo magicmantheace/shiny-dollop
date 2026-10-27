@@ -1,0 +1,76 @@
+{
+  "schema": "developmental-ai.sequential-reversal-probe-budget/v1",
+  "date": "2026-10-21",
+  "frozen_before_code": true,
+  "objective": "Reduce destructive disposable calibration interventions by using already frozen confidence criteria to stop early, while preserving accuracy; expose fail-after-switch risk.",
+  "seed_groups": {
+    "development": [
+      71001,
+      71013,
+      71031
+    ],
+    "inspected_additional": [
+      81001,
+      81013,
+      81031
+    ]
+  },
+  "model_training": "Same normal collect train/0..79 and reversed route-reversed train/300..379 80 episodes each from previous precommitted study.",
+  "calibration": {
+    "split": "train",
+    "indices": [
+      900,
+      911
+    ],
+    "fixed12": 12,
+    "earliest_stop": 4,
+    "criterion": "Existing OutcomeCalibration.decision chosen != abstain, using unchanged minimum 4 observations and log likelihood gap >=2.0.",
+    "forced4": "Stop after exactly 4 probes and preserve any abstention.",
+    "mixed_shift": "First 4 probe episodes use normal route dynamics, later probes use reversed route dynamics; evaluation uses reversed route; early stopping may produce stale calibration."
+  },
+  "evaluation": {
+    "split": "test",
+    "indices": [
+      15000,
+      15059
+    ],
+    "episodes_per_seed_world": 60,
+    "worlds": [
+      "route",
+      "route-reversed"
+    ]
+  },
+  "methods": [
+    "adaptive_stop",
+    "fixed12",
+    "forced4",
+    "always_abstain",
+    "privileged_oracle",
+    "stale_shift_adaptive",
+    "stale_shift_fixed12"
+  ],
+  "metrics": [
+    "test_completions",
+    "test_damage",
+    "calibration_probe_count",
+    "calibration_damage",
+    "abstentions",
+    "model_selection_scoring_only",
+    "stale_shift_failures"
+  ],
+  "controls": [
+    "Source/reverse models frozen",
+    "Calibration histories remain public and train-only",
+    "Keep earlier 12-probe original study untouched",
+    "All six seeds already inspected, NOT blind",
+    "All intervention damage counts including in the disposable simulator",
+    "No real-world experimentation authorization, model promotion or integration"
+  ],
+  "nonclaims": [
+    "Earlier stopping can mistakenly commit before a future environment switch",
+    "The two possible consequence rules are hand-designed and learned beforehand",
+    "No per-action safe information exploration guarantee",
+    "Probe harm is not mitigated merely because a simulator is disposable",
+    "Not general AI or autonomous novel causal discovery"
+  ]
+}

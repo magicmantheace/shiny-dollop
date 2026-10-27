@@ -1,0 +1,75 @@
+{
+  "schema": "developmental-ai.absolute-adequacy-on-third-rule/v1",
+  "frozen_before_candidate": true,
+  "date": "2026-10-21",
+  "goal": "Distinguish poorly supported outcomes from merely selecting between two familiar engineered numeric-feature models; evaluate stochastic outcomes and a new task-feasible third rule.",
+  "known_training": "Unchanged 80 source collect episodes and 80 reversed route episodes, numeric public sensor deltas only, stable feature law.",
+  "new_world": "Fresh deterministic synthetic feature-set generator with four each of normal-productive, reversed-productive, and diagonal feature classes. Known normal/reversed rules use prior effects. New third rule: diagonal actions progress; off-diagonal actions neutral unless x+y>=10 when harmful. No labels passed to any candidate.",
+  "noise": "Noise cohort: in normal and reversed rules, each simulated action outcome independently has a 10% deterministic hash-seeded probability of becoming neutral (including formerly harmful outcomes). Third rule noiseless to isolate unseen rule.",
+  "calibration": "Eight single-action disposable TRAIN episodes 2000..2007 per seed and world; public active probes maximize model predictive disagreement; two four-sample windows. Budget and harmful probes recorded. Source/changed models immutable.",
+  "candidate": {
+    "algorithm": "absolute per-window average negative log likelihood of best known model, with threshold <=1.2, and per-window source-vs-changed log margin >=2.0; require both windows select same known model; otherwise abstain with reason poor_fit or uncertain.",
+    "thresholds": {
+      "max_mean_nll": 1.2,
+      "min_margin": 2,
+      "windows": 2,
+      "size": 4
+    },
+    "unknown_rule": "No novel model is trained. If public outcomes poorly match both trained models, abstain. Unknown/abstention counts as failed task.",
+    "no_real_world_actions": true
+  },
+  "controls": [
+    "relative-only two-window agreement from earlier experiment",
+    "last-window-only existing selector",
+    "source-only model",
+    "changed-only model",
+    "always abstain",
+    "privileged true-rule oracle"
+  ],
+  "evaluation": {
+    "split": "test",
+    "indices": [
+      22000,
+      22059
+    ],
+    "per_seed": 60,
+    "worlds": [
+      "normal_noisy",
+      "reversed_noisy",
+      "third_rule"
+    ]
+  },
+  "seeds": {
+    "development": [
+      93001,
+      93013,
+      93031
+    ],
+    "reserved": [
+      94011,
+      94023,
+      94029
+    ]
+  },
+  "metrics": [
+    "task_success",
+    "harmful_test_actions",
+    "test_stalls",
+    "harmful_calibration_actions",
+    "probe_count",
+    "poor_fit_flags",
+    "uncertain_flags",
+    "selection_accuracy_scoring_only",
+    "source_model_replay_integrity"
+  ],
+  "restrictions": [
+    "No outcome truth, feature category or environment name given to candidate.",
+    "Independent new generated action handles; features engineered, not learned vision.",
+    "No claims of blind transfer after any seed outcomes inspected; reserved seed list frozen, preserve failures.",
+    "A third unknown rule may not be identifiable from selected probes; disclose false acceptances.",
+    "Noise is simple deterministic hash-seeded perturbation, not realistic environmental uncertainty.",
+    "Calibration probes can be harmful; do not describe as safe.",
+    "Do not tune thresholds using reserved results; preserve this protocol and all historical studies.",
+    "Do not replace default policy or modify AthenZ/Synveil. Draft PR remains unmerged."
+  ]
+}
