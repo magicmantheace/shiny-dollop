@@ -109,5 +109,69 @@ superseded image.
 ## What the guest records do and do not claim
 
 - The A/B desktop proof is a **peel**, not the joined image's
-  drag/
-...[truncated 2981 chars]
+  drag/resize choreography: the five full-stack windows stack in
+  varying order, so each window is closed by its own proven
+  primitive (browser by focus click + Ctrl+Shift+W after its
+  page settles, files and update GUI by their drawn close
+  boxes, first window by raise + Escape), the terminal is
+  focused and exited by the typed fixed `exit` command, and
+  success is the login screen's return — the session's own end
+  condition. `pointer_move_resize_keyboard` is recorded
+  **false** for this image and
+  `desktop_windows_closed_and_terminal_exited` true; no
+  drag/resize is claimed for the A/B desktop.
+- The broken-state boot is **skipped** (recorded in both JSONs):
+  on the A/B layout a destroyed STATE partition takes the
+  recovery-diagnostics path, not this harness's locked-login
+  path. It is not part of this pass's sequence.
+- The update/rollback mechanics themselves stand at the earlier
+  records (`ab-qemu-proof-2026-10-26`,
+  `ab-gui-qemu-proof-2026-10-26`,
+  `browser-qemu-proof-2026-10-27`); this pass proves the
+  packaged full-stack image boots and runs its whole desktop
+  from both the framebuffer path and USB storage.
+
+## Failures on the way (kept, with causes)
+
+- First framebuffer attempt died copying the 3.9 GB image into a
+  512 MB tmpfs (harness `TMPDIR` placement) — environment, not
+  the image.
+- At the harness's former default 1024 MB the hardware-kernel
+  image **panics** in `do_populate_rootfs` (write error
+  unpacking the ~560 MB browser rootfs): a real minimum-RAM
+  fact for this stack, captured on the serial console. The
+  acceptance runs at 3072 MB, as the browser acceptance does;
+  the TG01's 32 GB is far above the failing size.
+- The joined desktop proof failed on this healthy desktop
+  (window occlusion by the files/GUI windows and the
+  autostarted browser) — resolved by the peel proof above, not
+  by weakening a gate: session end still requires both the
+  first window and the terminal to exit.
+- The first USB run's guest sequence passed but its readback
+  reported no browser evidence (profile spuriously "present"):
+  SIGTERM teardown leaves the DATA journal un-replayed and
+  debugfs could not open the extracted copy at all. Journal
+  replay on a copy recovered the complete evidence, and the
+  readback now replays the journal and fails distinctly when a
+  filesystem will not open.
+- One USB re-run died at the power-cut-recovery boot with
+  QEMU's "Failed to get write lock": qemu.sh backgrounds QEMU
+  under bash, so the wrapper's exit did not prove the lock was
+  released. Harness teardown now waits for the lock.
+- The final rebuild (post-unblocking source `9dbeda0`) lost two
+  acceptance attempts to environment service restarts — one
+  framebuffer run and one USB run, each killed mid-sequence —
+  and package churn stripped QEMU/OVMF, part of QEMU's library
+  tree, sgdisk, and the merged-usr `/lib` symlink mid-pass;
+  all were restored from the local .deb cache. The graded runs
+  in this record are complete, uninterrupted passes on the
+  final image.
+
+## Files
+
+- `guest-validation-vga.json` — framebuffer (standard VGA,
+  simpledrm) variant, storage virtio-blk.
+- `guest-validation-usb.json` — emulated USB storage variant,
+  graphics virtio-vga.
+- `build-receipt.json` — the image build receipt (source,
+  digests, generations, publisher, browser payload).
