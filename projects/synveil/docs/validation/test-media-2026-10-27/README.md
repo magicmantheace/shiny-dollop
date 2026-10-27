@@ -120,10 +120,23 @@ superseded image.
   **false** for this image and
   `desktop_windows_closed_and_terminal_exited` true; no
   drag/resize is claimed for the A/B desktop.
-- The broken-state boot is **skipped** (recorded in both JSONs):
-  on the A/B layout a destroyed STATE partition takes the
-  recovery-diagnostics path, not this harness's locked-login
-  path. It is not part of this pass's sequence.
+- The broken-state boot **ran** on both variants of this image
+  (corrected 2026-10-27 on independent review — an earlier text
+  of this record carried over the previous package's skip note,
+  which did not describe these runs): a copy whose STATE
+  filesystem was destroyed host-side booted to the same locked
+  login screen as a healthy boot, denied the test password (no
+  credential store survives on a destroyed STATE), never
+  reached a desktop in a 20-second watch, and printed nothing
+  but firmware lines on serial. That is
+  `broken_state_fails_closed_to_locked_login: true` in both
+  JSONs, backed by `hardware-broken-state.log` in each variant's
+  run evidence. The previous package's runs (source `9be2404`,
+  image `283b1974…`) did skip this leg — their JSONs carry the
+  skip string instead — because on the A/B layout a destroyed
+  STATE was expected to take the recovery-diagnostics path
+  rather than this harness's locked-login path; on this image
+  the guest's observed endpoint was the locked login itself.
 - The update/rollback mechanics themselves stand at the earlier
   records (`ab-qemu-proof-2026-10-26`,
   `ab-gui-qemu-proof-2026-10-26`,

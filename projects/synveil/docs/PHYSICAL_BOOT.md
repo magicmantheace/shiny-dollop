@@ -34,9 +34,10 @@ kernel remains **unverified**. Record:
 Two honest limits from that record: the A/B desktop proof is a
 window-peel (each window closed by its own control, terminal
 exited, login screen's return observed) — no drag/resize is
-claimed for the A/B desktop; and the destroyed-STATE boot was
-skipped there because the A/B layout takes the
-recovery-diagnostics path for it.
+claimed for the A/B desktop; and the destroyed-STATE boot ran
+on both variants of this image and failed closed to the locked
+login (an earlier text said it was skipped there — that
+described the previous package's runs; corrected 2026-10-27).
 
 **Review resolution (2026-10-25):** an independent review found the
 earlier "owner test-ready" conclusion premature and held the status
