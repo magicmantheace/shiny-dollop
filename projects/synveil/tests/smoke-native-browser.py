@@ -244,6 +244,7 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "application/octet-stream")
             self.send_header("Content-Length", str(BIG_SIZE))
+            self.send_header("Cache-Control", "no-store")
             self.end_headers()
             chunk = b"\0" * (1024 * 1024)
             try:
@@ -261,6 +262,9 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
+        # Downloads must be real fetches every time — a repeat
+        # click in the collision leg must not be cache-served.
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
