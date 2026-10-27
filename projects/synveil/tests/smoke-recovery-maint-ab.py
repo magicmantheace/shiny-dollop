@@ -195,7 +195,9 @@ def probe_locked(boot):
     before = len(boot.lines)
     boot.send(r"printf '\n%s%s\n' SYNVEIL_ SERIAL_UNLOCK_BYPASS")
     boot.send("exec /bin/sh")
-    boot.send("id; echo SYNVEIL_MAINT_PWNED")
+    # Split marker: console echo of the probe can never produce it
+    # contiguously; only real shell execution could.
+    boot.send("id; echo SYNVEIL_MAINT_PW''NED")
     time.sleep(4)
     window = "\n".join(boot.lines[before:])
     return ("SYNVEIL_SERIAL_UNLOCK_BYPASS" not in window

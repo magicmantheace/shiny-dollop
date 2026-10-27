@@ -174,7 +174,10 @@ def probe_locked(boot):
     before = len(boot.lines)
     boot.send(r"printf '\n%s%s\n' SYNVEIL_ SERIAL_UNLOCK_BYPASS")
     boot.send("exec /bin/sh")
-    boot.send("id; echo SYNVEIL_MAINT_PWNED")
+    # The marker is split in the typed line so console echo of the
+    # probe itself can never produce it; only real shell execution
+    # (which would join the quotes away) could print it contiguously.
+    boot.send("id; echo SYNVEIL_MAINT_PW''NED")
     time.sleep(4)
     window = "\n".join(boot.lines[before:])
     return ("SYNVEIL_SERIAL_UNLOCK_BYPASS" not in window

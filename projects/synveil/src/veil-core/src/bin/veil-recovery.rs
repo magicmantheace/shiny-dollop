@@ -66,11 +66,14 @@ fn audit(event: &str, fields: &str) {
 }
 
 /// Switch console echo off/on with a fixed-program, fixed-argument
-/// stty call. The operator's input is never part of the arguments.
+/// stty call. stty operates on its standard input, which init has
+/// already attached to /dev/console; the operator's input is never
+/// part of the arguments. (A positional device operand is not
+/// accepted by the rootfs stty and must not be passed.)
 fn set_echo(on: bool) -> bool {
     let setting = if on { "echo" } else { "-echo" };
     Command::new("/bin/stty")
-        .args([setting, "/dev/console"])
+        .args([setting])
         .stdin(std::process::Stdio::inherit())
         .status()
         .map(|status| status.success())

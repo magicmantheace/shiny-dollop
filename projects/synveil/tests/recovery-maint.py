@@ -63,7 +63,7 @@ class AuthenticatedMaintenanceTests(unittest.TestCase):
         commands = [line.strip() for line in source.splitlines()
                     if "Command::new" in line]
         self.assertEqual(commands, ['Command::new("/bin/stty")'])
-        self.assertIn('args([setting, "/dev/console"])', source)
+        self.assertIn("args([setting])", source)
 
     def test_commands_are_enumerated_and_exact_match(self):
         source = BINARY.read_text()
