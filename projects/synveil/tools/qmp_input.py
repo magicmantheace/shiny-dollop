@@ -244,6 +244,8 @@ AB_COMMANDS = {
 }
 
 _AB_CHAR_KEYS = {c: c for c in "abcdefghijklmnopqrstuvwxyz0123456789"}
+_AB_CHAR_KEYS.update({c: "shift+" + c.lower()
+                      for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"})
 _AB_CHAR_KEYS.update({" ": "spc", "/": "slash", "-": "minus", ".": "dot",
                       "_": "shift+minus", ">": "shift+dot", ";": "semicolon"})
 

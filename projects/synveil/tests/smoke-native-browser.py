@@ -409,11 +409,43 @@ def click_link(boot, color, tag):
             continue
         block = color_block(*frame, color)
         if block:
+            save_frame(frame, f"link-{tag}")
             click(boot, *block["center"])
             return True
         time.sleep(0.5)
     ab.save_failure_frame(boot, f"link-{tag}")
     return False
+
+
+def save_frame(frame, tag):
+    """Keep one driver frame in the evidence dir for diagnosis."""
+    try:
+        width, height, data = frame
+        ppm = EVIDENCE / f"{tag}.ppm"
+        with ppm.open("wb") as handle:
+            handle.write(f"P6\n{width} {height}\n255\n".encode())
+            handle.write(bytes(data))
+    except Exception:
+        pass
+
+
+def click_link_and_wait(boot, color, tag, log, port, path, count,
+                        budget=480):
+    """Click a download link until the fixture server records the
+    GET. A first click on this stack can be consumed raising and
+    focusing the browser window (observed: the effect of a click
+    landing one interaction late), so the click repeats against a
+    fresh frame until the server-side evidence appears — the
+    verdict never rests on the click itself, only on the GET."""
+    deadline = time.monotonic() + budget
+    while time.monotonic() < deadline:
+        if log.count(port, path) >= count:
+            return True
+        if not click_link(boot, color, tag):
+            return False
+        if wait_download_get(log, port, path, count, timeout=45):
+            return True
+    return log.count(port, path) >= count
 
 
 INTERSTITIAL_BLUE = (0x1A, 0x73, 0xE8)
@@ -1007,8 +1039,9 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
             if page:
                 # B1: first download (Chromium downloads directly to
                 # ~/Downloads — no dialog; evidence is the file itself).
-                got = click_link(boot, LINK_PAYLOAD, "payload") \
-                    and wait_download_get(log, GOOD_PORT, "/payload.bin", 1)
+                got = click_link_and_wait(
+                    boot, LINK_PAYLOAD, "payload", log, GOOD_PORT,
+                    "/payload.bin", 1)
                 if got:
                     time.sleep(10)
                 record("B1", download_started=bool(got))
@@ -1017,8 +1050,9 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
                 # untouched original (verified at readback).
                 got2 = False
                 if ensure_page(boot):
-                    got2 = click_link(boot, LINK_PAYLOAD, "payload-again") \
-                        and wait_download_get(log, GOOD_PORT, "/payload.bin", 2)
+                    got2 = click_link_and_wait(
+                        boot, LINK_PAYLOAD, "payload-again", log,
+                        GOOD_PORT, "/payload.bin", 2)
                     if got2:
                         time.sleep(10)
                 record("B2", second_download=bool(got2))
@@ -1027,8 +1061,9 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
                 # the browser must stay alive.
                 alive = False
                 if ensure_page(boot):
-                    if click_link(boot, LINK_BIG, "big") \
-                            and wait_download_get(log, GOOD_PORT, "/big.bin", 1):
+                    if click_link_and_wait(
+                            boot, LINK_BIG, "big", log, GOOD_PORT,
+                            "/big.bin", 1):
                         time.sleep(120)
                         alive = page_proof(boot, timeout=120)
                 record("B3", browser_alive_after=bool(alive))
@@ -1094,8 +1129,9 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
                 remember_browser_rect(boot)
             got2 = False
             if page:
-                got2 = click_link(boot, LINK_PAYLOAD2, "payload2") \
-                    and wait_download_get(log, GOOD_PORT, "/payload2.bin", 1)
+                got2 = click_link_and_wait(
+                    boot, LINK_PAYLOAD2, "payload2", log, GOOD_PORT,
+                    "/payload2.bin", 1)
                 if got2:
                     time.sleep(10)
             record("B6", staged=bool(staged), healthy=bool(healthy),
