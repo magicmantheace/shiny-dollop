@@ -597,11 +597,15 @@ def close_browser_window(boot):
         click(boot, bx + 30, by + 30)  # page title area: focus only
         time.sleep(0.6)
     try:
-        send_keys(boot.qmp, ("ctrl+shift+w",), timeout=5,
+        send_keys(boot.qmp, ("ctrl+shift+w",), timeout=20,
                   allowed=frozenset({"ctrl+shift+w"}))
     except (QMPError, OSError, ValueError):
-        ab.save_failure_frame(boot, "browser-close-keys")
-        return False
+        try:
+            send_keys(boot.qmp, ("ctrl+shift+w",), timeout=20,
+                      allowed=frozenset({"ctrl+shift+w"}))
+        except (QMPError, OSError, ValueError):
+            ab.save_failure_frame(boot, "browser-close-keys")
+            return False
     time.sleep(1.0)
     return page_absent(boot, timeout=30)
 
@@ -870,7 +874,13 @@ def validate_browser_results(results):
 def ensure_page(boot):
     """Make sure the browser page (not a covering window) is what a
     link click will hit: if the proof page's color is on screen,
-    click its middle to raise that window."""
+    click a NEUTRAL point of it to raise that window. The neutral
+    point is the page block's top-left interior (the title area) —
+    the block's centroid is NOT safe: the background pixels are
+    concentrated below the link blocks, so their centroid lands
+    on the big-download link and starts a 448 MiB download that
+    fills the data partition (this silently ate the B2 collision
+    download in an earlier run)."""
     try:
         frame = ab.next_frame(boot)
     except (ValueError, OSError):
@@ -878,7 +888,8 @@ def ensure_page(boot):
     if color_fraction(*frame, PAGE_BG) >= 0.05:
         block = color_block(*frame, PAGE_BG)
         if block:
-            click(boot, *block["center"])
+            bx, by, _bw, _bh = block["rect"]
+            click(boot, bx + 24, by + 24)
             time.sleep(0.6)
             return True
     return page_proof(boot, timeout=60)
