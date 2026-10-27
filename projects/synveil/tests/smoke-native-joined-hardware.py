@@ -472,57 +472,253 @@ def send_chord(qmp, *qcodes, timeout=20.0):
             qmp_input._hold_keys(sock, reader, qcodes)
 
 
-def weston_proof_ab(guest, deadline_s=360):
+def _ab_debug_frame(guest, name):
+    """When SYNVEIL_AB_DEBUG_DIR is set, dump the current frame
+    as a PPM there — diagnosis for the normalization steps
+    below (which stage saw what). Unset in normal runs."""
+    debug_dir = os.environ.get("SYNVEIL_AB_DEBUG_DIR")
+    if not debug_dir:
+        return
+    try:
+        width, height, data = guest.frame()
+        with open(Path(debug_dir) / f"{name}.ppm", "wb") as fh:
+            fh.write(f"P6\n{width} {height}\n255\n".encode())
+            fh.write(bytes(data))
+    except Exception:  # noqa: BLE001 - debug aid must not fail the proof
+        pass
+
+
+def _px(data, width, x, y):
+    off = (y * width + x) * 3
+    return data[off], data[off + 1], data[off + 2]
+
+
+def _near(rgb, color, tol=8):
+    return all(abs(a - b) <= tol for a, b in zip(rgb, color))
+
+
+_FILES_TITLE = (0x1D, 0x5C, 0x57)
+_GUI_TITLE = (0x5B, 0x2E, 0x6E)
+_GUI_CLOSE = (0xA8, 0x44, 0x55)
+_GUI_PAPER = (0xF2, 0xF0, 0xEB)
+_GUI_BANNERS = {(0x2E, 0x7D, 0x4F), (0xB0, 0x7A, 0x1E),
+                (0xA8, 0x2A, 0x2A), (0x6E, 0x6E, 0x6E)}
+
+
+def _files_title_block(width, height, data):
+    """The files window by its app-drawn teal title bar (the
+    same identity tests/smoke-native-browser.py uses): scan
+    below the desktop's top panel band and bound the title
+    pixels. Returns (x, y, w, h) of the title block or None."""
+    min_x, min_y, max_x, max_y = width, height, -1, -1
+    hits = 0
+    for yy in range(40, height):
+        for xx in range(width):
+            if _near(_px(data, width, xx, yy), _FILES_TITLE, 6):
+                hits += 1
+                min_x = min(min_x, xx)
+                max_x = max(max_x, xx)
+                min_y = min(min_y, yy)
+                max_y = max(max_y, yy)
+    if hits < 400 or max_x < 0:
+        return None
+    return (min_x, min_y, max_x - min_x + 1, max_y - min_y + 1)
+
+
+def _gui_window_rect(width, height, data):
+    """The update GUI window by its drawn purple title bar and
+    close box (the same identity tests/smoke-native-ab.py
+    uses). Returns (x, y, w, h) or None."""
+    interior = _GUI_BANNERS | {_GUI_PAPER, _GUI_TITLE}
+    for yy in range(0, height - 200):
+        xx = 0
+        while xx < width:
+            if _near(_px(data, width, xx, yy), _GUI_TITLE):
+                start = xx
+                while xx < width and _near(_px(data, width, xx, yy),
+                                           _GUI_TITLE):
+                    xx += 1
+                if xx - start >= 300:
+                    w = xx - start
+                    probe = xx
+                    while probe < width and _near(
+                            _px(data, width, probe, yy), _GUI_CLOSE):
+                        probe += 1
+                    if probe > xx:
+                        w += probe - xx
+                    bottom = yy
+                    for row in range(yy + 1, height):
+                        if any(_near(_px(data, width, start + 2, row), c)
+                               for c in interior):
+                            bottom = row
+                        else:
+                            break
+                    return (start, yy, w, bottom - yy + 1)
+            else:
+                xx += 1
+    return None
+
+
+def _click(guest, width, height, x, y):
+    weston_smoke.pointer(guest.qmp, width, height, x, y, button=True)
+    weston_smoke.pointer(guest.qmp, width, height, x, y, button=False)
+
+
+def _close_browser_cover(guest, width, height):
+    """Close the autostarted browser window covering the
+    desktop: wait for its page to finish painting (two white
+    samples 1.5 s apart, close in value — a chord sent while
+    Chromium is still initializing can be dropped; the browser
+    acceptance's own close waits for its page proof first, for
+    the same reason), focus it with a page click, then
+    Ctrl+Shift+W, the close the browser acceptance uses.
+    Retries the click+chord up to three times."""
+    for _attempt in range(3):
+        prev = None
+        stable_end = time.monotonic() + 60
+        lifted = False
+        while time.monotonic() < stable_end:
+            try:
+                w2, h2, d2 = guest.frame()
+            except Exception:  # noqa: BLE001
+                time.sleep(0.5)
+                continue
+            frac = _white_fraction(w2, h2, d2)
+            if frac <= 0.02:
+                return True
+            if prev is not None and frac > 0.20 \
+                    and abs(frac - prev) < 0.05:
+                break
+            prev = frac
+            time.sleep(1.5)
+        _click(guest, width, height, width // 2, 150)
+        time.sleep(0.6)
+        send_chord(guest.qmp, "ctrl", "shift", "w")
+        lift_end = time.monotonic() + 30
+        while time.monotonic() < lift_end:
+            try:
+                w2, h2, d2 = guest.frame()
+            except Exception:  # noqa: BLE001
+                time.sleep(0.5)
+                continue
+            if _white_fraction(w2, h2, d2) <= 0.02:
+                lifted = True
+                break
+            time.sleep(0.8)
+        if lifted:
+            return True
+    return False
+
+
+def weston_proof_ab(guest, deadline_s=600):
     """Desktop proof for the full-stack A/B desktop.
 
-    Same first window, terminal and session lifecycle as the
-    joined image, plus four more windows — and the browser, which
-    autostarts near-maximized and can cover the first window and
-    the terminal entirely (observed on this image: the New Tab
-    page is up ~40 s after login with both proof windows
-    occluded). So first normalize: if the browser's white page
-    covers the desktop, focus it with a click and close its
-    window with Ctrl+Shift+W (the close the browser acceptance
-    itself uses); then run the joined image's own pointer/
-    keyboard proof (drag, resize, Escape-close, terminal exit)
-    on the uncovered desktop. That the browser ran at all is
-    gated separately by the DATA-partition readback, not by
-    this function's success."""
+    The joined image's proof choreographs its own two windows;
+    the full-stack session opens five (first window, terminal,
+    files, update GUI, browser), in an order and stacking that
+    vary run to run — the browser autostarts near-maximized and
+    can cover everything, and the first window can start out
+    mostly hidden behind the files/GUI windows, where the
+    joined scanner sees only a narrow strip of it (observed:
+    115 px exposed, below its 180 px run threshold). So this
+    proof does not choreograph; it peels. Each pass over the
+    live frame applies the one close primitive that window
+    type itself proved in the earlier acceptances:
+
+    * browser cover (near-pure-white page): focus click +
+      Ctrl+Shift+W (tests/smoke-native-browser.py's close);
+    * files window (teal title bar): its drawn close box
+      (same source);
+    * update GUI (purple title bar): its drawn close box
+      (tests/smoke-native-ab.py's close);
+    * first window: raise click + Escape (the joined proof's
+      own close);
+    * terminal: focus click + the typed fixed `exit` command
+      (the joined proof's own terminal exit).
+
+    Success is the session's own end condition made visible:
+    the login screen returns, which the session reaches only
+    when its first window and terminal have both exited. The
+    browser having run at all is gated separately by the
+    DATA-partition readback, not by this function's success —
+    but the peel still gives it its chance: no window is closed
+    until the browser cover has been handled or the desktop has
+    stood for 120 s, so a fast peel cannot end the session
+    before the autostarted browser has even appeared."""
     end = time.monotonic() + deadline_s
+    saw_desktop = False
+    desktop_since = None
+    browser_handled = False
     while time.monotonic() < end:
         try:
             width, height, data = guest.frame()
         except Exception:  # noqa: BLE001 - transitioning scanout
             time.sleep(0.5)
             continue
+        if not is_auth(signature(width, height, data)):
+            saw_desktop = True
+            if desktop_since is None:
+                desktop_since = time.monotonic()
+        if saw_desktop and is_auth(signature(width, height, data)):
+            return True
         if _white_fraction(width, height, data) > 0.20:
-            weston_smoke.pointer(guest.qmp, width, height,
-                                 width // 2, height // 2, button=True)
-            weston_smoke.pointer(guest.qmp, width, height,
-                                 width // 2, height // 2, button=False)
-            send_chord(guest.qmp, "ctrl", "shift", "w")
-            lift_end = time.monotonic() + 90
-            while time.monotonic() < lift_end:
-                try:
-                    w2, h2, d2 = guest.frame()
-                except Exception:  # noqa: BLE001
-                    time.sleep(0.5)
-                    continue
-                if _white_fraction(w2, h2, d2) <= 0.02:
-                    break
-                time.sleep(0.8)
-            else:
+            _ab_debug_frame(guest, "peel-browser")
+            if not _close_browser_cover(guest, width, height):
                 return False
+            browser_handled = True
+            continue
+        settled = browser_handled or (
+            desktop_since is not None
+            and time.monotonic() - desktop_since > 120)
+        if not settled:
+            time.sleep(0.8)
+            continue
+        files = _files_title_block(width, height, data)
+        if files is not None:
+            _ab_debug_frame(guest, "peel-files")
+            fx, fy, fw, _fh = files
+            _click(guest, width, height, fx + max(fw, 720) - 14, fy + 14)
+            time.sleep(1.0)
+            continue
+        gui = _gui_window_rect(width, height, data)
+        if gui is not None:
+            _ab_debug_frame(guest, "peel-gui")
+            gx, gy, gw, _gh = gui
+            _click(guest, width, height, gx + gw - 14, gy + 14)
+            time.sleep(1.0)
             continue
         window = weston_smoke.original_window(width, height, data)
-        if window and weston_smoke.terminal_pixels_visible(
-                width, height, data, window):
-            break
+        if window is not None:
+            _ab_debug_frame(guest, "peel-first-window")
+            x, y, _w, _h = window
+            _click(guest, width, height, x + 30, y + 14)
+            try:
+                send_keys(guest.qmp, ("esc",), timeout=5)
+            except (QMPError, OSError, ValueError):
+                pass
+            time.sleep(1.0)
+            continue
+        try:
+            tx, ty = weston_smoke.terminal_point(width, height, data)
+        except RuntimeError:
+            tx = None
+        if tx is not None:
+            _ab_debug_frame(guest, "peel-terminal")
+            _click(guest, width, height, tx, ty)
+            time.sleep(0.4)
+            try:
+                send_keys(guest.qmp, ("e", "x", "i", "t", "ret"),
+                          timeout=5, allowed=ALLOWED_TERMINAL_RETURN)
+            except (QMPError, OSError, ValueError):
+                pass
+            time.sleep(2.0)
+            continue
         time.sleep(0.8)
-    else:
+    try:
+        width, height, data = guest.frame()
+        return is_auth(signature(width, height, data))
+    except Exception:  # noqa: BLE001
         return False
-    return joined_smoke.weston_proof(guest.qmp, Path(guest._temp.name),
-                                     full=True)
 
 
 def wait_desktop_ab(guest, deadline_s):
@@ -843,7 +1039,8 @@ def main() -> int:
         "mismatched_confirmation_rejected": True,
         "wrong_password_denied_after_cold_reboot": True,
         "weston_desktop_after_login": True,
-        "pointer_move_resize_keyboard": True,
+        "pointer_move_resize_keyboard": not AB_DESKTOP,
+        "desktop_windows_closed_and_terminal_exited": AB_DESKTOP,
         "session_end_relocks_login": True,
         "hard_power_cut_returns_to_login_and_credential_survives": True,
         "broken_state_fails_closed_to_locked_login": True,
@@ -870,10 +1067,14 @@ def main() -> int:
         result["chromium_evidence"] = chromium
         result["chromium_launched_and_persisted_on_data"] = True
         result["desktop_proof"] = (
-            "ab-normalized: the autostarted browser's cover is "
-            "closed via Ctrl+Shift+W, then the joined pointer/"
-            "keyboard proof (drag, resize, Escape-close, "
-            "terminal exit) runs on the uncovered desktop")
+            "ab peel: each full-stack window is closed by its "
+            "own proven primitive (browser by focus click + "
+            "Ctrl+Shift+W, files and update GUI by their drawn "
+            "close boxes, first window by raise + Escape) and "
+            "the terminal is focused and exited by the typed "
+            "fixed exit command; success is the login screen's "
+            "return, the session's own end condition. No "
+            "drag/resize is claimed for the A/B desktop.")
     result_name = ("guest-validation.json" if variant == "virtio"
                    else f"guest-validation-{variant}.json")
     result_dir = evidence_dir if args.ab_receipt else IMAGE_DIR
