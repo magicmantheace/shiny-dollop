@@ -2,8 +2,10 @@
 
 - Status: **Proposed — tiers 1–3 implemented and demonstrated in QEMU
   (2026-10-27, see the evidence-status section at the end of this ADR);
-  tier 4 remains unimplemented pending explicit owner approval of the
-  recovery-factor design**
+  tier 4 design approved by the owner 2026-10-27
+  ([ADR 0020](0020-recovery-factor-design-approval.md)) and
+  implementation authorized; tier 4 itself remains unimplemented
+  until its guest evidence exists**
 - Date: 2026-10-12
 - Related: [authenticated graphical session](0008-authenticated-graphical-session.md), [password verifier](0009-source-built-argon2id-verifier.md)
 - Scope: future installed Synveil systems; current authenticated QEMU preview remains unrecoverable after password loss
@@ -149,10 +151,15 @@ full artifacts are in the
   interrupted update, failing generation, rollback, user-data survival)
   and extended by the gate B acceptance above, which performs the
   rollback from the authenticated maintenance path itself.
-- **Gate D (tier 4): not implemented.** A draft specification exists
+- **Gate D (tier 4): design approved; implementation authorized,
+  not yet implemented.** The specification
   ([RECOVERY_FACTOR_SPEC.md](../RECOVERY_FACTOR_SPEC.md), commit
-  `af50cba`) and awaits explicit owner approval of its enumerated
-  decisions before any implementation, per sequence D.
+  `af50cba`) was approved by the owner on 2026-10-27 — Option A with
+  the recommended defaults, decisions D1–D10 recorded in
+  [ADR 0020](0020-recovery-factor-design-approval.md). Per sequence
+  D, implementation may now proceed; tier 4 counts as demonstrated
+  only when the specification's section 11 guest evidence exists at
+  an exact commit.
 - **Gate E:** per-gate guest evidence is recorded at exact commits in
   the validation record. Physical installation remains blocked: the
   complete recovery path (tier 4 included) has not been exercised, and

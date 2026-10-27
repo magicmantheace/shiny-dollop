@@ -1,17 +1,20 @@
 # Recovery factor specification for forgotten-password recovery
 
-> **DRAFT — AWAITING EXPLICIT OWNER APPROVAL**
+> **APPROVED BY OWNER 2026-10-27 — IMPLEMENTATION AUTHORIZED**
 >
-> This document is a draft specification only. It is submitted to the
-> owner for the explicit approval that ADR 0010 reserves for the
-> recovery-factor design. **No implementation is authorized by this
-> draft**, and no code, enrollment flow, or image change may be made on
-> the basis of this document alone. **This document does not modify
-> ADR 0010**, does not change its Proposed status, and does not mark any
-> ADR 0010 gate complete. If the owner approves a design, that approval
-> must be recorded separately before implementation begins.
+> The owner approved this specification's Option A "with the
+> recommended defaults" on 2026-10-27, after a walkthrough of the
+> options and the section 12 decision list. The approval and the
+> D1–D10 mapping are recorded separately, as this document requires,
+> in [ADR 0020](adr/0020-recovery-factor-design-approval.md); that
+> record governs where it and this text differ. Implementation of
+> the approved design is authorized. Approval does not mark any
+> ADR 0010 gate complete: tier 4 may be called validated only when
+> the guest evidence of section 11 exists at an exact commit, per
+> ADR 0010 gate E. The body of this specification is unchanged from
+> the approved draft (commit `af50cba`).
 
-- Status: Draft — awaiting explicit owner approval; no implementation authorized
+- Status: Approved by owner 2026-10-27 (ADR 0020); implementation authorized
 - Date: 2026-10-27
 - Scope: ADR 0010 tier 4 (forgotten password) only, for future installed
   Synveil systems
