@@ -1072,6 +1072,40 @@ def enroll_first_user(boot, secret):
     return boot.wait("SYNVEIL_ENROLL_COMPLETED", 120)
 
 
+def terminal_command_verified(boot, command_id, marker, probe,
+                              timeout=420, attempts=3):
+    """Marker-verified terminal command with retype attempts.
+
+    QMP key holds can stretch under host load; the terminal's key
+    repeat then doubles a character and garbles the command (seen
+    in a saved frame: '/usr/sbbin/veil-ab requestt staage' ->
+    'not found'). The serial marker is the only trustworthy sign
+    the command actually ran, so a missing marker inside the
+    probe window means: Ctrl+C the line and type it again. The
+    probe is generous — interrupting a genuinely still-running
+    stage would be worse than waiting."""
+    for attempt in range(attempts):
+        last = attempt == attempts - 1
+        if terminal_command(boot, command_id, marker,
+                            timeout=timeout if last else probe):
+            return True
+        try:
+            send_chord(boot, "ctrl", "c")
+        except (QMPError, OSError, ValueError):
+            pass
+        time.sleep(0.5)
+    return False
+
+
+def terminal_command_twice(boot, command_id):
+    """Idempotent unmarked commands (digest + sync) are typed
+    twice: a garbled first attempt errors out at the prompt, the
+    second lands the effect; a clean first attempt makes the
+    second a harmless rewrite of the same file."""
+    terminal_command(boot, command_id)
+    return terminal_command(boot, command_id)
+
+
 def _run_boots(results, record, log, workdir, vars_template, secret,
                releases):
     if True:
@@ -1138,7 +1172,7 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
                 # Graphical file access + in-guest digest, then reboot.
                 close_browser_window(boot)
                 refresh_files_window(boot)
-                terminal_command(boot, "dl-sha256")
+                terminal_command_twice(boot, "dl-sha256")
                 mark = len(boot.lines)
                 terminal_command(boot, "reboot")
                 network2 = boot.wait_count("SYNVEIL_NETWORK_READY", 2, 600)
@@ -1147,7 +1181,7 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
                 record("B5", network_ready_again=bool(network2 and logged2),
                        page_proof=bool(page2))
                 close_browser_window(boot)
-                terminal_command(boot, "dl-sha256")
+                terminal_command_twice(boot, "dl-sha256")
             else:
                 record("B1", download_started=False)
                 record("B2", second_download=False)
@@ -1175,8 +1209,9 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
             page_proof(boot)
             remember_browser_rect(boot)
             close_browser_window(boot)
-            staged = terminal_command(boot, "stage", "SYNVEIL_AB_STAGED",
-                                      timeout=420)
+            staged = terminal_command_verified(
+                boot, "stage", "SYNVEIL_AB_STAGED", probe=240,
+                timeout=420)
             mark = len(boot.lines)
             terminal_command(boot, "reboot")
             healthy = boot.wait("SYNVEIL_AB_HEALTH_PASSED", 600, since=mark)
@@ -1195,10 +1230,11 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
                    page_proof=bool(page), download_started=bool(got2))
             close_browser_window(boot)
             refresh_files_window(boot)
-            terminal_command(boot, "dl-sha256")
-            terminal_command(boot, "dl2-sha256")
-            terminal_command(boot, "confirm", "SYNVEIL_AB_CONFIRMED",
-                             timeout=420)
+            terminal_command_twice(boot, "dl-sha256")
+            terminal_command_twice(boot, "dl2-sha256")
+            terminal_command_verified(
+                boot, "confirm", "SYNVEIL_AB_CONFIRMED", probe=60,
+                timeout=300)
         finally:
             boot.quit()
         results["B6"]["artifacts"] = browser_artifacts(
@@ -1214,8 +1250,9 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
             page_proof(boot)
             remember_browser_rect(boot)
             close_browser_window(boot)
-            armed = terminal_command(boot, "rollback",
-                                     "SYNVEIL_AB_ROLLBACK", timeout=420)
+            armed = terminal_command_verified(
+                boot, "rollback", "SYNVEIL_AB_ROLLBACK", probe=60,
+                timeout=300)
             mark = len(boot.lines)
             terminal_command(boot, "reboot")
             healthy = boot.wait("SYNVEIL_AB_HEALTH_PASSED", 600, since=mark)
@@ -1224,10 +1261,11 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
             record("B7", rollback_armed=bool(armed), healthy=bool(healthy),
                    page_proof=bool(page))
             close_browser_window(boot)
-            terminal_command(boot, "dl-sha256")
-            terminal_command(boot, "dl2-sha256")
-            terminal_command(boot, "confirm", "SYNVEIL_AB_CONFIRMED",
-                             timeout=420)
+            terminal_command_twice(boot, "dl-sha256")
+            terminal_command_twice(boot, "dl2-sha256")
+            terminal_command_verified(
+                boot, "confirm", "SYNVEIL_AB_CONFIRMED", probe=60,
+                timeout=300)
         finally:
             boot.quit()
         results["B7"]["artifacts"] = browser_artifacts(
