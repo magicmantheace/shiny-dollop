@@ -380,6 +380,42 @@ fn action_restore() {
 
 /// Compare an entered confirmation group (bytes, any case, stray
 /// whitespace ignored) against a displayed group.
+/// The section 6 print offer, shared by enrollment and rotation:
+/// only when a local printer device is already present, the key
+/// text may be written directly to the device. Never a spooler,
+/// never a network queue (decision D3).
+fn offer_print(reader: &mut BufReader<io::Stdin>, grouped: &str) {
+    let device = ["/dev/lp0", "/dev/usb/lp0"]
+        .into_iter()
+        .find(|path| std::path::Path::new(path).exists());
+    let Some(device) = device else {
+        out("SYNVEIL_RECOVERY_FACTOR_PRINT_UNAVAILABLE");
+        return;
+    };
+    out("SYNVEIL_RECOVERY_FACTOR_PRINT_AVAILABLE");
+    out("SYNVEIL_RECOVERY_FACTOR_PRINT_PROMPT");
+    match read_line(reader, MAX_FACTOR_LINE) {
+        Line::Text(line) if line.as_slice() == b"print" => {
+            let written = std::fs::OpenOptions::new()
+                .write(true)
+                .open(device)
+                .and_then(|mut file| {
+                    writeln!(
+                        file,
+                        "Synveil recovery key (keep with your recovery material):"
+                    )?;
+                    writeln!(file, "{grouped}")?;
+                    writeln!(file, "\u{c}")
+                });
+            match written {
+                Ok(()) => out("SYNVEIL_RECOVERY_FACTOR_PRINTED"),
+                Err(_) => out("SYNVEIL_RECOVERY_FACTOR_PRINT_FAILED"),
+            }
+        }
+        _ => out("SYNVEIL_RECOVERY_FACTOR_PRINT_SKIPPED"),
+    }
+}
+
 fn group_matches(line: &[u8], expected: &str) -> bool {
     let folded: Vec<u8> = line
         .iter()
@@ -453,6 +489,7 @@ fn action_rotate(reader: &mut BufReader<io::Stdin>) {
     out("SYNVEIL_RECOVERY_ROTATE_DISPLAY_BEGIN");
     out(&factor.display.grouped);
     out("SYNVEIL_RECOVERY_ROTATE_DISPLAY_END");
+    offer_print(reader, &factor.display.grouped);
     if !set_echo(false) {
         factor.clear();
         out("SYNVEIL_RECOVERY_ROTATE_REFUSED");
