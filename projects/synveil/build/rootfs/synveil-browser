@@ -86,8 +86,27 @@ probe_sandbox() {
             cmdline=$(tr '\0' ' ' < "$proc/cmdline" 2>/dev/null) || continue
             case "$cmdline" in
                 *"--type=renderer"*"--user-data-dir=$PROFILE"*)
-                    seccomp=$(grep '^Seccomp:' "$proc/status" 2>/dev/null \
-                        | awk '{print $2}')
+                    # The zygote applies the renderer's seccomp
+                    # filter just after the process appears; on a
+                    # loaded first boot a first-sight read races
+                    # that window and records seccomp=0 even
+                    # though the filter lands moments later
+                    # (observed in the browser proof: boot 1's
+                    # records were 0, later boots' were 2).
+                    # Settle-poll the SAME pid until the filter
+                    # lands (bounded ~20 s), then record the
+                    # steady value — still truthful if it never
+                    # engages.
+                    seccomp=""
+                    settle=0
+                    while [ $settle -lt 40 ]; do
+                        seccomp=$(awk '/^Seccomp:/{print $2}' \
+                            "$proc/status" 2>/dev/null)
+                        [ "$seccomp" = "2" ] && break
+                        [ -d "$proc" ] || break
+                        settle=$((settle + 1))
+                        sleep 0.5
+                    done
                     echo "SYNVEIL_SANDBOX_RENDERER user_ns=$(readlink "$proc/ns/user" 2>/dev/null) session_user_ns=$session_user_ns seccomp=${seccomp:-unknown} pid=$pid" \
                         >> "$status"
                     return 0

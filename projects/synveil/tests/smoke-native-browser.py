@@ -525,11 +525,13 @@ def files_window_rect(width, height, data):
                         min_hits=400)
     if not block:
         return None
-    x, y, w, _h = block["rect"]
+    x, y, w, title_h = block["rect"]
     # The window extends below the title bar; its height is not
     # derivable from the title color alone — the client requests
-    # 720x520 (files-window.c WIN_W/WIN_H).
-    return (x, y, max(w, 720), 520)
+    # 720x520 (files-window.c WIN_W/WIN_H). The title bar height
+    # matters: the app draws in content coordinates, which start
+    # title_h below the decoration top the rect reports.
+    return (x, y, max(w, 720), 520, title_h)
 
 
 def close_files_window(boot):
@@ -540,7 +542,7 @@ def close_files_window(boot):
     rect = files_window_rect(*frame)
     if not rect:
         return True  # already closed
-    x, y, w, _h = rect
+    x, y, w, _h, _title_h = rect
     click(boot, x + w - 14, y + 14)
     time.sleep(0.8)
     return True
@@ -685,8 +687,8 @@ def browser_artifacts(disk, workdir):
         out = subprocess.run(["debugfs", "-R", f"ls -l {parent}",
                               str(image)], capture_output=True)
         for line in out.stdout.decode("utf-8", "replace").splitlines():
-            parts = line.split(None, 7)
-            if len(parts) == 8 and parts[7] == name:
+            parts = line.split(None, 8)
+            if len(parts) == 9 and parts[8] == name:
                 got = subprocess.run(
                     ["debugfs", "-R", f"cat <{parts[0]}>", str(image)],
                     capture_output=True)
@@ -955,10 +957,15 @@ def refresh_files_window(boot):
             continue
         rect = files_window_rect(*frame)
         if rect:
-            x, y, w, h = rect
+            x, y, w, h, title_h = rect
             click(boot, x + 60, y + 14)          # raise via title bar
             time.sleep(0.5)
-            click(boot, x + 16 + 64, y + h - 92 + 18)  # Refresh center
+            # The app draws Refresh at content (16, h-92, 128x36);
+            # frame coords add the decoration's title bar height.
+            # Clicking at decoration-relative h-74 landed on an
+            # entry row and never rescanned (observed: B6's files
+            # log had no post-download scan).
+            click(boot, x + 16 + 64, y + title_h + h - 92 + 18)
             time.sleep(1.5)
             return True
         time.sleep(0.5)
