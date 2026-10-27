@@ -242,8 +242,33 @@ class Guest:
         except subprocess.TimeoutExpired:
             os.killpg(self.process.pid, signal.SIGKILL)
             self.process.wait(timeout=5)
+        self._wait_image_free()
         self._temp.cleanup()
         return False
+
+    def _wait_image_free(self, timeout_s=20):
+        """qemu.sh backgrounds QEMU under bash, so the wrapper's
+        exit does not prove QEMU has released the image's write
+        lock; the next boot on the same copy then fails
+        spuriously with 'Failed to get write lock' (observed on
+        the power-cut-recovery boot). Poll /proc until no
+        qemu-system process still names this image."""
+        image = str(self.work / "synveil-x86_64.img").encode()
+        end = time.monotonic() + timeout_s
+        while time.monotonic() < end:
+            holder = False
+            for cmdline in Path("/proc").glob("[0-9]*/cmdline"):
+                try:
+                    argv = cmdline.read_bytes().split(b"\0")
+                except OSError:
+                    continue
+                if argv and b"qemu-system" in argv[0] and \
+                        any(image in arg for arg in argv):
+                    holder = True
+                    break
+            if not holder:
+                return
+            time.sleep(0.25)
 
     def frame(self):
         self._frame_no += 1
@@ -316,6 +341,7 @@ class Guest:
         except ProcessLookupError:
             pass
         self.process.wait(timeout=8)
+        self._wait_image_free()
 
     def serial_bytes(self):
         with self._lock:
