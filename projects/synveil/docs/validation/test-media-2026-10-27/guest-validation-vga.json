@@ -1,7 +1,7 @@
 {
   "schema": "synveil.native-joined-hardware-guest/v1",
-  "source_commit": "9be2404b27cc9980362ff5d2cedcaecec5de0b72",
-  "image_sha256": "283b1974be9e292d6e28f5ec9848bf5427ffc9e8f5c690a16e502378df3e6c83",
+  "source_commit": "9dbeda0d2be75c3f6e3267c949ec6db3656193e3",
+  "image_sha256": "4be22adaaddb4c5e5abab87d8d636abc18cd4f4e67265b0a1fac188db1925553",
   "image_kind": "ab-full-stack",
   "boot_target": "hardware",
   "variant": "vga",
@@ -21,6 +21,7 @@
   "desktop_windows_closed_and_terminal_exited": true,
   "session_end_relocks_login": true,
   "hard_power_cut_returns_to_login_and_credential_survives": true,
+  "broken_state_fails_closed_to_locked_login": true,
   "state_on_image_provided_partition": true,
   "separate_state_disk_used": false,
   "serial_contains_no_guest_console_or_shell": true,
@@ -42,7 +43,6 @@
     "virtio-blk stands in for the owner's USB SSD; this image's boot from emulated USB storage is recorded by the usb variant of this acceptance",
     "USB keyboard/tablet are QEMU devices; TG01 HID behavior is unproven"
   ],
-  "broken_state_boot": "skipped: on the A/B layout a destroyed STATE partition takes the recovery-diagnostics path, not this harness's locked-login path; not part of this pass's sequence",
   "chromium_evidence": {
     "browser_log_on_data_partition": true,
     "browser_started_markers_in_log": 2,

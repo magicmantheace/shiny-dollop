@@ -5,14 +5,13 @@ full-stack test-media package — not an install, not yet physically
 validated.**
 
 **Full-stack refresh (2026-10-27):** the owner test-media package
-was rebuilt from source `768150a` and now contains the whole
+was rebuilt from source `9dbeda0` and now contains the whole
 current stack — the A/B updater with graphical update controls,
-Chromium with its privacy layers (nine vendor endpoints
-null-routed; accounts.google.com reachable by the owner's
-2026-10-27 decision so sign-in works), and persistent
+Chromium stock-configured (no connection blocking in any layer,
+by the owner's 2026-10-27 decision), and persistent
 Downloads — as
 one A/B disk image (`synveil-x86_64.img`, SHA-256
-`283b1974be9e292d6e28f5ec9848bf5427ffc9e8f5c690a16e502378df3e6c83`,
+`4be22adaaddb4c5e5abab87d8d636abc18cd4f4e67265b0a1fac188db1925553`,
 3,900,702,720 bytes), plus the signed v2 release media for the
 update/rollback test. The 2026-10-25 review's four points were
 re-proven on this image: the guarded writer's transitive
@@ -23,8 +22,9 @@ no other DRM driver can bind — physical RTX 3060 compatibility
 remains explicitly unverified); the complete image booted from
 emulated USB storage through the full sequence (enrollment, cold
 reboot, wrong password denied, login, desktop with the browser
-launched — 2 start markers read back from the DATA partition —
-relock, state persisted); and the package documents enumerate the
+launched — start markers read back from the DATA partition in
+both variants — relock, power-cut recovery, state persisted);
+and the package documents enumerate the
 specific protections implemented and tested, with no absolute
 Windows-safety language. Guest networking **is** configured in
 this image (DHCP; proven in QEMU on `virtio-net-pci` at the

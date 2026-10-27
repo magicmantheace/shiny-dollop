@@ -1,19 +1,19 @@
 {
   "schema": "synveil.ab-proof-build/v1",
-  "source_commit": "9be2404b27cc9980362ff5d2cedcaecec5de0b72",
+  "source_commit": "9dbeda0d2be75c3f6e3267c949ec6db3656193e3",
   "boot_target": "hardware",
   "publisher": {
     "key_id": "synveil-dev-2026-01",
     "development": true,
-    "public_key_hex": "99973e6e8fcff54fef07d5955c2e644ff13b9359c0c4c624b7c1889063e776d5"
+    "public_key_hex": "fe5eaee2ad1841293f05b42bb76399df4d1ec9e1bf3af567ab6ab634e7296d72"
   },
   "generations": {
     "1": {
       "version": 1,
       "generation_id": "synveil-gen-v1",
-      "uki": "/home/hatch/workspace/_build-synveil/projects/synveil/out/test-media-build/gen-v1/synveil-x86_64.efi",
-      "uki_sha256": "4b4588e9327f23f8fe8cd070a0fc67cb5a4e60049ea0c3cfa51a686625837802",
-      "uki_bytes": 259957760,
+      "uki": "/home/hatch/workspace/_build-synveil/projects/synveil/out/browser-proof/gen-v1/synveil-x86_64.efi",
+      "uki_sha256": "9f28de61517eb9c3f2039f95240e7dea02daf912da0deab455b7effdbe4f115c",
+      "uki_bytes": 259953664,
       "background": "0xFF101820",
       "seat_stub": false,
       "state_format": 1
@@ -21,8 +21,8 @@
     "2": {
       "version": 2,
       "generation_id": "synveil-gen-v2",
-      "uki": "/home/hatch/workspace/_build-synveil/projects/synveil/out/test-media-build/gen-v2/synveil-x86_64.efi",
-      "uki_sha256": "380a35ccc90c6615b62ebfc607d20625af43dec91f685ea102e52859f385779b",
+      "uki": "/home/hatch/workspace/_build-synveil/projects/synveil/out/browser-proof/gen-v2/synveil-x86_64.efi",
+      "uki_sha256": "43cd1ff2cebf230373914e295c6eeb6021866819ceb87aaf5c9ce4b0f4ebbcb6",
       "uki_bytes": 259957760,
       "background": "0xFF0B3D2E",
       "seat_stub": false,
@@ -31,22 +31,22 @@
     "3": {
       "version": 3,
       "generation_id": "synveil-gen-v3",
-      "uki": "/home/hatch/workspace/_build-synveil/projects/synveil/out/test-media-build/gen-v3/synveil-x86_64.efi",
-      "uki_sha256": "5096640649febf2e65242067ba16495991268c3a1067c20bfaababb0062c9d1c",
-      "uki_bytes": 259290112,
+      "uki": "/home/hatch/workspace/_build-synveil/projects/synveil/out/browser-proof/gen-v3/synveil-x86_64.efi",
+      "uki_sha256": "ffa2af2410e3a7e0b6fc1ae17b1097284761e57da40ae71dfb344c43b918bd4c",
+      "uki_bytes": 259298304,
       "background": "0xFF3D0B0B",
       "seat_stub": true,
       "state_format": 1
     }
   },
   "recovery": {
-    "uki": "/home/hatch/workspace/_build-synveil/projects/synveil/out/test-media-build/recovery/synveil-x86_64.efi",
-    "uki_sha256": "364201b726433073eef3c0debda663cfb50d58665242bd97078d586331310afa",
-    "uki_bytes": 61264896
+    "uki": "/home/hatch/workspace/_build-synveil/projects/synveil/out/browser-proof/recovery/synveil-x86_64.efi",
+    "uki_sha256": "57c578e2cadf7cdca0a2eba875d320d5bf89b7e09adec8378b28833550fba5d6",
+    "uki_bytes": 61268992
   },
   "disk": {
-    "path": "/home/hatch/workspace/_build-synveil/projects/synveil/out/test-media-build/synveil-ab.img",
-    "sha256": "283b1974be9e292d6e28f5ec9848bf5427ffc9e8f5c690a16e502378df3e6c83",
+    "path": "/home/hatch/workspace/_build-synveil/projects/synveil/out/browser-proof/synveil-ab.img",
+    "sha256": "4be22adaaddb4c5e5abab87d8d636abc18cd4f4e67265b0a1fac188db1925553",
     "bytes": 3900702720,
     "layout": [
       {
@@ -89,31 +89,31 @@
   },
   "releases": {
     "release-v2": {
-      "media": "/home/hatch/workspace/_build-synveil/projects/synveil/out/test-media-build/release-v2.img",
-      "media_sha256": "7dcdc68e2f7b2b9724af34f5969151cf9942f0a76d7e10bb31c470be9bcdc755",
+      "media": "/home/hatch/workspace/_build-synveil/projects/synveil/out/browser-proof/release-v2.img",
+      "media_sha256": "172888a85d490506ef8a4947ffbbfbe8ab1232d5af66de227b319234f57f6f3d",
       "version": 2,
       "generation_id": "synveil-gen-v2",
-      "payload_sha256": "380a35ccc90c6615b62ebfc607d20625af43dec91f685ea102e52859f385779b",
+      "payload_sha256": "43cd1ff2cebf230373914e295c6eeb6021866819ceb87aaf5c9ce4b0f4ebbcb6",
       "payload_bytes": 259957760,
       "key_id": "synveil-dev-2026-01",
       "corrupt_signature": false
     },
     "release-v3": {
-      "media": "/home/hatch/workspace/_build-synveil/projects/synveil/out/test-media-build/release-v3.img",
-      "media_sha256": "131dcdd60206d17d573d023a3acb81565a4961f6d904b9de287dcfee02613a39",
+      "media": "/home/hatch/workspace/_build-synveil/projects/synveil/out/browser-proof/release-v3.img",
+      "media_sha256": "ec898a815fa36e48c21a3e3f342448258aebd676800d54c2ea203a430656255c",
       "version": 3,
       "generation_id": "synveil-gen-v3",
-      "payload_sha256": "5096640649febf2e65242067ba16495991268c3a1067c20bfaababb0062c9d1c",
-      "payload_bytes": 259290112,
+      "payload_sha256": "ffa2af2410e3a7e0b6fc1ae17b1097284761e57da40ae71dfb344c43b918bd4c",
+      "payload_bytes": 259298304,
       "key_id": "synveil-dev-2026-01",
       "corrupt_signature": false
     },
     "release-v2-badsig": {
-      "media": "/home/hatch/workspace/_build-synveil/projects/synveil/out/test-media-build/release-v2-badsig.img",
-      "media_sha256": "9b8bdff3e1b87d39e79cffac68ac3d4676f0079b032f3dc874a904d8e7d92524",
+      "media": "/home/hatch/workspace/_build-synveil/projects/synveil/out/browser-proof/release-v2-badsig.img",
+      "media_sha256": "71734b3537bc74306d38c47de386a26a16fb44df32d585c5a722b966cd50d7c3",
       "version": 2,
       "generation_id": "synveil-gen-v2",
-      "payload_sha256": "380a35ccc90c6615b62ebfc607d20625af43dec91f685ea102e52859f385779b",
+      "payload_sha256": "43cd1ff2cebf230373914e295c6eeb6021866819ceb87aaf5c9ce4b0f4ebbcb6",
       "payload_bytes": 259957760,
       "key_id": "synveil-dev-2026-01",
       "corrupt_signature": true
@@ -129,18 +129,6 @@
     "assets_copied": 1290,
     "assets_identical_to_baseline": 0,
     "link_closure_files_checked": 160,
-    "privacy_policy_sha256": "12ee2d5ba8a892ceaaf8a82e91a3c80281d8e404d08a4d7e44bc15a08ca944dc",
-    "nulled_phone_home_hosts": [
-      "update.googleapis.com",
-      "clients2.google.com",
-      "clientservices.googleapis.com",
-      "safebrowsing.googleapis.com",
-      "sb-ssl.google.com",
-      "ssl.gstatic.com",
-      "optimizationguide-pa.googleapis.com",
-      "translate.googleapis.com",
-      "edgedl.me.gvt1.com"
-    ],
     "test_ca_sha256": null,
     "test_host": null,
     "start_url": null
