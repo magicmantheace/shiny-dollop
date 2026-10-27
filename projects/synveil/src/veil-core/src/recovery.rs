@@ -30,8 +30,8 @@
 
 use std::fs::{self, OpenOptions};
 use std::io::{self, Read, Write};
-use std::os::unix::fs::{FileTypeExt, MetadataExt, OpenOptionsExt, PermissionsExt};
-use std::path::{Path, PathBuf};
+use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
+use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::credential::{
@@ -775,6 +775,7 @@ pub fn random_installation_id() -> io::Result<[u8; FACTOR_BYTES]> {
 mod tests {
     use super::*;
     use std::os::unix::fs::DirBuilderExt;
+    use std::path::PathBuf;
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static IDS: AtomicU64 = AtomicU64::new(1);
