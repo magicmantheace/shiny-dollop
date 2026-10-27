@@ -96,6 +96,24 @@ def write_partition(disk, number, image):
         "conv=notrunc", "status=none")
 
 
+def replay_journal(image):
+    """Replay any pending ext4 journal left by a killed QEMU boot.
+
+    Host edits made with debugfs on an image whose journal still
+    holds the pre-edit directory/inode transactions are silently
+    reverted when the guest mounts the filesystem and replays that
+    journal (observed in attempt 2: the control record's slots.B
+    edit and the DATA probe file both vanished in the guest, while
+    the journal-free FAT ESP edit persisted). Replaying the journal
+    on the extracted copy first makes host edits and reads see the
+    same state the guest will see.
+    """
+    result = subprocess.run(["e2fsck", "-fy", str(image)],
+                            capture_output=True, text=True)
+    if result.returncode not in (0, 1, 2):
+        raise RuntimeError(f"e2fsck {image}: {result.stdout} {result.stderr}")
+
+
 def debugfs_read(image, guest_path):
     result = subprocess.run(["debugfs", "-R", f"cat {guest_path}",
                              str(image)], capture_output=True)
@@ -250,6 +268,7 @@ def main():
     # 3. Fixture setup on the host: slot B populated, control record
     #    extended, owner file placed on DATA.
     state = extract_partition(disk, 4, OUT / "state.img")
+    replay_journal(state)
     control = json.loads(debugfs_read(state, "/lib/synveil/ab-control.json"))
     gen_b = slot_identity("B", generations[2])
     control["slots"]["B"] = {k: gen_b[k] for k in (
@@ -279,6 +298,7 @@ def main():
     owner_content = b"synveil owner data probe: restore must not touch this file\n"
     owner_file.write_bytes(owner_content)
     data = extract_partition(disk, 5, OUT / "data.img")
+    replay_journal(data)
     debugfs_write(data, owner_file, "/owner-restore-probe.txt")
     write_partition(disk, 5, data)
     check = extract_partition(disk, 5, OUT / "data-check.img")
@@ -309,6 +329,7 @@ def main():
     boot.stop()
     # Did the denied maintenance boot leave the fixture state intact?
     check = extract_partition(disk, 4, OUT / "state-after-denied.img")
+    replay_journal(check)
     intact = json.loads(debugfs_read(check, "/lib/synveil/ab-control.json"))
     results["fixture-survives-denied-boot"] = (
         (intact.get("slots") or {}).get("B") is not None)
@@ -348,10 +369,12 @@ def main():
 
     # 7. Host checks: DATA byte-intact, control record, audit log.
     data = extract_partition(disk, 5, OUT / "data-after.img")
+    replay_journal(data)
     owner_sha_after = sha256_bytes(
         debugfs_read(data, "/owner-restore-probe.txt"))
     results["data-intact"] = owner_sha_after == owner_sha_before
     state = extract_partition(disk, 4, OUT / "state-after.img")
+    replay_journal(state)
     control_after = json.loads(
         debugfs_read(state, "/lib/synveil/ab-control.json"))
     trial = control_after.get("trial") or {}
