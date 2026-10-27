@@ -76,6 +76,25 @@ if [ -x /usr/libexec/synveil/mount-state ]; then
     /usr/libexec/synveil/mount-state || echo SYNVEIL_STATE_UNAVAILABLE
 fi
 
+# BEGIN PASSWORD_RESET
+# Explicit boot argument selects the ADR 0010 tier-4 password reset:
+# the recovery program verifies the enrolled recovery factor against
+# its installation-bound record before accepting any input, and only
+# an explicitly confirmed reset replaces the password record. This
+# branch runs after the state mount (the verifier and the anchor
+# need it) and before core, seat, networking and display. Neither
+# success nor failure ever opens an interactive root serial shell:
+# the console locks unconditionally when the program exits.
+if grep -qw 'synveil.recovery=reset' /proc/cmdline 2>/dev/null; then
+    if [ -x /usr/sbin/veil-recovery ]; then
+        /usr/sbin/veil-recovery
+    else
+        echo SYNVEIL_RECOVERY_RESET_UNAVAILABLE
+    fi
+    serial_lock_forever
+fi
+# END PASSWORD_RESET
+
 # BEGIN AUTHENTICATED_MAINTENANCE
 # Explicit boot argument selects ADR 0010 tier-2 maintenance: local
 # text-mode authentication through the ADR 0009 verifier (never the

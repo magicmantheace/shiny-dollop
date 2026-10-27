@@ -80,6 +80,9 @@ RECOVERY_STATUS_TEST="${SYNVEIL_KERNEL_TEST_RECOVERY_STATUS:-0}"
 RECOVERY_MAINT_TEST="${SYNVEIL_KERNEL_TEST_RECOVERY_MAINT:-0}"
 [[ "$RECOVERY_MAINT_TEST" == 0 || "$RECOVERY_MAINT_TEST" == 1 ]] ||
     die "SYNVEIL_KERNEL_TEST_RECOVERY_MAINT must be 0 or 1"
+RECOVERY_RESET_TEST="${SYNVEIL_KERNEL_TEST_RECOVERY_RESET:-0}"
+[[ "$RECOVERY_RESET_TEST" == 0 || "$RECOVERY_RESET_TEST" == 1 ]] ||
+    die "SYNVEIL_KERNEL_TEST_RECOVERY_RESET must be 0 or 1"
 KERNEL_CMDLINE="console=ttyS0,115200n8 earlycon=uart,io,0x3f8,115200 rdinit=/init panic=-1 loglevel=6"
 if [[ "$BOOT_TARGET" == hardware ]]; then
     # An HP Pavilion need not expose the QEMU COM1 console. A real virtual
@@ -91,6 +94,9 @@ if [[ "$RECOVERY_STATUS_TEST" == 1 ]]; then
 fi
 if [[ "$RECOVERY_MAINT_TEST" == 1 ]]; then
     KERNEL_CMDLINE="$KERNEL_CMDLINE synveil.recovery=maint"
+fi
+if [[ "$RECOVERY_RESET_TEST" == 1 ]]; then
+    KERNEL_CMDLINE="$KERNEL_CMDLINE synveil.recovery=reset"
 fi
 
 "$LINUX_SRC/scripts/config" --file "$KERNEL_BUILD/.config"     --set-str INITRAMFS_SOURCE "$INITRAMFS"     --set-str CMDLINE "$KERNEL_CMDLINE"     -e EFI     -e EFI_STUB     -e BLK_DEV_INITRD     -e SERIAL_8250     -e SERIAL_8250_CONSOLE     -e CMDLINE_BOOL     -e CMDLINE_OVERRIDE
