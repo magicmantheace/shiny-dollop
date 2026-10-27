@@ -1233,44 +1233,55 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
                        extra_drives=[releases[2]])
         boot.start(secret)
         try:
-            ab.login(boot, secret)
-            page_proof(boot)
-            remember_browser_rect(boot)
-            close_browser_window(boot)
-            staged = terminal_command_verified(
-                boot, "stage", "SYNVEIL_AB_STAGED", probe=240,
-                timeout=420)
-            mark = len(boot.lines)
-            terminal_command(boot, "reboot")
-            # Login BEFORE the health wait, as the A/B proof
-            # driver does: the guest's session health check needs
-            # the authenticated session, so waiting for health
-            # first deadlocks the trial boot (observed: attempt 1
-            # HEALTH_FAILED check=session, attempts burning).
-            logged = ab.login(boot, secret, since=mark)
-            healthy = boot.wait("SYNVEIL_AB_HEALTH_PASSED", 600, since=mark)
-            page = page_proof(boot) if logged else False
-            if page:
+            # A failed login (greeter typing can flake under host
+            # load) must not send the rest of the session's steps
+            # grinding against the greeter — the terminal/stage
+            # retry stack alone burns ~45 minutes of worst-case
+            # waits (observed in a real run). Record and stop.
+            logged0 = ab.login(boot, secret)
+            staged = False
+            if logged0:
+                page_proof(boot)
                 remember_browser_rect(boot)
-            got2 = False
-            if page:
-                got2 = click_link_and_wait(
-                    boot, LINK_PAYLOAD2, "payload2", log, GOOD_PORT,
-                    "/payload2.bin", 1)
-                if got2:
-                    time.sleep(10)
-            record("B6", staged=bool(staged), healthy=bool(healthy),
-                   page_proof=bool(page), download_started=bool(got2))
-            close_browser_window(boot)
-            refreshed = refresh_files_window(boot)
-            close_files_window(boot)
-            terminal_command_twice(boot, "dl-sha256")
-            terminal_command_twice(boot, "dl2-sha256")
-            confirmed = terminal_command_verified(
-                boot, "confirm", "SYNVEIL_AB_CONFIRMED", probe=60,
-                timeout=300)
-            results["B6"]["files_refreshed"] = bool(refreshed)
-            results["B6"]["confirm_ok"] = bool(confirmed)
+                close_browser_window(boot)
+                staged = terminal_command_verified(
+                    boot, "stage", "SYNVEIL_AB_STAGED", probe=240,
+                    timeout=420)
+            if logged0:
+                mark = len(boot.lines)
+                terminal_command(boot, "reboot")
+                # Login BEFORE the health wait, as the A/B proof
+                # driver does: the guest's session health check needs
+                # the authenticated session, so waiting for health
+                # first deadlocks the trial boot (observed: attempt 1
+                # HEALTH_FAILED check=session, attempts burning).
+                logged = ab.login(boot, secret, since=mark)
+                healthy = boot.wait("SYNVEIL_AB_HEALTH_PASSED", 600, since=mark)
+                page = page_proof(boot) if logged else False
+                if page:
+                    remember_browser_rect(boot)
+                got2 = False
+                if page:
+                    got2 = click_link_and_wait(
+                        boot, LINK_PAYLOAD2, "payload2", log, GOOD_PORT,
+                        "/payload2.bin", 1)
+                    if got2:
+                        time.sleep(10)
+                record("B6", staged=bool(staged), healthy=bool(healthy),
+                       page_proof=bool(page), download_started=bool(got2))
+                close_browser_window(boot)
+                refreshed = refresh_files_window(boot)
+                close_files_window(boot)
+                terminal_command_twice(boot, "dl-sha256")
+                terminal_command_twice(boot, "dl2-sha256")
+                confirmed = terminal_command_verified(
+                    boot, "confirm", "SYNVEIL_AB_CONFIRMED", probe=60,
+                    timeout=300)
+                results["B6"]["files_refreshed"] = bool(refreshed)
+                results["B6"]["confirm_ok"] = bool(confirmed)
+            else:
+                record("B6", staged=False, healthy=False,
+                       page_proof=False, download_started=False)
         finally:
             boot.quit()
         results["B6"]["artifacts"] = browser_artifacts(
@@ -1282,30 +1293,36 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
         boot = NetBoot(workdir, "browser3", disk, vars3)
         boot.start(secret)
         try:
-            ab.login(boot, secret)
-            page_proof(boot)
-            remember_browser_rect(boot)
-            close_browser_window(boot)
-            armed = terminal_command_verified(
-                boot, "rollback", "SYNVEIL_AB_ROLLBACK", probe=60,
-                timeout=300)
-            mark = len(boot.lines)
-            terminal_command(boot, "reboot")
-            logged = ab.login(boot, secret, since=mark)
-            healthy = boot.wait("SYNVEIL_AB_HEALTH_PASSED", 600, since=mark)
-            page = page_proof(boot) if logged else False
-            record("B7", rollback_armed=bool(armed), healthy=bool(healthy),
-                   page_proof=bool(page))
-            close_browser_window(boot)
-            refreshed = refresh_files_window(boot)
-            close_files_window(boot)
-            terminal_command_twice(boot, "dl-sha256")
-            terminal_command_twice(boot, "dl2-sha256")
-            confirmed = terminal_command_verified(
-                boot, "confirm", "SYNVEIL_AB_CONFIRMED", probe=60,
-                timeout=300)
-            results["B7"]["files_refreshed"] = bool(refreshed)
-            results["B7"]["confirm_ok"] = bool(confirmed)
+            logged0 = ab.login(boot, secret)
+            armed = False
+            if logged0:
+                page_proof(boot)
+                remember_browser_rect(boot)
+                close_browser_window(boot)
+                armed = terminal_command_verified(
+                    boot, "rollback", "SYNVEIL_AB_ROLLBACK", probe=60,
+                    timeout=300)
+            if logged0:
+                mark = len(boot.lines)
+                terminal_command(boot, "reboot")
+                logged = ab.login(boot, secret, since=mark)
+                healthy = boot.wait("SYNVEIL_AB_HEALTH_PASSED", 600, since=mark)
+                page = page_proof(boot) if logged else False
+                record("B7", rollback_armed=bool(armed), healthy=bool(healthy),
+                       page_proof=bool(page))
+                close_browser_window(boot)
+                refreshed = refresh_files_window(boot)
+                close_files_window(boot)
+                terminal_command_twice(boot, "dl-sha256")
+                terminal_command_twice(boot, "dl2-sha256")
+                confirmed = terminal_command_verified(
+                    boot, "confirm", "SYNVEIL_AB_CONFIRMED", probe=60,
+                    timeout=300)
+                results["B7"]["files_refreshed"] = bool(refreshed)
+                results["B7"]["confirm_ok"] = bool(confirmed)
+            else:
+                record("B7", rollback_armed=False,
+                       healthy=False, page_proof=False)
         finally:
             boot.quit()
         results["B7"]["artifacts"] = browser_artifacts(
