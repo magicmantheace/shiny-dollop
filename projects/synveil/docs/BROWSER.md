@@ -1,7 +1,7 @@
 # Networking and the graphical browser
 
 Status: **QEMU-proven** (Priority 3/4 acceptance,
-`docs/validation/browser-qemu-proof-2026-10-26/`). No physical
+`docs/validation/browser-qemu-proof-2026-10-27/`). No physical
 hardware claim: the TG01's Ethernet/Wi-Fi devices, their kernel
 drivers, and firmware are unverified — the proof uses QEMU's
 `virtio-net-pci` with user networking (slirp), which is also the
@@ -32,8 +32,27 @@ pinned and hash-verified like every other sealed component:
   loaders, gio modules, mesa DRI), and the data trees. What
   maintainer scripts would have generated (the CA bundle, the
   GLib schema cache) is generated deterministically instead.
-  Sealed payload: **1,851 files, 437 MB**
+  Sealed payload: **1,290 files, 465 MB**
   (`tools/distro_chromium_assets.py`).
+- Two non-obvious seal contracts, both found by the guest
+  refusing to start: the Debian wrapper's runtime files under
+  `etc/chromium.d/` and `etc/chromium/` (default flags, API key
+  stubs, `master_preferences`) are sealed as data, and the
+  prune keeps the **non-ELF resources** inside
+  `usr/lib/chromium/` (ICU data, .pak files, snapshot blobs) —
+  a DT_NEEDED-only prune deletes them and the browser dies at
+  startup. `master_preferences` was reviewed line by line: it
+  carries Debian's own defaults, including
+  `safebrowsing.enabled=false` (a distribution default, not a
+  change made here); nothing in it weakens the sandbox or TLS.
+  The project's baseline owns fontconfig and xkb data, so the
+  payload's copies of those trees are dropped — the assembled
+  rootfs must have zero path collisions.
+- Workspace umask here is 0007, which silently produced a
+  payload the session user (uid 1000) could not traverse or
+  read. Every sealed file is mode-checked at seal time: the
+  stage build **refuses to seal** any payload file that lacks
+  other-read, and generated artifacts are pinned to 0644.
 - The distribution's libc and libstdc++ are pruned by the graph:
   the image runs the project's own glibc 2.44 / GCC 16 runtimes
   (newer than Debian 13's), and every payload ELF's DT_NEEDED
@@ -73,7 +92,12 @@ Chromium's sandbox is a hard acceptance gate, not a flag:
 - On every start, the launcher inspects one of the browser's
   renderers through `/proc` and appends a record to
   `~/sandbox-probe-status.txt`: the renderer's user-namespace id
-  versus the session's, and its seccomp mode. The acceptance
+  versus the session's, and its seccomp mode. The zygote applies
+  the seccomp filter just after the renderer appears, so the
+  probe settle-polls the same pid (bounded ~20 s) before
+  recording — a first-sight read raced that window on loaded
+  first boots and recorded seccomp 0 for a renderer that was
+  filtered moments later. The acceptance
   gate requires records whose renderer namespace differs from
   the session's with seccomp mode 2 (filter) — kernel-level
   evidence, re-derived from the DATA partition, with negative
@@ -126,7 +150,15 @@ controlled endpoint is a local HTTPS server whose certificate
 test CA; in proof builds that CA is **appended** to the bundle
 and imported into the profile's NSS database with certutil —
 both recorded in the build receipt (the driver refuses to run
-against a disk whose receipt names a different CA). A second
+against a disk whose receipt names a different CA). The NSS
+seeding is done by the launcher on first start (proof builds
+only, gated on the in-image `proof-ca.pem`): it creates
+`~/.pki/nssdb` **before** invoking certutil — certutil creates
+the database files but not their parent directory, and the
+seed silently produced an empty database until that was fixed
+(the failure was instructive: with the CA absent from the NSS
+store, Chromium rejected the fixture certificate outright —
+TLS verification working exactly as designed). A second
 endpoint serves the same name from an unrelated CA; the gate
 requires zero GET requests there plus at least one refused
 handshake — a browser that verified nothing could not produce
