@@ -312,12 +312,16 @@ def browser_icon_png():
 
 #: Vendor phone-home endpoints null-routed in every browser
 #: image (see overlay_browser's hosts assembly and
-#: docs/BROWSER.md, "No vendor calls").
+#: docs/BROWSER.md, "No vendor calls"). accounts.google.com
+#: is deliberately NOT in this list: by the owner's decision
+#: of 2026-10-27 it stays reachable so Google sign-in works
+#: in the browser. It is the single disclosed exception; the
+#: privacy gate treats it as such (see
+#: tests/smoke-native-browser.py, NETLOG_OWNER_EXCEPTION_DNS).
 NULLED_PHONE_HOME_HOSTS = (
     "update.googleapis.com",
     "clients2.google.com",
     "clientservices.googleapis.com",
-    "accounts.google.com",
     "safebrowsing.googleapis.com",
     "sb-ssl.google.com",
     "ssl.gstatic.com",
@@ -394,24 +398,25 @@ def overlay_browser(rootfs, stage, *, test_ca, test_host, start_url):
 
     hosts = rootfs / "etc/hosts"
     hosts_text = "127.0.0.1 localhost\n"
-    # Shipped privacy guarantee (owner requirement): the pure
-    # phone-home endpoints of the browser vendor are null-routed
-    # at the name layer of the OS itself, so no DNS query and no
+    # Shipped privacy configuration: the pure phone-home
+    # endpoints of the browser vendor are null-routed at the
+    # name layer of the OS itself, so no DNS query and no
     # connection for them can ever leave the machine. Chromium's
     # managed policies already disable the services that accept
     # being disabled (network time, variations, Safe Browsing,
     # sync, translate, suggestions); the component updater's
-    # data-component checks and the identity service's startup
-    # account fetch ignore ComponentUpdatesEnabled in a stock
-    # build (verified against Chromium 156: the requests fire
-    # with the policy loaded), so this layer is what makes the
-    # no-outbound-calls property absolute. Browser updates
-    # arrive only through Synveil's signed A/B releases. The
-    # trade-off is deliberate and documented in docs/BROWSER.md:
-    # these vendor service endpoints are unreachable from the
-    # guest at all (including accounts.google.com, whose
-    # unprompted ListAccounts fetch is the phone-home being
-    # stopped).
+    # data-component checks ignore ComponentUpdatesEnabled in a
+    # stock build (verified against Chromium 156: the requests
+    # fire with the policy loaded), so this layer is what makes
+    # those endpoints unreachable. Browser updates arrive only
+    # through Synveil's signed A/B releases. The trade-off is
+    # deliberate and documented in docs/BROWSER.md. One
+    # disclosed exception, by the owner's decision of
+    # 2026-10-27: accounts.google.com is NOT null-routed, so
+    # Google sign-in works; its unprompted startup ListAccounts
+    # fetch therefore does leave the machine, and the privacy
+    # gate records it as the owner-authorized exception rather
+    # than a violation.
     for name in NULLED_PHONE_HOME_HOSTS:
         hosts_text += f"127.0.0.1 {name}\n"
     if test_host:

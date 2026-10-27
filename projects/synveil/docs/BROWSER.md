@@ -193,7 +193,7 @@ all shipped in every browser image:
 3. **Name-layer null-routing** — the image `/etc/hosts` maps
    the pure phone-home endpoints to 127.0.0.1:
    update.googleapis.com, clients2.google.com,
-   clientservices.googleapis.com, accounts.google.com,
+   clientservices.googleapis.com,
    safebrowsing.googleapis.com, sb-ssl.google.com,
    ssl.gstatic.com, optimizationguide-pa.googleapis.com,
    translate.googleapis.com, edgedl.me.gvt1.com (the list is
@@ -210,23 +210,36 @@ all shipped in every browser image:
    these out in source; this project ships the distribution
    binary, so the OS name layer makes egress impossible
    instead. The trade-off is deliberate: those vendor service
-   endpoints are unreachable from the guest at all — including
-   accounts.google.com, whose unprompted startup fetch is the
-   phone-home being stopped.
+   endpoints are unreachable from the guest at all.
+   **Disclosed exception (owner decision, 2026-10-27):**
+   accounts.google.com is **not** null-routed, so Google
+   sign-in works in the browser. Its unprompted startup
+   ListAccounts fetch therefore does leave the machine; the
+   acceptance gate treats that name — and only that name — as
+   the owner-authorized exception (below).
 
 Verification is egress-based and part of the acceptance gate:
 proof builds run Chromium with `--log-net-log` into
 `~/net-logs` on DATA (shipped builds never log network
 activity), and `validate_browser_results` fails any boot whose
-net log shows a DNS wire query or a socket to anything but the
-fixture (loopback is where null-routed attempts die). The
+net log shows a DNS wire query or a socket to anything but
+the fixture (loopback is where null-routed attempts die) —
+**IPv4 and IPv6 alike** (the parser dropped IPv6 endpoints
+until the 2026-10-27 review correction; regression fixtures
+are in `tests/smoke-gates.py`). The one exception is
+accounts.google.com: its DNS egress is allowed as the owner's
+decision above, and a socket is allowed only when the same
+log binds it to that name through its resolver source (an
+endpoint the log cannot attribute stays a violation). The
 receipt discloses the hosts the browser still *tried*
-internally (update.googleapis.com, accounts.google.com) —
-with this configuration they can never become a DNS query or
-an external connection. Proven values are in
-`docs/validation/browser-privacy-proof-2026-10-27/`: zero DNS
-wire names and fixture+loopback-only sockets at every
-readback of the joint acceptance.
+internally (update.googleapis.com, accounts.google.com) and
+any exception sockets. For the nine null-routed names, an
+internal attempt can never become a DNS query or an external
+connection. Proven values for the pre-exception configuration
+are in `docs/validation/browser-privacy-proof-2026-10-27/`
+(see the correction note there): zero DNS wire names and
+fixture+loopback-only sockets at every readback of the joint
+acceptance.
 
 ## Downloads
 

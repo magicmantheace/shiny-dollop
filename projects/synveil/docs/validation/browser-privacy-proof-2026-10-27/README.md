@@ -111,3 +111,26 @@ Serial logs of the three boots are alongside the receipts.
 QEMU only (user networking/slirp); no firmware variables were
 written; TLS verification was never disabled anywhere,
 including fixtures.
+
+## Corrections (2026-10-27, after this record was written)
+
+- **Parser scope (independent review, verified firsthand):**
+  the net-log socket parser behind this record matched only
+  IPv4 endpoints, so IPv6 endpoints were silently dropped from
+  the evidence. The measured IPv4 values above stand as
+  recorded; the absolute reading of "no outbound vendor
+  connections" exceeded what the gate could see. The parser
+  now extracts IPv6 endpoints (bracketed and bare), the gate
+  judges them, and `tests/smoke-gates.py` carries the
+  negative regression fixtures (an IPv6 vendor endpoint
+  fails; IPv6 loopback is contained like 127.0.0.1). The
+  shipped image was not changed by the parser fix.
+- **Owner decision (2026-10-27):** accounts.google.com is
+  unblocked so Google sign-in works. It is no longer in the
+  image's null-route list (nine hosts remain); the gate
+  treats it as the disclosed owner-authorized exception —
+  its DNS egress is allowed, and a socket is allowed only
+  when the same log binds it to that name through its
+  resolver source. Test media built after this decision
+  carries the change; see
+  `docs/validation/test-media-2026-10-27/`.
