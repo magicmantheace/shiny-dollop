@@ -76,6 +76,7 @@ from pathlib import Path
 import secrets
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -85,6 +86,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
+import qmp_input  # noqa: E402
 from qmp_input import QMPError, type_test_secret, send_keys, \
     ALLOWED_TERMINAL_RETURN  # noqa: E402
 
@@ -106,6 +108,10 @@ STATE_PARTUUID = "7c9e2d41-8b3a-4f5e-a6d1-2e8c4b7f9053"
 QEMU_GRAPHICS = "virtio"
 QEMU_IMAGE_USB = False
 QEMU_MEMORY = "768M"
+
+# Set by main() in --ab-receipt mode: the full-stack desktop
+# needs its own desktop proof (weston_proof_ab).
+AB_DESKTOP = False
 
 # DATA partition of the A/B layout (tools/native_ab.py): veil-ab
 # mounts it at /home, so the session user's home — browser.log,
@@ -423,6 +429,122 @@ def chromium_readback(image: Path, scratch: Path) -> dict:
     return evidence
 
 
+def _white_fraction(width, height, data):
+    """Fraction of sampled pixels that are near-pure white — the
+    signature of the browser's New Tab page covering the desktop.
+    No other full-stack window paints >= 250 white: the files
+    window is beige, the update window grey-green, the terminal
+    black, the first window a blue-green gradient."""
+    white = total = 0
+    for y in range(0, height, 6):
+        base = y * width * 3
+        for x in range(0, width, 6):
+            off = base + x * 3
+            total += 1
+            if data[off] >= 250 and data[off + 1] >= 250 \
+                    and data[off + 2] >= 250:
+                white += 1
+    return white / total if total else 0.0
+
+
+def send_chord(qmp, *qcodes, timeout=20.0):
+    """Hold a key chord over QMP. qmp_input.send_keys presses its
+    strings one qcode at a time; a chord needs _hold_keys with
+    the qcode tuple — the shape tests/smoke-native-browser.py
+    uses to close the browser."""
+    deadline = time.monotonic() + timeout
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+        while True:
+            try:
+                sock.settimeout(max(0.1, min(1.0,
+                                             deadline - time.monotonic())))
+                sock.connect(str(qmp))
+                break
+            except (FileNotFoundError, ConnectionRefusedError):
+                if time.monotonic() >= deadline:
+                    raise QMPError("QMP socket unavailable")
+                time.sleep(0.05)
+        sock.settimeout(max(0.1, deadline - time.monotonic()))
+        with sock.makefile("rb") as reader:
+            qmp_input._read_reply(reader, greeting=True)
+            qmp_input.emit_command(sock, reader,
+                                   {"execute": "qmp_capabilities"})
+            qmp_input._hold_keys(sock, reader, qcodes)
+
+
+def weston_proof_ab(guest, deadline_s=360):
+    """Desktop proof for the full-stack A/B desktop.
+
+    Same first window, terminal and session lifecycle as the
+    joined image, plus four more windows — and the browser, which
+    autostarts near-maximized and can cover the first window and
+    the terminal entirely (observed on this image: the New Tab
+    page is up ~40 s after login with both proof windows
+    occluded). So first normalize: if the browser's white page
+    covers the desktop, focus it with a click and close its
+    window with Ctrl+Shift+W (the close the browser acceptance
+    itself uses); then run the joined image's own pointer/
+    keyboard proof (drag, resize, Escape-close, terminal exit)
+    on the uncovered desktop. That the browser ran at all is
+    gated separately by the DATA-partition readback, not by
+    this function's success."""
+    end = time.monotonic() + deadline_s
+    while time.monotonic() < end:
+        try:
+            width, height, data = guest.frame()
+        except Exception:  # noqa: BLE001 - transitioning scanout
+            time.sleep(0.5)
+            continue
+        if _white_fraction(width, height, data) > 0.20:
+            weston_smoke.pointer(guest.qmp, width, height,
+                                 width // 2, height // 2, button=True)
+            weston_smoke.pointer(guest.qmp, width, height,
+                                 width // 2, height // 2, button=False)
+            send_chord(guest.qmp, "ctrl", "shift", "w")
+            lift_end = time.monotonic() + 90
+            while time.monotonic() < lift_end:
+                try:
+                    w2, h2, d2 = guest.frame()
+                except Exception:  # noqa: BLE001
+                    time.sleep(0.5)
+                    continue
+                if _white_fraction(w2, h2, d2) <= 0.02:
+                    break
+                time.sleep(0.8)
+            else:
+                return False
+            continue
+        window = weston_smoke.original_window(width, height, data)
+        if window and weston_smoke.terminal_pixels_visible(
+                width, height, data, window):
+            break
+        time.sleep(0.8)
+    else:
+        return False
+    return joined_smoke.weston_proof(guest.qmp, Path(guest._temp.name),
+                                     full=True)
+
+
+def wait_desktop_ab(guest, deadline_s):
+    """Desktop reached, in either full-stack form: the proof
+    windows visible, or the browser's page covering them."""
+    end = time.monotonic() + deadline_s
+    while time.monotonic() < end:
+        try:
+            width, height, data = guest.frame()
+        except Exception:  # noqa: BLE001
+            time.sleep(0.5)
+            continue
+        if _white_fraction(width, height, data) > 0.20:
+            return True
+        window = weston_smoke.original_window(width, height, data)
+        if window and weston_smoke.terminal_pixels_visible(
+                width, height, data, window):
+            return True
+        time.sleep(0.8)
+    return False
+
+
 def boot_one_fresh(work, evidence_dir, secret, wrong, timeout):
     """Boot 1: console evidence, enrollment, login, desktop, relock."""
     facts = {}
@@ -482,8 +604,12 @@ def boot_one_fresh(work, evidence_dir, secret, wrong, timeout):
             raise RuntimeError("login screen not stable after enrollment")
         # Login -> Weston desktop proof -> session end relocks.
         type_test_secret(guest.qmp, secret, timeout=18)
-        if not joined_smoke.weston_proof(guest.qmp, Path(guest._temp.name),
-                                         full=True):
+        if AB_DESKTOP:
+            proof_ok = weston_proof_ab(guest)
+        else:
+            proof_ok = joined_smoke.weston_proof(
+                guest.qmp, Path(guest._temp.name), full=True)
+        if not proof_ok:
             raise RuntimeError("weston desktop proof failed (boot 1)")
         guest.wait_for("relock after session end",
                        lambda s: is_auth(s) and same_screen(s, login), 120)
@@ -509,7 +635,11 @@ def boot_two_reboot(work, evidence_dir, secret, wrong, login_screen, timeout):
             and s["title"] == login_screen["title"], 60)
         # Correct password -> desktop, then cut the power mid-session.
         type_test_secret(guest.qmp, secret, timeout=18)
-        if not guest.wait_desktop(120):
+        if AB_DESKTOP:
+            reached = wait_desktop_ab(guest, 300)
+        else:
+            reached = guest.wait_desktop(120)
+        if not reached:
             raise RuntimeError("desktop did not appear after cold reboot")
         guest.check_serial()
         guest.hard_stop()
@@ -521,8 +651,12 @@ def boot_two_reboot(work, evidence_dir, secret, wrong, login_screen, timeout):
             raise RuntimeError(
                 "power cut did not return to the boot-1 login screen")
         type_test_secret(guest.qmp, secret, timeout=18)
-        if not joined_smoke.weston_proof(guest.qmp, Path(guest._temp.name),
-                                         full=False):
+        if AB_DESKTOP:
+            proof_ok = weston_proof_ab(guest)
+        else:
+            proof_ok = joined_smoke.weston_proof(
+                guest.qmp, Path(guest._temp.name), full=False)
+        if not proof_ok:
             raise RuntimeError("weston desktop proof failed (boot 2)")
         guest.wait_for("relock after power-cut-recovery session",
                        lambda s: is_auth(s) and same_screen(s, login_screen),
@@ -552,7 +686,7 @@ def boot_three_broken_state(work, evidence_dir, secret, login_screen, timeout):
 
 
 def main() -> int:
-    global QEMU_GRAPHICS, QEMU_IMAGE_USB, QEMU_MEMORY
+    global QEMU_GRAPHICS, QEMU_IMAGE_USB, QEMU_MEMORY, AB_DESKTOP
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--timeout", type=float, default=420)
     parser.add_argument("--graphics", choices=("virtio", "vga"),
@@ -587,6 +721,7 @@ def main() -> int:
     QEMU_GRAPHICS = args.graphics
     QEMU_IMAGE_USB = args.image_usb
     QEMU_MEMORY = args.memory
+    AB_DESKTOP = bool(args.ab_receipt)
     variant = args.variant or (
         "virtio" if args.graphics == "virtio" and not args.image_usb
         else "-".join(part for part in
@@ -734,6 +869,11 @@ def main() -> int:
     if chromium is not None:
         result["chromium_evidence"] = chromium
         result["chromium_launched_and_persisted_on_data"] = True
+        result["desktop_proof"] = (
+            "ab-normalized: the autostarted browser's cover is "
+            "closed via Ctrl+Shift+W, then the joined pointer/"
+            "keyboard proof (drag, resize, Escape-close, "
+            "terminal exit) runs on the uncovered desktop")
     result_name = ("guest-validation.json" if variant == "virtio"
                    else f"guest-validation-{variant}.json")
     result_dir = evidence_dir if args.ab_receipt else IMAGE_DIR
