@@ -1,17 +1,42 @@
 # Physical UEFI boot bring-up
 
-**Status (2026-10-25): Ready for the owner's first boot test — not an install, not yet physically validated.**
+**Status (2026-10-27): Ready for the owner's first boot test of the
+full-stack test-media package — not an install, not yet physically
+validated.**
 
-**Networking/browser scope note (2026-10-26):** the A/B proof disk
-(not this test-media image) gained guest networking and a graphical
-browser, demonstrated **in QEMU only** — QEMU user networking
-(slirp) with a `virtio-net-pci` device; see
-[BROWSER.md](BROWSER.md) and the
-[browser proof record](validation/browser-qemu-proof-2026-10-26/README.md).
-The owner test-media image described below still contains **no
-networking**, and the TG01's network hardware, drivers, and
-firmware remain **unverified**. Nothing in the QEMU browser proof
-changes this document's physical-boot status.
+**Full-stack refresh (2026-10-27):** the owner test-media package
+was rebuilt from source `768150a` and now contains the whole
+current stack — the A/B updater with graphical update controls,
+Chromium with its privacy layers (nine vendor endpoints
+null-routed; accounts.google.com reachable by the owner's
+2026-10-27 decision so sign-in works), and persistent
+Downloads — as
+one A/B disk image (`synveil-x86_64.img`, SHA-256
+`283b1974be9e292d6e28f5ec9848bf5427ffc9e8f5c690a16e502378df3e6c83`,
+3,900,702,720 bytes), plus the signed v2 release media for the
+update/rollback test. The 2026-10-25 review's four points were
+re-proven on this image: the guarded writer's transitive
+backing-device refusal suite passes 15/15 on fixtures; the full
+framebuffer acceptance passed on the firmware-framebuffer/
+simpledrm path (QEMU standard VGA; `CONFIG_DRM_BOCHS` not set, so
+no other DRM driver can bind — physical RTX 3060 compatibility
+remains explicitly unverified); the complete image booted from
+emulated USB storage through the full sequence (enrollment, cold
+reboot, wrong password denied, login, desktop with the browser
+launched — 2 start markers read back from the DATA partition —
+relock, state persisted); and the package documents enumerate the
+specific protections implemented and tested, with no absolute
+Windows-safety language. Guest networking **is** configured in
+this image (DHCP; proven in QEMU on `virtio-net-pci` at the
+browser records) — the TG01's own NIC/Wi-Fi being driven by this
+kernel remains **unverified**. Record:
+[test-media record](validation/test-media-2026-10-27/README.md).
+Two honest limits from that record: the A/B desktop proof is a
+window-peel (each window closed by its own control, terminal
+exited, login screen's return observed) — no drag/resize is
+claimed for the A/B desktop; and the destroyed-STATE boot was
+skipped there because the A/B layout takes the
+recovery-diagnostics path for it.
 
 **Review resolution (2026-10-25):** an independent review found the
 earlier "owner test-ready" conclusion premature and held the status
