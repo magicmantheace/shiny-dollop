@@ -19,7 +19,7 @@ const MIN_PASSWORD_BYTES: usize = 8;
 const LINUX_O_NOFOLLOW: i32 = 0o400000;
 const LINUX_O_NONBLOCK: i32 = 0o4000;
 
-fn valid_phc_format(phc: &str) -> bool {
+pub(crate) fn valid_phc_format(phc: &str) -> bool {
     if !phc.starts_with(PHC_PREFIX) || phc.len() > MAX_PHC_BYTES {
         return false;
     }
@@ -184,7 +184,7 @@ fn device_is_state_partition(device: &str) -> bool {
     uevent_is_state_partition(&uevent)
 }
 
-fn has_persistent_state() -> bool {
+pub(crate) fn has_persistent_state() -> bool {
     let Ok(mounts) = fs::read_to_string("/proc/mounts") else {
         return false;
     };
@@ -192,6 +192,131 @@ fn has_persistent_state() -> bool {
         return false;
     };
     device_is_state_partition(&device)
+}
+
+/// Hash an arbitrary verifier input under the pinned ADR 0009
+/// parameters. The recovery-factor record (ADR 0010 tier 4, ADR 0020)
+/// stores a PHC record over a fixed domain-separated encoding, not a
+/// password; the PHC discipline — Argon2id v=19, 64 MiB / 3 passes /
+/// 1 lane, 16-byte salt, strict format caps — is identical to the
+/// password record's, so both records share one audited shape.
+pub(crate) fn hash_input_phc(input: &[u8], salt_bytes: &[u8; 16]) -> Option<String> {
+    let salt = SaltString::encode_b64(salt_bytes).ok()?;
+    let parameters = Params::new(65536, 3, 1, Some(32)).ok()?;
+    let phc = Argon2::new(Algorithm::Argon2id, Version::V0x13, parameters)
+        .hash_password(input, &salt)
+        .ok()?
+        .to_string();
+    if valid_phc_format(&phc) {
+        Some(phc)
+    } else {
+        None
+    }
+}
+
+/// Verify an arbitrary verifier input against a PHC record under the
+/// same strict format caps as the password path. No account or
+/// password-length policy is applied here; callers construct
+/// fixed-shape inputs (see `recovery::binding_input`).
+pub(crate) fn verify_input_phc(input: &[u8], phc: &str) -> bool {
+    if !valid_phc_format(phc) {
+        return false;
+    }
+    let Ok(parsed) = PasswordHash::new(phc) else {
+        return false;
+    };
+    Argon2::default().verify_password(input, &parsed).is_ok()
+}
+
+/// Write `bytes` to `path` atomically inside its private directory:
+/// a temporary file is created refusing symlinks, given mode 0600,
+/// synchronized, then renamed over the destination and the directory
+/// synchronized. A crash leaves either the old record or the new one,
+/// never a torn record. A stale temporary from an interrupted write
+/// is unlinked first (the link itself, never its target).
+pub(crate) fn write_record_atomically(dir: &Path, path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+        return Err(unsafe_path());
+    };
+    let temp = dir.join(format!(".{name}.new"));
+    match fs::remove_file(&temp) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error),
+    }
+    let mut out = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .custom_flags(LINUX_O_NOFOLLOW | LINUX_O_NONBLOCK)
+        .open(&temp)?;
+    let result = (|| {
+        out.write_all(bytes)?;
+        out.sync_all()?;
+        drop(out);
+        fs::rename(&temp, path)?;
+        fs::File::open(dir)?.sync_all()
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temp);
+    }
+    result
+}
+
+/// Replace the enrolled password record. This is the mutation the
+/// ADR 0010 tier 4 reset flow performs after the recovery factor has
+/// verified and the owner has explicitly confirmed (specification
+/// section 9); it is the only replacement path, and enrollment still
+/// refuses to overwrite. The current record must strictly validate
+/// first — replacing an absent, corrupt or untrusted record is
+/// refused — and the swap itself is atomic (see
+/// `write_record_atomically`), through the same credential authority
+/// and storage discipline as enrollment.
+pub fn replace_root_credential(password: &[u8]) -> io::Result<()> {
+    if !has_persistent_state() {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "persistent state unavailable",
+        ));
+    }
+    let record = Path::new(ROOT_CREDENTIAL_PATH);
+    let base = record
+        .parent()
+        .and_then(Path::parent)
+        .ok_or_else(unsafe_path)?;
+    replace_in_private_state(base, 0, password)
+}
+
+fn replace_in_private_state(base: &Path, uid: u32, password: &[u8]) -> io::Result<()> {
+    if password.len() < MIN_PASSWORD_BYTES
+        || password.len() > MAX_PASSWORD_BYTES
+        || !private_directory(base, uid)
+    {
+        return Err(unsafe_path());
+    }
+    let auth = base.join("auth");
+    if !private_directory(&auth, uid) {
+        return Err(unsafe_path());
+    }
+    let path = auth.join("credential.phc");
+    if read_private_record(&path, uid).is_none() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "no enrolled credential to replace",
+        ));
+    }
+    let mut salt_bytes = [0u8; 16];
+    fs::File::open("/dev/urandom")?.read_exact(&mut salt_bytes)?;
+    let salt = SaltString::encode_b64(&salt_bytes).map_err(|_| unsafe_path())?;
+    let parameters = Params::new(65536, 3, 1, Some(32)).map_err(|_| unsafe_path())?;
+    let phc = Argon2::new(Algorithm::Argon2id, Version::V0x13, parameters)
+        .hash_password(password, &salt)
+        .map_err(|_| unsafe_path())?
+        .to_string();
+    if !valid_phc_format(&phc) {
+        return Err(unsafe_path());
+    }
+    write_record_atomically(&auth, &path, format!("{phc}\n").as_bytes())
 }
 
 /// One-time developer-VM enrollment; read password from an already protected
@@ -522,6 +647,69 @@ mod tests {
         fs::set_permissions(&target, fs::Permissions::from_mode(0o600)).unwrap();
         std::os::unix::fs::symlink(&target, &record).unwrap();
         assert!(read_private_record(&record, owner).is_none());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn arbitrary_input_phc_roundtrip_uses_the_pinned_shape() {
+        let salt = [7u8; 16];
+        let input = b"synveil-recovery-v1 fixture input";
+        let phc = hash_input_phc(input, &salt).unwrap();
+        assert!(valid_phc_format(&phc));
+        assert!(verify_input_phc(input, &phc));
+        assert!(!verify_input_phc(b"synveil-recovery-v1 other input", &phc));
+        // The strict caps still apply: a tampered cost never verifies.
+        assert!(!verify_input_phc(
+            input,
+            &phc.replace("m=65536", "m=1048576")
+        ));
+        assert!(!verify_input_phc(input, "not-a-phc-record"));
+    }
+
+    #[test]
+    fn replacement_swaps_the_credential_and_rejects_the_old_one() {
+        let dir = private_dir();
+        let owner = fs::metadata(&dir).unwrap().uid();
+        enroll_in_private_state(&dir, owner, b"fixture-original-password").unwrap();
+        let path = dir.join("auth/credential.phc");
+        replace_in_private_state(&dir, owner, b"fixture-replacement-password").unwrap();
+        let record = read_root_private_record(&path, owner).unwrap();
+        assert!(!verify_phc(
+            LOCAL_ACCOUNT,
+            b"fixture-original-password",
+            &record
+        ));
+        assert!(verify_phc(
+            LOCAL_ACCOUNT,
+            b"fixture-replacement-password",
+            &record
+        ));
+        assert_eq!(fs::metadata(&path).unwrap().mode() & 0o777, 0o600);
+        assert_eq!(fs::metadata(&path).unwrap().nlink(), 1);
+        // No stale temporary is left behind by the atomic write.
+        assert!(!dir.join("auth/.credential.phc.new").exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn replacement_refuses_absent_or_short_credentials() {
+        let dir = private_dir();
+        let owner = fs::metadata(&dir).unwrap().uid();
+        let auth = dir.join("auth");
+        fs::DirBuilder::new().mode(0o700).create(&auth).unwrap();
+        assert_eq!(
+            replace_in_private_state(&dir, owner, b"fixture-valid-password")
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::NotFound
+        );
+        enroll_in_private_state(&dir, owner, b"fixture-original-password").unwrap();
+        assert_eq!(
+            replace_in_private_state(&dir, owner, b"short")
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::PermissionDenied
+        );
         fs::remove_dir_all(dir).unwrap();
     }
 
