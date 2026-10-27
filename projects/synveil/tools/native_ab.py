@@ -330,6 +330,26 @@ def overlay_browser(rootfs, stage, *, test_ca, test_host, start_url):
     shutil.copyfile(ROOT / "build/rootfs/synveil-browser", wrapper)
     wrapper.chmod(0o755)
 
+    # Shipped privacy configuration (owner requirement): the
+    # browser makes no outbound connections to the distribution
+    # or the vendor at runtime — no component updates, no
+    # variations/field-trial fetches, no telemetry. Browser
+    # updates arrive only through Synveil's own signed A/B
+    # releases. Installed as a Chromium managed policy for
+    # EVERY browser build (proof and production alike); the
+    # launcher's flags and the profile seed repeat the core of
+    # it as defense in depth.
+    policy_source = ROOT / "build/rootfs/chromium-policies.json"
+    policies = rootfs / "etc/chromium/policies/managed"
+    policies.mkdir(parents=True, exist_ok=True)
+    for parent in (rootfs / "etc/chromium/policies",
+                   rootfs / "etc/chromium"):
+        parent.chmod(0o755)
+    policies.chmod(0o755)
+    policy_file = policies / "synveil-privacy.json"
+    shutil.copyfile(policy_source, policy_file)
+    policy_file.chmod(0o644)
+
     config = rootfs / "etc/synveil"
     for marker in ("browser", "files-app"):
         entry = config / marker
@@ -363,6 +383,8 @@ def overlay_browser(rootfs, stage, *, test_ca, test_host, start_url):
         "assets_copied": counts["copied"],
         "assets_identical_to_baseline": counts["identical"],
         "link_closure_files_checked": closure_files,
+        "privacy_policy_sha256": hashlib.sha256(
+            policy_source.read_bytes()).hexdigest(),
         "test_ca_sha256": None,
         "test_host": None,
         "start_url": None,

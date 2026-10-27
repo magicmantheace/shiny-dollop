@@ -4,7 +4,13 @@
 # distribution Chromium 156, native Wayland via Ozone, running as
 # the authenticated session user with its sandbox left entirely
 # alone — there is deliberately no --no-sandbox (nor any
-# TLS-related flag) anywhere in this image. After starting the
+# TLS-related flag) anywhere in this image. The browser also
+# makes no calls to the distribution or the vendor at runtime:
+# a managed policy in /etc/chromium/policies/managed disables
+# component updates, variations, telemetry and the other
+# phone-home services, and the launch flags below repeat the
+# core of it; browser updates arrive only through Synveil's
+# own signed A/B releases. After starting the
 # browser, the launcher records kernel-level sandbox evidence for
 # one of its renderers (namespace + seccomp state from /proc) into
 # ~/sandbox-probe-status.txt: the Priority 3 gate reads it back
@@ -49,7 +55,14 @@ LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export LD_LIBRARY_PATH
 
 if [ ! -f "$PROFILE/Default/Preferences" ]; then
-    printf '%s' '{"download":{"default_directory":"/home/synveil/Downloads","prompt_for_download":false},"browser":{"check_default_browser":false}}' \
+    # The seed repeats the core of the managed privacy policy
+    # (/etc/chromium/policies/managed/synveil-privacy.json) at
+    # profile level: no search suggestions, no network
+    # prediction/preconnect, Safe Browsing off (its URL checks
+    # phone home), no translate prompts, no DNS-over-HTTPS
+    # resolver of the vendor's choosing. Browser updates come
+    # only through Synveil's signed A/B releases.
+    printf '%s' '{"download":{"default_directory":"/home/synveil/Downloads","prompt_for_download":false},"browser":{"check_default_browser":false},"net":{"network_prediction_options":2},"search":{"suggest_enabled":false},"safebrowsing":{"enabled":false,"scouting_enabled":false},"translate":{"enabled":false},"dns_over_https":{"mode":"off"}}' \
         > "$PROFILE/Default/Preferences" || {
         echo "synveil-browser: cannot seed profile Preferences"
         exit 1
@@ -72,6 +85,25 @@ if [ -f /etc/synveil/browser-start-url ]; then
     URL=$(cat /etc/synveil/browser-start-url)
 fi
 echo "SYNVEIL_BROWSER_STARTED backend=chromium url=${URL:-default}"
+
+# No-phone-home posture (owner requirement), defense in depth
+# under the managed policy of the same name: no background
+# networking subsystems, no component updater, no domain
+# reliability reporting, no sync, no pings, no client-side
+# phishing calls, no media-router/optimization-hints/translate
+# services phoning out. None of these flags touches the
+# sandbox or TLS verification.
+PRIVACY_FLAGS="--disable-background-networking --disable-component-update --disable-domain-reliability --disable-sync --no-pings --disable-client-side-phishing-detection --disable-features=MediaRouter,OptimizationHints,TranslateUI"
+
+# Proof builds only: capture Chromium's own network log so the
+# acceptance gate can enumerate every remote endpoint the
+# browser actually contacted and fail on anything but the
+# fixture. Shipped builds never log network activity.
+NETLOG=""
+if [ -f /usr/share/synveil/proof-ca.pem ]; then
+    mkdir -p "$HOME/net-logs"
+    NETLOG="--log-net-log=$HOME/net-logs/$(date +%s)-$$.json --net-log-capture-mode=Default"
+fi
 
 probe_sandbox() {
     # Poll for a renderer of THIS profile and record its kernel
@@ -124,6 +156,7 @@ probe_sandbox() {
     --no-first-run --no-default-browser-check \
     --disable-dev-shm-usage --disable-gpu \
     --disk-cache-size=16777216 \
+    $PRIVACY_FLAGS $NETLOG \
     --user-data-dir="$PROFILE" $URL &
 BROWSER_PID=$!
 trap 'kill $BROWSER_PID 2>/dev/null' TERM INT

@@ -682,6 +682,33 @@ def _first_token(raw):
     return parts[0] if parts else None
 
 
+# No-phone-home evidence (owner requirement): proof builds run
+# Chromium with --log-net-log into ~/net-logs; the readback
+# enumerates every remote endpoint the browser actually
+# contacted — hostnames from url/host fields, literal sockets
+# from remote_endpoint/address fields. Only the fixture may
+# appear: the good and bad fixture ports, and the slirp DNS
+# transport (the NAMES it carries are judged by the host list).
+NETLOG_ALLOWED_HOSTS = {"test.synveil.invalid", "localhost"}
+NETLOG_ALLOWED_SOCKETS = {"10.0.2.2:8443", "10.0.2.2:8444",
+                          "10.0.2.3:53"}
+
+
+def _netlog_extract(blob):
+    text = blob.decode("utf-8", "replace")
+    hosts = set()
+    for match in re.finditer(
+            r'"(?:url|host)":\s*"(?:[a-zA-Z][a-zA-Z0-9+.-]*://)?'
+            r'([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', text):
+        hosts.add(match.group(1).lower().rstrip("."))
+    sockets = set()
+    for match in re.finditer(
+            r'"(?:remote_endpoint|address)":\s*"'
+            r'(\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})"', text):
+        sockets.add(f"{match.group(1)}:{int(match.group(2))}")
+    return hosts, sockets
+
+
 def browser_artifacts(disk, workdir):
     """Read the persistent DATA partition back host-side: A/B
     control facts (via the A/B driver's reader) plus everything
@@ -763,6 +790,21 @@ def browser_artifacts(disk, workdir):
         "files_payload_scans": files_payload_scans,
         "files_payload2_scans": files_payload2_scans,
     })
+    netlog_names = sorted(name for name in
+                          ext4_list(image, "/synveil/net-logs")
+                          if name.endswith(".json"))
+    netlog_hosts, netlog_sockets = set(), set()
+    for name in netlog_names:
+        blob = read(f"/synveil/net-logs/{name}")
+        if blob:
+            hosts, sockets = _netlog_extract(blob)
+            netlog_hosts |= hosts
+            netlog_sockets |= sockets
+    facts.update({
+        "netlog_files": len(netlog_names),
+        "netlog_hosts": sorted(netlog_hosts),
+        "netlog_sockets": sorted(netlog_sockets),
+    })
     return facts
 
 
@@ -827,6 +869,26 @@ def validate_browser_results(results):
             failures.append(f"{scenario}: browser profile missing or "
                             "download directory not the persistent home")
 
+    def privacy_ok(scenario):
+        facts = need(scenario, "artifacts") or {}
+        if not facts.get("netlog_files"):
+            failures.append(
+                f"{scenario}: no Chromium net log on DATA — the "
+                "no-phone-home property (no component updates, "
+                "no variations fetch, no telemetry) is unproven "
+                "for this boot")
+            return
+        for host in facts.get("netlog_hosts") or []:
+            if host not in NETLOG_ALLOWED_HOSTS:
+                failures.append(
+                    f"{scenario}: browser contacted unexpected "
+                    f"host {host} — phone-home not disabled")
+        for sock in facts.get("netlog_sockets") or []:
+            if sock not in NETLOG_ALLOWED_SOCKETS:
+                failures.append(
+                    f"{scenario}: browser opened a socket to "
+                    f"unexpected endpoint {sock}")
+
     def sandbox_ok(scenario, minimum):
         facts = need(scenario, "artifacts") or {}
         good = 0
@@ -861,6 +923,7 @@ def validate_browser_results(results):
         failures.append("B1: no baseline credential recorded")
     digest_pair("B1", "payload", PAYLOAD_SHA256)
     survival("B1", baseline_credential)
+    privacy_ok("B1")
     sandbox_ok("B1", 1)
 
     b2 = results.get("B2", {})
@@ -906,6 +969,7 @@ def validate_browser_results(results):
         failures.append("B5: page did not load again after cold reboot")
     digest_pair("B5", "payload", PAYLOAD_SHA256)
     survival("B5", baseline_credential)
+    privacy_ok("B5")
     facts5 = b5.get("artifacts") or {}
     if facts5.get("files_payload_scans", 0) < 1:
         failures.append("B5: files window never listed payload.bin — "
@@ -920,6 +984,7 @@ def validate_browser_results(results):
     digest_pair("B6", "payload", PAYLOAD_SHA256)
     digest_pair("B6", "payload2", PAYLOAD2_SHA256)
     survival("B6", baseline_credential)
+    privacy_ok("B6")
     if facts6.get("files_payload2_scans", 0) < 1:
         failures.append("B6: files window never listed payload2.bin")
 
@@ -932,6 +997,7 @@ def validate_browser_results(results):
     digest_pair("B7", "payload", PAYLOAD_SHA256)
     digest_pair("B7", "payload2", PAYLOAD2_SHA256)
     survival("B7", baseline_credential)
+    privacy_ok("B7")
     sandbox_ok("B7", 3)
 
     for scenario in ("B1", "B5", "B6", "B7"):
