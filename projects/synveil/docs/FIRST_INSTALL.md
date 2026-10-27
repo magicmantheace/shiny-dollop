@@ -30,9 +30,12 @@ hardware-profile section below): the hardware-profile joined image
 is boot-validated in QEMU, a reviewed removable-media preparation
 method exists, and the owner test package with instructions is
 assembled. What remains blocked is a first **install** — persistent
-use on hardware — which still requires the independent owner
-recovery program (ADR 0010), the A/B installation milestone, and
-physical validation on the target machine. Production-safe
+use on hardware — which still requires the complete independent
+owner recovery path (ADR 0010: tiers 1–3 demonstrated in QEMU on
+2026-10-27, [recovery-gates record](validation/recovery-gates-2026-10-27/README.md);
+the tier-4 recovery factor is still a draft specification awaiting
+owner approval), the A/B installation milestone, and physical
+validation on the target machine. Production-safe
 first-user enrollment and a real window manager — previously on the
 blocked list — are implemented and proven in QEMU in the joined
 image described below; that proof is QEMU-only and does not itself
@@ -82,9 +85,12 @@ backing-device tracing, the actual DRM driver vs the simpledrm path,
 complete-image USB boot evidence, and precise recovery/Windows-safety
 wording); their resolution, with evidence, is recorded in the
 [review-resolution record](validation/review-resolution-2026-10-25/README.md).
-None of it changes the install blockers above: independent owner
-recovery (ADR 0010) remains unimplemented, and rewriting disposable
-test media is not a substitute for it.
+A 2026-10-27 recovery pass demonstrated ADR 0010 tiers 1–3 in QEMU
+([recovery-gates record](validation/recovery-gates-2026-10-27/README.md)),
+but it does not clear the install blockers above: the tier-4 recovery
+factor remains unimplemented pending owner approval of its design,
+no recovery evidence exists on physical hardware, and rewriting
+disposable test media is not a substitute for the complete path.
 
 ## Native authenticated Files browser (development)
 

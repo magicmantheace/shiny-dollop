@@ -1,6 +1,9 @@
 # ADR 0010: Independent Owner Recovery (Proposed)
 
-- Status: **Proposed — owner authorization and implementation not yet granted**
+- Status: **Proposed — tiers 1–3 implemented and demonstrated in QEMU
+  (2026-10-27, see the evidence-status section at the end of this ADR);
+  tier 4 remains unimplemented pending explicit owner approval of the
+  recovery-factor design**
 - Date: 2026-10-12
 - Related: [authenticated graphical session](0008-authenticated-graphical-session.md), [password verifier](0009-source-built-argon2id-verifier.md)
 - Scope: future installed Synveil systems; current authenticated QEMU preview remains unrecoverable after password loss
@@ -110,6 +113,8 @@ status transcript, and probes that the locked serial console cannot execute
 root commands. **Passing host fixtures is not proof of successful native
 QEMU recovery; guest evidence at an exact revision is still required.**
 do not mark ADR gate A complete until that evidence exists.
+*(Superseded 2026-10-27: that guest evidence now exists at exact
+revision `915751d` — see the evidence-status section below.)*
 
 ## Explicit non-decision
 
@@ -117,3 +122,38 @@ This ADR does not approve or implement password resets, a physical installer,
 serial-root access, recovery-key enrollment, an AI emergency bypass or a
 privileged generic command runner. It records a proposed dependency order so
 non-sensitive recovery diagnostics can proceed independently.
+
+## Evidence status (2026-10-27)
+
+Guest evidence for the implementation sequence above now exists in QEMU;
+full artifacts are in the
+[recovery-gates validation record](../validation/recovery-gates-2026-10-27/README.md).
+
+- **Gate A (tier 1): demonstrated in QEMU** at exact revision `915751d`
+  on the dedicated recovery-status fixture (build-time
+  `synveil.recovery=status` kernel argument; core/seat/graphics absent
+  from that fixture's boot path). The serial transcript shows the fixed
+  status markers and the locked console refusing the injected probe.
+  The mode remains unreachable under the shipped images' fixed kernel
+  command line; it is a fixture-only boot today.
+- **Gate B (tier 2): demonstrated in QEMU.** The six-case maintenance
+  smoke (legitimate authentication; denial for wrong, absent and
+  corrupt credentials; no serial-root bypass) passed at `63dff06`, and
+  the A/B-substrate acceptance — an authenticated maintenance session
+  restoring the known-good generation with user data byte-intact —
+  passed at `915751d` after a test-fixture defect was found and fixed
+  (host surgery on journaled ext4 images; see the record's root-cause
+  section — the defect was in the acceptance fixture, not the guest).
+- **Gate C (tier 3): demonstrated in QEMU** on the A/B proof substrate
+  ([A/B proof record](../validation/ab-qemu-proof-2026-10-26/README.md):
+  interrupted update, failing generation, rollback, user-data survival)
+  and extended by the gate B acceptance above, which performs the
+  rollback from the authenticated maintenance path itself.
+- **Gate D (tier 4): not implemented.** A draft specification exists
+  ([RECOVERY_FACTOR_SPEC.md](../RECOVERY_FACTOR_SPEC.md), commit
+  `af50cba`) and awaits explicit owner approval of its enumerated
+  decisions before any implementation, per sequence D.
+- **Gate E:** per-gate guest evidence is recorded at exact commits in
+  the validation record. Physical installation remains blocked: the
+  complete recovery path (tier 4 included) has not been exercised, and
+  none of this evidence is from physical hardware.

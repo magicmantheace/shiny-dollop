@@ -187,13 +187,18 @@ a claim of boot success on the physical machine.
       is destroyed — all exercised on the hardware-profile image in
       QEMU ([validation record](validation/joined-hardware-124abbc/README.md)).
       The read-only `recovery-status` diagnostic mode (ADR 0010 tier
-      A) exists in the initramfs but is unreachable under this image's
-      fixed kernel command line, and the interactive owner recovery
-      of ADR 0010 tiers B–D is unimplemented and gated on an
-      owner-approved design. For this disposable test media the
-      documented recovery procedure is a media rewrite
-      ([owner guide](OWNER_FIRST_BOOT_TEST.md)). The gate stays open
-      for installed systems.
+      1) is guest-proven on its dedicated fixture at `915751d` but
+      remains unreachable under this image's fixed kernel command
+      line. The tier-2 authenticated maintenance path (text-mode,
+      separately audited verifier, enumerated operations) and the
+      tier-3 rollback substrate are demonstrated in QEMU — including
+      a maintenance-initiated restore with user data byte-intact —
+      in the [recovery-gates record](validation/recovery-gates-2026-10-27/README.md).
+      Tier 4 (forgotten-password recovery factor) remains a draft
+      specification awaiting an owner-approved design. For this
+      disposable test media the documented recovery procedure is a
+      media rewrite ([owner guide](OWNER_FIRST_BOOT_TEST.md)). The
+      gate stays open for installed systems.
 - [x] Signed or otherwise owner-verified release/image provenance, with
       clear test-media identification and checksums.
       Owner-verified route (2026-10-25): the image is **unsigned**;
