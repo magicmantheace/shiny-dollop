@@ -1,0 +1,593 @@
+{
+  "benchmark": "curriculum-v1",
+  "status": "development-seeds-inspected",
+  "training_tasks": [
+    "collect"
+  ],
+  "train_episodes": 3500,
+  "test_episodes": 150,
+  "results": [
+    {
+      "seed": 13,
+      "tasks": {
+        "reach": {
+          "untrained": {
+            "schema": "curriculum-v1",
+            "task": "reach",
+            "split": "test",
+            "policy": "learned",
+            "seed": 13,
+            "episodes": 150,
+            "trained_episodes": 0,
+            "success_rate": 0.3933,
+            "mean_steps": 70.23,
+            "mean_blocked": 15.84
+          },
+          "trained": {
+            "schema": "curriculum-v1",
+            "task": "reach",
+            "split": "test",
+            "policy": "learned",
+            "seed": 13,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.66,
+            "mean_steps": 35.11,
+            "mean_blocked": 0.0
+          },
+          "random": {
+            "schema": "curriculum-v1",
+            "task": "reach",
+            "split": "test",
+            "policy": "random",
+            "seed": 13,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.38,
+            "mean_steps": 71.19,
+            "mean_blocked": 15.84
+          },
+          "greedy": {
+            "schema": "curriculum-v1",
+            "task": "reach",
+            "split": "test",
+            "policy": "greedy",
+            "seed": 13,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.9133,
+            "mean_steps": 13.43,
+            "mean_blocked": 0.0
+          },
+          "oracle": {
+            "schema": "curriculum-v1",
+            "task": "reach",
+            "split": "test",
+            "policy": "oracle",
+            "seed": 13,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 1.0,
+            "mean_steps": 5.65,
+            "mean_blocked": 0.0
+          },
+          "success_gain": 0.2667
+        },
+        "collect": {
+          "untrained": {
+            "schema": "curriculum-v1",
+            "task": "collect",
+            "split": "test",
+            "policy": "learned",
+            "seed": 13,
+            "episodes": 150,
+            "trained_episodes": 0,
+            "success_rate": 0.1667,
+            "mean_steps": 82.13,
+            "mean_blocked": 18.16
+          },
+          "trained": {
+            "schema": "curriculum-v1",
+            "task": "collect",
+            "split": "test",
+            "policy": "learned",
+            "seed": 13,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.64,
+            "mean_steps": 37.78,
+            "mean_blocked": 0.0
+          },
+          "random": {
+            "schema": "curriculum-v1",
+            "task": "collect",
+            "split": "test",
+            "policy": "random",
+            "seed": 13,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.2,
+            "mean_steps": 81.01,
+            "mean_blocked": 18.23
+          },
+          "greedy": {
+            "schema": "curriculum-v1",
+            "task": "collect",
+            "split": "test",
+            "policy": "greedy",
+            "seed": 13,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.92,
+            "mean_steps": 14.03,
+            "mean_blocked": 0.0
+          },
+          "oracle": {
+            "schema": "curriculum-v1",
+            "task": "collect",
+            "split": "test",
+            "policy": "oracle",
+            "seed": 13,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 1.0,
+            "mean_steps": 6.5,
+            "mean_blocked": 0.0
+          },
+          "success_gain": 0.4733
+        },
+        "courier": {
+          "untrained": {
+            "schema": "curriculum-v1",
+            "task": "courier",
+            "split": "test",
+            "policy": "learned",
+            "seed": 13,
+            "episodes": 150,
+            "trained_episodes": 0,
+            "success_rate": 0.0533,
+            "mean_steps": 175.87,
+            "mean_blocked": 39.04
+          },
+          "trained": {
+            "schema": "curriculum-v1",
+            "task": "courier",
+            "split": "test",
+            "policy": "learned",
+            "seed": 13,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.4867,
+            "mean_steps": 101.31,
+            "mean_blocked": 0.0
+          },
+          "random": {
+            "schema": "curriculum-v1",
+            "task": "courier",
+            "split": "test",
+            "policy": "random",
+            "seed": 13,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.0733,
+            "mean_steps": 172.04,
+            "mean_blocked": 38.45
+          },
+          "greedy": {
+            "schema": "curriculum-v1",
+            "task": "courier",
+            "split": "test",
+            "policy": "greedy",
+            "seed": 13,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.8733,
+            "mean_steps": 32.91,
+            "mean_blocked": 0.0
+          },
+          "oracle": {
+            "schema": "curriculum-v1",
+            "task": "courier",
+            "split": "test",
+            "policy": "oracle",
+            "seed": 13,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 1.0,
+            "mean_steps": 13.24,
+            "mean_blocked": 0.0
+          },
+          "success_gain": 0.4334
+        }
+      }
+    },
+    {
+      "seed": 29,
+      "tasks": {
+        "reach": {
+          "untrained": {
+            "schema": "curriculum-v1",
+            "task": "reach",
+            "split": "test",
+            "policy": "learned",
+            "seed": 29,
+            "episodes": 150,
+            "trained_episodes": 0,
+            "success_rate": 0.28,
+            "mean_steps": 78.12,
+            "mean_blocked": 18.39
+          },
+          "trained": {
+            "schema": "curriculum-v1",
+            "task": "reach",
+            "split": "test",
+            "policy": "learned",
+            "seed": 29,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.7,
+            "mean_steps": 32.44,
+            "mean_blocked": 0.83
+          },
+          "random": {
+            "schema": "curriculum-v1",
+            "task": "reach",
+            "split": "test",
+            "policy": "random",
+            "seed": 29,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.3667,
+            "mean_steps": 74.65,
+            "mean_blocked": 18.92
+          },
+          "greedy": {
+            "schema": "curriculum-v1",
+            "task": "reach",
+            "split": "test",
+            "policy": "greedy",
+            "seed": 29,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.9067,
+            "mean_steps": 14.82,
+            "mean_blocked": 0.0
+          },
+          "oracle": {
+            "schema": "curriculum-v1",
+            "task": "reach",
+            "split": "test",
+            "policy": "oracle",
+            "seed": 29,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 1.0,
+            "mean_steps": 5.93,
+            "mean_blocked": 0.0
+          },
+          "success_gain": 0.42
+        },
+        "collect": {
+          "untrained": {
+            "schema": "curriculum-v1",
+            "task": "collect",
+            "split": "test",
+            "policy": "learned",
+            "seed": 29,
+            "episodes": 150,
+            "trained_episodes": 0,
+            "success_rate": 0.1533,
+            "mean_steps": 77.86,
+            "mean_blocked": 17.11
+          },
+          "trained": {
+            "schema": "curriculum-v1",
+            "task": "collect",
+            "split": "test",
+            "policy": "learned",
+            "seed": 29,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.7867,
+            "mean_steps": 24.1,
+            "mean_blocked": 0.33
+          },
+          "random": {
+            "schema": "curriculum-v1",
+            "task": "collect",
+            "split": "test",
+            "policy": "random",
+            "seed": 29,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.2467,
+            "mean_steps": 76.63,
+            "mean_blocked": 16.73
+          },
+          "greedy": {
+            "schema": "curriculum-v1",
+            "task": "collect",
+            "split": "test",
+            "policy": "greedy",
+            "seed": 29,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.9467,
+            "mean_steps": 11.23,
+            "mean_blocked": 0.0
+          },
+          "oracle": {
+            "schema": "curriculum-v1",
+            "task": "collect",
+            "split": "test",
+            "policy": "oracle",
+            "seed": 29,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 1.0,
+            "mean_steps": 6.55,
+            "mean_blocked": 0.0
+          },
+          "success_gain": 0.6334
+        },
+        "courier": {
+          "untrained": {
+            "schema": "curriculum-v1",
+            "task": "courier",
+            "split": "test",
+            "policy": "learned",
+            "seed": 29,
+            "episodes": 150,
+            "trained_episodes": 0,
+            "success_rate": 0.12,
+            "mean_steps": 177.9,
+            "mean_blocked": 39.26
+          },
+          "trained": {
+            "schema": "curriculum-v1",
+            "task": "courier",
+            "split": "test",
+            "policy": "learned",
+            "seed": 29,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.5467,
+            "mean_steps": 94.29,
+            "mean_blocked": 0.9
+          },
+          "random": {
+            "schema": "curriculum-v1",
+            "task": "courier",
+            "split": "test",
+            "policy": "random",
+            "seed": 29,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.06,
+            "mean_steps": 182.67,
+            "mean_blocked": 39.93
+          },
+          "greedy": {
+            "schema": "curriculum-v1",
+            "task": "courier",
+            "split": "test",
+            "policy": "greedy",
+            "seed": 29,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.88,
+            "mean_steps": 34.92,
+            "mean_blocked": 0.0
+          },
+          "oracle": {
+            "schema": "curriculum-v1",
+            "task": "courier",
+            "split": "test",
+            "policy": "oracle",
+            "seed": 29,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 1.0,
+            "mean_steps": 13.29,
+            "mean_blocked": 0.0
+          },
+          "success_gain": 0.4267
+        }
+      }
+    },
+    {
+      "seed": 47,
+      "tasks": {
+        "reach": {
+          "untrained": {
+            "schema": "curriculum-v1",
+            "task": "reach",
+            "split": "test",
+            "policy": "learned",
+            "seed": 47,
+            "episodes": 150,
+            "trained_episodes": 0,
+            "success_rate": 0.3467,
+            "mean_steps": 79.63,
+            "mean_blocked": 18.11
+          },
+          "trained": {
+            "schema": "curriculum-v1",
+            "task": "reach",
+            "split": "test",
+            "policy": "learned",
+            "seed": 47,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.72,
+            "mean_steps": 31.41,
+            "mean_blocked": 0.54
+          },
+          "random": {
+            "schema": "curriculum-v1",
+            "task": "reach",
+            "split": "test",
+            "policy": "random",
+            "seed": 47,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.3733,
+            "mean_steps": 74.17,
+            "mean_blocked": 16.21
+          },
+          "greedy": {
+            "schema": "curriculum-v1",
+            "task": "reach",
+            "split": "test",
+            "policy": "greedy",
+            "seed": 47,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.9333,
+            "mean_steps": 11.1,
+            "mean_blocked": 0.0
+          },
+          "oracle": {
+            "schema": "curriculum-v1",
+            "task": "reach",
+            "split": "test",
+            "policy": "oracle",
+            "seed": 47,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 1.0,
+            "mean_steps": 5.45,
+            "mean_blocked": 0.0
+          },
+          "success_gain": 0.3733
+        },
+        "collect": {
+          "untrained": {
+            "schema": "curriculum-v1",
+            "task": "collect",
+            "split": "test",
+            "policy": "learned",
+            "seed": 47,
+            "episodes": 150,
+            "trained_episodes": 0,
+            "success_rate": 0.1333,
+            "mean_steps": 87.21,
+            "mean_blocked": 19.44
+          },
+          "trained": {
+            "schema": "curriculum-v1",
+            "task": "collect",
+            "split": "test",
+            "policy": "learned",
+            "seed": 47,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.6533,
+            "mean_steps": 37.17,
+            "mean_blocked": 1.27
+          },
+          "random": {
+            "schema": "curriculum-v1",
+            "task": "collect",
+            "split": "test",
+            "policy": "random",
+            "seed": 47,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.1267,
+            "mean_steps": 87.36,
+            "mean_blocked": 19.71
+          },
+          "greedy": {
+            "schema": "curriculum-v1",
+            "task": "collect",
+            "split": "test",
+            "policy": "greedy",
+            "seed": 47,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.9267,
+            "mean_steps": 13.97,
+            "mean_blocked": 0.0
+          },
+          "oracle": {
+            "schema": "curriculum-v1",
+            "task": "collect",
+            "split": "test",
+            "policy": "oracle",
+            "seed": 47,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 1.0,
+            "mean_steps": 6.75,
+            "mean_blocked": 0.0
+          },
+          "success_gain": 0.52
+        },
+        "courier": {
+          "untrained": {
+            "schema": "curriculum-v1",
+            "task": "courier",
+            "split": "test",
+            "policy": "learned",
+            "seed": 47,
+            "episodes": 150,
+            "trained_episodes": 0,
+            "success_rate": 0.0933,
+            "mean_steps": 176.23,
+            "mean_blocked": 40.8
+          },
+          "trained": {
+            "schema": "curriculum-v1",
+            "task": "courier",
+            "split": "test",
+            "policy": "learned",
+            "seed": 47,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.52,
+            "mean_steps": 96.99,
+            "mean_blocked": 1.41
+          },
+          "random": {
+            "schema": "curriculum-v1",
+            "task": "courier",
+            "split": "test",
+            "policy": "random",
+            "seed": 47,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.08,
+            "mean_steps": 175.29,
+            "mean_blocked": 39.77
+          },
+          "greedy": {
+            "schema": "curriculum-v1",
+            "task": "courier",
+            "split": "test",
+            "policy": "greedy",
+            "seed": 47,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 0.86,
+            "mean_steps": 38.65,
+            "mean_blocked": 0.0
+          },
+          "oracle": {
+            "schema": "curriculum-v1",
+            "task": "courier",
+            "split": "test",
+            "policy": "oracle",
+            "seed": 47,
+            "episodes": 150,
+            "trained_episodes": 3500,
+            "success_rate": 1.0,
+            "mean_steps": 12.79,
+            "mean_blocked": 0.0
+          },
+          "success_gain": 0.4267
+        }
+      }
+    }
+  ]
+}

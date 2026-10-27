@@ -1,0 +1,246 @@
+{
+  "calibration_episodes_per_model": 40,
+  "calibration_namespace": "train indices 5000..",
+  "evaluation_namespace": "test indices 6000..",
+  "fit_iterations": 6,
+  "kind": "inspected-development-not-blind",
+  "note": "regime truth is used only for offline calibration and scoring, never online selection; threshold is not calibrated confidence",
+  "phase_episodes": 12,
+  "rows": [
+    {
+      "calibration": {
+        "artifact_digest": "e98dc1f8ad35fb817691e71efc9887b05772ab90e6d819e9a50b5f4e7a0fd1ca",
+        "catalogue": "b367d09fc0bee6e553f2fe77a8cd44918572f82d4799136a05cd585381928c73",
+        "episodes_per_regime": 40,
+        "input_hash": "9c872d2f1e97714388aec52359e168fe9f81c4f0e5e3cb9cd5afa4dc812fb489",
+        "margin": 0.022044215,
+        "schema": "calibrated-step/v1",
+        "seed": 17,
+        "signed_advantages": {
+          "changed": 0.04408843,
+          "original": 0.148955047
+        }
+      },
+      "seed": 17,
+      "strategies": {
+        "frozen_baseline": [
+          {
+            "final_selected": "original",
+            "first_correct_observation": 31,
+            "fraction_abstained": 0.2083,
+            "fraction_correct": 0.7917,
+            "fraction_wrong": 0.0,
+            "regime_for_scoring_only": "original",
+            "switches": 1
+          },
+          {
+            "final_selected": "changed",
+            "first_correct_observation": 31,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.7917,
+            "fraction_wrong": 0.2083,
+            "regime_for_scoring_only": "changed",
+            "switches": 1
+          },
+          {
+            "final_selected": "original",
+            "first_correct_observation": 19,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.875,
+            "fraction_wrong": 0.125,
+            "regime_for_scoring_only": "original",
+            "switches": 1
+          }
+        ],
+        "offline_calibrated": [
+          {
+            "final_selected": "original",
+            "first_correct_observation": 19,
+            "fraction_abstained": 0.0556,
+            "fraction_correct": 0.875,
+            "fraction_wrong": 0.0694,
+            "regime_for_scoring_only": "original",
+            "switches": 2
+          },
+          {
+            "final_selected": "changed",
+            "first_correct_observation": 19,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.7431,
+            "fraction_wrong": 0.2569,
+            "regime_for_scoring_only": "changed",
+            "switches": 3
+          },
+          {
+            "final_selected": "original",
+            "first_correct_observation": 19,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.875,
+            "fraction_wrong": 0.125,
+            "regime_for_scoring_only": "original",
+            "switches": 1
+          }
+        ]
+      }
+    },
+    {
+      "calibration": {
+        "artifact_digest": "08cb68a0a173fca760949f0f64a6104ebcabf947ed063fa0475316244f58d63e",
+        "catalogue": "5341b6dcaa866476690c0bf12de456c8b98d2413c48dd2d999b16ceb9d7882b1",
+        "episodes_per_regime": 40,
+        "input_hash": "5afc231f19c1c66658c9f368b25d341d6eb1632e60a0a3afbf39bce0bf5de1ef",
+        "margin": 0.049568016,
+        "schema": "calibrated-step/v1",
+        "seed": 23,
+        "signed_advantages": {
+          "changed": 0.099136032,
+          "original": 0.181471711
+        }
+      },
+      "seed": 23,
+      "strategies": {
+        "frozen_baseline": [
+          {
+            "final_selected": "original",
+            "first_correct_observation": 21,
+            "fraction_abstained": 0.1389,
+            "fraction_correct": 0.8611,
+            "fraction_wrong": 0.0,
+            "regime_for_scoring_only": "original",
+            "switches": 1
+          },
+          {
+            "final_selected": "original",
+            "first_correct_observation": null,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.0,
+            "fraction_wrong": 1.0,
+            "regime_for_scoring_only": "changed",
+            "switches": 0
+          },
+          {
+            "final_selected": "original",
+            "first_correct_observation": 1,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 1.0,
+            "fraction_wrong": 0.0,
+            "regime_for_scoring_only": "original",
+            "switches": 0
+          }
+        ],
+        "offline_calibrated": [
+          {
+            "final_selected": "original",
+            "first_correct_observation": 19,
+            "fraction_abstained": 0.125,
+            "fraction_correct": 0.875,
+            "fraction_wrong": 0.0,
+            "regime_for_scoring_only": "original",
+            "switches": 1
+          },
+          {
+            "final_selected": "original",
+            "first_correct_observation": 80,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.2431,
+            "fraction_wrong": 0.7569,
+            "regime_for_scoring_only": "changed",
+            "switches": 2
+          },
+          {
+            "final_selected": "original",
+            "first_correct_observation": 1,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 1.0,
+            "fraction_wrong": 0.0,
+            "regime_for_scoring_only": "original",
+            "switches": 0
+          }
+        ]
+      }
+    },
+    {
+      "calibration": {
+        "artifact_digest": "8c537690f1a7f9fecff1cb24d729a1681fa9b0ae814353de6245dc7473c8c261",
+        "catalogue": "6d280977b403dc7c82388ce5d9cc8c138dc8bd31ece45687ab5e6fdb6912e481",
+        "episodes_per_regime": 40,
+        "input_hash": "2ca1d09789af53e6c6e04468a00de79b198014905901f77711eab1c178e22ac7",
+        "margin": 0.045906984,
+        "schema": "calibrated-step/v1",
+        "seed": 41,
+        "signed_advantages": {
+          "changed": 0.091813969,
+          "original": 0.153128431
+        }
+      },
+      "seed": 41,
+      "strategies": {
+        "frozen_baseline": [
+          {
+            "final_selected": "original",
+            "first_correct_observation": 7,
+            "fraction_abstained": 0.0417,
+            "fraction_correct": 0.9583,
+            "fraction_wrong": 0.0,
+            "regime_for_scoring_only": "original",
+            "switches": 1
+          },
+          {
+            "final_selected": "original",
+            "first_correct_observation": null,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.0,
+            "fraction_wrong": 1.0,
+            "regime_for_scoring_only": "changed",
+            "switches": 0
+          },
+          {
+            "final_selected": "original",
+            "first_correct_observation": 1,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 1.0,
+            "fraction_wrong": 0.0,
+            "regime_for_scoring_only": "original",
+            "switches": 0
+          }
+        ],
+        "offline_calibrated": [
+          {
+            "final_selected": "original",
+            "first_correct_observation": 7,
+            "fraction_abstained": 0.0417,
+            "fraction_correct": 0.9583,
+            "fraction_wrong": 0.0,
+            "regime_for_scoring_only": "original",
+            "switches": 1
+          },
+          {
+            "final_selected": "original",
+            "first_correct_observation": 67,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.4514,
+            "fraction_wrong": 0.5486,
+            "regime_for_scoring_only": "changed",
+            "switches": 2
+          },
+          {
+            "final_selected": "original",
+            "first_correct_observation": 1,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 1.0,
+            "fraction_wrong": 0.0,
+            "regime_for_scoring_only": "original",
+            "switches": 0
+          }
+        ]
+      }
+    }
+  ],
+  "schema": "calibrated-step/v1",
+  "seed_list": [
+    17,
+    23,
+    41
+  ],
+  "train_episodes_per_model": 130
+}

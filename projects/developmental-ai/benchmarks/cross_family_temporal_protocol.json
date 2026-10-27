@@ -1,0 +1,69 @@
+{
+  "schema": "developmental-ai.cross-family-temporal-protocol/v1",
+  "status": "precommitted; no test outcomes examined",
+  "objective": "Transfer observation-only temporal correspondence trained on navigation streams to a delayed-choice cue-recovery task with more deletions and distractor insertions",
+  "seeds": {
+    "development": [
+      43103,
+      50021,
+      61031
+    ],
+    "additional_inspected": [
+      72019,
+      83003,
+      94009
+    ]
+  },
+  "training": {
+    "nav_mapping_namespace": "train/89400..89639",
+    "nav_model_namespace": "train/90500..90529",
+    "model_pseudo_selection": "unsupervised fixed-eight marginal over five candidate streams",
+    "model_em_iterations": 3,
+    "delayed_response_mapping": "separately fitted from public delayed-choice train/0..299, validation train/5000..5059; no delayed temporal training"
+  },
+  "evaluation": {
+    "delayed_split": "test",
+    "start_index": 99900,
+    "episodes_per_seed": 40,
+    "variant": "long"
+  },
+  "generator": {
+    "templates": [
+      "01230123",
+      "12301230",
+      "23012301",
+      "30123012"
+    ],
+    "true_cue": "delayed simulator's opening public cue used by benchmark generator ONLY",
+    "streams": "one sensor sequence and five candidate forecasts; one correct cue and four distractors with duplicate decoy allowed; channels encoded with same hidden seed permutation",
+    "sensor_noise": "drop uniform 0..3 events, then insert uniform 2..4 random sensor tokens",
+    "forecast_noise": "drop uniform 0..2 events, then insert uniform 2..4 random forecast tokens",
+    "valid_length": "8..12",
+    "source_order": "uniform shuffle episode-specific",
+    "cue_offset": "candidate carries public proposal label [cue,0]; source name is synthetic"
+  },
+  "evaluated_methods": [
+    "frozen variable-event model trained navigation only",
+    "fixed-eight marginal using same mapping",
+    "max-path DP using same mapping",
+    "bag-frequency same mapping",
+    "public-length count heuristic (diagnostic only)",
+    "hand-engineered last-token recency",
+    "privileged cipher variable model",
+    "correct-cue reference"
+  ],
+  "metrics": [
+    "cue recovery out of 40",
+    "actual delayed-choice task completion out of 40 with same train-fitted response mapping",
+    "count MAE for variable model vs always-6 and mean length minus 4"
+  ],
+  "boundaries": [
+    "No delayed test cue or correct action passed to scoring model, only benchmark generator/score",
+    "No delayed test data changes parameters",
+    "Known templates, four symbol channels and candidate-provided cue labels are engineered",
+    "No claim of independent blind cohort or general world transfer",
+    "Do not modify protocol, candidates or hyperparameters after first result",
+    "No OS actions, identity or consented memory data, automatic promotion"
+  ],
+  "v2a_v2b": "unchanged"
+}

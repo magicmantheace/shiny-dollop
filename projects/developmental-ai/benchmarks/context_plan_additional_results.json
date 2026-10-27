@@ -1,0 +1,220 @@
+{
+  "blind": false,
+  "episodes": 80,
+  "protocol": "benchmarks/context_plan_transfer_protocol.json",
+  "rows": [
+    {
+      "learned_context_plans": {
+        "case_7e19ee12": 5,
+        "case_9d091a01": 4
+      },
+      "methods": {
+        "context": {
+          "by_context": {
+            "0": 33,
+            "1": 31
+          },
+          "cold20": 4,
+          "mean_attempts": 5.0375,
+          "mean_blocked": 0.6625,
+          "stalled": 0,
+          "success": 64,
+          "warm60": 60
+        },
+        "latest": {
+          "by_context": {
+            "0": 33,
+            "1": 0
+          },
+          "cold20": 3,
+          "mean_attempts": 6.1875,
+          "mean_blocked": 2.625,
+          "stalled": 0,
+          "success": 33,
+          "warm60": 30
+        },
+        "lexical": {
+          "by_context": {
+            "0": 0,
+            "1": 0
+          },
+          "cold20": 0,
+          "mean_attempts": 7.0,
+          "mean_blocked": 6.0,
+          "stalled": 0,
+          "success": 0,
+          "warm60": 0
+        },
+        "oracle": {
+          "by_context": {
+            "0": 40,
+            "1": 40
+          },
+          "cold20": 20,
+          "mean_attempts": 4.0,
+          "mean_blocked": 0.0,
+          "stalled": 0,
+          "success": 80,
+          "warm60": 60
+        },
+        "reset": {
+          "by_context": {
+            "0": 5,
+            "1": 1
+          },
+          "cold20": 2,
+          "mean_attempts": 6.925,
+          "mean_blocked": 3.075,
+          "stalled": 0,
+          "success": 6,
+          "warm60": 4
+        }
+      },
+      "plan_sha256": "2c14dc7c0ea9c718f9b5d7f1b27c0d9e017bd6df13908e1591e921c53d50cc48",
+      "seed": 27007
+    },
+    {
+      "learned_context_plans": {
+        "case_132bfea4": 5,
+        "case_ce99e54c": 5
+      },
+      "methods": {
+        "context": {
+          "by_context": {
+            "0": 38,
+            "1": 39
+          },
+          "cold20": 17,
+          "mean_attempts": 5.125,
+          "mean_blocked": 0.175,
+          "stalled": 0,
+          "success": 77,
+          "warm60": 60
+        },
+        "latest": {
+          "by_context": {
+            "0": 0,
+            "1": 39
+          },
+          "cold20": 9,
+          "mean_attempts": 6.05,
+          "mean_blocked": 1.575,
+          "stalled": 0,
+          "success": 39,
+          "warm60": 30
+        },
+        "lexical": {
+          "by_context": {
+            "0": 0,
+            "1": 0
+          },
+          "cold20": 0,
+          "mean_attempts": 7.0,
+          "mean_blocked": 6.5,
+          "stalled": 0,
+          "success": 0,
+          "warm60": 0
+        },
+        "oracle": {
+          "by_context": {
+            "0": 40,
+            "1": 40
+          },
+          "cold20": 20,
+          "mean_attempts": 4.0,
+          "mean_blocked": 0.0,
+          "stalled": 0,
+          "success": 80,
+          "warm60": 60
+        },
+        "reset": {
+          "by_context": {
+            "0": 2,
+            "1": 4
+          },
+          "cold20": 4,
+          "mean_attempts": 6.9125,
+          "mean_blocked": 3.1125,
+          "stalled": 0,
+          "success": 6,
+          "warm60": 2
+        }
+      },
+      "plan_sha256": "dc04fabb69e6aaad0529c278058b0d84fa5867eb10f623e0d746d108e28be54e",
+      "seed": 27011
+    },
+    {
+      "learned_context_plans": {
+        "case_532f4bf5": 5,
+        "case_c49be947": 4
+      },
+      "methods": {
+        "context": {
+          "by_context": {
+            "0": 21,
+            "1": 40
+          },
+          "cold20": 10,
+          "mean_attempts": 5.2375,
+          "mean_blocked": 0.7125,
+          "stalled": 0,
+          "success": 61,
+          "warm60": 51
+        },
+        "latest": {
+          "by_context": {
+            "0": 0,
+            "1": 40
+          },
+          "cold20": 10,
+          "mean_attempts": 6.0125,
+          "mean_blocked": 3.475,
+          "stalled": 0,
+          "success": 40,
+          "warm60": 30
+        },
+        "lexical": {
+          "by_context": {
+            "0": 0,
+            "1": 0
+          },
+          "cold20": 0,
+          "mean_attempts": 7.0,
+          "mean_blocked": 6.5,
+          "stalled": 0,
+          "success": 0,
+          "warm60": 0
+        },
+        "oracle": {
+          "by_context": {
+            "0": 40,
+            "1": 40
+          },
+          "cold20": 20,
+          "mean_attempts": 4.0,
+          "mean_blocked": 0.0,
+          "stalled": 0,
+          "success": 80,
+          "warm60": 60
+        },
+        "reset": {
+          "by_context": {
+            "0": 4,
+            "1": 3
+          },
+          "cold20": 3,
+          "mean_attempts": 6.875,
+          "mean_blocked": 3.0375,
+          "stalled": 0,
+          "success": 7,
+          "warm60": 4
+        }
+      },
+      "plan_sha256": "bb4dfc5a3f3e90fb9b75a4888eab2c2c2fc274b1ac67c45edf88b35c7273307c",
+      "seed": 27017
+    }
+  ],
+  "schema": "developmental-ai.context-plan-benchmark/v1",
+  "split": "test",
+  "start": 85000
+}

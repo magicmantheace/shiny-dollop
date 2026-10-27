@@ -1,0 +1,189 @@
+{
+  "iterations": 10,
+  "kind": "inspected-development-not-blind",
+  "navigation_episodes_per_phase": 15,
+  "note": "the monitor sees only ordinary unlabelled histories; benchmark truth is used only for measurement",
+  "order": [
+    "original",
+    "changed",
+    "original"
+  ],
+  "phase_episodes": 25,
+  "rows": [
+    {
+      "phases": [
+        {
+          "correct_snapshot_navigation": 0.8,
+          "correct_steps": 21,
+          "final_selected": "original",
+          "final_status": "stable",
+          "first_correct_step": 5,
+          "fixed_original_navigation": 0.8,
+          "fraction_correct": 0.84,
+          "known_physics_oracle_navigation": 0.8,
+          "mean_end_model_log_likelihoods": {
+            "changed": -1.601216,
+            "original": -1.345486
+          },
+          "regime_for_scoring_only": "original",
+          "selected_model_navigation": 0.8,
+          "switch_events": 1
+        },
+        {
+          "correct_snapshot_navigation": 0.5333,
+          "correct_steps": 21,
+          "final_selected": "changed",
+          "final_status": "stable",
+          "first_correct_step": 5,
+          "fixed_original_navigation": 0.1333,
+          "fraction_correct": 0.84,
+          "known_physics_oracle_navigation": 0.6,
+          "mean_end_model_log_likelihoods": {
+            "changed": -1.638532,
+            "original": -1.841385
+          },
+          "regime_for_scoring_only": "changed",
+          "selected_model_navigation": 0.5333,
+          "switch_events": 1
+        },
+        {
+          "correct_snapshot_navigation": 1.0,
+          "correct_steps": 21,
+          "final_selected": "original",
+          "final_status": "stable",
+          "first_correct_step": 5,
+          "fixed_original_navigation": 1.0,
+          "fraction_correct": 0.84,
+          "known_physics_oracle_navigation": 1.0,
+          "mean_end_model_log_likelihoods": {
+            "changed": -1.431461,
+            "original": -1.190611
+          },
+          "regime_for_scoring_only": "original",
+          "selected_model_navigation": 1.0,
+          "switch_events": 1
+        }
+      ],
+      "seed": 1009
+    },
+    {
+      "phases": [
+        {
+          "correct_snapshot_navigation": 0.8667,
+          "correct_steps": 20,
+          "final_selected": "original",
+          "final_status": "stable",
+          "first_correct_step": 6,
+          "fixed_original_navigation": 0.8667,
+          "fraction_correct": 0.8,
+          "known_physics_oracle_navigation": 0.8667,
+          "mean_end_model_log_likelihoods": {
+            "changed": -1.630725,
+            "original": -1.301415
+          },
+          "regime_for_scoring_only": "original",
+          "selected_model_navigation": 0.8667,
+          "switch_events": 1
+        },
+        {
+          "correct_snapshot_navigation": 0.4667,
+          "correct_steps": 21,
+          "final_selected": "changed",
+          "final_status": "stable",
+          "first_correct_step": 5,
+          "fixed_original_navigation": 0.2667,
+          "fraction_correct": 0.84,
+          "known_physics_oracle_navigation": 0.4667,
+          "mean_end_model_log_likelihoods": {
+            "changed": -1.513889,
+            "original": -1.783421
+          },
+          "regime_for_scoring_only": "changed",
+          "selected_model_navigation": 0.4667,
+          "switch_events": 1
+        },
+        {
+          "correct_snapshot_navigation": 0.9333,
+          "correct_steps": 22,
+          "final_selected": "original",
+          "final_status": "stable",
+          "first_correct_step": 4,
+          "fixed_original_navigation": 0.9333,
+          "fraction_correct": 0.88,
+          "known_physics_oracle_navigation": 0.8,
+          "mean_end_model_log_likelihoods": {
+            "changed": -1.49625,
+            "original": -1.271787
+          },
+          "regime_for_scoring_only": "original",
+          "selected_model_navigation": 0.9333,
+          "switch_events": 1
+        }
+      ],
+      "seed": 1013
+    },
+    {
+      "phases": [
+        {
+          "correct_snapshot_navigation": 0.7333,
+          "correct_steps": 21,
+          "final_selected": "original",
+          "final_status": "stable",
+          "first_correct_step": 5,
+          "fixed_original_navigation": 0.7333,
+          "fraction_correct": 0.84,
+          "known_physics_oracle_navigation": 0.7333,
+          "mean_end_model_log_likelihoods": {
+            "changed": -1.654667,
+            "original": -1.362162
+          },
+          "regime_for_scoring_only": "original",
+          "selected_model_navigation": 0.7333,
+          "switch_events": 1
+        },
+        {
+          "correct_snapshot_navigation": 0.5333,
+          "correct_steps": 18,
+          "final_selected": "changed",
+          "final_status": "stable",
+          "first_correct_step": 8,
+          "fixed_original_navigation": 0.2,
+          "fraction_correct": 0.72,
+          "known_physics_oracle_navigation": 0.7333,
+          "mean_end_model_log_likelihoods": {
+            "changed": -1.868571,
+            "original": -2.058979
+          },
+          "regime_for_scoring_only": "changed",
+          "selected_model_navigation": 0.5333,
+          "switch_events": 1
+        },
+        {
+          "correct_snapshot_navigation": 0.8667,
+          "correct_steps": 22,
+          "final_selected": "original",
+          "final_status": "stable",
+          "first_correct_step": 4,
+          "fixed_original_navigation": 0.8667,
+          "fraction_correct": 0.88,
+          "known_physics_oracle_navigation": 0.8667,
+          "mean_end_model_log_likelihoods": {
+            "changed": -1.660723,
+            "original": -1.46538
+          },
+          "regime_for_scoring_only": "original",
+          "selected_model_navigation": 0.8667,
+          "switch_events": 1
+        }
+      ],
+      "seed": 1031
+    }
+  ],
+  "schema": "continuous-dynamics/v1",
+  "seeds": [
+    1009,
+    1013,
+    1031
+  ],
+  "train_episodes_per_model": 350
+}

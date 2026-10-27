@@ -1,0 +1,29 @@
+{
+  "schema": "developmental-ai.learned-memory-transfer-protocol/v1",
+  "status": "frozen-before-first-audit-run-but-not-independently-blind",
+  "intent": "compare grid-observation-learned offset memory transfer against engineered and no-memory controls",
+  "development_seeds": [2749,6607,9901],
+  "first_run_audit_seeds": [15101,22003,31013],
+  "train": {
+    "family": "grid",
+    "policy_episodes_per_seed": 1200,
+    "offset_updater_episodes_per_seed": 80,
+    "split": "train",
+    "start_index": 0
+  },
+  "test": {
+    "family": "occluded",
+    "split": "test",
+    "start_index": 80000,
+    "episodes_per_seed": 64,
+    "methods": ["random", "forget", "engineered", "learned"]
+  },
+  "measures": ["successes", "mean_steps", "learned_transition_counts"],
+  "caveats": [
+    "Initial beacon storage and 3-feature representation remain engineered",
+    "Only action/outcome-to-relative-offset update is learned from public observations",
+    "Both source and destination tasks are grid-navigation variants",
+    "Audit evaluated after algorithm design in same development pass; not independent blind validation",
+    "No autonomous goals, general memory or model promotion"
+  ]
+}

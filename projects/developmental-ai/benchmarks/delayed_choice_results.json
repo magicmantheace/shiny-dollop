@@ -1,0 +1,84 @@
+{
+  "schema": "delayed-choice-v1",
+  "protocol": {
+    "training_band": "short",
+    "test_split": "test",
+    "test_bands": [
+      "short",
+      "long"
+    ],
+    "training_episodes": 800,
+    "test_episodes": 400,
+    "seeds": [
+      11,
+      31,
+      73
+    ],
+    "evaluation": "development"
+  },
+  "rows": [
+    {
+      "seed": 11,
+      "mode": "retain",
+      "before_long": 0.2025,
+      "after_short": 1.0,
+      "after_long": 1.0
+    },
+    {
+      "seed": 11,
+      "mode": "reactive",
+      "before_long": 0.2025,
+      "after_short": 0.255,
+      "after_long": 0.195
+    },
+    {
+      "seed": 11,
+      "mode": "overwrite",
+      "before_long": 0.2025,
+      "after_short": 0.25,
+      "after_long": 0.2475
+    },
+    {
+      "seed": 31,
+      "mode": "retain",
+      "before_long": 0.235,
+      "after_short": 1.0,
+      "after_long": 1.0
+    },
+    {
+      "seed": 31,
+      "mode": "reactive",
+      "before_long": 0.235,
+      "after_short": 0.28,
+      "after_long": 0.2175
+    },
+    {
+      "seed": 31,
+      "mode": "overwrite",
+      "before_long": 0.235,
+      "after_short": 0.285,
+      "after_long": 0.2475
+    },
+    {
+      "seed": 73,
+      "mode": "retain",
+      "before_long": 0.2,
+      "after_short": 1.0,
+      "after_long": 1.0
+    },
+    {
+      "seed": 73,
+      "mode": "reactive",
+      "before_long": 0.2,
+      "after_short": 0.2375,
+      "after_long": 0.25
+    },
+    {
+      "seed": 73,
+      "mode": "overwrite",
+      "before_long": 0.2,
+      "after_short": 0.2675,
+      "after_long": 0.29
+    }
+  ]
+}

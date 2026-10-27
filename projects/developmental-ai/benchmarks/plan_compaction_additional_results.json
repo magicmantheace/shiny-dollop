@@ -1,0 +1,198 @@
+{
+  "blind": false,
+  "episodes_per_seed": 80,
+  "protocol": "benchmarks/plan_compaction_protocol.json",
+  "rows": [
+    {
+      "checkpoint_sha256": "5fdd53f54e84d2afac6eb331cb726c56cbec604f6a89409923742814b239e604",
+      "methods": {
+        "cached_repair": {
+          "B": 0,
+          "first_A": 20,
+          "mean_attempts": 7.0,
+          "mean_blocked": 0.5,
+          "return_A": 20,
+          "success": 40
+        },
+        "compaction": {
+          "B": 35,
+          "first_A": 13,
+          "mean_attempts": 5.3125,
+          "mean_blocked": 0.4125,
+          "return_A": 20,
+          "success": 68
+        },
+        "oracle": {
+          "B": 40,
+          "first_A": 20,
+          "mean_attempts": 4.0,
+          "mean_blocked": 0.0,
+          "return_A": 20,
+          "success": 80
+        },
+        "reactive": {
+          "B": 12,
+          "first_A": 3,
+          "mean_attempts": 7.0,
+          "mean_blocked": 1.6375,
+          "return_A": 8,
+          "success": 23
+        },
+        "role_order": {
+          "B": 40,
+          "first_A": 20,
+          "mean_attempts": 5.0,
+          "mean_blocked": 0.0,
+          "return_A": 20,
+          "success": 80
+        }
+      },
+      "omission_trials": 77,
+      "seed": 56003,
+      "stored_plan_lengths": [
+        7,
+        6,
+        5,
+        5,
+        4,
+        4,
+        5,
+        6
+      ],
+      "successful_omission_trials": 63
+    },
+    {
+      "checkpoint_sha256": "ae144c8bc4922011f59965ce8c24853be1a7b41c2ed8e91e75f7a4345a002ee3",
+      "methods": {
+        "cached_repair": {
+          "B": 40,
+          "first_A": 18,
+          "mean_attempts": 7.0,
+          "mean_blocked": 0.075,
+          "return_A": 20,
+          "success": 78
+        },
+        "compaction": {
+          "B": 39,
+          "first_A": 13,
+          "mean_attempts": 4.7875,
+          "mean_blocked": 0.55,
+          "return_A": 16,
+          "success": 68
+        },
+        "oracle": {
+          "B": 40,
+          "first_A": 20,
+          "mean_attempts": 4.0,
+          "mean_blocked": 0.0,
+          "return_A": 20,
+          "success": 80
+        },
+        "reactive": {
+          "B": 12,
+          "first_A": 8,
+          "mean_attempts": 7.0,
+          "mean_blocked": 1.6375,
+          "return_A": 6,
+          "success": 26
+        },
+        "role_order": {
+          "B": 40,
+          "first_A": 20,
+          "mean_attempts": 5.0,
+          "mean_blocked": 0.0,
+          "return_A": 20,
+          "success": 80
+        }
+      },
+      "omission_trials": 70,
+      "seed": 56009,
+      "stored_plan_lengths": [
+        7,
+        6,
+        5,
+        4,
+        5,
+        5,
+        4,
+        5,
+        4,
+        4,
+        5,
+        5,
+        5,
+        6,
+        5
+      ],
+      "successful_omission_trials": 52
+    },
+    {
+      "checkpoint_sha256": "6bf84a25ddf9c09470f5f1c7589da7ee0078e74ca45a413582ec4fb2c30a5e7b",
+      "methods": {
+        "cached_repair": {
+          "B": 40,
+          "first_A": 20,
+          "mean_attempts": 7.0,
+          "mean_blocked": 0.0,
+          "return_A": 20,
+          "success": 80
+        },
+        "compaction": {
+          "B": 33,
+          "first_A": 18,
+          "mean_attempts": 4.8375,
+          "mean_blocked": 0.5375,
+          "return_A": 16,
+          "success": 67
+        },
+        "oracle": {
+          "B": 40,
+          "first_A": 20,
+          "mean_attempts": 4.0,
+          "mean_blocked": 0.0,
+          "return_A": 20,
+          "success": 80
+        },
+        "reactive": {
+          "B": 12,
+          "first_A": 5,
+          "mean_attempts": 7.0,
+          "mean_blocked": 1.675,
+          "return_A": 7,
+          "success": 24
+        },
+        "role_order": {
+          "B": 40,
+          "first_A": 20,
+          "mean_attempts": 5.0,
+          "mean_blocked": 0.0,
+          "return_A": 20,
+          "success": 80
+        }
+      },
+      "omission_trials": 76,
+      "seed": 56017,
+      "stored_plan_lengths": [
+        7,
+        6,
+        5,
+        4,
+        4,
+        5,
+        5,
+        6,
+        5,
+        5,
+        4,
+        5,
+        5,
+        6,
+        5
+      ],
+      "successful_omission_trials": 57
+    }
+  ],
+  "schema": "developmental-ai.plan-compaction-benchmark/v1",
+  "split": "test",
+  "start": 87000
+}

@@ -1,0 +1,106 @@
+{
+  "blind": false,
+  "evaluation": "test/93000..93063",
+  "fit": "source_bursts/train/0..159",
+  "protocol": "benchmarks/outcome_event_memory_protocol.json",
+  "reward": "source_bursts/train/2000..2199",
+  "rows": [
+    {
+      "families": {
+        "shifted_bursts": {
+          "episodes": 64,
+          "successes": {
+            "hmm_longest": 20,
+            "hmm_recent": 12,
+            "learned_inferred": 51,
+            "learned_raw": 24,
+            "oracle_available": 58,
+            "raw_majority": 16
+          }
+        },
+        "source_bursts": {
+          "episodes": 64,
+          "successes": {
+            "hmm_longest": 16,
+            "hmm_recent": 18,
+            "learned_inferred": 46,
+            "learned_raw": 32,
+            "oracle_available": 52,
+            "raw_majority": 19
+          }
+        }
+      },
+      "model_sha256": "0fee4af66d0120f16c4d75afde10521285b2f634d8c03275bf5a518f2254732e",
+      "seed": 14003,
+      "training_reward_counts": {
+        "inferred_event": 128,
+        "raw_event": 86
+      }
+    },
+    {
+      "families": {
+        "shifted_bursts": {
+          "episodes": 64,
+          "successes": {
+            "hmm_longest": 17,
+            "hmm_recent": 19,
+            "learned_inferred": 34,
+            "learned_raw": 19,
+            "oracle_available": 56,
+            "raw_majority": 12
+          }
+        },
+        "source_bursts": {
+          "episodes": 64,
+          "successes": {
+            "hmm_longest": 17,
+            "hmm_recent": 15,
+            "learned_inferred": 39,
+            "learned_raw": 31,
+            "oracle_available": 54,
+            "raw_majority": 18
+          }
+        }
+      },
+      "model_sha256": "aa22ab4667cf83e60a0aad4426415585cdef17b8268ebc305f1a7313981b59e1",
+      "seed": 14009,
+      "training_reward_counts": {
+        "inferred_event": 113,
+        "raw_event": 68
+      }
+    },
+    {
+      "families": {
+        "shifted_bursts": {
+          "episodes": 64,
+          "successes": {
+            "hmm_longest": 17,
+            "hmm_recent": 12,
+            "learned_inferred": 41,
+            "learned_raw": 17,
+            "oracle_available": 51,
+            "raw_majority": 13
+          }
+        },
+        "source_bursts": {
+          "episodes": 64,
+          "successes": {
+            "hmm_longest": 14,
+            "hmm_recent": 14,
+            "learned_inferred": 45,
+            "learned_raw": 29,
+            "oracle_available": 52,
+            "raw_majority": 13
+          }
+        }
+      },
+      "model_sha256": "99e484f346ad41a046e6fc668f2552f4e4d3b6bf4a4d8cb0d625ece4ec294e63",
+      "seed": 14033,
+      "training_reward_counts": {
+        "inferred_event": 125,
+        "raw_event": 87
+      }
+    }
+  ],
+  "schema": "developmental-ai.outcome-event-memory-benchmark/v1"
+}

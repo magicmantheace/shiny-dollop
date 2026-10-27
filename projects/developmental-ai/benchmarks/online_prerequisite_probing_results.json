@@ -1,0 +1,394 @@
+{
+  "cold_episodes": 20,
+  "episodes_per_seed_family": 80,
+  "first_index": 83000,
+  "independent_blind": false,
+  "protocol": "benchmarks/online_prerequisite_probing_protocol.json",
+  "rows": [
+    {
+      "checkpoint_sha256": "cf7532fd6c00237a9ba44d889cf59839dc20a141479ddcc2df5d4a171bf07554",
+      "evidence_events": 488,
+      "family": "workshop",
+      "methods": {
+        "goal_first": {
+          "cold_success": 7,
+          "mean_attempts": 11.562,
+          "mean_blocked": 6.338,
+          "stalled": 0,
+          "total_success": 25,
+          "warm_success": 18
+        },
+        "goal_then_untried": {
+          "cold_success": 19,
+          "mean_attempts": 10.1,
+          "mean_blocked": 3.413,
+          "stalled": 0,
+          "total_success": 72,
+          "warm_success": 53
+        },
+        "online": {
+          "cold_success": 20,
+          "mean_attempts": 6.1,
+          "mean_blocked": 1.05,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        },
+        "oracle": {
+          "cold_success": 20,
+          "mean_attempts": 4.0,
+          "mean_blocked": 0.0,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        },
+        "random": {
+          "cold_success": 13,
+          "mean_attempts": 10.075,
+          "mean_blocked": 3.737,
+          "stalled": 0,
+          "total_success": 61,
+          "warm_success": 48
+        },
+        "role_order": {
+          "cold_success": 20,
+          "mean_attempts": 6.0,
+          "mean_blocked": 0.0,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        },
+        "workshop_static": {
+          "cold_success": 20,
+          "mean_attempts": 4.0,
+          "mean_blocked": 0.0,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        }
+      },
+      "seed": 14003
+    },
+    {
+      "checkpoint_sha256": "46a207c8becd6afad3b9a323997c905e196b33f6860e2b3a88df66f007fe297a",
+      "evidence_events": 486,
+      "family": "repair",
+      "methods": {
+        "goal_first": {
+          "cold_success": 3,
+          "mean_attempts": 11.812,
+          "mean_blocked": 6.713,
+          "stalled": 0,
+          "total_success": 14,
+          "warm_success": 11
+        },
+        "goal_then_untried": {
+          "cold_success": 16,
+          "mean_attempts": 10.65,
+          "mean_blocked": 4.0,
+          "stalled": 0,
+          "total_success": 64,
+          "warm_success": 48
+        },
+        "online": {
+          "cold_success": 20,
+          "mean_attempts": 6.075,
+          "mean_blocked": 1.038,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        },
+        "oracle": {
+          "cold_success": 20,
+          "mean_attempts": 5.0,
+          "mean_blocked": 0.0,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        },
+        "random": {
+          "cold_success": 16,
+          "mean_attempts": 10.412,
+          "mean_blocked": 4.188,
+          "stalled": 0,
+          "total_success": 58,
+          "warm_success": 42
+        },
+        "role_order": {
+          "cold_success": 20,
+          "mean_attempts": 7.0,
+          "mean_blocked": 0.0,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        },
+        "workshop_static": {
+          "cold_success": 9,
+          "mean_attempts": 10.562,
+          "mean_blocked": 5.0,
+          "stalled": 0,
+          "total_success": 45,
+          "warm_success": 36
+        }
+      },
+      "seed": 14003
+    },
+    {
+      "checkpoint_sha256": "4e84e25c57f4f2076b8b035d999896f596d57cf39c6a7d585f8c98177f46da5a",
+      "evidence_events": 486,
+      "family": "workshop",
+      "methods": {
+        "goal_first": {
+          "cold_success": 9,
+          "mean_attempts": 11.412,
+          "mean_blocked": 6.15,
+          "stalled": 0,
+          "total_success": 27,
+          "warm_success": 18
+        },
+        "goal_then_untried": {
+          "cold_success": 18,
+          "mean_attempts": 10.1,
+          "mean_blocked": 3.663,
+          "stalled": 0,
+          "total_success": 69,
+          "warm_success": 51
+        },
+        "online": {
+          "cold_success": 20,
+          "mean_attempts": 6.075,
+          "mean_blocked": 1.05,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        },
+        "oracle": {
+          "cold_success": 20,
+          "mean_attempts": 4.0,
+          "mean_blocked": 0.0,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        },
+        "random": {
+          "cold_success": 16,
+          "mean_attempts": 9.562,
+          "mean_blocked": 3.362,
+          "stalled": 0,
+          "total_success": 61,
+          "warm_success": 45
+        },
+        "role_order": {
+          "cold_success": 20,
+          "mean_attempts": 6.0,
+          "mean_blocked": 0.0,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        },
+        "workshop_static": {
+          "cold_success": 20,
+          "mean_attempts": 4.0,
+          "mean_blocked": 0.0,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        }
+      },
+      "seed": 14009
+    },
+    {
+      "checkpoint_sha256": "4318e445828ad3a12385bacc4e6e1718ed4818e0bd81a5af3deafc738d22ee8e",
+      "evidence_events": 487,
+      "family": "repair",
+      "methods": {
+        "goal_first": {
+          "cold_success": 3,
+          "mean_attempts": 11.75,
+          "mean_blocked": 6.625,
+          "stalled": 0,
+          "total_success": 12,
+          "warm_success": 9
+        },
+        "goal_then_untried": {
+          "cold_success": 16,
+          "mean_attempts": 10.613,
+          "mean_blocked": 4.1,
+          "stalled": 0,
+          "total_success": 64,
+          "warm_success": 48
+        },
+        "online": {
+          "cold_success": 20,
+          "mean_attempts": 6.088,
+          "mean_blocked": 1.05,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        },
+        "oracle": {
+          "cold_success": 20,
+          "mean_attempts": 5.0,
+          "mean_blocked": 0.0,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        },
+        "random": {
+          "cold_success": 13,
+          "mean_attempts": 10.5,
+          "mean_blocked": 4.6,
+          "stalled": 0,
+          "total_success": 46,
+          "warm_success": 33
+        },
+        "role_order": {
+          "cold_success": 20,
+          "mean_attempts": 7.0,
+          "mean_blocked": 0.0,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        },
+        "workshop_static": {
+          "cold_success": 11,
+          "mean_attempts": 10.863,
+          "mean_blocked": 5.2,
+          "stalled": 0,
+          "total_success": 37,
+          "warm_success": 26
+        }
+      },
+      "seed": 14009
+    },
+    {
+      "checkpoint_sha256": "a49fbce1779aa93555679a4668055574e0f0bb7d6295b6630823133b660dcab8",
+      "evidence_events": 486,
+      "family": "workshop",
+      "methods": {
+        "goal_first": {
+          "cold_success": 5,
+          "mean_attempts": 11.537,
+          "mean_blocked": 6.263,
+          "stalled": 0,
+          "total_success": 25,
+          "warm_success": 20
+        },
+        "goal_then_untried": {
+          "cold_success": 18,
+          "mean_attempts": 10.137,
+          "mean_blocked": 3.538,
+          "stalled": 0,
+          "total_success": 70,
+          "warm_success": 52
+        },
+        "online": {
+          "cold_success": 20,
+          "mean_attempts": 6.075,
+          "mean_blocked": 1.05,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        },
+        "oracle": {
+          "cold_success": 20,
+          "mean_attempts": 4.0,
+          "mean_blocked": 0.0,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        },
+        "random": {
+          "cold_success": 16,
+          "mean_attempts": 9.975,
+          "mean_blocked": 3.737,
+          "stalled": 0,
+          "total_success": 61,
+          "warm_success": 45
+        },
+        "role_order": {
+          "cold_success": 20,
+          "mean_attempts": 6.0,
+          "mean_blocked": 0.0,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        },
+        "workshop_static": {
+          "cold_success": 20,
+          "mean_attempts": 4.0,
+          "mean_blocked": 0.0,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        }
+      },
+      "seed": 14033
+    },
+    {
+      "checkpoint_sha256": "bf5419a5948786b22b30d354162106d878534656dde5f830e51bf0ec39509b35",
+      "evidence_events": 569,
+      "family": "repair",
+      "methods": {
+        "goal_first": {
+          "cold_success": 5,
+          "mean_attempts": 11.85,
+          "mean_blocked": 6.675,
+          "stalled": 0,
+          "total_success": 20,
+          "warm_success": 15
+        },
+        "goal_then_untried": {
+          "cold_success": 17,
+          "mean_attempts": 10.4,
+          "mean_blocked": 3.812,
+          "stalled": 0,
+          "total_success": 65,
+          "warm_success": 48
+        },
+        "online": {
+          "cold_success": 20,
+          "mean_attempts": 7.112,
+          "mean_blocked": 1.075,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        },
+        "oracle": {
+          "cold_success": 20,
+          "mean_attempts": 5.0,
+          "mean_blocked": 0.0,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        },
+        "random": {
+          "cold_success": 15,
+          "mean_attempts": 10.425,
+          "mean_blocked": 4.35,
+          "stalled": 0,
+          "total_success": 49,
+          "warm_success": 34
+        },
+        "role_order": {
+          "cold_success": 20,
+          "mean_attempts": 7.0,
+          "mean_blocked": 0.0,
+          "stalled": 0,
+          "total_success": 80,
+          "warm_success": 60
+        },
+        "workshop_static": {
+          "cold_success": 10,
+          "mean_attempts": 10.975,
+          "mean_blocked": 5.237,
+          "stalled": 0,
+          "total_success": 40,
+          "warm_success": 30
+        }
+      },
+      "seed": 14033
+    }
+  ],
+  "schema": "developmental-ai.online-prerequisite-probing-benchmark/v1"
+}

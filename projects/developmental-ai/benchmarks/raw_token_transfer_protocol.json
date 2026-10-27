@@ -1,0 +1,64 @@
+{
+  "schema": "developmental-ai.raw-token-transfer-protocol/v1",
+  "freeze": "pre-evaluation",
+  "purpose": "Test reward-learned matching of raw token streams across two disjoint, unknown symbolic alphabets",
+  "prior_artifact": "benchmarks/dynamic_reliability_protocol.json",
+  "seeds": {
+    "development": [
+      43103,
+      50021,
+      61031
+    ],
+    "additional": [
+      72019,
+      83003,
+      94009
+    ]
+  },
+  "split": {
+    "fit": "train/88500..88859",
+    "eval": "test/99200..99239"
+  },
+  "train_episodes_per_seed": 360,
+  "eval_episodes_per_seed": 40,
+  "grid_updater_train": 24,
+  "number_of_candidates": 5,
+  "probes": 8,
+  "probe_alphabet": [
+    "sensor-0",
+    "sensor-1",
+    "sensor-2",
+    "sensor-3"
+  ],
+  "forecast_alphabet": [
+    "forecast-0",
+    "forecast-1",
+    "forecast-2",
+    "forecast-3"
+  ],
+  "cipher": "seed-stable hidden permutation applied ONLY by simulator cue generator; no mapping supplied to learner",
+  "correct_forecast_fidelity": 0.75,
+  "decoy_fidelity": 0.25,
+  "methods": [
+    "reward-learned raw-symbol pair scores",
+    "fixed source ID bandit",
+    "literal token equality",
+    "unsupervised global maximum-likelihood token alignment (matched training exposures)",
+    "privileged cipher-decoded agreement oracle",
+    "random cue"
+  ],
+  "measures": [
+    "navigation successes per 40 trial seed",
+    "correct cue identification",
+    "raw-token model saved/replayed"
+  ],
+  "restrictions": [
+    "reward learner observes candidate offsets and public raw streams, receives only terminal task success during train",
+    "no hidden cipher or reference cue in learner training/inference/checkpoint API",
+    "baseline can observe train streams, not outcomes, for unsupervised alignment",
+    "do not modify evaluation seeds or tune hyperparameters using test performance",
+    "report negative findings and ties",
+    "previously inspected seeds are not blind",
+    "never automatically promote models or access OS/human records"
+  ]
+}

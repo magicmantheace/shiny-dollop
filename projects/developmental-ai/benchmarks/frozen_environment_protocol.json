@@ -1,0 +1,32 @@
+{
+  "schema": "developmental-ai.cross-family-protocol/v1",
+  "status": "preregistered-development-not-independent-blind",
+  "purpose": "D1 protocol freeze and D2 adapter conformance; D3 cross-family learning not yet demonstrated",
+  "interface_schema": "developmental-ai.environment-session/v1",
+  "development": {
+    "seeds": [2749, 6607, 9901],
+    "split": "test",
+    "start_index": 60000,
+    "episodes_per_seed_family": 16
+  },
+  "reserved_not_yet_executed": {
+    "seeds": [32081, 48779],
+    "split": "test",
+    "start_index": 90000,
+    "episodes_per_seed_family": 40,
+    "warning": "Not secret or automatically blind. Preserve unexamined for separate future candidate freeze and independent execution."
+  },
+  "training": {
+    "split": "train",
+    "episodes_per_seed_delayed": 96,
+    "variant": "short"
+  },
+  "task_families": [
+    {"id": "grid", "variant": "default", "test_property": "continuous target-direction signal"},
+    {"id": "occluded", "variant": "default", "test_property": "initial target beacon only"},
+    {"id": "delayed", "variant": "long", "test_property": "distractor-resistant memory and short-to-long delay transfer"}
+  ],
+  "baselines": ["random", "family_specific"],
+  "metrics": ["terminal_success_rate", "mean_steps", "mean_reward", "valid_action_fraction"],
+  "hard_gates": ["no hidden environment state in policy", "all tests frozen before development evaluations", "no cross-family generalization claims from task-specific policies"]
+}

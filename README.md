@@ -8,6 +8,7 @@ This repository is a permanent, **multi-project** workspace. Its root is an inde
 | --- | --- | --- |
 | Universal PC Game Launcher | [`projects/universal-game-launcher/`](projects/universal-game-launcher/README.md) | Existing development; unmerged review branch/PR — do not overwrite |
 | GitHub Development Command Center | [`projects/github-development-command-center/`](projects/github-development-command-center/README.md) | PARKED — do not implement without new authorization |
+| Developmental-AI | [`projects/developmental-ai/`](projects/developmental-ai/README.md) | Imported 2026-10-27 from the standalone `magicmantheace/Developmental-AI` repo (at its commit `188873d`); unmerged import branch/PR — canonical-home decision pending the owner |
 
 ## New Muse application queue — specifications only
 

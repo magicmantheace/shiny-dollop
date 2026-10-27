@@ -1,0 +1,88 @@
+{
+  "schema": "developmental-ai.reversible-event-priority-protocol/v1",
+  "status": "frozen-before-evaluation",
+  "purpose": "Measure reward-only adaptation after unannounced goal reversal and return, while retaining learned event priorities",
+  "seeds": {
+    "development": [
+      14003,
+      14009,
+      14033
+    ],
+    "additional_previously_inspected": [
+      27007,
+      27011,
+      27017
+    ]
+  },
+  "segmenter": {
+    "training_family": "source_bursts",
+    "training_split": "train",
+    "indices": "0..159",
+    "em_iterations": 5
+  },
+  "phases": [
+    {
+      "name": "original",
+      "reward_rule": "seed-private context->label A",
+      "start_train": 2000,
+      "count": 200
+    },
+    {
+      "name": "reversal",
+      "reward_rule": "seed-private context->different label B",
+      "start_train": 2300,
+      "count": 96
+    },
+    {
+      "name": "return",
+      "reward_rule": "context->label A restored",
+      "start_train": 2500,
+      "count": 96
+    }
+  ],
+  "evaluations": {
+    "family": "shifted_bursts",
+    "split": "test",
+    "phase_start_indices": [
+      95000,
+      95100,
+      95200
+    ],
+    "episodes_per_phase_per_seed": 48,
+    "no_evaluation_rewards_used_for_training": true
+  },
+  "methods": [
+    "new archived-priority-bank with reward-only change recognition",
+    "cumulative counts no forgetting",
+    "last-32 feedback sliding-window bandit",
+    "frozen first-phase policy",
+    "task-specific longest-event baseline",
+    "privileged available-goal oracle"
+  ],
+  "metrics": [
+    "per-phase per-seed heldout task success",
+    "online training reward early/late each phase",
+    "number of context-bank regimes and switches",
+    "return-phase recovery relative to baseline",
+    "model-bound checksum and exact replay of reward choices"
+  ],
+  "mechanism": {
+    "known_event_labels": 4,
+    "contexts": 2,
+    "archive_slots_at_most": 3,
+    "training_exploration_every": 7,
+    "prior": "Beta(1,1)",
+    "short_likelihood_window": 12,
+    "change_detection_threshold": "frozen in source before results; no tuning on evaluation"
+  },
+  "restrictions": [
+    "No phase or reward-rule labels given to learner; benchmark scoring sees simulator private goals",
+    "Only public context/raw tokens + own chosen event and terminal boolean to learner",
+    "Evaluation namespace never trains",
+    "All methods get same train episode count and reward for their chosen action",
+    "No D3/D4 claim on familiar fixed context/label priors",
+    "Previously inspected seed cohorts are not blind",
+    "No default deployment, automatic permissions or private records",
+    "Preserve V2A then V2B ordering"
+  ]
+}

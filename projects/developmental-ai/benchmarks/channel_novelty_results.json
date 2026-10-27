@@ -1,0 +1,352 @@
+{
+  "budgets": {
+    "episodes_per_condition": 24,
+    "hazard_calibration": 12,
+    "iterations": 2,
+    "reference": 64,
+    "rounds": 1,
+    "train": 48,
+    "validation": 16
+  },
+  "kind": "inspected-seeds-not-blind",
+  "notes": "Stuck odometry and landmark faults are artificially injected. Both guards have independent train-only alpha=.10 calibrations, so their OR is not calibrated at 10%. Same frozen bank, hazard and all evaluation streams. Conditions and seeds were previously inspected; no out-of-family proof, navigation benefit, or statistical guarantee.",
+  "partitions": {
+    "evaluation": "test/93000+",
+    "fit": "train/0+",
+    "hazard": "train/40000+",
+    "references": "train/50000+",
+    "validation": "train/10000+"
+  },
+  "rows": [
+    {
+      "closed_loop_pause_comparison": {
+        "landmark-fault": {
+          "episodes": 24,
+          "layered_guard_pauses": 18,
+          "layered_guard_success": 6,
+          "original_guard_pauses": 18,
+          "original_guard_success": 6,
+          "unmodified_success": 6
+        },
+        "normal": {
+          "episodes": 24,
+          "layered_guard_pauses": 1,
+          "layered_guard_success": 16,
+          "original_guard_pauses": 1,
+          "original_guard_success": 16,
+          "unmodified_success": 17
+        },
+        "odometry-fault": {
+          "episodes": 24,
+          "layered_guard_pauses": 17,
+          "layered_guard_success": 4,
+          "original_guard_pauses": 2,
+          "original_guard_success": 7,
+          "unmodified_success": 7
+        }
+      },
+      "conditions": {
+        "known-shift": {
+          "channel_alarms": 0,
+          "channel_only_alarms": 0,
+          "combined_alarms": 0,
+          "constant_landmark_alarms": 0,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "channel": null,
+            "combined": null,
+            "old": null
+          },
+          "old_alarms": 0,
+          "zero_odometry_alarms": 0
+        },
+        "landmark-fault": {
+          "channel_alarms": 24,
+          "channel_only_alarms": 0,
+          "combined_alarms": 24,
+          "constant_landmark_alarms": 24,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "channel": 5.0,
+            "combined": 4.042,
+            "old": 4.042
+          },
+          "old_alarms": 24,
+          "zero_odometry_alarms": 0
+        },
+        "normal": {
+          "channel_alarms": 0,
+          "channel_only_alarms": 0,
+          "combined_alarms": 0,
+          "constant_landmark_alarms": 0,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "channel": null,
+            "combined": null,
+            "old": null
+          },
+          "old_alarms": 0,
+          "zero_odometry_alarms": 0
+        },
+        "odometry-fault": {
+          "channel_alarms": 24,
+          "channel_only_alarms": 21,
+          "combined_alarms": 24,
+          "constant_landmark_alarms": 0,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "channel": 6.0,
+            "combined": 5.792,
+            "old": 4.333
+          },
+          "old_alarms": 3,
+          "zero_odometry_alarms": 24
+        },
+        "rotated-map": {
+          "channel_alarms": 0,
+          "channel_only_alarms": 0,
+          "combined_alarms": 6,
+          "constant_landmark_alarms": 0,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "channel": null,
+            "combined": 4.333,
+            "old": 4.333
+          },
+          "old_alarms": 6,
+          "zero_odometry_alarms": 0
+        }
+      },
+      "model_count": 2,
+      "model_surprise_cutoff": 2.28749079,
+      "run_cutoffs": {
+        "constant_landmark": 4,
+        "zero_odometry": 5
+      },
+      "seed": 17,
+      "switch_hazard": 0.04
+    },
+    {
+      "closed_loop_pause_comparison": {
+        "landmark-fault": {
+          "episodes": 24,
+          "layered_guard_pauses": 21,
+          "layered_guard_success": 3,
+          "original_guard_pauses": 21,
+          "original_guard_success": 3,
+          "unmodified_success": 4
+        },
+        "normal": {
+          "episodes": 24,
+          "layered_guard_pauses": 2,
+          "layered_guard_success": 18,
+          "original_guard_pauses": 2,
+          "original_guard_success": 18,
+          "unmodified_success": 18
+        },
+        "odometry-fault": {
+          "episodes": 24,
+          "layered_guard_pauses": 18,
+          "layered_guard_success": 6,
+          "original_guard_pauses": 7,
+          "original_guard_success": 12,
+          "unmodified_success": 13
+        }
+      },
+      "conditions": {
+        "known-shift": {
+          "channel_alarms": 1,
+          "channel_only_alarms": 1,
+          "combined_alarms": 3,
+          "constant_landmark_alarms": 0,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "channel": 19.0,
+            "combined": 14.0,
+            "old": 11.5
+          },
+          "old_alarms": 2,
+          "zero_odometry_alarms": 1
+        },
+        "landmark-fault": {
+          "channel_alarms": 24,
+          "channel_only_alarms": 0,
+          "combined_alarms": 24,
+          "constant_landmark_alarms": 24,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "channel": 5.0,
+            "combined": 4.0,
+            "old": 4.0
+          },
+          "old_alarms": 24,
+          "zero_odometry_alarms": 0
+        },
+        "normal": {
+          "channel_alarms": 0,
+          "channel_only_alarms": 0,
+          "combined_alarms": 1,
+          "constant_landmark_alarms": 0,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "channel": null,
+            "combined": 4.0,
+            "old": 4.0
+          },
+          "old_alarms": 1,
+          "zero_odometry_alarms": 0
+        },
+        "odometry-fault": {
+          "channel_alarms": 24,
+          "channel_only_alarms": 13,
+          "combined_alarms": 24,
+          "constant_landmark_alarms": 0,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "channel": 6.0,
+            "combined": 5.5,
+            "old": 7.0
+          },
+          "old_alarms": 11,
+          "zero_odometry_alarms": 24
+        },
+        "rotated-map": {
+          "channel_alarms": 0,
+          "channel_only_alarms": 0,
+          "combined_alarms": 11,
+          "constant_landmark_alarms": 0,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "channel": null,
+            "combined": 4.182,
+            "old": 4.182
+          },
+          "old_alarms": 11,
+          "zero_odometry_alarms": 0
+        }
+      },
+      "model_count": 1,
+      "model_surprise_cutoff": 2.05388213,
+      "run_cutoffs": {
+        "constant_landmark": 4,
+        "zero_odometry": 5
+      },
+      "seed": 23,
+      "switch_hazard": 0.0
+    },
+    {
+      "closed_loop_pause_comparison": {
+        "landmark-fault": {
+          "episodes": 24,
+          "layered_guard_pauses": 22,
+          "layered_guard_success": 2,
+          "original_guard_pauses": 22,
+          "original_guard_success": 2,
+          "unmodified_success": 3
+        },
+        "normal": {
+          "episodes": 24,
+          "layered_guard_pauses": 2,
+          "layered_guard_success": 16,
+          "original_guard_pauses": 2,
+          "original_guard_success": 16,
+          "unmodified_success": 17
+        },
+        "odometry-fault": {
+          "episodes": 24,
+          "layered_guard_pauses": 20,
+          "layered_guard_success": 2,
+          "original_guard_pauses": 5,
+          "original_guard_success": 2,
+          "unmodified_success": 3
+        }
+      },
+      "conditions": {
+        "known-shift": {
+          "channel_alarms": 0,
+          "channel_only_alarms": 0,
+          "combined_alarms": 1,
+          "constant_landmark_alarms": 0,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "channel": null,
+            "combined": 5.0,
+            "old": 5.0
+          },
+          "old_alarms": 1,
+          "zero_odometry_alarms": 0
+        },
+        "landmark-fault": {
+          "channel_alarms": 24,
+          "channel_only_alarms": 0,
+          "combined_alarms": 24,
+          "constant_landmark_alarms": 24,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "channel": 5.0,
+            "combined": 4.0,
+            "old": 4.0
+          },
+          "old_alarms": 24,
+          "zero_odometry_alarms": 0
+        },
+        "normal": {
+          "channel_alarms": 0,
+          "channel_only_alarms": 0,
+          "combined_alarms": 1,
+          "constant_landmark_alarms": 0,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "channel": null,
+            "combined": 5.0,
+            "old": 5.0
+          },
+          "old_alarms": 1,
+          "zero_odometry_alarms": 0
+        },
+        "odometry-fault": {
+          "channel_alarms": 24,
+          "channel_only_alarms": 23,
+          "combined_alarms": 24,
+          "constant_landmark_alarms": 0,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "channel": 6.0,
+            "combined": 5.958,
+            "old": 5.0
+          },
+          "old_alarms": 1,
+          "zero_odometry_alarms": 24
+        },
+        "rotated-map": {
+          "channel_alarms": 0,
+          "channel_only_alarms": 0,
+          "combined_alarms": 8,
+          "constant_landmark_alarms": 0,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "channel": null,
+            "combined": 5.0,
+            "old": 5.0
+          },
+          "old_alarms": 8,
+          "zero_odometry_alarms": 0
+        }
+      },
+      "model_count": 2,
+      "model_surprise_cutoff": 2.30928515,
+      "run_cutoffs": {
+        "constant_landmark": 4,
+        "zero_odometry": 5
+      },
+      "seed": 41,
+      "switch_hazard": 0.1
+    }
+  ],
+  "schema": "channel-novelty/v1",
+  "seeds": [
+    17,
+    23,
+    41
+  ]
+}

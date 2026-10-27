@@ -1,0 +1,101 @@
+{
+  "calibration_episodes_per_phase": 40,
+  "calibration_namespace": "train indices 5000..",
+  "evaluation_episodes_per_phase": 12,
+  "evaluation_namespace": "test indices 6000..",
+  "fit_namespace": "train indices 0..",
+  "iterations": 6,
+  "kind": "inspected-research-not-blind",
+  "max_empirical_error": 0.1,
+  "notes": "train labels tune empirical rejection threshold only; neither test labels nor test events used in fitting; abstention counts reduce wrong outputs at a coverage cost, not a statistical safety guarantee",
+  "rows": [
+    {
+      "profile": {
+        "accepted_samples": 510,
+        "bank_digest": "d6bf3384e44e3152b8ed431d4a5097ca5ff721f624b741aea6411357b707a1aa",
+        "digest": "10bb8983dce5535904390868f56985ba662b4e170db219807401bce419a9850d",
+        "evidence_digest": "a737dafddd69b49a7b35c197de40b117475ca66a9a0b8ab4d6feef46fbed22f2",
+        "gap": 0.120296,
+        "max_empirical_error": 0.1,
+        "schema": "decision-abstention/v1",
+        "seed": 1009,
+        "training_samples": 1440,
+        "wrong_samples": 2
+      },
+      "results": {
+        "frozen": {
+          "abstain": 6,
+          "correct": 386,
+          "wrong": 40
+        },
+        "selective": {
+          "abstain": 253,
+          "correct": 175,
+          "wrong": 4
+        }
+      },
+      "seed": 1009
+    },
+    {
+      "profile": {
+        "accepted_samples": 544,
+        "bank_digest": "1d3932246d092bee3449ce6e552c171762997168bea78e20745bb76a4fe24ad1",
+        "digest": "9ddd8ae549987dbe01109646b50b9fe57a8bb6f60fc60cf0481b436f48f4942e",
+        "evidence_digest": "f887ad10b9d397245c9511e09f1c1993b5f673a1ce592e9261e45d0686cda5ad",
+        "gap": 0.120376,
+        "max_empirical_error": 0.1,
+        "schema": "decision-abstention/v1",
+        "seed": 1013,
+        "training_samples": 1440,
+        "wrong_samples": 16
+      },
+      "results": {
+        "frozen": {
+          "abstain": 54,
+          "correct": 293,
+          "wrong": 85
+        },
+        "selective": {
+          "abstain": 285,
+          "correct": 147,
+          "wrong": 0
+        }
+      },
+      "seed": 1013
+    },
+    {
+      "profile": {
+        "accepted_samples": 596,
+        "bank_digest": "4c83b09b920f32c8dd5ac85f3fb9a5cfce8879573bac0fe223e64a5d7f8a47d5",
+        "digest": "5c00d825b713609c9c5fa494ab20756113da1e5a4d3eaed905ee51f3df31149a",
+        "evidence_digest": "80ad8d8703027ef5d143a4f2134580e9e9cd592ba19696ea81483c0893830046",
+        "gap": 0.120133,
+        "max_empirical_error": 0.1,
+        "schema": "decision-abstention/v1",
+        "seed": 1031,
+        "training_samples": 1440,
+        "wrong_samples": 5
+      },
+      "results": {
+        "frozen": {
+          "abstain": 6,
+          "correct": 337,
+          "wrong": 89
+        },
+        "selective": {
+          "abstain": 239,
+          "correct": 176,
+          "wrong": 17
+        }
+      },
+      "seed": 1031
+    }
+  ],
+  "schema": "decision-abstention/v1",
+  "seeds": [
+    1009,
+    1013,
+    1031
+  ],
+  "train_episodes_per_model": 130
+}

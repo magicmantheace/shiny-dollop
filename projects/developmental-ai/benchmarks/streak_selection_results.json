@@ -1,0 +1,125 @@
+{
+  "calibration_episodes_per_phase": 40,
+  "data_separation": {
+    "calibration": "train 5000+",
+    "fit": "train 0..N-1",
+    "test": "test 6000+"
+  },
+  "evaluation_episodes_per_phase": 12,
+  "iterations": 6,
+  "kind": "inspected-development-not-blind",
+  "max_empirical_error": 0.02,
+  "note": "Streak is an optional experimental policy. Strict remains default. Empirical risk calibration is not a statistical coverage or safety guarantee. All seeds inspected.",
+  "rows": [
+    {
+      "profile": {
+        "accepted_steps": 730,
+        "bank_digest": "b367d09fc0bee6e553f2fe77a8cd44918572f82d4799136a05cd585381928c73",
+        "calibration_steps": 1440,
+        "digest": "f58ac9094b24dde5e2dcf6462ca4aa02d3074b6e5d7873c3adf78a481ae11227",
+        "eligible_steps": 936,
+        "evidence_digest": "0026f2804132ca44f6182704fc0b4466f6c638842b4d17512af66a2c6d478009",
+        "max_empirical_error": 0.02,
+        "min_streak": 3,
+        "schema": "streak-selection/v1",
+        "seed": 17,
+        "threshold": 0.083795,
+        "wrong_steps": 14
+      },
+      "results": {
+        "conservative": {
+          "abstain": 286,
+          "correct": 146,
+          "wrong": 0
+        },
+        "frozen": {
+          "abstain": 30,
+          "correct": 354,
+          "wrong": 48
+        },
+        "streak": {
+          "abstain": 243,
+          "correct": 186,
+          "wrong": 3
+        }
+      },
+      "seed": 17
+    },
+    {
+      "profile": {
+        "accepted_steps": 335,
+        "bank_digest": "5341b6dcaa866476690c0bf12de456c8b98d2413c48dd2d999b16ceb9d7882b1",
+        "calibration_steps": 1440,
+        "digest": "c6ee9a48fa4b86ee6e13e6391a1619cae67d8be83c2ffc79cdc059b61551a748",
+        "eligible_steps": 915,
+        "evidence_digest": "c2ae3eb96ab9be7a5080f143af1f962348575159518b07d56f5c3b0f4606c8e9",
+        "max_empirical_error": 0.02,
+        "min_streak": 3,
+        "schema": "streak-selection/v1",
+        "seed": 23,
+        "threshold": 0.158634,
+        "wrong_steps": 6
+      },
+      "results": {
+        "conservative": {
+          "abstain": 329,
+          "correct": 101,
+          "wrong": 2
+        },
+        "frozen": {
+          "abstain": 20,
+          "correct": 268,
+          "wrong": 144
+        },
+        "streak": {
+          "abstain": 356,
+          "correct": 76,
+          "wrong": 0
+        }
+      },
+      "seed": 23
+    },
+    {
+      "profile": {
+        "accepted_steps": 401,
+        "bank_digest": "6d280977b403dc7c82388ce5d9cc8c138dc8bd31ece45687ab5e6fdb6912e481",
+        "calibration_steps": 1440,
+        "digest": "e7fc64ba237d6c92e9791cfb51122ea2ea1561383643be3bc0a3ee4caee5d6a6",
+        "eligible_steps": 925,
+        "evidence_digest": "f1dedebae4e8a5d4cdf70e94556d497af2626614b9bafaf4cd18800b5b694bd8",
+        "max_empirical_error": 0.02,
+        "min_streak": 3,
+        "schema": "streak-selection/v1",
+        "seed": 41,
+        "threshold": 0.154239,
+        "wrong_steps": 8
+      },
+      "results": {
+        "conservative": {
+          "abstain": 320,
+          "correct": 111,
+          "wrong": 1
+        },
+        "frozen": {
+          "abstain": 6,
+          "correct": 282,
+          "wrong": 144
+        },
+        "streak": {
+          "abstain": 348,
+          "correct": 84,
+          "wrong": 0
+        }
+      },
+      "seed": 41
+    }
+  ],
+  "schema": "streak-selection/v1",
+  "seeds": [
+    17,
+    23,
+    41
+  ],
+  "streak_length": 3,
+  "train_episodes_per_model": 130
+}
