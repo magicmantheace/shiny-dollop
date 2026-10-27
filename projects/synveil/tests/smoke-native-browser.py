@@ -519,18 +519,38 @@ def wait_download_get(log, port, path, count, timeout=240):
     return False
 
 
+def _teal_title_block(width, height, data):
+    """The files app's own title bar (COL_TITLE teal, drawn at the
+    top of its content). The desktop's top panel is a similar
+    dark teal and unions into any full-frame color search —
+    observed rect (0, 0, 1038, ...) spanning panel + window —
+    so only scan below the panel band (y >= 40) and take the
+    title pixels' own bounding box."""
+    min_x, min_y, max_x, max_y = width, height, -1, -1
+    hits = 0
+    for y in range(40, height):
+        for x in range(width):
+            if _near(ab._px(data, width, x, y), FILES_TITLE, 6):
+                hits += 1
+                min_x = min(min_x, x)
+                max_x = max(max_x, x)
+                min_y = min(min_y, y)
+                max_y = max(max_y, y)
+    if hits < 400 or max_x < 0:
+        return None
+    return (min_x, min_y, max_x - min_x + 1, max_y - min_y + 1)
+
+
 def files_window_rect(width, height, data):
-    """The files window by its teal title bar (its own drawing)."""
-    block = color_block(width, height, data, FILES_TITLE, tol=6,
-                        min_hits=400)
+    """The files window by its app-drawn title bar: (x, y, w,
+    content_h_nominal, title_h). The client requests 720x520
+    (files-window.c WIN_W/WIN_H) but the shell may grant more;
+    only x/y/w/title_h are measured — geometry that needs the
+    real content height must measure it, not assume."""
+    block = _teal_title_block(width, height, data)
     if not block:
         return None
-    x, y, w, title_h = block["rect"]
-    # The window extends below the title bar; its height is not
-    # derivable from the title color alone — the client requests
-    # 720x520 (files-window.c WIN_W/WIN_H). The title bar height
-    # matters: the app draws in content coordinates, which start
-    # title_h below the decoration top the rect reports.
+    x, y, w, title_h = block
     return (x, y, max(w, 720), 520, title_h)
 
 
@@ -945,6 +965,53 @@ def ensure_page(boot):
     return page_proof(boot, timeout=60)
 
 
+def _find_refresh_button(width, height, data, x, y, w, h, title_h):
+    """Locate the files app's Refresh button by its fill color
+    (COL_BTN 0x2E7D4F in files-window.c) below the window's
+    measured title bar, returning the centroid or None. Other
+    elements share the color (the update window's banner), so
+    matching pixels are clustered into row bands and the band
+    shaped like the button (90-170 wide, 24-48 tall, thousands
+    of pixels) wins — measured on a real session frame: band
+    rows 472-507, x 362-489, 4459 px."""
+    target = (0x2E, 0x7D, 0x4F)
+    x0 = max(0, x - 4)
+    x1 = min(width, x + w + 4)
+    y0 = max(0, y + title_h)
+    y1 = min(height, y + 900)
+    rows = {}
+    for yy in range(y0, y1):
+        pts = [xx for xx in range(x0, x1)
+               if _near(ab._px(data, width, xx, yy), target, 6)]
+        if len(pts) >= 8:
+            rows[yy] = pts
+    if not rows:
+        return None
+    bands = []
+    band = [min(rows), min(rows), rows[min(rows)]]
+    prev = min(rows)
+    for yy in sorted(rows):
+        if yy == prev + 1:
+            band[1] = yy
+            band[2] = band[2] + rows[yy]
+        elif yy != prev:
+            bands.append(tuple(band))
+            band = [yy, yy, rows[yy]]
+        prev = yy
+    bands.append(tuple(band))
+    for top, bottom, pts in sorted(bands, key=lambda b: -len(b[2])):
+        if len(pts) < 1500:
+            return None
+        bh = bottom - top + 1
+        bw = max(pts) - min(pts) + 1
+        if 90 <= bw <= 170 and 24 <= bh <= 48:
+            return (sum(pts) // len(pts),
+                    sum(yy for yy in rows
+                        for _ in rows[yy] if top <= yy <= bottom)
+                    // len(pts))
+    return None
+
+
 def refresh_files_window(boot):
     """Click the files window's Refresh with it raised, so its log
     records a fresh scan of Downloads."""
@@ -960,12 +1027,16 @@ def refresh_files_window(boot):
             x, y, w, h, title_h = rect
             click(boot, x + 60, y + 14)          # raise via title bar
             time.sleep(0.5)
-            # The app draws Refresh at content (16, h-92, 128x36);
-            # frame coords add the decoration's title bar height.
-            # Clicking at decoration-relative h-74 landed on an
-            # entry row and never rescanned (observed: B6's files
-            # log had no post-download scan).
-            click(boot, x + 16 + 64, y + title_h + h - 92 + 18)
+            try:
+                frame = ab.next_frame(boot)
+            except (ValueError, OSError):
+                pass
+            btn = _find_refresh_button(*frame, x, y, w, h, title_h)
+            if btn:
+                click(boot, btn[0], btn[1])
+            else:
+                ab.save_failure_frame(boot, "files-refresh-nobtn")
+                click(boot, x + 16 + 64, y + title_h + h - 92 + 18)
             time.sleep(1.5)
             return True
         time.sleep(0.5)
