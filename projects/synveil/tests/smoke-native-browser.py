@@ -1214,8 +1214,13 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
                 timeout=420)
             mark = len(boot.lines)
             terminal_command(boot, "reboot")
-            healthy = boot.wait("SYNVEIL_AB_HEALTH_PASSED", 600, since=mark)
+            # Login BEFORE the health wait, as the A/B proof
+            # driver does: the guest's session health check needs
+            # the authenticated session, so waiting for health
+            # first deadlocks the trial boot (observed: attempt 1
+            # HEALTH_FAILED check=session, attempts burning).
             logged = ab.login(boot, secret, since=mark)
+            healthy = boot.wait("SYNVEIL_AB_HEALTH_PASSED", 600, since=mark)
             page = page_proof(boot) if logged else False
             if page:
                 remember_browser_rect(boot)
@@ -1255,8 +1260,8 @@ def _run_boots(results, record, log, workdir, vars_template, secret,
                 timeout=300)
             mark = len(boot.lines)
             terminal_command(boot, "reboot")
-            healthy = boot.wait("SYNVEIL_AB_HEALTH_PASSED", 600, since=mark)
             logged = ab.login(boot, secret, since=mark)
+            healthy = boot.wait("SYNVEIL_AB_HEALTH_PASSED", 600, since=mark)
             page = page_proof(boot) if logged else False
             record("B7", rollback_armed=bool(armed), healthy=bool(healthy),
                    page_proof=bool(page))
