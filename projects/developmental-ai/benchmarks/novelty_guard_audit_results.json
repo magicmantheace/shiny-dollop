@@ -1,0 +1,212 @@
+{
+  "budgets": {
+    "alpha": 0.1,
+    "evaluation_per_condition": 24,
+    "fit": 48,
+    "hazard": 12,
+    "iterations": 2,
+    "reference": 64,
+    "rounds": 1,
+    "validation": 16
+  },
+  "kind": "previously-inspected-not-blind",
+  "notes": "The same action policy is used to collect all 36-step streams. Faults artificially override a valid sensor channel. Rotated two-mark layout is still within the known small-ring family. Training uses ordinary trajectories, but the harness constructs their regimes. Alarm is observational only and does not change navigation or grant any permission. Known-schedule calibration mix is not identical to every test condition; no distribution-free false alarm guarantee. Original seeds inspected repeatedly.",
+  "partitions": {
+    "evaluation": "test/93000+",
+    "hazard": "train/40000+",
+    "model_fit": "train/0+",
+    "novelty_reference": "train/50000+",
+    "validation": "train/10000+"
+  },
+  "rows": [
+    {
+      "closed_loop_pause_comparison": {
+        "landmark-fault": {
+          "baseline_success": 6,
+          "episodes": 24,
+          "guard_alarms": 19,
+          "guard_paused": 19,
+          "guard_success": 5
+        },
+        "normal": {
+          "baseline_success": 20,
+          "episodes": 24,
+          "guard_alarms": 0,
+          "guard_paused": 0,
+          "guard_success": 20
+        }
+      },
+      "conditions": {
+        "known-shift": {
+          "alarm_rate": 0.125,
+          "alarms": 3,
+          "episodes": 24,
+          "first_alarm_mean_step": 5.3333,
+          "mean_max_prefix_surprise": 1.77114
+        },
+        "landmark-fault": {
+          "alarm_rate": 1.0,
+          "alarms": 24,
+          "episodes": 24,
+          "first_alarm_mean_step": 4.0,
+          "mean_max_prefix_surprise": 3.675995
+        },
+        "normal": {
+          "alarm_rate": 0.125,
+          "alarms": 3,
+          "episodes": 24,
+          "first_alarm_mean_step": 5.3333,
+          "mean_max_prefix_surprise": 1.754855
+        },
+        "odometry-fault": {
+          "alarm_rate": 0.541667,
+          "alarms": 13,
+          "episodes": 24,
+          "first_alarm_mean_step": 6.1538,
+          "mean_max_prefix_surprise": 2.227368
+        },
+        "rotated-map": {
+          "alarm_rate": 0.333333,
+          "alarms": 8,
+          "episodes": 24,
+          "first_alarm_mean_step": 5.875,
+          "mean_max_prefix_surprise": 1.96734
+        }
+      },
+      "discovery_accepted": true,
+      "model_count": 2,
+      "reference_sha256": "adc086fed32468fe09289f3bdc12b3622e8f93086ba73b87e9a37b7351fb5905",
+      "seed": 1009,
+      "switch_hazard": 0.1,
+      "threshold": 2.19821848
+    },
+    {
+      "closed_loop_pause_comparison": {
+        "landmark-fault": {
+          "baseline_success": 4,
+          "episodes": 24,
+          "guard_alarms": 22,
+          "guard_paused": 21,
+          "guard_success": 3
+        },
+        "normal": {
+          "baseline_success": 15,
+          "episodes": 24,
+          "guard_alarms": 3,
+          "guard_paused": 3,
+          "guard_success": 13
+        }
+      },
+      "conditions": {
+        "known-shift": {
+          "alarm_rate": 0.041667,
+          "alarms": 1,
+          "episodes": 24,
+          "first_alarm_mean_step": 5.0,
+          "mean_max_prefix_surprise": 1.817891
+        },
+        "landmark-fault": {
+          "alarm_rate": 1.0,
+          "alarms": 24,
+          "episodes": 24,
+          "first_alarm_mean_step": 4.0,
+          "mean_max_prefix_surprise": 3.986268
+        },
+        "normal": {
+          "alarm_rate": 0.041667,
+          "alarms": 1,
+          "episodes": 24,
+          "first_alarm_mean_step": 5.0,
+          "mean_max_prefix_surprise": 1.740856
+        },
+        "odometry-fault": {
+          "alarm_rate": 0.208333,
+          "alarms": 5,
+          "episodes": 24,
+          "first_alarm_mean_step": 4.4,
+          "mean_max_prefix_surprise": 2.043627
+        },
+        "rotated-map": {
+          "alarm_rate": 0.208333,
+          "alarms": 5,
+          "episodes": 24,
+          "first_alarm_mean_step": 7.4,
+          "mean_max_prefix_surprise": 1.953263
+        }
+      },
+      "discovery_accepted": true,
+      "model_count": 2,
+      "reference_sha256": "bf650b223f33bc1bf9f7205afdc77589e73efaedfe666b3aa09e594d8bcd1b44",
+      "seed": 1013,
+      "switch_hazard": 0.1,
+      "threshold": 2.23535164
+    },
+    {
+      "closed_loop_pause_comparison": {
+        "landmark-fault": {
+          "baseline_success": 2,
+          "episodes": 24,
+          "guard_alarms": 21,
+          "guard_paused": 21,
+          "guard_success": 2
+        },
+        "normal": {
+          "baseline_success": 18,
+          "episodes": 24,
+          "guard_alarms": 2,
+          "guard_paused": 1,
+          "guard_success": 18
+        }
+      },
+      "conditions": {
+        "known-shift": {
+          "alarm_rate": 0.125,
+          "alarms": 3,
+          "episodes": 24,
+          "first_alarm_mean_step": 12.6667,
+          "mean_max_prefix_surprise": 1.743426
+        },
+        "landmark-fault": {
+          "alarm_rate": 1.0,
+          "alarms": 24,
+          "episodes": 24,
+          "first_alarm_mean_step": 4.0,
+          "mean_max_prefix_surprise": 3.60443
+        },
+        "normal": {
+          "alarm_rate": 0.083333,
+          "alarms": 2,
+          "episodes": 24,
+          "first_alarm_mean_step": 8.0,
+          "mean_max_prefix_surprise": 1.674762
+        },
+        "odometry-fault": {
+          "alarm_rate": 0.458333,
+          "alarms": 11,
+          "episodes": 24,
+          "first_alarm_mean_step": 5.6364,
+          "mean_max_prefix_surprise": 1.952321
+        },
+        "rotated-map": {
+          "alarm_rate": 0.416667,
+          "alarms": 10,
+          "episodes": 24,
+          "first_alarm_mean_step": 4.6,
+          "mean_max_prefix_surprise": 1.956886
+        }
+      },
+      "discovery_accepted": true,
+      "model_count": 2,
+      "reference_sha256": "4c709515beee003a0a8a732871abedaf7dcdafa06dcffea447c9eeb54ee508dc",
+      "seed": 1031,
+      "switch_hazard": 0.01,
+      "threshold": 2.02650739
+    }
+  ],
+  "schema": "novelty-guard/v1",
+  "seeds": [
+    1009,
+    1013,
+    1031
+  ]
+}

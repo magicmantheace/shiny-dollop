@@ -1,0 +1,301 @@
+{
+  "blind": false,
+  "eval_episodes_per_seed": 64,
+  "eval_test_start": 80000,
+  "evaluation_family": "occluded",
+  "evaluation_note": "Previously examined seed family and a new test episode range; not independent blind validation. Cue write, action/event labels and fixed Q features remain engineered.",
+  "policy_train_grid_episodes": 1200,
+  "purpose": "exploratory D3 learned memory-update transfer",
+  "rows": [
+    {
+      "mean_steps": 82.9844,
+      "mode": "random",
+      "seed": 15101,
+      "success_rate": 0.21875,
+      "successes": 14
+    },
+    {
+      "mean_steps": 92.7812,
+      "mode": "forget",
+      "seed": 15101,
+      "success_rate": 0.0,
+      "successes": 0
+    },
+    {
+      "mean_steps": 36.2812,
+      "mode": "engineered",
+      "seed": 15101,
+      "success_rate": 0.65625,
+      "successes": 42
+    },
+    {
+      "mean_steps": 36.2812,
+      "mode": "learned",
+      "seed": 15101,
+      "success_rate": 0.65625,
+      "successes": 42
+    },
+    {
+      "mean_steps": 89.6406,
+      "mode": "random",
+      "seed": 22003,
+      "success_rate": 0.17188,
+      "successes": 11
+    },
+    {
+      "mean_steps": 95.4062,
+      "mode": "forget",
+      "seed": 22003,
+      "success_rate": 0.0,
+      "successes": 0
+    },
+    {
+      "mean_steps": 39.875,
+      "mode": "engineered",
+      "seed": 22003,
+      "success_rate": 0.65625,
+      "successes": 42
+    },
+    {
+      "mean_steps": 39.875,
+      "mode": "learned",
+      "seed": 22003,
+      "success_rate": 0.65625,
+      "successes": 42
+    },
+    {
+      "mean_steps": 78.9219,
+      "mode": "random",
+      "seed": 31013,
+      "success_rate": 0.15625,
+      "successes": 10
+    },
+    {
+      "mean_steps": 84.6875,
+      "mode": "forget",
+      "seed": 31013,
+      "success_rate": 0.0,
+      "successes": 0
+    },
+    {
+      "mean_steps": 37.2656,
+      "mode": "engineered",
+      "seed": 31013,
+      "success_rate": 0.625,
+      "successes": 40
+    },
+    {
+      "mean_steps": 37.2656,
+      "mode": "learned",
+      "seed": 31013,
+      "success_rate": 0.625,
+      "successes": 40
+    }
+  ],
+  "schema": "developmental-ai.learned-memory-transfer-benchmark/v1",
+  "train_family": "grid",
+  "updater_evidence": [
+    {
+      "fingerprint": "1bea3aaf9f08c3257538e070d503c194dc65692ff68f56f3bff94f840ed7f2fb",
+      "learned_updates": {
+        "0|blocked": [
+          0,
+          0
+        ],
+        "0|move": [
+          0,
+          1
+        ],
+        "0|timeout": [
+          0,
+          1
+        ],
+        "1|blocked": [
+          0,
+          0
+        ],
+        "1|move": [
+          0,
+          -1
+        ],
+        "1|timeout": [
+          0,
+          -1
+        ],
+        "2|blocked": [
+          0,
+          0
+        ],
+        "2|move": [
+          1,
+          0
+        ],
+        "2|timeout": [
+          1,
+          0
+        ],
+        "3|blocked": [
+          0,
+          0
+        ],
+        "3|move": [
+          -1,
+          0
+        ],
+        "3|timeout": [
+          -1,
+          0
+        ],
+        "4|empty_eat": [
+          0,
+          0
+        ],
+        "4|food": [
+          0,
+          0
+        ],
+        "4|timeout": [
+          0,
+          0
+        ]
+      },
+      "sample_count": 1706,
+      "seed": 15101
+    },
+    {
+      "fingerprint": "d7e7b963200378c3a8ddd1186f02a2719b74ec9e5ec89a247156a32f0228f2b7",
+      "learned_updates": {
+        "0|blocked": [
+          0,
+          0
+        ],
+        "0|move": [
+          0,
+          1
+        ],
+        "0|timeout": [
+          0,
+          1
+        ],
+        "1|blocked": [
+          0,
+          0
+        ],
+        "1|move": [
+          0,
+          -1
+        ],
+        "1|timeout": [
+          0,
+          -1
+        ],
+        "2|blocked": [
+          0,
+          0
+        ],
+        "2|move": [
+          1,
+          0
+        ],
+        "2|timeout": [
+          1,
+          0
+        ],
+        "3|blocked": [
+          0,
+          0
+        ],
+        "3|move": [
+          -1,
+          0
+        ],
+        "3|timeout": [
+          -1,
+          0
+        ],
+        "4|empty_eat": [
+          0,
+          0
+        ],
+        "4|food": [
+          0,
+          0
+        ],
+        "4|timeout": [
+          0,
+          0
+        ]
+      },
+      "sample_count": 1351,
+      "seed": 22003
+    },
+    {
+      "fingerprint": "b5ec8ea1ef8be5984f38fe2a40b06ae4e1c2d783b4d6962951f34766dcf3ce0f",
+      "learned_updates": {
+        "0|blocked": [
+          0,
+          0
+        ],
+        "0|move": [
+          0,
+          1
+        ],
+        "0|timeout": [
+          0,
+          1
+        ],
+        "1|blocked": [
+          0,
+          0
+        ],
+        "1|move": [
+          0,
+          -1
+        ],
+        "1|timeout": [
+          0,
+          -1
+        ],
+        "2|blocked": [
+          0,
+          0
+        ],
+        "2|move": [
+          1,
+          0
+        ],
+        "2|timeout": [
+          1,
+          0
+        ],
+        "3|blocked": [
+          0,
+          0
+        ],
+        "3|move": [
+          -1,
+          0
+        ],
+        "3|timeout": [
+          -1,
+          0
+        ],
+        "4|empty_eat": [
+          0,
+          0
+        ],
+        "4|food": [
+          0,
+          0
+        ],
+        "4|timeout": [
+          0,
+          0
+        ]
+      },
+      "sample_count": 1741,
+      "seed": 31013
+    }
+  ],
+  "updater_train_grid_episodes": 80
+}

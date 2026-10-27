@@ -1,0 +1,83 @@
+{
+  "schema": "developmental-ai.repeated-reversal-schedule/v1",
+  "parent_protocol": "benchmarks/repeated_reversal_protocol.json",
+  "status": "frozen before implementing or evaluating outcomes",
+  "seeds": {
+    "development": [
+      14003,
+      14009,
+      14033
+    ],
+    "additional_previously_inspected": [
+      27007,
+      27011,
+      27017
+    ]
+  },
+  "fit": {
+    "family": "source_bursts",
+    "train_indices": "0..159",
+    "iterations": 5
+  },
+  "bootstrap": {
+    "family": "source_bursts",
+    "train_indices": "2000..2199",
+    "episodes": 200
+  },
+  "phases": [
+    "A",
+    "B",
+    "A",
+    "B",
+    "A",
+    "A_control"
+  ],
+  "adaptation": {
+    "family": "shifted_bursts",
+    "train_start": 7000,
+    "phase_stride": 100,
+    "episodes_per_phase": 80
+  },
+  "evaluation": {
+    "family": "shifted_bursts",
+    "split": "test",
+    "start": 96000,
+    "phase_stride": 100,
+    "episodes_per_phase": 40
+  },
+  "modes": [
+    "frozen",
+    "cumulative",
+    "window32",
+    "archive_recall",
+    "raw_window32",
+    "available_target_oracle"
+  ],
+  "archive_recall": {
+    "frozen_anchor_first_n": 200,
+    "recent_count": 32,
+    "comparison_count": 16,
+    "log_bayes_decision_margin": 1.5,
+    "default_model": "recent",
+    "prior_success_alpha": 1,
+    "prior_success_beta": 1,
+    "exploration_fraction": 0.2
+  },
+  "measure": [
+    "successes per seed and phase (read-only evaluation)",
+    "train-online reward per phase",
+    "first 20 adaptation rewards",
+    "archive vs recent episode-by-episode selections",
+    "archive preference recall after return to A",
+    "false anchor selections in unchanged A control",
+    "checkpoint deterministic replay"
+  ],
+  "boundaries": [
+    "no hidden phase, current correct label or true state to learner",
+    "outcomes only boolean after selected action",
+    "same deterministic episode streams and equal adaptation budgets",
+    "results will be exploratory; all seeds previously inspected",
+    "no claims of safe deployment or skill learning on losses/ties",
+    "immutable historical benchmark and V2A/V2B roadmaps retained"
+  ]
+}

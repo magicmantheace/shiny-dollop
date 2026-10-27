@@ -1,0 +1,215 @@
+{
+  "blind": false,
+  "protocol": "benchmarks/hidden_prerequisite_protocol.json",
+  "rows": [
+    {
+      "checkpoint_sha256": "398c6430186e9bb6524c867f93a8d22b12ce016ad9113a9b85d55e86ba6e7b2f",
+      "families": {
+        "repair": {
+          "mean_attempts": {
+            "goal_first": 11.825,
+            "learned": 10.925,
+            "oracle": 5.0,
+            "random": 10.55,
+            "role_order": 7.0
+          },
+          "mean_blocked": {
+            "goal_first": 6.737,
+            "learned": 5.237,
+            "oracle": 0.0,
+            "random": 4.225,
+            "role_order": 0.0
+          },
+          "successes": {
+            "goal_first": 16,
+            "learned": 36,
+            "oracle": 80,
+            "random": 60,
+            "role_order": 80
+          }
+        },
+        "workshop": {
+          "mean_attempts": {
+            "goal_first": 11.463,
+            "learned": 4.0,
+            "oracle": 4.0,
+            "random": 10.1,
+            "role_order": 6.0
+          },
+          "mean_blocked": {
+            "goal_first": 6.112,
+            "learned": 0.0,
+            "oracle": 0.0,
+            "random": 3.775,
+            "role_order": 0.0
+          },
+          "successes": {
+            "goal_first": 33,
+            "learned": 80,
+            "oracle": 80,
+            "random": 63,
+            "role_order": 80
+          }
+        }
+      },
+      "learned_prerequisites": {
+        "assemble": [
+          "gather_a",
+          "gather_b"
+        ],
+        "deliver": [
+          "assemble",
+          "gather_a",
+          "gather_b"
+        ],
+        "gather_a": [],
+        "gather_b": [],
+        "inspect": [],
+        "pack": [],
+        "verify": []
+      },
+      "seed": 27007
+    },
+    {
+      "checkpoint_sha256": "9d98e94152668a04e59d170ede859087148a77aac922cc8fa2908c8d5bf12525",
+      "families": {
+        "repair": {
+          "mean_attempts": {
+            "goal_first": 11.825,
+            "learned": 10.838,
+            "oracle": 5.0,
+            "random": 10.137,
+            "role_order": 7.0
+          },
+          "mean_blocked": {
+            "goal_first": 6.65,
+            "learned": 5.175,
+            "oracle": 0.0,
+            "random": 3.85,
+            "role_order": 0.0
+          },
+          "successes": {
+            "goal_first": 14,
+            "learned": 39,
+            "oracle": 80,
+            "random": 59,
+            "role_order": 80
+          }
+        },
+        "workshop": {
+          "mean_attempts": {
+            "goal_first": 11.662,
+            "learned": 4.0,
+            "oracle": 4.0,
+            "random": 9.7,
+            "role_order": 6.0
+          },
+          "mean_blocked": {
+            "goal_first": 6.4,
+            "learned": 0.0,
+            "oracle": 0.0,
+            "random": 3.4,
+            "role_order": 0.0
+          },
+          "successes": {
+            "goal_first": 17,
+            "learned": 80,
+            "oracle": 80,
+            "random": 64,
+            "role_order": 80
+          }
+        }
+      },
+      "learned_prerequisites": {
+        "assemble": [
+          "gather_a",
+          "gather_b"
+        ],
+        "deliver": [
+          "assemble",
+          "gather_a",
+          "gather_b"
+        ],
+        "gather_a": [],
+        "gather_b": [],
+        "inspect": [],
+        "pack": [],
+        "verify": []
+      },
+      "seed": 27011
+    },
+    {
+      "checkpoint_sha256": "aff9d66eb2d1e30ddde8c7a36542697d62afce63f1ee0cd0138618090ebe340a",
+      "families": {
+        "repair": {
+          "mean_attempts": {
+            "goal_first": 11.713,
+            "learned": 10.95,
+            "oracle": 5.0,
+            "random": 10.4,
+            "role_order": 7.0
+          },
+          "mean_blocked": {
+            "goal_first": 6.513,
+            "learned": 5.263,
+            "oracle": 0.0,
+            "random": 4.263,
+            "role_order": 0.0
+          },
+          "successes": {
+            "goal_first": 20,
+            "learned": 34,
+            "oracle": 80,
+            "random": 54,
+            "role_order": 80
+          }
+        },
+        "workshop": {
+          "mean_attempts": {
+            "goal_first": 11.675,
+            "learned": 4.0,
+            "oracle": 4.0,
+            "random": 9.975,
+            "role_order": 6.0
+          },
+          "mean_blocked": {
+            "goal_first": 6.375,
+            "learned": 0.0,
+            "oracle": 0.0,
+            "random": 3.712,
+            "role_order": 0.0
+          },
+          "successes": {
+            "goal_first": 27,
+            "learned": 80,
+            "oracle": 80,
+            "random": 62,
+            "role_order": 80
+          }
+        }
+      },
+      "learned_prerequisites": {
+        "assemble": [
+          "gather_a",
+          "gather_b"
+        ],
+        "deliver": [
+          "assemble",
+          "gather_a",
+          "gather_b"
+        ],
+        "gather_a": [],
+        "gather_b": [],
+        "inspect": [],
+        "pack": [],
+        "verify": []
+      },
+      "seed": 27017
+    }
+  ],
+  "schema": "developmental-ai.hidden-prerequisite-benchmark/v1",
+  "test": "test/81000..81079",
+  "test_episodes_per_family_seed": 80,
+  "train": "workshop/train/0..359",
+  "train_episodes": 360
+}

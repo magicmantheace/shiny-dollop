@@ -1,0 +1,145 @@
+{
+  "blind": false,
+  "protocol": "benchmarks/unaligned_stream_protocol.json",
+  "reward_training": "terminal success bit only",
+  "rows": [
+    {
+      "checkpoint_sha256": "fc4743148aadd9ac6b59905f8f16086a8ace589c612c9fd4c0a53d37fc05d54f",
+      "seed": 43103,
+      "source_hits": {
+        "bag_frequency": 9,
+        "correct_cue": 40,
+        "identity": 8,
+        "learned_raw": 21,
+        "oracle_cipher_dp": 26,
+        "random": 9,
+        "unsupervised_dp": 26
+      },
+      "source_train_success_counts": {
+        "src_0": [
+          9,
+          52
+        ],
+        "src_1": [
+          8,
+          45
+        ],
+        "src_2": [
+          8,
+          47
+        ],
+        "src_3": [
+          10,
+          50
+        ],
+        "src_4": [
+          11,
+          46
+        ]
+      },
+      "successes": {
+        "bag_frequency": 7,
+        "correct_cue": 37,
+        "identity": 8,
+        "learned_raw": 19,
+        "oracle_cipher_dp": 24,
+        "random": 8,
+        "unsupervised_dp": 24
+      },
+      "unsupervised_mapping_exact": true
+    },
+    {
+      "checkpoint_sha256": "1929ff9a2bc13ef94e4cd07559ab8e4b9cf89a943666adea1827327e9b85c55d",
+      "seed": 50021,
+      "source_hits": {
+        "bag_frequency": 12,
+        "correct_cue": 40,
+        "identity": 12,
+        "learned_raw": 28,
+        "oracle_cipher_dp": 30,
+        "random": 7,
+        "unsupervised_dp": 30
+      },
+      "source_train_success_counts": {
+        "src_0": [
+          6,
+          44
+        ],
+        "src_1": [
+          6,
+          55
+        ],
+        "src_2": [
+          5,
+          44
+        ],
+        "src_3": [
+          4,
+          38
+        ],
+        "src_4": [
+          10,
+          59
+        ]
+      },
+      "successes": {
+        "bag_frequency": 10,
+        "correct_cue": 37,
+        "identity": 11,
+        "learned_raw": 25,
+        "oracle_cipher_dp": 29,
+        "random": 7,
+        "unsupervised_dp": 29
+      },
+      "unsupervised_mapping_exact": true
+    },
+    {
+      "checkpoint_sha256": "5b3555a3216f36b48b00241b9324ab137e85cb9941d0a8ba28a5ce6526f775fe",
+      "seed": 61031,
+      "source_hits": {
+        "bag_frequency": 7,
+        "correct_cue": 40,
+        "identity": 7,
+        "learned_raw": 21,
+        "oracle_cipher_dp": 22,
+        "random": 6,
+        "unsupervised_dp": 22
+      },
+      "source_train_success_counts": {
+        "src_0": [
+          11,
+          57
+        ],
+        "src_1": [
+          9,
+          55
+        ],
+        "src_2": [
+          4,
+          33
+        ],
+        "src_3": [
+          16,
+          45
+        ],
+        "src_4": [
+          11,
+          50
+        ]
+      },
+      "successes": {
+        "bag_frequency": 7,
+        "correct_cue": 38,
+        "identity": 6,
+        "learned_raw": 19,
+        "oracle_cipher_dp": 21,
+        "random": 6,
+        "unsupervised_dp": 21
+      },
+      "unsupervised_mapping_exact": true
+    }
+  ],
+  "schema": "developmental-ai.unaligned-stream-benchmark/v1",
+  "test": "test/99600..99639",
+  "train": "train/89400..89639"
+}

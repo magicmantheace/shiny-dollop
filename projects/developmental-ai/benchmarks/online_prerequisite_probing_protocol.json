@@ -1,0 +1,55 @@
+{
+  "schema": "developmental-ai.online-prerequisite-probing-protocol/v1",
+  "status": "frozen-before-evaluation",
+  "purpose": "Learn target-environment action readiness and reusable preconditions from accepted/blocked feedback within and across target episodes, without simulator DAG access",
+  "base_simulator": "developmental_ai.hidden_prerequisites.HiddenProcedure unchanged",
+  "seeds": {
+    "development": [
+      14003,
+      14009,
+      14033
+    ],
+    "additional_previously_inspected": [
+      27007,
+      27011,
+      27017
+    ]
+  },
+  "evaluation": {
+    "families": [
+      "workshop",
+      "repair"
+    ],
+    "split": "test",
+    "first_index": 83000,
+    "episodes_per_seed_family": 80,
+    "cold_first_episodes": 20,
+    "action_budget": 12,
+    "online_updates": "One update for every observed action/outcome; persistent role-level evidence across prior evaluated episodes, no future data"
+  },
+  "permitted_evidence": "public frame, own attempted action and its accepted/blocked response and eventual goal; no hidden prerequisite graph or true missing requirement labels",
+  "method": "adaptive active probing with versioned outcome trace, replay-verifiable learned readiness evidence and bounded goal retry after relevant progress",
+  "baselines": [
+    "random",
+    "goal_first",
+    "fixed role_order",
+    "zero-shot workshop-only PreconditionSkill trained 360 episodes",
+    "privileged dependency graph oracle",
+    "simple goal-first then uniform untried roles"
+  ],
+  "metrics": [
+    "cold first20 success and warm last60 success per seed/family",
+    "mean blocked attempts",
+    "mean total attempts",
+    "target trial success versus static workshop model",
+    "checkpoint replay and tamper handling"
+  ],
+  "restrictions": [
+    "Do not change earlier frozen hidden-prerequisite benchmark or results",
+    "Role tags and 7-action vocabulary remain engineered, note role_order heuristic is powerful",
+    "No reward-based tuning to test results; keep first result even if fails",
+    "No external action authority; model checksums not signatures",
+    "Previously inspected seeds are NOT independent blind",
+    "Preserve AthenZ/Synveil separation and V2A-before-overlapping-V2B roadmap"
+  ]
+}

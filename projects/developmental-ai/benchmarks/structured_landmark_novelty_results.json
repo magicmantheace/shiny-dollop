@@ -1,0 +1,67 @@
+{
+  "iterations": 6,
+  "kind": "inspected-novel-layout-not-blind",
+  "navigation_episodes": 60,
+  "offset_for_simulator_only": 3,
+  "rows": [
+    {
+      "learned_offsets": {
+        "11": 3,
+        "9": 3
+      },
+      "navigation_success": {
+        "physics_oracle": 0.46667,
+        "structured_map": 0.48333,
+        "unconstrained_em": 0.23333
+      },
+      "seed": 17,
+      "test_mean_log_likelihood": {
+        "physics_oracle": -1.60555,
+        "structured_map": -1.61628,
+        "unconstrained_em": -1.63122
+      }
+    },
+    {
+      "learned_offsets": {
+        "11": 3,
+        "9": 3
+      },
+      "navigation_success": {
+        "physics_oracle": 0.58333,
+        "structured_map": 0.63333,
+        "unconstrained_em": 0.3
+      },
+      "seed": 23,
+      "test_mean_log_likelihood": {
+        "physics_oracle": -1.53078,
+        "structured_map": -1.53791,
+        "unconstrained_em": -1.56061
+      }
+    },
+    {
+      "learned_offsets": {
+        "11": 3,
+        "9": 3
+      },
+      "navigation_success": {
+        "physics_oracle": 0.6,
+        "structured_map": 0.56667,
+        "unconstrained_em": 0.23333
+      },
+      "seed": 41,
+      "test_mean_log_likelihood": {
+        "physics_oracle": -1.65135,
+        "structured_map": -1.66304,
+        "unconstrained_em": -1.70216
+      }
+    }
+  ],
+  "schema": "structured-landmarks/v1",
+  "seed_list": [
+    17,
+    23,
+    41
+  ],
+  "test_episodes": 40,
+  "train_episodes": 90
+}

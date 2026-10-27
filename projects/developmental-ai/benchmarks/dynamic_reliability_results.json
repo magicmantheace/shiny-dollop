@@ -1,0 +1,203 @@
+{
+  "inspected_during_development": true,
+  "paired_reference_to_learner": false,
+  "precommitted_protocol": "benchmarks/dynamic_reliability_protocol.json",
+  "reward_only_training": true,
+  "rows": [
+    {
+      "cue_correct": {
+        "evidence": 36,
+        "first": 10,
+        "identity": 10,
+        "last": 8,
+        "max_agreement": 39,
+        "oracle": 40,
+        "random": 6
+      },
+      "evidence_stats": {
+        "0": [
+          0,
+          61
+        ],
+        "1": [
+          1,
+          88
+        ],
+        "2": [
+          46,
+          77
+        ],
+        "3": [
+          123,
+          134
+        ]
+      },
+      "identity_stats": {
+        "src_0": [
+          25,
+          96
+        ],
+        "src_1": [
+          14,
+          62
+        ],
+        "src_2": [
+          27,
+          105
+        ],
+        "src_3": [
+          9,
+          47
+        ],
+        "src_4": [
+          9,
+          50
+        ]
+      },
+      "navigation_successes": {
+        "evidence": 33,
+        "first": 10,
+        "identity": 9,
+        "last": 6,
+        "max_agreement": 35,
+        "oracle": 36,
+        "random": 5
+      },
+      "record_digest": "d613fda5ea6ee201e6d5370ce019222baecaede7165b7fa12850f9e2359d3a3b",
+      "seed": 43103
+    },
+    {
+      "cue_correct": {
+        "evidence": 34,
+        "first": 6,
+        "identity": 9,
+        "last": 11,
+        "max_agreement": 36,
+        "oracle": 40,
+        "random": 8
+      },
+      "evidence_stats": {
+        "0": [
+          0,
+          58
+        ],
+        "1": [
+          1,
+          71
+        ],
+        "2": [
+          56,
+          93
+        ],
+        "3": [
+          124,
+          138
+        ]
+      },
+      "identity_stats": {
+        "src_0": [
+          12,
+          69
+        ],
+        "src_1": [
+          26,
+          112
+        ],
+        "src_2": [
+          9,
+          58
+        ],
+        "src_3": [
+          8,
+          51
+        ],
+        "src_4": [
+          12,
+          70
+        ]
+      },
+      "navigation_successes": {
+        "evidence": 33,
+        "first": 5,
+        "identity": 9,
+        "last": 10,
+        "max_agreement": 34,
+        "oracle": 37,
+        "random": 7
+      },
+      "record_digest": "f40385a18208aa1c50bf9354acaffc96f64b0faa51c649a626e48a0e14e59a21",
+      "seed": 50021
+    },
+    {
+      "cue_correct": {
+        "evidence": 38,
+        "first": 7,
+        "identity": 10,
+        "last": 7,
+        "max_agreement": 39,
+        "oracle": 40,
+        "random": 12
+      },
+      "evidence_stats": {
+        "0": [
+          0,
+          65
+        ],
+        "1": [
+          1,
+          93
+        ],
+        "2": [
+          34,
+          64
+        ],
+        "3": [
+          127,
+          138
+        ]
+      },
+      "identity_stats": {
+        "src_0": [
+          11,
+          63
+        ],
+        "src_1": [
+          4,
+          36
+        ],
+        "src_2": [
+          24,
+          110
+        ],
+        "src_3": [
+          20,
+          84
+        ],
+        "src_4": [
+          12,
+          67
+        ]
+      },
+      "navigation_successes": {
+        "evidence": 36,
+        "first": 7,
+        "identity": 9,
+        "last": 7,
+        "max_agreement": 37,
+        "oracle": 38,
+        "random": 10
+      },
+      "record_digest": "9299e0572c833359f6cc7ec1b28f0a6b15f3f6af1e2f266020868b9087b43bd9",
+      "seed": 61031
+    }
+  ],
+  "schema": "developmental-ai.dynamic-reliability-benchmark/v1",
+  "test_indices": [
+    99000,
+    99039
+  ],
+  "train_indices": [
+    88000,
+    88359
+  ]
+}

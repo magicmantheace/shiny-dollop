@@ -1,0 +1,98 @@
+{
+  "schema": "developmental-ai.event-segmentation-protocol/v1",
+  "status": "frozen before first evaluation",
+  "question": "Can an HMM fitted from unlabeled source-family streams preserve the longest latent event across a different event-duration/noise generator without target-family training?",
+  "training": {
+    "family": "source-bursts",
+    "split": "train",
+    "indices": "0..159",
+    "per_seed": 160,
+    "latent_segments": 5,
+    "duration_range": [
+      3,
+      11
+    ],
+    "token_accuracy": 0.76,
+    "em_iterations": 5,
+    "initial_persistence": 0.78,
+    "initial_emission_accuracy": 0.72,
+    "pseudocount": 2
+  },
+  "evaluation": {
+    "split": "test",
+    "indices": "92000..92063",
+    "per_seed": 64,
+    "families": {
+      "source_bursts": {
+        "segments": 5,
+        "durations": [
+          3,
+          11
+        ],
+        "token_accuracy": 0.76
+      },
+      "shifted_bursts": {
+        "segments": 6,
+        "durations": [
+          2,
+          17
+        ],
+        "token_accuracy": 0.62
+      }
+    },
+    "unique_longest_event_min_margin": 2
+  },
+  "cohorts": {
+    "development": [
+      14003,
+      14009,
+      14033
+    ],
+    "additional_inspected_after_initial": [
+      27007,
+      27011,
+      27017
+    ]
+  },
+  "model": {
+    "alphabet": 4,
+    "latent_states": 4,
+    "known_symmetric_categorical_emission": true,
+    "known_symmetric_state_transition": true,
+    "trained_from_raw_tokens_only": true,
+    "segmentation": "Viterbi maximum path; contiguous runs; longest inferred event; deterministic ties",
+    "p_bounds": [
+      0.5,
+      0.985
+    ],
+    "q_bounds": [
+      0.52,
+      0.98
+    ]
+  },
+  "baselines": [
+    "last raw token",
+    "first raw token",
+    "most frequent raw token",
+    "longest identical observed run",
+    "fixed prior HMM with identical decoding",
+    "trained source HMM",
+    "privileged latent segmentation oracle"
+  ],
+  "metrics": [
+    "success selecting label of unique longest true event",
+    "inferred number of event spans vs generator true span count",
+    "framewise hidden-label agreement",
+    "per-seed A/B comparisons",
+    "checkpoint integrity and deterministic replay"
+  ],
+  "safety": [
+    "No hidden boundaries, target labels, duration ranges or generator parameters in learned fit/decoder interface",
+    "Only raw observations in training and inference; simulator truth only for scoring",
+    "No target-family fit, tuning or model updates; benchmark frozen before running",
+    "Precommitted seeds are not independent blind data; exploratory only",
+    "Report simple baseline wins and cross-family regressions",
+    "No code/OS actions, model promotions or owner/private memory",
+    "D1/D3 remain open; V2A/V2B sequence unchanged"
+  ]
+}

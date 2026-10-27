@@ -1,0 +1,329 @@
+{
+  "calibration": 8,
+  "hazard_candidates": [
+    0.0,
+    0.01,
+    0.04,
+    0.1,
+    0.2
+  ],
+  "iterations": 2,
+  "kind": "inspected-development-not-blind",
+  "notes": "Known 9/11 ring and hardcoded two-landmark spacing; simulator changes noise/layout at steps 12 and 24, without sending transition/regime labels to filters. Fitting and hazard selection use separate train samples. Benchmark uses hidden position only for Brier. No blind seed, no new model trained during stream, no automatic rollout.",
+  "partitions": {
+    "discovery_validation": "train/10000+",
+    "fit": "train/0+",
+    "hazard_selection": "train/40000+",
+    "stationary_test": "test/86000+",
+    "switch_test": "test/85000+"
+  },
+  "rounds": 1,
+  "rows": [
+    {
+      "calibration_receipt_digest": "e2f9eeeb799e3ee9076d466d73a1afa4bdeb2dcea7178cf7840db5bb2d6b68a6",
+      "evaluation": {
+        "stationary": {
+          "selected_switching": {
+            "abstention": 0.648148,
+            "brier": 0.614087,
+            "nll": 1.464874,
+            "phase_abstention": [
+              0.677083,
+              0.642361,
+              0.625
+            ],
+            "phase_brier": [
+              0.61039,
+              0.667281,
+              0.564591
+            ]
+          },
+          "stationary_mixture": {
+            "abstention": 0.34838,
+            "brier": 0.633117,
+            "nll": 1.45995,
+            "phase_abstention": [
+              0.53125,
+              0.3125,
+              0.201389
+            ],
+            "phase_brier": [
+              0.630007,
+              0.685469,
+              0.583875
+            ]
+          }
+        },
+        "switching": {
+          "selected_switching": {
+            "abstention": 0.710648,
+            "brier": 0.721073,
+            "nll": 1.600108,
+            "phase_abstention": [
+              0.628472,
+              0.670139,
+              0.833333
+            ],
+            "phase_brier": [
+              0.501729,
+              0.881597,
+              0.779892
+            ]
+          },
+          "stationary_mixture": {
+            "abstention": 0.371528,
+            "brier": 0.79276,
+            "nll": 1.621453,
+            "phase_abstention": [
+              0.475694,
+              0.371528,
+              0.267361
+            ],
+            "phase_brier": [
+              0.4969,
+              1.014943,
+              0.866438
+            ]
+          }
+        }
+      },
+      "hazard_calibration": [
+        {
+          "hazard": 0.0,
+          "mean_nll": 1.594984
+        },
+        {
+          "hazard": 0.01,
+          "mean_nll": 1.588383
+        },
+        {
+          "hazard": 0.04,
+          "mean_nll": 1.584495
+        },
+        {
+          "hazard": 0.1,
+          "mean_nll": 1.587085
+        },
+        {
+          "hazard": 0.2,
+          "mean_nll": 1.592266
+        }
+      ],
+      "proposal_two_models": true,
+      "proposal_validation": {
+        "candidate": -1.513507,
+        "delta": 0.052752,
+        "single": -1.566259
+      },
+      "seed": 1009,
+      "selected_hazard": 0.04
+    },
+    {
+      "calibration_receipt_digest": "72fc51e585f41e6717215c78b8ae115fff06c1f1920f39a0812b08a7153e2f63",
+      "evaluation": {
+        "stationary": {
+          "selected_switching": {
+            "abstention": 0.857639,
+            "brier": 0.639488,
+            "nll": 1.521162,
+            "phase_abstention": [
+              0.763889,
+              0.923611,
+              0.885417
+            ],
+            "phase_brier": [
+              0.571839,
+              0.692176,
+              0.654447
+            ]
+          },
+          "stationary_mixture": {
+            "abstention": 0.288194,
+            "brier": 0.562383,
+            "nll": 1.522896,
+            "phase_abstention": [
+              0.427083,
+              0.239583,
+              0.197917
+            ],
+            "phase_brier": [
+              0.53693,
+              0.612798,
+              0.537422
+            ]
+          }
+        },
+        "switching": {
+          "selected_switching": {
+            "abstention": 0.886574,
+            "brier": 0.772593,
+            "nll": 1.546406,
+            "phase_abstention": [
+              0.791667,
+              0.951389,
+              0.916667
+            ],
+            "phase_brier": [
+              0.610821,
+              0.952249,
+              0.754709
+            ]
+          },
+          "stationary_mixture": {
+            "abstention": 0.366898,
+            "brier": 0.812945,
+            "nll": 1.557733,
+            "phase_abstention": [
+              0.440972,
+              0.361111,
+              0.298611
+            ],
+            "phase_brier": [
+              0.617388,
+              1.046516,
+              0.774932
+            ]
+          }
+        }
+      },
+      "hazard_calibration": [
+        {
+          "hazard": 0.0,
+          "mean_nll": 1.622881
+        },
+        {
+          "hazard": 0.01,
+          "mean_nll": 1.605389
+        },
+        {
+          "hazard": 0.04,
+          "mean_nll": 1.595274
+        },
+        {
+          "hazard": 0.1,
+          "mean_nll": 1.593085
+        },
+        {
+          "hazard": 0.2,
+          "mean_nll": 1.598996
+        }
+      ],
+      "proposal_two_models": true,
+      "proposal_validation": {
+        "candidate": -1.466512,
+        "delta": 0.035927,
+        "single": -1.502438
+      },
+      "seed": 1013,
+      "selected_hazard": 0.1
+    },
+    {
+      "calibration_receipt_digest": "fdc3d92e6da7e8bb76dee8728623027aa3fb7eb64048b8b05096fedf664080d0",
+      "evaluation": {
+        "stationary": {
+          "selected_switching": {
+            "abstention": 0.452546,
+            "brier": 0.63121,
+            "nll": 1.51817,
+            "phase_abstention": [
+              0.541667,
+              0.454861,
+              0.361111
+            ],
+            "phase_brier": [
+              0.542476,
+              0.638225,
+              0.71293
+            ]
+          },
+          "stationary_mixture": {
+            "abstention": 0.452546,
+            "brier": 0.63121,
+            "nll": 1.51817,
+            "phase_abstention": [
+              0.541667,
+              0.454861,
+              0.361111
+            ],
+            "phase_brier": [
+              0.542476,
+              0.638225,
+              0.71293
+            ]
+          }
+        },
+        "switching": {
+          "selected_switching": {
+            "abstention": 0.396991,
+            "brier": 0.743113,
+            "nll": 1.584091,
+            "phase_abstention": [
+              0.534722,
+              0.34375,
+              0.3125
+            ],
+            "phase_brier": [
+              0.487517,
+              1.034598,
+              0.707225
+            ]
+          },
+          "stationary_mixture": {
+            "abstention": 0.396991,
+            "brier": 0.743113,
+            "nll": 1.584091,
+            "phase_abstention": [
+              0.534722,
+              0.34375,
+              0.3125
+            ],
+            "phase_brier": [
+              0.487517,
+              1.034598,
+              0.707225
+            ]
+          }
+        }
+      },
+      "hazard_calibration": [
+        {
+          "hazard": 0.0,
+          "mean_nll": 1.52995
+        },
+        {
+          "hazard": 0.01,
+          "mean_nll": 1.530212
+        },
+        {
+          "hazard": 0.04,
+          "mean_nll": 1.532272
+        },
+        {
+          "hazard": 0.1,
+          "mean_nll": 1.536993
+        },
+        {
+          "hazard": 0.2,
+          "mean_nll": 1.543708
+        }
+      ],
+      "proposal_two_models": true,
+      "proposal_validation": {
+        "candidate": -1.624239,
+        "delta": 0.072438,
+        "single": -1.696678
+      },
+      "seed": 1031,
+      "selected_hazard": 0.0
+    }
+  ],
+  "schema": "switching-belief/v1",
+  "seeds": [
+    1009,
+    1013,
+    1031
+  ],
+  "test": 24,
+  "train": 48,
+  "validation": 16
+}

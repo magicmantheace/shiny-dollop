@@ -1,0 +1,138 @@
+{
+  "candidate_training_episodes": 80,
+  "fit_iterations": 6,
+  "floor": -3.3,
+  "kind": "inspected-development-not-blind",
+  "known_train_episodes": 130,
+  "notes": "Ring topology and reset beacon known; labels used for measurement only. Candidate fitted from ordinary sequences then quarantined. Novelty floor uncalibrated.",
+  "phase_episodes": 12,
+  "rows": [
+    {
+      "novel_candidate": {
+        "automatic_promotions": 0,
+        "candidate_improvement_over_best_known": 0.0015,
+        "held_out_negative_log_likelihoods": {
+          "changed": 1.663,
+          "original": 1.6569,
+          "quarantined_candidate": 1.6554
+        },
+        "status": "awaiting-human-review",
+        "training_histories": 80
+      },
+      "phases": [
+        {
+          "correct_step_fraction": 0.7917,
+          "final_selected": "original",
+          "first_correct_observation": 31,
+          "regime_for_scoring_only": "original",
+          "switches": 1,
+          "unknown_observations": 0
+        },
+        {
+          "correct_step_fraction": 0.7917,
+          "final_selected": "changed",
+          "first_correct_observation": 31,
+          "regime_for_scoring_only": "changed",
+          "switches": 1,
+          "unknown_observations": 0
+        },
+        {
+          "correct_step_fraction": 0.875,
+          "final_selected": "original",
+          "first_correct_observation": 19,
+          "regime_for_scoring_only": "original",
+          "switches": 1,
+          "unknown_observations": 0
+        }
+      ],
+      "seed": 17
+    },
+    {
+      "novel_candidate": {
+        "automatic_promotions": 0,
+        "candidate_improvement_over_best_known": -0.0083,
+        "held_out_negative_log_likelihoods": {
+          "changed": 1.6948,
+          "original": 1.6448,
+          "quarantined_candidate": 1.6531
+        },
+        "status": "awaiting-human-review",
+        "training_histories": 80
+      },
+      "phases": [
+        {
+          "correct_step_fraction": 0.8611,
+          "final_selected": "original",
+          "first_correct_observation": 21,
+          "regime_for_scoring_only": "original",
+          "switches": 1,
+          "unknown_observations": 0
+        },
+        {
+          "correct_step_fraction": 0.0,
+          "final_selected": "original",
+          "first_correct_observation": null,
+          "regime_for_scoring_only": "changed",
+          "switches": 0,
+          "unknown_observations": 0
+        },
+        {
+          "correct_step_fraction": 1.0,
+          "final_selected": "original",
+          "first_correct_observation": 1,
+          "regime_for_scoring_only": "original",
+          "switches": 0,
+          "unknown_observations": 0
+        }
+      ],
+      "seed": 23
+    },
+    {
+      "novel_candidate": {
+        "automatic_promotions": 0,
+        "candidate_improvement_over_best_known": -0.0359,
+        "held_out_negative_log_likelihoods": {
+          "changed": 1.6679,
+          "original": 1.6215,
+          "quarantined_candidate": 1.6574
+        },
+        "status": "awaiting-human-review",
+        "training_histories": 80
+      },
+      "phases": [
+        {
+          "correct_step_fraction": 0.9583,
+          "final_selected": "original",
+          "first_correct_observation": 7,
+          "regime_for_scoring_only": "original",
+          "switches": 1,
+          "unknown_observations": 0
+        },
+        {
+          "correct_step_fraction": 0.0,
+          "final_selected": "original",
+          "first_correct_observation": null,
+          "regime_for_scoring_only": "changed",
+          "switches": 0,
+          "unknown_observations": 0
+        },
+        {
+          "correct_step_fraction": 1.0,
+          "final_selected": "original",
+          "first_correct_observation": 1,
+          "regime_for_scoring_only": "original",
+          "switches": 0,
+          "unknown_observations": 0
+        }
+      ],
+      "seed": 41
+    }
+  ],
+  "schema": "step-dynamics/v1",
+  "seeds": [
+    17,
+    23,
+    41
+  ],
+  "test_episodes": 80
+}

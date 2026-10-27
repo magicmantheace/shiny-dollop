@@ -1,0 +1,73 @@
+{
+  "schema": "developmental-ai.hidden-prerequisite-protocol/v1",
+  "status": "frozen before implementing or evaluating",
+  "intent": "Learn prerequisites of opaque actions from legal/blocked outcomes when no dependency graph is exposed; test transfer across related procedurally renamed workshop and repair tasks",
+  "training": {
+    "family": "workshop",
+    "split": "train",
+    "episodes": 360,
+    "indices": "0..359",
+    "learning": "observe only public role tags, completed actions, attempted action and acceptance/terminal reward; no hidden DAG or ancestor closure",
+    "max_attempts": 12
+  },
+  "evaluation": {
+    "families": [
+      "workshop",
+      "repair"
+    ],
+    "split": "test",
+    "start": 81000,
+    "episodes": 80,
+    "attempt_budget": 12
+  },
+  "seeds": {
+    "development": [
+      14003,
+      14009,
+      14033
+    ],
+    "additional_inspected": [
+      27007,
+      27011,
+      27017
+    ]
+  },
+  "world": {
+    "action_roles": [
+      "prepare",
+      "prepare",
+      "combine",
+      "finish",
+      "inspect",
+      "repair",
+      "verify"
+    ],
+    "opaque_names_per_episode": true,
+    "known_goal_tag": true,
+    "hidden_prerequisites": true,
+    "blocked_attempt_consumes_budget": true,
+    "feedback": "accepted/blocked/goal/timeout",
+    "different_family_graphs": true
+  },
+  "methods": [
+    "learned per-role dependency evidence from workshop trials",
+    "random",
+    "fixed heuristic sorted role",
+    "attempt-goal-first then random retry",
+    "privileged graph oracle"
+  ],
+  "metrics": [
+    "success per 80 episodes and seed/family",
+    "mean attempts",
+    "mean blocked attempts",
+    "evidence learned per role and zero-shot repair regression"
+  ],
+  "security": [
+    "No true DAG, ancestor closure, goal-index or hidden model state in learner frames",
+    "Only simulation action names, bounded role tags, completed list, goal alias, and ordinary feedback",
+    "Frozen protocol no post-result tuning",
+    "Previously inspected seeds not blind; D1 D3 D4 remain open",
+    "No unrestricted actions or private records, snapshots integrity not signatures",
+    "Preserve historic published benchmarks and V2A-before/overlapping-V2B"
+  ]
+}

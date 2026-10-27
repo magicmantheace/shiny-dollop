@@ -1,0 +1,206 @@
+{
+  "iterations": 3,
+  "kind": "inspected-development-not-blind",
+  "navigation": 24,
+  "notes": "No regime/position labels passed to fitting or selection. Known 9/11 rings and two half-separated sensor markers remain an engineered bias. Test only scores after training and candidate selection. Oracle sees true simulator probability law. Per-seed inspected results, no runtime model promotion.",
+  "partitions": {
+    "evaluation": "test/70000+",
+    "fit": "train/0+",
+    "navigation": "test/77000+",
+    "probe": "test/65000+",
+    "validation": "train/10000+"
+  },
+  "rounds": 2,
+  "rows": [
+    {
+      "accepted": true,
+      "kind": "odometry",
+      "regimes": {
+        "changed": {
+          "model_offsets": [
+            {
+              "11": 2,
+              "9": 0
+            },
+            {
+              "11": 0,
+              "9": 0
+            }
+          ],
+          "navigation_success": {
+            "mixed_selected_or_fallback": 0.416667,
+            "physics_oracle": 0.416667,
+            "regime_grouped_upper": 0.333333,
+            "single": 0.291667
+          },
+          "physics_oracle_score": -1.689067,
+          "probe_selected": 0,
+          "regime_grouped_score": -1.780915,
+          "selected": 0,
+          "single_score": -1.803506,
+          "unsupervised_score": -1.792586
+        },
+        "original": {
+          "model_offsets": [
+            {
+              "11": 2,
+              "9": 0
+            },
+            {
+              "11": 0,
+              "9": 0
+            }
+          ],
+          "navigation_success": {
+            "mixed_selected_or_fallback": 0.875,
+            "physics_oracle": 0.875,
+            "regime_grouped_upper": 0.791667,
+            "single": 0.875
+          },
+          "physics_oracle_score": -1.384122,
+          "probe_selected": 1,
+          "regime_grouped_score": -1.397317,
+          "selected": 1,
+          "single_score": -1.41632,
+          "unsupervised_score": -1.416569
+        }
+      },
+      "seed": 1009,
+      "validation": {
+        "candidate": -1.541609,
+        "delta": 0.032318,
+        "single": -1.573927
+      }
+    },
+    {
+      "accepted": true,
+      "kind": "odometry",
+      "regimes": {
+        "changed": {
+          "model_offsets": [
+            {
+              "11": 2,
+              "9": 0
+            },
+            {
+              "11": 0,
+              "9": 0
+            }
+          ],
+          "navigation_success": {
+            "mixed_selected_or_fallback": 0.291667,
+            "physics_oracle": 0.625,
+            "regime_grouped_upper": 0.541667,
+            "single": 0.125
+          },
+          "physics_oracle_score": -1.612199,
+          "probe_selected": 0,
+          "regime_grouped_score": -1.634069,
+          "selected": 0,
+          "single_score": -1.759415,
+          "unsupervised_score": -1.733946
+        },
+        "original": {
+          "model_offsets": [
+            {
+              "11": 2,
+              "9": 0
+            },
+            {
+              "11": 0,
+              "9": 0
+            }
+          ],
+          "navigation_success": {
+            "mixed_selected_or_fallback": 0.958333,
+            "physics_oracle": 1.0,
+            "regime_grouped_upper": 0.958333,
+            "single": 0.958333
+          },
+          "physics_oracle_score": -1.437478,
+          "probe_selected": 1,
+          "regime_grouped_score": -1.4382,
+          "selected": 1,
+          "single_score": -1.471974,
+          "unsupervised_score": -1.497172
+        }
+      },
+      "seed": 1013,
+      "validation": {
+        "candidate": -1.499712,
+        "delta": 0.021456,
+        "single": -1.521167
+      }
+    },
+    {
+      "accepted": true,
+      "kind": "odometry",
+      "regimes": {
+        "changed": {
+          "model_offsets": [
+            {
+              "11": 2,
+              "9": 2
+            },
+            {
+              "11": 0,
+              "9": 0
+            }
+          ],
+          "navigation_success": {
+            "mixed_selected_or_fallback": 0.625,
+            "physics_oracle": 0.583333,
+            "regime_grouped_upper": 0.583333,
+            "single": 0.041667
+          },
+          "physics_oracle_score": -1.569274,
+          "probe_selected": 0,
+          "regime_grouped_score": -1.583265,
+          "selected": 0,
+          "single_score": -1.620512,
+          "unsupervised_score": -1.603462
+        },
+        "original": {
+          "model_offsets": [
+            {
+              "11": 2,
+              "9": 2
+            },
+            {
+              "11": 0,
+              "9": 0
+            }
+          ],
+          "navigation_success": {
+            "mixed_selected_or_fallback": 0.75,
+            "physics_oracle": 0.75,
+            "regime_grouped_upper": 0.791667,
+            "single": 0.833333
+          },
+          "physics_oracle_score": -1.398077,
+          "probe_selected": 1,
+          "regime_grouped_score": -1.411237,
+          "selected": 1,
+          "single_score": -1.446948,
+          "unsupervised_score": -1.431516
+        }
+      },
+      "seed": 1031,
+      "validation": {
+        "candidate": -1.568564,
+        "delta": 0.025122,
+        "single": -1.593686
+      }
+    }
+  ],
+  "schedule": "alternating",
+  "schema": "mixed-experience/v1",
+  "seeds": [
+    1009,
+    1013,
+    1031
+  ],
+  "test": 28,
+  "train": 72,
+  "validation": 24
+}

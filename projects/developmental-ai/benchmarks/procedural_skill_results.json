@@ -1,0 +1,213 @@
+{
+  "blind": false,
+  "episodes_per_seed_family": 100,
+  "evaluation_split": "test/70000..70099",
+  "no_target_reward_fit": true,
+  "protocol": "benchmarks/procedural_skill_protocol.json",
+  "rows": [
+    {
+      "ablation_sha256": "33ea485d9b5cb402b1f30705c6b8688b3aa834f02ca29d84c06c801536ebe751",
+      "families": {
+        "repair": {
+          "mean_steps": {
+            "feature_ablation": 5.92,
+            "greedy": 5.0,
+            "learned": 5.0,
+            "oracle": 5.0,
+            "random": 6.0
+          },
+          "success": {
+            "feature_ablation": 31,
+            "greedy": 100,
+            "learned": 100,
+            "oracle": 100,
+            "random": 1
+          },
+          "wasted": {
+            "feature_ablation": 161,
+            "greedy": 0,
+            "learned": 0,
+            "oracle": 0,
+            "random": 199
+          }
+        },
+        "workshop": {
+          "mean_steps": {
+            "feature_ablation": 5.71,
+            "greedy": 4.0,
+            "learned": 4.0,
+            "oracle": 4.0,
+            "random": 5.91
+          },
+          "success": {
+            "feature_ablation": 53,
+            "greedy": 100,
+            "learned": 100,
+            "oracle": 100,
+            "random": 19
+          },
+          "wasted": {
+            "feature_ablation": 218,
+            "greedy": 0,
+            "learned": 0,
+            "oracle": 0,
+            "random": 272
+          }
+        }
+      },
+      "learned_sha256": "96775ad730b822679443f921816a761304ebff4181b7157166720148d939b446",
+      "seed": 14003,
+      "training_table": {
+        "0|0": [
+          -214.40000000000202,
+          628
+        ],
+        "0|1": [
+          248.00000000000705,
+          1800
+        ],
+        "1|1": [
+          1656.0,
+          552
+        ]
+      }
+    },
+    {
+      "ablation_sha256": "75e14a59638e2db383e4d6f80907faabb7a51c4f4d4ebb89ee5ebf8e8a754e08",
+      "families": {
+        "repair": {
+          "mean_steps": {
+            "feature_ablation": 5.97,
+            "greedy": 5.0,
+            "learned": 5.0,
+            "oracle": 5.0,
+            "random": 6.0
+          },
+          "success": {
+            "feature_ablation": 22,
+            "greedy": 100,
+            "learned": 100,
+            "oracle": 100,
+            "random": 6
+          },
+          "wasted": {
+            "feature_ablation": 175,
+            "greedy": 0,
+            "learned": 0,
+            "oracle": 0,
+            "random": 194
+          }
+        },
+        "workshop": {
+          "mean_steps": {
+            "feature_ablation": 5.74,
+            "greedy": 4.0,
+            "learned": 4.0,
+            "oracle": 4.0,
+            "random": 5.94
+          },
+          "success": {
+            "feature_ablation": 56,
+            "greedy": 100,
+            "learned": 100,
+            "oracle": 100,
+            "random": 22
+          },
+          "wasted": {
+            "feature_ablation": 218,
+            "greedy": 0,
+            "learned": 0,
+            "oracle": 0,
+            "random": 272
+          }
+        }
+      },
+      "learned_sha256": "450feacfbfa2fbc1312aef7b19f50a4433ed9607bddcb5bd35f9022a0ec27e46",
+      "seed": 14009,
+      "training_table": {
+        "0|0": [
+          -197.00000000000142,
+          590
+        ],
+        "0|1": [
+          248.00000000000722,
+          1800
+        ],
+        "1|1": [
+          1674.0,
+          558
+        ]
+      }
+    },
+    {
+      "ablation_sha256": "6bddf7be8253ba34f68e3c1a7f405c575a98eb21e40adc061f53c950d84b0a8e",
+      "families": {
+        "repair": {
+          "mean_steps": {
+            "feature_ablation": 5.94,
+            "greedy": 5.0,
+            "learned": 5.0,
+            "oracle": 5.0,
+            "random": 5.99
+          },
+          "success": {
+            "feature_ablation": 34,
+            "greedy": 100,
+            "learned": 100,
+            "oracle": 100,
+            "random": 8
+          },
+          "wasted": {
+            "feature_ablation": 160,
+            "greedy": 0,
+            "learned": 0,
+            "oracle": 0,
+            "random": 191
+          }
+        },
+        "workshop": {
+          "mean_steps": {
+            "feature_ablation": 5.73,
+            "greedy": 4.0,
+            "learned": 4.0,
+            "oracle": 4.0,
+            "random": 5.94
+          },
+          "success": {
+            "feature_ablation": 58,
+            "greedy": 100,
+            "learned": 100,
+            "oracle": 100,
+            "random": 21
+          },
+          "wasted": {
+            "feature_ablation": 215,
+            "greedy": 0,
+            "learned": 0,
+            "oracle": 0,
+            "random": 273
+          }
+        }
+      },
+      "learned_sha256": "f18371824988ade6a7032fbf8f05586f76ba1e8ce6de02ebd4f39f79e204281f",
+      "seed": 14033,
+      "training_table": {
+        "0|0": [
+          -200.10000000000167,
+          597
+        ],
+        "0|1": [
+          239.00000000000688,
+          1800
+        ],
+        "1|1": [
+          1644.0,
+          548
+        ]
+      }
+    }
+  ],
+  "schema": "developmental-ai.procedural-skill-benchmark/v1",
+  "training_family": "workshop",
+  "training_split": "train/0..599"
+}

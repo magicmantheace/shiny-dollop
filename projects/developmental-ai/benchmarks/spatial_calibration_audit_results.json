@@ -1,0 +1,222 @@
+{
+  "calibration_episodes": 40,
+  "evaluation_episodes": 40,
+  "fit_episodes": 60,
+  "iterations": 5,
+  "kind": "inspected-development-not-blind",
+  "notes": "Ground-truth location is revealed ONLY to offline temperature fitting and benchmark diagnostics, not the navigation filter. This is explicitly supervised calibration on a fixed ring, not self-supervised model learning. Model condition is supplied by the benchmark and not inferred at runtime.",
+  "rows": [
+    {
+      "regimes": {
+        "changed": {
+          "calibration_record_count": 480,
+          "temperature": 1.0,
+          "test_calibrated": {
+            "brier": 0.84395,
+            "credible80_coverage": 0.79583,
+            "credible80_set_size": 4.96667,
+            "nll": 1.95966,
+            "top1_accuracy": 0.21458,
+            "true_position_mass": 0.17561
+          },
+          "test_physics_oracle": {
+            "brier": 0.62122,
+            "credible80_coverage": 0.89167,
+            "credible80_set_size": 3.36667,
+            "nll": 1.32805,
+            "top1_accuracy": 0.44583,
+            "true_position_mass": 0.37457
+          },
+          "test_record_count": 480,
+          "test_uncalibrated": {
+            "brier": 0.84395,
+            "credible80_coverage": 0.79583,
+            "credible80_set_size": 4.96667,
+            "nll": 1.95966,
+            "top1_accuracy": 0.21458,
+            "true_position_mass": 0.17561
+          },
+          "train_calibration_nll_after": 1.82252,
+          "train_calibration_nll_before": 1.82252
+        },
+        "original": {
+          "calibration_record_count": 480,
+          "temperature": 0.5,
+          "test_calibrated": {
+            "brier": 0.61005,
+            "credible80_coverage": 0.86875,
+            "credible80_set_size": 3.08542,
+            "nll": 1.33173,
+            "top1_accuracy": 0.52708,
+            "true_position_mass": 0.37976
+          },
+          "test_physics_oracle": {
+            "brier": 0.45538,
+            "credible80_coverage": 0.90417,
+            "credible80_set_size": 2.15417,
+            "nll": 0.90836,
+            "top1_accuracy": 0.64792,
+            "true_position_mass": 0.53804
+          },
+          "test_record_count": 480,
+          "test_uncalibrated": {
+            "brier": 0.66632,
+            "credible80_coverage": 0.92917,
+            "credible80_set_size": 4.5,
+            "nll": 1.45021,
+            "top1_accuracy": 0.52708,
+            "true_position_mass": 0.28227
+          },
+          "train_calibration_nll_after": 1.33549,
+          "train_calibration_nll_before": 1.43342
+        }
+      },
+      "seed": 1009
+    },
+    {
+      "regimes": {
+        "changed": {
+          "calibration_record_count": 480,
+          "temperature": 0.8,
+          "test_calibrated": {
+            "brier": 0.75129,
+            "credible80_coverage": 0.82917,
+            "credible80_set_size": 4.19792,
+            "nll": 1.64965,
+            "top1_accuracy": 0.33333,
+            "true_position_mass": 0.24611
+          },
+          "test_physics_oracle": {
+            "brier": 0.60753,
+            "credible80_coverage": 0.90208,
+            "credible80_set_size": 3.38333,
+            "nll": 1.28313,
+            "top1_accuracy": 0.45833,
+            "true_position_mass": 0.39153
+          },
+          "test_record_count": 480,
+          "test_uncalibrated": {
+            "brier": 0.75525,
+            "credible80_coverage": 0.87292,
+            "credible80_set_size": 4.5625,
+            "nll": 1.66219,
+            "top1_accuracy": 0.33333,
+            "true_position_mass": 0.23041
+          },
+          "train_calibration_nll_after": 1.70396,
+          "train_calibration_nll_before": 1.70846
+        },
+        "original": {
+          "calibration_record_count": 480,
+          "temperature": 0.5,
+          "test_calibrated": {
+            "brier": 0.5709,
+            "credible80_coverage": 0.82708,
+            "credible80_set_size": 2.58333,
+            "nll": 1.29844,
+            "top1_accuracy": 0.55625,
+            "true_position_mass": 0.44737
+          },
+          "test_physics_oracle": {
+            "brier": 0.5041,
+            "credible80_coverage": 0.85625,
+            "credible80_set_size": 2.17292,
+            "nll": 1.09699,
+            "top1_accuracy": 0.57708,
+            "true_position_mass": 0.52097
+          },
+          "test_record_count": 480,
+          "test_uncalibrated": {
+            "brier": 0.60578,
+            "credible80_coverage": 0.91875,
+            "credible80_set_size": 3.93542,
+            "nll": 1.33688,
+            "top1_accuracy": 0.55625,
+            "true_position_mass": 0.34104
+          },
+          "train_calibration_nll_after": 1.02886,
+          "train_calibration_nll_before": 1.17235
+        }
+      },
+      "seed": 1013
+    },
+    {
+      "regimes": {
+        "changed": {
+          "calibration_record_count": 480,
+          "temperature": 1.0,
+          "test_calibrated": {
+            "brier": 0.80477,
+            "credible80_coverage": 0.80833,
+            "credible80_set_size": 4.5,
+            "nll": 1.82077,
+            "top1_accuracy": 0.25417,
+            "true_position_mass": 0.20465
+          },
+          "test_physics_oracle": {
+            "brier": 0.6129,
+            "credible80_coverage": 0.89583,
+            "credible80_set_size": 3.13958,
+            "nll": 1.28064,
+            "top1_accuracy": 0.47708,
+            "true_position_mass": 0.39384
+          },
+          "test_record_count": 480,
+          "test_uncalibrated": {
+            "brier": 0.80477,
+            "credible80_coverage": 0.80833,
+            "credible80_set_size": 4.5,
+            "nll": 1.82077,
+            "top1_accuracy": 0.25417,
+            "true_position_mass": 0.20465
+          },
+          "train_calibration_nll_after": 1.80384,
+          "train_calibration_nll_before": 1.80384
+        },
+        "original": {
+          "calibration_record_count": 480,
+          "temperature": 0.5,
+          "test_calibrated": {
+            "brier": 0.49106,
+            "credible80_coverage": 0.89167,
+            "credible80_set_size": 2.59167,
+            "nll": 1.05083,
+            "top1_accuracy": 0.63333,
+            "true_position_mass": 0.48827
+          },
+          "test_physics_oracle": {
+            "brier": 0.45474,
+            "credible80_coverage": 0.89167,
+            "credible80_set_size": 2.13958,
+            "nll": 0.95613,
+            "top1_accuracy": 0.64792,
+            "true_position_mass": 0.55621
+          },
+          "test_record_count": 480,
+          "test_uncalibrated": {
+            "brier": 0.56089,
+            "credible80_coverage": 0.95625,
+            "credible80_set_size": 3.85,
+            "nll": 1.20843,
+            "top1_accuracy": 0.63333,
+            "true_position_mass": 0.36448
+          },
+          "train_calibration_nll_after": 1.17724,
+          "train_calibration_nll_before": 1.28385
+        }
+      },
+      "seed": 1031
+    }
+  ],
+  "schema": "spatial-calibration/v1",
+  "seeds": [
+    1009,
+    1013,
+    1031
+  ],
+  "windows": {
+    "read_only_evaluation": "test/40000+",
+    "supervised_temperature_fit": "train/5000+",
+    "unsupervised_model_fit": "train/0+"
+  }
+}

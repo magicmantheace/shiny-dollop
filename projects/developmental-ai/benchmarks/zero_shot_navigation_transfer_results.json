@@ -1,0 +1,158 @@
+{
+  "blind": false,
+  "evaluation_start_index": 70000,
+  "notes": "Previously inspected development seeds. Grid Q policy is frozen and evaluated zero-shot on occluded. One-time beacon dead-reckoning is engineered, not learned. No hidden map access.",
+  "rows": [
+    {
+      "family": "grid",
+      "mean_steps": 79.01562,
+      "policy": "untrained",
+      "seed": 2749,
+      "success_rate": 0.17188,
+      "successes": 11
+    },
+    {
+      "family": "grid",
+      "mean_steps": 11.90625,
+      "policy": "greedy",
+      "seed": 2749,
+      "success_rate": 0.90625,
+      "successes": 58
+    },
+    {
+      "family": "grid",
+      "mean_steps": 29.79688,
+      "policy": "trained_grid",
+      "seed": 2749,
+      "success_rate": 0.70312,
+      "successes": 45
+    },
+    {
+      "family": "occluded",
+      "mean_steps": 80.23438,
+      "policy": "untrained",
+      "seed": 2749,
+      "success_rate": 0.14062,
+      "successes": 9
+    },
+    {
+      "family": "occluded",
+      "mean_steps": 14.15625,
+      "policy": "greedy",
+      "seed": 2749,
+      "success_rate": 0.90625,
+      "successes": 58
+    },
+    {
+      "family": "occluded",
+      "mean_steps": 32.125,
+      "policy": "trained_grid",
+      "seed": 2749,
+      "success_rate": 0.70312,
+      "successes": 45
+    },
+    {
+      "family": "grid",
+      "mean_steps": 82.17188,
+      "policy": "untrained",
+      "seed": 6607,
+      "success_rate": 0.20312,
+      "successes": 13
+    },
+    {
+      "family": "grid",
+      "mean_steps": 12.26562,
+      "policy": "greedy",
+      "seed": 6607,
+      "success_rate": 0.92188,
+      "successes": 59
+    },
+    {
+      "family": "grid",
+      "mean_steps": 30.90625,
+      "policy": "trained_grid",
+      "seed": 6607,
+      "success_rate": 0.71875,
+      "successes": 46
+    },
+    {
+      "family": "occluded",
+      "mean_steps": 79.9375,
+      "policy": "untrained",
+      "seed": 6607,
+      "success_rate": 0.15625,
+      "successes": 10
+    },
+    {
+      "family": "occluded",
+      "mean_steps": 10.90625,
+      "policy": "greedy",
+      "seed": 6607,
+      "success_rate": 0.95312,
+      "successes": 61
+    },
+    {
+      "family": "occluded",
+      "mean_steps": 21.0,
+      "policy": "trained_grid",
+      "seed": 6607,
+      "success_rate": 0.82812,
+      "successes": 53
+    },
+    {
+      "family": "grid",
+      "mean_steps": 87.4375,
+      "policy": "untrained",
+      "seed": 9901,
+      "success_rate": 0.125,
+      "successes": 8
+    },
+    {
+      "family": "grid",
+      "mean_steps": 13.95312,
+      "policy": "greedy",
+      "seed": 9901,
+      "success_rate": 0.90625,
+      "successes": 58
+    },
+    {
+      "family": "grid",
+      "mean_steps": 31.89062,
+      "policy": "trained_grid",
+      "seed": 9901,
+      "success_rate": 0.70312,
+      "successes": 45
+    },
+    {
+      "family": "occluded",
+      "mean_steps": 82.48438,
+      "policy": "untrained",
+      "seed": 9901,
+      "success_rate": 0.23438,
+      "successes": 15
+    },
+    {
+      "family": "occluded",
+      "mean_steps": 15.09375,
+      "policy": "greedy",
+      "seed": 9901,
+      "success_rate": 0.92188,
+      "successes": 59
+    },
+    {
+      "family": "occluded",
+      "mean_steps": 36.42188,
+      "policy": "trained_grid",
+      "seed": 9901,
+      "success_rate": 0.6875,
+      "successes": 44
+    }
+  ],
+  "schema": "developmental-ai.zero-shot-navigation-transfer/v1",
+  "test_episodes_per_family": 64,
+  "test_split": "test",
+  "train_episodes": 1200,
+  "train_family": "grid",
+  "train_split": "train",
+  "zero_shot_family": "occluded"
+}
