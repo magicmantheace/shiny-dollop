@@ -259,6 +259,10 @@ def main():
     control_file.write_text(json.dumps(control, indent=2) + "\n")
     debugfs_write(state, control_file, "/lib/synveil/ab-control.json")
     write_partition(disk, 4, state)
+    check = extract_partition(disk, 4, OUT / "state-check.img")
+    written = json.loads(debugfs_read(check, "/lib/synveil/ab-control.json"))
+    if (written.get("slots") or {}).get("B") is None:
+        raise RuntimeError("control write-back did not persist on the disk")
 
     slot_b = extract_partition(disk, 3, OUT / "slot-b.img")
     run("mmd", "-i", str(slot_b), "::EFI")
@@ -277,6 +281,9 @@ def main():
     data = extract_partition(disk, 5, OUT / "data.img")
     debugfs_write(data, owner_file, "/owner-restore-probe.txt")
     write_partition(disk, 5, data)
+    check = extract_partition(disk, 5, OUT / "data-check.img")
+    if debugfs_read(check, "/owner-restore-probe.txt") != owner_content:
+        raise RuntimeError("DATA write-back did not persist on the disk")
     owner_sha_before = sha256_bytes(
         debugfs_read(data, "/owner-restore-probe.txt"))
 
@@ -300,6 +307,11 @@ def main():
     ok = ok and probe_locked(boot)
     results["maint-denied"] = ok
     boot.stop()
+    # Did the denied maintenance boot leave the fixture state intact?
+    check = extract_partition(disk, 4, OUT / "state-after-denied.img")
+    intact = json.loads(debugfs_read(check, "/lib/synveil/ab-control.json"))
+    results["fixture-survives-denied-boot"] = (
+        (intact.get("slots") or {}).get("B") is not None)
 
     # 5. Maintenance boot: authenticate and restore.
     boot = Boot("maint-restore", disk, vars_file)
