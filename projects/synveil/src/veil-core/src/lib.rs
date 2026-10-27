@@ -22,6 +22,7 @@ pub mod audit_retention;
 pub mod credential;
 pub mod ed25519;
 pub mod observer;
+pub mod recovery;
 pub mod seat;
 pub mod secret;
 pub mod session;
