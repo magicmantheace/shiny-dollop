@@ -146,3 +146,15 @@ OK.
 - Chromium window management under Weston (maximize state)
   is untouched.
 - The NetSurf fallback stage remains unsealed.
+
+## Addendum (2026-10-27, later the same day)
+
+The owner's no-vendor-calls requirement landed after this
+record was written. The joint acceptance was re-run on an
+image carrying the shipped privacy configuration (managed
+policies, launcher flags, profile seed, and /etc/hosts
+null-routing of the vendor phone-home endpoints); it passed
+in full, with the net-log egress gate clean at every readback.
+See `../browser-privacy-proof-2026-10-27/` and
+`docs/BROWSER.md`, "No vendor calls". The identities in this
+record describe the earlier image and remain accurate for it.

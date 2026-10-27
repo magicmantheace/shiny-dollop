@@ -1,7 +1,9 @@
 # Networking and the graphical browser
 
 Status: **QEMU-proven** (Priority 3/4 acceptance,
-`docs/validation/browser-qemu-proof-2026-10-27/`). No physical
+`docs/validation/browser-qemu-proof-2026-10-27/`; privacy
+addendum — no vendor calls at runtime —
+`docs/validation/browser-privacy-proof-2026-10-27/`). No physical
 hardware claim: the TG01's Ethernet/Wi-Fi devices, their kernel
 drivers, and firmware are unverified — the proof uses QEMU's
 `virtio-net-pci` with user networking (slirp), which is also the
@@ -163,6 +165,68 @@ endpoint serves the same name from an unrelated CA; the gate
 requires zero GET requests there plus at least one refused
 handshake — a browser that verified nothing could not produce
 that record.
+
+## No vendor calls (owner privacy requirement)
+
+The shipped browser configuration makes **no outbound
+connections to the distribution or the vendor at runtime**:
+no component-update checks, no variations/field-trial fetches,
+no telemetry or phone-home endpoints. Browser updates arrive
+only through Synveil's own signed A/B releases. Three layers,
+all shipped in every browser image:
+
+1. **Managed policies** —
+   `/etc/chromium/policies/managed/synveil-privacy.json`
+   (source `build/rootfs/chromium-policies.json`; its sha256 is
+   recorded in every build receipt): component updates,
+   metrics reporting, Safe Browsing, search suggestions,
+   alternate error pages, network prediction, DNS-over-HTTPS,
+   network-time queries, browser sign-in, sync, the default
+   search provider, media router, translate, background mode
+   and QUIC are off; WebRTC is restricted to proxied UDP.
+2. **Launcher flags and the profile seed** repeat the core at
+   process/profile level: background networking, the component
+   updater, domain reliability, sync, pings and client-side
+   phishing are disabled by flag; the seeded Preferences turn
+   off suggestions, prediction, Safe Browsing, translate and
+   DoH.
+3. **Name-layer null-routing** — the image `/etc/hosts` maps
+   the pure phone-home endpoints to 127.0.0.1:
+   update.googleapis.com, clients2.google.com,
+   clientservices.googleapis.com, accounts.google.com,
+   safebrowsing.googleapis.com, sb-ssl.google.com,
+   ssl.gstatic.com, optimizationguide-pa.googleapis.com,
+   translate.googleapis.com, edgedl.me.gvt1.com (the list is
+   `NULLED_PHONE_HOME_HOSTS` in `tools/native_ab.py`, recorded
+   in the build receipt). This layer exists because measurement
+   against this exact build showed a stock Chromium 156 still
+   issuing its component-update checks and an identity
+   ListAccounts fetch at startup with the policies verifiably
+   loaded (the loader logs the policy file; the network-time
+   service obeys its policy — present in a no-policy control
+   run, absent with policies — while the component updater's
+   data-component checks are documented as not covered by
+   ComponentUpdatesEnabled). Privacy distributions patch
+   these out in source; this project ships the distribution
+   binary, so the OS name layer makes egress impossible
+   instead. The trade-off is deliberate: those vendor service
+   endpoints are unreachable from the guest at all — including
+   accounts.google.com, whose unprompted startup fetch is the
+   phone-home being stopped.
+
+Verification is egress-based and part of the acceptance gate:
+proof builds run Chromium with `--log-net-log` into
+`~/net-logs` on DATA (shipped builds never log network
+activity), and `validate_browser_results` fails any boot whose
+net log shows a DNS wire query or a socket to anything but the
+fixture (loopback is where null-routed attempts die). The
+receipt discloses the hosts the browser still *tried*
+internally (update.googleapis.com, accounts.google.com) —
+with this configuration they can never become a DNS query or
+an external connection. Proven values are in
+`docs/validation/browser-privacy-proof-2026-10-27/`: zero DNS
+wire names and fixture+loopback-only sockets at every
+readback of the joint acceptance.
 
 ## Downloads
 
