@@ -1,0 +1,62 @@
+name: Fast A-B-A recovery and negative findings
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/observable_affordances.py"
+      - "benchmarks/fast_reacquisition_protocol.json"
+      - "benchmarks/fast_reacquisition_benchmark.py"
+      - "tests/test_fast_reacquisition.py"
+      - ".github/workflows/fast-reacquisition.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fast-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Replay, no-stage-hints, held-out read-only and regression tests
+        run: python -m unittest tests.test_regime_retrieval tests.test_fast_reacquisition -v
+      - name: Freeze-first development cohort
+        run: python -m benchmarks.fast_reacquisition_benchmark --cohort development > recovery-development.json
+      - name: Freeze-first additional cohort
+        run: python -m benchmarks.fast_reacquisition_benchmark --cohort additional > recovery-additional.json
+      - name: Report all checkpoints and source-side harm separately
+        run: |
+          python - <<'PY'
+          import json
+          for path in ("recovery-development.json","recovery-additional.json"):
+              study=json.load(open(path,encoding="utf-8"))
+              print(path, "blind:", study["blind"])
+              print("independent training actor totals:", {
+                  field: sum(row["actor_total"][field] for row in study["rows"])
+                  for field in ("observations","harmful","productive","neutral")})
+              for stage, checkpoints in (("B",(0,4,8,12,24,48,160)),
+                                         ("return_A",(0,4,8,12,24,48))):
+                  for n in checkpoints:
+                      runs=[row["evaluation"][f"{stage}_{n}"] for row in study["rows"]]
+                      print("stage",stage,"new_observations",n)
+                      for method in ("fast_retrieval","fixed_12_retrieval","recent_8_knn",
+                                     "recent_32_knn","cumulative_knn","frozen_A_knn",
+                                     "untrained_random","always_abstain","privileged_oracle"):
+                          scores=[item["scores"][method] for item in runs]
+                          print(method,{key:sum(item[key] for item in scores)
+                                        for key in ("successes","hurt","abstained")})
+                      print("fast chosen:",[item["fast_selection"]["source"] for item in runs])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fast-reacquisition-complete-simulation-results
+          path: |
+            recovery-development.json
+            recovery-additional.json
+          retention-days: 14

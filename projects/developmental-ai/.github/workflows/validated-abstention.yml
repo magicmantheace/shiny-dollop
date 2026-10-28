@@ -1,0 +1,71 @@
+name: Held-out adequacy and abstention risk controls
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/validated_abstention_memory.py"
+      - "benchmarks/validated_abstention_protocol.json"
+      - "benchmarks/validated_abstention_benchmark.py"
+      - "tests/test_validated_abstention.py"
+      - ".github/workflows/validated-abstention.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frozen-risk-abstention:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Disjoint holdout, replay, full-risk accounting and prior causal regression
+        run: python -m unittest tests.test_validated_abstention tests.test_gated_composition tests.test_composed_feature -v
+      - name: Frozen development cohort
+        run: python -m benchmarks.validated_abstention_benchmark --cohort development > validated-development.json
+      - name: Frozen additional cohort
+        run: python -m benchmarks.validated_abstention_benchmark --cohort additional > validated-additional.json
+      - name: Report every confidence, source harm, task success and abstention
+        run: |
+          python - <<'PY'
+          import json
+          for filename in ("validated-development.json","validated-additional.json"):
+              d=json.load(open(filename,encoding="utf8"))
+              print("RESULT",filename,"blind",d["blind"],
+                    "learner_training_actions",d["learner_training_actions"])
+              for phase in ("source","conditional","return_source","xor"):
+                  costs=[x["external_actor_cost"][phase] for x in d["rows"]]
+                  print("ACTOR",phase,{k:sum(a[k] for a in costs) for k in
+                        ("observations","harmful","productive","neutral")})
+              for phase,points in (
+                  ("conditional",(0,8,16,24,32,48,64,96,128)),
+                  ("return_source",(0,8,16,24,32,48,64)),
+                  ("xor",(0,8,16,24,32,48,64,96,128))):
+                  for count in points:
+                      rows=[r["stages"][phase][str(count)] for r in d["rows"]]
+                      print("CHECKPOINT",phase,count,"adequate",
+                            [row["validation"]["meets_adequacy_gate"] for row in rows],
+                            "gain",[row["validation"]["mean_gain_over_null"] for row in rows],
+                            "hits",[row["validation"]["class_accuracy_count"] for row in rows],
+                            "programs",[row["validation"]["validated_names"] for row in rows])
+                      for method in ("validated_abstain","always_act_gated",
+                                     "always_act_global","frozen_source",
+                                     "recent32_span","privileged_known_xor",
+                                     "always_abstain","random","perfect_action_oracle"):
+                          scores=[r["scores"][method] for r in rows]
+                          print("SCORE",method,{k:sum(a[k] for a in scores)
+                                for k in ("successes","harmful_actions","abstained",
+                                          "attempted_tasks","executed_actions")})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: validated-abstention-complete-cohort-data
+          path: |
+            validated-development.json
+            validated-additional.json
+          retention-days: 14

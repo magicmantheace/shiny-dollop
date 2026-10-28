@@ -1,0 +1,64 @@
+name: Archive consistency learning comparison
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/observable_affordances.py"
+      - "benchmarks/archive_consistency_protocol.json"
+      - "benchmarks/archive_consistency_benchmark.py"
+      - "tests/test_archive_consistency.py"
+      - ".github/workflows/archive-consistency.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  consistency-comparison:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Archive replay and unchanged historical policy unit tests
+        run: python -m unittest tests.test_regime_retrieval tests.test_fast_reacquisition tests.test_archive_consistency -v
+      - name: Frozen development seeds
+        run: python -m benchmarks.archive_consistency_benchmark --cohort development > consistency-development.json
+      - name: Frozen additional seeds
+        run: python -m benchmarks.archive_consistency_benchmark --cohort additional > consistency-additional.json
+      - name: Print exact performance, failures and training actor harm
+        run: |
+          python - <<'PY'
+          import json
+          for filename in ("consistency-development.json","consistency-additional.json"):
+              result=json.load(open(filename,encoding="utf-8"))
+              print(filename, "blind:",result["blind"])
+              print("training actor:",{key:sum(row["actor_totals"][key] for row in result["rows"])
+                   for key in ("observations","harmful","productive","neutral")})
+              for stage, checkpoints in (("B",(0,4,8,12,24,48,160)),
+                                         ("return_A",(0,4,8,12,24,48))):
+                  for n in checkpoints:
+                      scores=[r["checkpoints"][f"{stage}_{n}"] for r in result["rows"]]
+                      print("stage",stage,"new_observations",n,
+                            "decisions:",[r["consistency"]["source"] for r in scores],
+                            "quarantines:",[r["consistency"]["quarantined_archive_indices"]
+                                           for r in scores])
+                      for method in ("consistent_retrieval","fast_retrieval",
+                                     "fixed_12_retrieval","recent_8_knn",
+                                     "recent_32_knn","cumulative_knn","frozen_A_knn",
+                                     "untrained_random","always_abstain","privileged_oracle"):
+                          parts=[r["scores"][method] for r in scores]
+                          print(method,{k:sum(x[k] for x in parts) for k in
+                                        ("successes","hurt","abstained")})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: consistency-complete-early-reversal-evidence
+          path: |
+            consistency-development.json
+            consistency-additional.json
+          retention-days: 14

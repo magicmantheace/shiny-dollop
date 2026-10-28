@@ -1,0 +1,70 @@
+name: Conditional grammar expansion and XOR negative control
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/gated_composition_memory.py"
+      - "benchmarks/gated_composition_protocol.json"
+      - "benchmarks/gated_composition_benchmark.py"
+      - "tests/test_gated_composition.py"
+      - ".github/workflows/gated-composition.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frozen-conditional-and-xor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Gated grammar, history replay and earlier feature tests
+        run: python -m unittest tests.test_gated_composition tests.test_composed_feature tests.test_cross_rule -v
+      - name: Precommitted development cohort
+        run: python -m benchmarks.gated_composition_benchmark --cohort development > gated-development.json
+      - name: Precommitted additional cohort
+        run: python -m benchmarks.gated_composition_benchmark --cohort additional > gated-additional.json
+      - name: Report all conditional choices, harms, abstentions, and actor costs
+        run: |
+          python - <<'PY'
+          import json
+          for filename in ("gated-development.json","gated-additional.json"):
+              report=json.load(open(filename,encoding="utf8"))
+              print("RESULT",filename,"blind",report["blind"],
+                    "learner_training_actions",report["learner_training_actions"])
+              for phase in ("source","conditional","return_source","xor"):
+                  amounts=[r["actor_cost"][phase] for r in report["rows"]]
+                  print("ACTOR",phase,{k:sum(x[k] for x in amounts) for k in
+                        ("observations","harmful","productive","neutral")})
+              for phase,points in (
+                  ("conditional",(0,4,8,16,32,64,96,128)),
+                  ("return_source",(0,4,8,16,32,64)),
+                  ("xor",(0,4,8,16,32,64,96,128))):
+                  for n in points:
+                      items=[r["stages"][phase][str(n)] for r in report["rows"]]
+                      print("CHECKPOINT",phase,n,
+                            "modes",[i["selection"]["selected"] for i in items],
+                            "global",[i["selection"]["global_name"] for i in items],
+                            "arms",[i["selection"]["conditional_names"] for i in items])
+                      for method in (
+                          "gated_composition","prior_global_composed",
+                          "prior_fixed_hypotheses","source_span","recent32_span",
+                          "privileged_correct_conditional","privileged_correct_xor",
+                          "random","abstain","perfect_action_oracle"):
+                          trial=[r["scores"][method] for r in items]
+                          print("SCORE",method,{k:sum(t[k] for t in trial)
+                                for k in ("successes","harmful_actions","abstained")})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gated-vs-xor-frozen-full-evidence
+          path: |
+            gated-development.json
+            gated-additional.json
+          retention-days: 14

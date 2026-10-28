@@ -1,0 +1,58 @@
+name: Quarantined C adaptation (focused)
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/quarantined_c.py"
+      - "benchmarks/quarantined_c_benchmark.py"
+      - "benchmarks/quarantined_c_protocol.json"
+      - "tests/test_quarantined_c.py"
+      - ".github/workflows/quarantined-c-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-review-and-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Check public-memory review and replay tests
+        run: python -m unittest tests.test_quarantined_c -v
+      - name: Inspected development C adaptation cohort
+        run: python -m benchmarks.quarantined_c_benchmark --cohort development > quarantined-development.json
+      - name: Inspected additional C adaptation cohort
+        run: python -m benchmarks.quarantined_c_benchmark --cohort inspected-additional > quarantined-additional.json
+      - name: Report ALL methods and approval decisions
+        run: |
+          python - <<'PY'
+          import json
+          for path in ("quarantined-development.json","quarantined-additional.json"):
+              data=json.load(open(path,encoding="utf-8"))
+              print(path)
+              print("Sandbox gates:",[(r["seed"],
+                  r["review"]["receipt"]["eligible_for_explicit_approval"],
+                  r["approved_in_simulation"]) for r in data["rows"]])
+              for environment in ("A","B","C"):
+                  results={}
+                  for method in ("staged_C","old_sentinel","C_only","novel","oracle"):
+                      group=[r["outcomes"][environment][method]
+                             for r in data["rows"]]
+                      results[method]={field:sum(g[field] for g in group)
+                                       for field in ("successes","spoilage","stalled")}
+                  print(environment,json.dumps(results,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sandbox-C-adaptation-full-tables
+          path: |
+            quarantined-development.json
+            quarantined-additional.json
+          retention-days: 14

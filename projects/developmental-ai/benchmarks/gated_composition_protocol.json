@@ -1,0 +1,123 @@
+{
+  "schema": "developmental-ai.gated-composition-protocol/v1",
+  "registered_at": "2026-10-23",
+  "freeze": "This file must be committed BEFORE new model, simulator implementation, tests and scoring; do not tune thresholds/hypotheses on either frozen cohort.",
+  "question": "Can prequential selection synthesize a public comparison-gated expression with distinct learned quadratic features per branch, improving over the globally quadratic library? Will the learner's limitations remain visible on a bitwise XOR rule that the new grammar lacks?",
+  "environment": {
+    "public": "Reuse 2 integer public sensors inlet,outlet (0..9), anonymous action IDs, budget6, goal3 and 12 artificially stratified choices (5 progress,4 damage,3 neutral). No hidden rule mode, side-channel or private params to learner.",
+    "source": "Prior span seed-band rule, 240 truthful independent external-actor first-action TRAIN events.",
+    "conditional": "IF inlet > outlet THEN (inlet*outlet+inlet+private_seed_salt)%7 ELSE (inlet*inlet+outlet+private_seed_salt)%5. Each residue law uses progress 0/1, damage 2/3 (mod5) or 2/3/4 (mod7), remainder neutral. Exactly same public schema.",
+    "xor": "Second target uses (bitwise_xor(inlet,outlet)+private_seed_salt)%5 with classes progress 0/1, damage 2/3, neutral4. No XOR operation in either current or expanded candidate grammar; cannot infer XOR syntax from supplied hypothesis programs.",
+    "phases": [
+      [
+        "source",
+        "source",
+        1000,
+        240
+      ],
+      [
+        "conditional",
+        "conditional",
+        2000,
+        128
+      ],
+      [
+        "return_source",
+        "source",
+        3000,
+        64
+      ],
+      [
+        "xor",
+        "xor",
+        4000,
+        128
+      ]
+    ],
+    "outcomes": "Deterministic underlying outcomes, truthful reports, external random one-action TRAIN actor; no noise robustness claim. Actual harm counted separately from TEST failures.",
+    "test": "Same held-out per-stage episode indices repeated across checkpoints and methods; no learning from TEST."
+  },
+  "model": {
+    "name": "GatedCompositionMemory",
+    "grammar": "Generate the existing 48 quadratic residue programs from multiply/add/coefficient/modulo; additionally provide generic conditional operator IF a>b. In a gated model independently select one of 52 prior model types (frozen span, recent span/checksum/ordered, 48 generated quadratics) for branch a>b and a<=b using each branch's predictive scores. This composes two programs never supplied as a finished target rule. Does NOT add XOR.",
+    "prequential": "Last 16 public events; for each event candidate predictor is trained on previous at most 64 outcomes strictly before event. Source model uses original 192. Score sums natural log probability of observed public outcome for each candidate. Branch candidates' scores use only their branch's events. Each scored event excluded from the model that predicts it.",
+    "model_choice": "Global winner maximizes full 16-event score. Gated candidate maximizes sum of the two per-branch best scores, minus penalty 2.0 natural log units. Require >=3 held-out scoring events for each branch before gated candidate can win. This is data-selected best of 52 per branch, so even with prequential fit separation multiple-comparison selection bias remains; penalty is handcrafted.",
+    "action": "Source frozen first192; selected global learned model fits most recent64 public events; gated branch decision-time model fits only matching branch from last64 public events. Score 3*P(progress)-10*P(damage), tie by anonymous action ID. No abstention in candidate (always-abstain comparator counted as failed).",
+    "memory": "Strict same-key public features/progress/damage events only, bounded length, deterministic SHA256 replay. Never store private law/phase, action labels, seeds, hidden salts, privileged assignments or exploration authority."
+  },
+  "cohorts": {
+    "development": [
+      252003,
+      252021,
+      252039
+    ],
+    "additional": [
+      253001,
+      253017,
+      253041
+    ]
+  },
+  "checkpoints": {
+    "conditional": [
+      0,
+      4,
+      8,
+      16,
+      32,
+      64,
+      96,
+      128
+    ],
+    "return_source": [
+      0,
+      4,
+      8,
+      16,
+      32,
+      64
+    ],
+    "xor": [
+      0,
+      4,
+      8,
+      16,
+      32,
+      64,
+      96,
+      128
+    ]
+  },
+  "test": {
+    "cases_per_seed_checkpoint": 16,
+    "conditional_indices": 290000,
+    "return_source_indices": 300000,
+    "xor_indices": 310000
+  },
+  "baselines": [
+    "gated_composition",
+    "prior_global_composed",
+    "prior_fixed_hypotheses",
+    "source_span",
+    "recent32_span",
+    "privileged_correct_conditional",
+    "privileged_correct_xor",
+    "random",
+    "abstain",
+    "perfect_action_oracle"
+  ],
+  "acceptance": [
+    "Conditional rule after64: >=65/96 successful TEST tasks and exceed global-composed baseline by >=15/96.",
+    "Returned source after16: >=65/96 successful TEST tasks.",
+    "Report XOR at all checkpoints including model false-confidence, harm, and whether genuine XOR candidate would outperform the learner; do not require the learner to discover absent syntax.",
+    "Track harmful unique independent TRAIN actions, harmful TEST actions and failed-by-abstention counts with matched TEST.",
+    "No promotion, merge or roadmap changes regardless of scores."
+  ],
+  "limitations": [
+    "The comparison gate, multiplication and candidate expressions are all developer-authored. The private conditional law is expressible in the extended grammar but was not provided as one finished hypothesis. This remains bounded grammatical composition.",
+    "True independent XOR operator is absent; absence of that operator, not a theorem of universal nonrepresentability, is all that is claimed.",
+    "Per-branch prequential selection among 52 alternatives produces multiple-testing optimism; the 2-unit penalty is not calibrated.",
+    "Artificially stratified action choices, deterministic outcomes and truthful labels are not realistic deployment conditions.",
+    "Source archive retained but untrusted external reports are not authenticated; first-contact harm can be catastrophic.",
+    "No real-world actuation, default agent promotion, cross-project AthenZ/Synveil work, PR merge or active D1–D10 and V2A/V2B roadmap changes."
+  ]
+}

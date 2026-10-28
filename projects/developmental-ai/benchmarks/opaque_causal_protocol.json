@@ -1,0 +1,62 @@
+{
+  "schema": "developmental-ai.opaque-causal-protocol/v1",
+  "date": "2026-10-20",
+  "status": "precommitted-before-candidate-execution",
+  "scope": "headless numeric sensors and anonymous per-episode action handles",
+  "train_families": [
+    "relay"
+  ],
+  "evaluation_families": [
+    "relay",
+    "cargo"
+  ],
+  "task_independence": "Different hand-authored transition families; common engineered observable numeric sensor/goal/action schema; NOT independently selected blind domains.",
+  "development_seeds": [
+    1103,
+    1109,
+    1123
+  ],
+  "reserved_seeds": [
+    2017,
+    2027,
+    2039
+  ],
+  "train_indices": [
+    0,
+    47
+  ],
+  "validation_indices": [
+    500,
+    523
+  ],
+  "test_indices": [
+    8000,
+    8059
+  ],
+  "episodes_per_family_per_seed": 60,
+  "episode_action_limit": 18,
+  "methods": [
+    "feedback",
+    "cyclic",
+    "random",
+    "oracle"
+  ],
+  "metrics": [
+    "completed",
+    "action_attempts",
+    "blocked_attempts",
+    "counterproductive_actions",
+    "policy_restart_exact"
+  ],
+  "controls": {
+    "no_leakage": "Learning may only consume public observations and public transition outcomes; never receive world hidden prerequisites, simulator family identifier, protected goal action, or an oracle planning trace",
+    "no_tuning": "Report all results; reserved cohort tested only once after freezing implementation; later changes must label reserve as inspected"
+  },
+  "nonclaims": [
+    "common numeric interface is engineered",
+    "opaque per-episode action handles prevent lexical skill lookup across episodes",
+    "study evaluates a common local probing algorithm, not transfer of task-specific learned models",
+    "simulated reward is not human agency or consciousness"
+  ],
+  "historical": "Existing outcome-skills, transfer, raw-token, prerequisite/prober/recovery protocols and main branch remain unchanged"
+}

@@ -1,0 +1,61 @@
+name: Experimental C stress (focused)
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/unseen_regime.py"
+      - "benchmarks/unseen_regime_benchmark.py"
+      - "benchmarks/unseen_regime_protocol.json"
+      - "tests/test_unseen_regime.py"
+      - ".github/workflows/experimental-c-stress.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  controlled-stress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile all involved sources
+        run: python -m compileall -q developmental_ai benchmarks tests
+      - name: Focused unseen-regime regression tests
+        run: python -m unittest tests.test_unseen_regime -v
+      - name: Full inspected development cohort and controls
+        run: python -m benchmarks.unseen_regime_benchmark --cohort development > stress-development.json
+      - name: Full inspected additional cohort and controls
+        run: python -m benchmarks.unseen_regime_benchmark --cohort inspected-additional > stress-additional.json
+      - name: Summarize all methods (no cherry-picked results)
+        run: |
+          python - <<'PY'
+          import json
+          for path in ("stress-development.json", "stress-additional.json"):
+              data = json.load(open(path, encoding="utf-8"))
+              print(path)
+              for phase in ("A", "B", "C"):
+                  totals = {}
+                  for method in ("no_cue", "union", "frozen_A", "frozen_B", "novel", "privileged_oracle"):
+                      samples = [row["scores"][phase][method] for row in data["rows"]]
+                      totals[method] = {
+                          "successes": sum(r["successes"] for r in samples),
+                          "episodes": sum(r["episodes"] for r in samples),
+                          "spoilage": sum(r["spoilage"] for r in samples),
+                          "stalled": sum(r["stalled"] for r in samples),
+                      }
+                  print(phase, json.dumps(totals, sort_keys=True))
+          PY
+      - name: Retain exact synthetic result tables
+        uses: actions/upload-artifact@v4
+        with:
+          name: unknown-c-frozen-cohorts
+          path: |
+            stress-development.json
+            stress-additional.json
+          retention-days: 14

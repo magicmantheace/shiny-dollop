@@ -1,0 +1,68 @@
+name: Different causal-rule feature hypotheses
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/feature_hypothesis_memory.py"
+      - "benchmarks/cross_rule_protocol.json"
+      - "benchmarks/cross_rule_benchmark.py"
+      - "tests/test_cross_rule.py"
+      - ".github/workflows/cross-rule.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  new-causal-physics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Independent arithmetic rules, learner evidence and earlier tests
+        run: python -m unittest tests.test_cross_rule tests.test_regret_switch tests.test_relation_transfer tests.test_stochastic_prequential -v
+      - name: Frozen development cohort
+        run: python -m benchmarks.cross_rule_benchmark --cohort development > cross-rule-development.json
+      - name: Frozen additional cohort
+        run: python -m benchmarks.cross_rule_benchmark --cohort additional > cross-rule-additional.json
+      - name: Surface every hypothesis choice, comparator and data acquisition cost
+        run: |
+          python - <<'PY'
+          import json
+          for filename in ("cross-rule-development.json","cross-rule-additional.json"):
+              evidence=json.load(open(filename,encoding="utf8"))
+              print("RESULT",filename,"blind",evidence["blind"],
+                    "learner_training_actions",evidence["learner_training_actions"])
+              for stage in ("source","checksum","return_source","ordered"):
+                  costs=[x["source_actor_costs"][stage] for x in evidence["rows"]]
+                  print("TRAIN",stage,{k:sum(r[k] for r in costs)
+                      for k in ("observations","harmful","productive","neutral")})
+              for stage,points in (("checksum",(0,4,8,16,32,64,96)),
+                                   ("return_source",(0,4,8,16,32,48)),
+                                   ("ordered",(0,4,8,16,32,64,96))):
+                  for checkpoint in points:
+                      rows=[x["stages"][stage][str(checkpoint)] for x in evidence["rows"]]
+                      print("CHECKPOINT",stage,checkpoint,
+                            "chosen",[r["selection"]["selected"] for r in rows])
+                      for method in (
+                          "hypothesis_selector","frozen_source_span",
+                          "recent8_span","recent32_span","recent24_checksum",
+                          "recent24_ordered","recent24_true_rule_privileged",
+                          "untrained_random","always_abstain",
+                          "privileged_action_oracle"):
+                          scores=[r["scores"][method] for r in rows]
+                          print("SCORE",method,{k:sum(x[k] for x in scores)
+                              for k in ("successes","harmful_actions","abstained")})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cross-rule-frozen-seed-artefacts
+          path: |
+            cross-rule-development.json
+            cross-rule-additional.json
+          retention-days: 14

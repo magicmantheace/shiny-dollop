@@ -1,0 +1,63 @@
+name: Paired outcome witness verification (focused)
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/paired_witness.py"
+      - "benchmarks/paired_witness_protocol.json"
+      - "benchmarks/paired_witness_benchmark.py"
+      - "tests/test_paired_witness.py"
+      - ".github/workflows/paired-witness.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  paired-witness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Test paired signing, quarantine, tampering, collusion
+        run: python -m unittest tests.test_paired_witness -v
+      - name: Development seed cohort
+        run: python -m benchmarks.paired_witness_benchmark --cohort development > witness-development.json
+      - name: Reserved seed cohort
+        run: python -m benchmarks.paired_witness_benchmark --cohort reserved > witness-reserved.json
+      - name: Print complete source attribution and all model results
+        run: |
+          python - <<'PY'
+          import json
+          methods=("two_honest_signers","forged_primary_honest_witness",
+                   "missing_witness","post_signature_tamper",
+                   "forged_primary_colluding_witness","single_forged_no_gate",
+                   "single_honest_no_gate","always_abstain",
+                   "privileged_true_effect_oracle")
+          for path in ("witness-development.json","witness-reserved.json"):
+              data=json.load(open(path,encoding="utf-8"))
+              print(path)
+              print("actual_actor_harm:",sum(r["actual_training_actor_harm"] for r in data["rows"]))
+              print("forgeries_relabelled_not_new_actions:",sum(r["forged_outcomes"] for r in data["rows"]))
+              for method in methods:
+                  rows=[x["scores"][method] for x in data["rows"]]
+                  print(method,json.dumps({
+                      "approvals":[r["audit"]["approved"] for r in rows],
+                      "reasons":[r["audit"]["reason"] for r in rows],
+                      "successes":sum(r["evaluation"]["successes"] for r in rows),
+                      "harmful_test_actions":sum(r["evaluation"]["hurt"] for r in rows),
+                      "stalls":sum(r["evaluation"]["stalled"] for r in rows),
+                      "abstentions":sum(r["evaluation"]["abstained"] for r in rows)},sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paired-witness-all-cohort-results
+          path: |
+            witness-development.json
+            witness-reserved.json
+          retention-days: 14

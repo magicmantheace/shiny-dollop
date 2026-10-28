@@ -1,0 +1,63 @@
+name: Learned relation transfer and adverse control
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/relation_outcome_memory.py"
+      - "benchmarks/relation_transfer_protocol.json"
+      - "benchmarks/relation_transfer_benchmark.py"
+      - "tests/test_relation_transfer.py"
+      - ".github/workflows/relation-transfer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  relation-transfer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify relation evidence replay and historical learner regression
+        run: python -m unittest tests.test_relation_transfer tests.test_variable_affordance tests.test_archive_consistency tests.test_regime_retrieval -v
+      - name: Exact frozen development cohort
+        run: python -m benchmarks.relation_transfer_benchmark --cohort development > relation-development.json
+      - name: Exact frozen additional cohort
+        run: python -m benchmarks.relation_transfer_benchmark --cohort additional > relation-additional.json
+      - name: Print all zero-shot, target-adaptation and negative-transfer outcomes
+        run: |
+          python - <<'PY'
+          import json
+          for filename in ("relation-development.json","relation-additional.json"):
+              data=json.load(open(filename,encoding="utf-8"))
+              print(filename,"blind:",data["blind"],"learner_training_actions:",data["learner_training_actions"])
+              for family in ("basin","lattice","prism","counterphase"):
+                  actor=[row["training_actor_costs"][family] for row in data["rows"]]
+                  print("actor",family,{k:sum(x[k] for x in actor) for k in
+                                        ("observations","harmful","productive","neutral")})
+              for family in ("lattice","prism","counterphase"):
+                  for n in (0,8,24,64):
+                      print("EVAL",family,"target_observations",n)
+                      for environment in ("basin",family):
+                          for method in ("transfer_range","source_frozen_range","target_only_range",
+                                         "raw_schema_memory","max_span_fixed","fixed_band_4",
+                                         "min_span_fixed","untrained_random","always_abstain",
+                                         "privileged_oracle"):
+                              sample=[row["checkpoints"][family][str(n)]["scores"][environment][method]
+                                      for row in data["rows"]]
+                              print("SCORE",environment,method,{k:sum(x[k] for x in sample)
+                                               for k in ("successes","harmful_actions","abstained")})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: relation-transfer-full-reproducible-simulation-results
+          path: |
+            relation-development.json
+            relation-additional.json
+          retention-days: 14

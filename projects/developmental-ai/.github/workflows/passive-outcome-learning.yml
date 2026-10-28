@@ -1,0 +1,62 @@
+name: Passive third-rule public outcome learning (focused)
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/passive_outcome_learning.py"
+      - "benchmarks/passive_outcome_protocol.json"
+      - "benchmarks/passive_outcome_benchmark.py"
+      - "tests/test_passive_outcome.py"
+      - ".github/workflows/passive-outcome-learning.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  passive-third-rule:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Test replay, no action-authority and source integrity
+        run: python -m unittest tests.test_passive_outcome -v
+      - name: Frozen development cohort
+        run: python -m benchmarks.passive_outcome_benchmark --cohort development > passive-development.json
+      - name: Frozen reserved cohort
+        run: python -m benchmarks.passive_outcome_benchmark --cohort reserved > passive-reserved.json
+      - name: Report all observer harm, task results, baselines and abstentions
+        run: |
+          python - <<'PY'
+          import json
+          methods=("guarded_random240","raw_random240","guarded_random24",
+                   "guarded_oldpolicy240","old_normal_model","old_reversed_model",
+                   "always_abstain","privileged_oracle")
+          for path in ("passive-development.json","passive-reserved.json"):
+              data=json.load(open(path,encoding="utf-8"))
+              print(path)
+              print("learner data-collection actions:",data["learner_generated_training_actions"])
+              for observer in ("random240","random24","oldpolicy240"):
+                  part=[row["actor_evidence"][observer] for row in data["rows"]]
+                  print(observer,json.dumps({
+                      key:sum(x[key] for x in part) for key in
+                      ("observations","actor_harmful_actions",
+                       "actor_productive_actions","actor_neutral_actions")},sort_keys=True))
+              for method in methods:
+                  part=[row["scores"][method] for row in data["rows"]]
+                  print(method,json.dumps({
+                      key:sum(x[key] for x in part) for key in
+                      ("successes","hurt","stalled","abstained")},sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: passive-outcome-full-synthetic-results
+          path: |
+            passive-development.json
+            passive-reserved.json
+          retention-days: 14

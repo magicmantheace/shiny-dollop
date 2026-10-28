@@ -1,0 +1,88 @@
+{
+  "schema": "developmental-ai.relation-conflict-protocol/v1",
+  "date": "2026-10-22",
+  "frozen_before": "New adaptive conflict selector, test harness and test scoring implementation",
+  "scientific_question": "Can a persistent relation learner reject harmful negative transfer from a previously useful source after receiving out-of-sample feedback in a conflicting unknown-schema family without harming zero-shot compatible-family transfer or old-family retention?",
+  "simulator": "Exactly the previously frozen relation-transfer generator (basin source, lattice/prism compatible targets, counterphase reversed), but entirely NEW seed cohorts and separate TEST indices. Simulator physics, engineered max-min statistic and engineered sensor names are unchanged; no independent generator.",
+  "cohorts": {
+    "development": [
+      162003,
+      162021,
+      162039
+    ],
+    "additional": [
+      163001,
+      163017,
+      163041
+    ]
+  },
+  "source": {
+    "family": "basin",
+    "indices": [
+      1000,
+      1239
+    ],
+    "training_actions": 240
+  },
+  "targets": {
+    "families": [
+      "lattice",
+      "prism",
+      "counterphase"
+    ],
+    "train_indices": "matching previously defined 2000..2063, 3000..3063 and 4000..4063",
+    "checkpoints": [
+      0,
+      4,
+      8,
+      16,
+      24,
+      64
+    ]
+  },
+  "heldout": {
+    "split": "test",
+    "indices": [
+      55000,
+      55039
+    ],
+    "episodes_per_family_seed_checkpoint": 40,
+    "same_test_episodes_at_multiple_checkpoints": true
+  },
+  "model": {
+    "candidate_source": "Range-conditioned model trained only on the original first observed feature-key signature.",
+    "candidate_target": "Range-conditioned model fitted on the *current target signature* observations EXCLUDING the latest 4 observed target events.",
+    "validation": "The latest 4 target feedback events rank source vs target by mean smoothed log-likelihood (0.25/category Laplace). Never train target candidate on events used for candidate selection. For fewer than 8 target observations choose source; after 8 choose target if target log likelihood strictly exceeds source, else source.",
+    "record": "Persist all validated observed events, source signature and replayed selected-source counts in a versioned SHA256 checkpoint, no hidden domain labels. No data deletion, automatic default promotion or action acquisition authority.",
+    "caveats": "Exact key signatures automatically partition old and new data: an engineer-given novelty marker, not semantic understanding. One signature with two conflicting regimes remains unsolved. A four-event predictive tail can be misleading under noise."
+  },
+  "methods": [
+    "gated_relation",
+    "source_frozen_range",
+    "target_only_range",
+    "raw_schema_memory",
+    "untrained_random",
+    "always_abstain",
+    "privileged_oracle"
+  ],
+  "training_costs": "One independent external random simulator first-action observation per TRAIN episode; source and three target streams counted once across methods/checkpoints, separate harmful source actions and read-only TEST harms.",
+  "scores": [
+    "heldout successes",
+    "harmful TEST actions",
+    "abstentions",
+    "mean attempts",
+    "selected source or target by checkpoint",
+    "training actor harms",
+    "revisit basin source",
+    "restore identity"
+  ],
+  "acceptance": "At 0 target feedback, gated=source frozen on lattice and prism. On counterphase, gated should improve over frozen source after 8,24 or64 target observations while retaining basin behavior. Compare to target-only and disclose cost/early learning failures. No tuning on additional seeds.",
+  "nonclaims": [
+    "The inverted control is purposely authored with the same features-to-range map, not genuinely unknown physics.",
+    "Generator and max-minus-min statistic are handwritten.",
+    "Even full recovery after observed target outcomes is within-domain adaptation, not zero-shot generalization.",
+    "Digest is not source attestation, and internally consistent fakes still win.",
+    "No AthenZ/Synveil integration, unrestricted actuation, default promotion or PR merge.",
+    "Preserve original protocol, negative findings, D1-D10, V2A/V2B."
+  ]
+}
