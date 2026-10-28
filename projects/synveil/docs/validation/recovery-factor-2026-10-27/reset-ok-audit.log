@@ -1,0 +1,18 @@
+t=1793146461 event=factor-enrollment-confirmed generation=1
+t=1793146902 event=reset-session-start 
+t=1793146905 event=factor-verification-verified generation=1
+t=1793146905 event=reset-confirmed generation=1
+t=1793146908 event=password-replaced 
+t=1793146909 event=factor-revoked generation=2
+t=1793146909 event=reset-completed 
+t=1793146922 event=session-start 
+t=1793146925 event=auth-ok 
+t=1793146925 event=action name=status result=ok
+t=1793146925 event=session-end result=exit
+t=1793146939 event=session-start 
+t=1793146942 event=auth-denied attempt=1
+t=1793146944 event=auth-denied attempt=2
+t=1793146947 event=auth-denied attempt=3
+t=1793146947 event=session-end result=denied
+t=1793146961 event=reset-session-start 
+t=1793146961 event=reset-denied category=revoked

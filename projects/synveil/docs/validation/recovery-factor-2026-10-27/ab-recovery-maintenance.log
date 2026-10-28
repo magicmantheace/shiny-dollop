@@ -1,0 +1,18 @@
+t=1793148798 event=factor-enrollment-confirmed generation=1
+t=1793148908 event=reset-session-start 
+t=1793148910 event=factor-verification-denied category=mismatch failed_attempts=1
+t=1793148913 event=factor-verification-denied category=mismatch failed_attempts=2
+t=1793148916 event=factor-verification-denied category=mismatch failed_attempts=3
+t=1793148916 event=reset-session-end result=denied
+t=1793148934 event=reset-session-start 
+t=1793148936 event=factor-verification-verified generation=1
+t=1793148937 event=reset-confirmed generation=1
+t=1793148940 event=password-replaced 
+t=1793148940 event=factor-revoked generation=2
+t=1793148940 event=reset-completed 
+t=1793149060 event=session-start 
+t=1793149063 event=auth-ok 
+t=1793149063 event=factor-rotation-requested prior_generation=2 new_generation=3
+t=1793149064 event=factor-rotation-confirmed generation=3
+t=1793149066 event=factor-rotation-completed generation=3
+t=1793149067 event=session-end result=exit
