@@ -102,7 +102,16 @@ exercised on the packaged image up to its no-credential denial,
 and the joined + browser acceptances re-proven at this head
 ([test-media recovery record](validation/test-media-recovery-2026-10-27/README.md)) —
 without changing the install blockers: the packaged-image boot
-test remains a boot test, not an install.
+test remains a boot test, not an install. One correction to that
+package, recorded 2026-10-28: its tier-4 reset code contains a
+crash-consistency defect (a used factor could survive a reset whose
+revocation failed or was interrupted). The defect is fixed in
+source (ADR 0021) and re-evidenced in QEMU at `5e9e240`
+([reset-transaction record](validation/recovery-reset-transaction-2026-10-28/README.md)),
+but the shipped package still contains the defective code until a
+rebuild or A/B update delivers the fix; the packaged-image boot
+test does not exercise the reset flow, so the boot test itself is
+unaffected.
 
 ## Native authenticated Files browser (development)
 

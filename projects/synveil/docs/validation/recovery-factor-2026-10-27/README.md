@@ -16,6 +16,21 @@ defaults on 2026-10-27, recorded in
 (commit `0fce0df`, before any implementation). Specification:
 [RECOVERY_FACTOR_SPEC.md](../../RECOVERY_FACTOR_SPEC.md).
 
+## Addendum (2026-10-28) — reset transaction defect found and fixed
+
+The evidence below stands for the normal path at `06e5a7b`, but the
+reset transaction as then implemented was **not crash-consistent**: a
+failed or interrupted factor revocation left the used factor active
+while reporting success, violating ADR 0020 D7's single-use guarantee.
+The defect was found by an external review of `ef72f3f`, fixed with a
+durable reset journal (ADR 0021), and re-evidenced at `5e9e240`
+(fixture verdict 35/35 including new interruption cases; A/B verdict
+13/13). Full record:
+[recovery-reset-transaction-2026-10-28](../recovery-reset-transaction-2026-10-28/README.md).
+The shipped test-media package at `ef72f3f` still contains the
+defective reset code; the fix is source-only until a package rebuild
+or an A/B update delivers it.
+
 ## Identities
 
 - Branch: `synveil/first-boot-desktop-muse`. **PR #17 is not

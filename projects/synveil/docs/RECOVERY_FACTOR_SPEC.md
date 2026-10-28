@@ -592,6 +592,16 @@ owner approves the authority, not just the secret:
    new session, is owner decision D7; this draft recommends automatic
    revocation, so a factor that may have been observed during recovery
    does not remain a standing reset authority.
+   Steps 5 and 6 are one crash-consistent transaction (ADR 0021): a
+   durable journal entry naming the consumed factor generation is
+   written before the password record changes; from that moment the
+   factor is consumed even if the revocation write never lands;
+   success is reported only when both the replacement and the
+   revocation are durable; and an interrupted transaction is
+   completed — revocation made durable, journal cleared — at the
+   next entry into the recovery environment, or factor use stays
+   denied. A revocation failure must never be reported as a
+   successful reset.
 7. The user-data partition is not mounted for writing, migrated, or
    otherwise altered by any step of this flow.
 
