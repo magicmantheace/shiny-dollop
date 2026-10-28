@@ -1,11 +1,13 @@
 # ADR 0010: Independent Owner Recovery (Proposed)
 
-- Status: **Proposed — tiers 1–3 implemented and demonstrated in QEMU
-  (2026-10-27, see the evidence-status section at the end of this ADR);
-  tier 4 design approved by the owner 2026-10-27
-  ([ADR 0020](0020-recovery-factor-design-approval.md)) and
-  implementation authorized; tier 4 itself remains unimplemented
-  until its guest evidence exists**
+- Status: **Proposed — tiers 1–4 implemented and demonstrated in QEMU
+  (2026-10-27, see the evidence-status section at the end of this
+  ADR); tier 4 was approved by the owner 2026-10-27
+  ([ADR 0020](0020-recovery-factor-design-approval.md)), implemented,
+  and demonstrated at `06e5a7b`
+  ([tier-4 record](../validation/recovery-factor-2026-10-27/README.md));
+  physical installation remains blocked per gate E on physical
+  validation and the A/B installation milestone**
 - Date: 2026-10-12
 - Related: [authenticated graphical session](0008-authenticated-graphical-session.md), [password verifier](0009-source-built-argon2id-verifier.md)
 - Scope: future installed Synveil systems; current authenticated QEMU preview remains unrecoverable after password loss
@@ -151,16 +153,29 @@ full artifacts are in the
   interrupted update, failing generation, rollback, user-data survival)
   and extended by the gate B acceptance above, which performs the
   rollback from the authenticated maintenance path itself.
-- **Gate D (tier 4): design approved; implementation authorized,
-  not yet implemented.** The specification
-  ([RECOVERY_FACTOR_SPEC.md](../RECOVERY_FACTOR_SPEC.md), commit
-  `af50cba`) was approved by the owner on 2026-10-27 — Option A with
-  the recommended defaults, decisions D1–D10 recorded in
-  [ADR 0020](0020-recovery-factor-design-approval.md). Per sequence
-  D, implementation may now proceed; tier 4 counts as demonstrated
-  only when the specification's section 11 guest evidence exists at
-  an exact commit.
+- **Gate D (tier 4): demonstrated in QEMU at `06e5a7b`.** The
+  specification ([RECOVERY_FACTOR_SPEC.md](../RECOVERY_FACTOR_SPEC.md),
+  commit `af50cba`) was approved by the owner on 2026-10-27 — Option A
+  with the recommended defaults, decisions D1–D10 recorded in
+  [ADR 0020](0020-recovery-factor-design-approval.md) — then
+  implemented (`veil-recovery-enroll`, the `veil-recovery` reset
+  flow and rotation, the recovery record/anchor library) and
+  validated: all thirteen specification section 11 tests have guest
+  evidence in the
+  [tier-4 record](../validation/recovery-factor-2026-10-27/README.md)
+  (fixture substrate 31 of 31 driver cases; A/B substrate 13 of 13,
+  including DATA-partition integrity across a denied attempt, a
+  successful reset, and a rotation). One boundary is stated there:
+  test 2 is demonstrated at the credential-authority level (shared
+  ADR 0009 verifier authentication after a cold reboot), not as a
+  graphical desktop session login. Decision D8's anchor uses the
+  placement documented in the tier-4 record (a strict record beside
+  `ab-control.json`, outside the credential directory); its exact
+  integrity mechanism remains subject to this ADR's separate review,
+  and the record does not claim tier 4 "validated" beyond the guest
+  evidence.
 - **Gate E:** per-gate guest evidence is recorded at exact commits in
-  the validation record. Physical installation remains blocked: the
-  complete recovery path (tier 4 included) has not been exercised, and
-  none of this evidence is from physical hardware.
+  the validation records. The complete recovery path (tiers 1–4) has
+  now been exercised in QEMU. Physical installation remains blocked:
+  none of this evidence is from physical hardware, and the A/B
+  installation milestone is still ahead.

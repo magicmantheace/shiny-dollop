@@ -194,11 +194,16 @@ a claim of boot success on the physical machine.
       tier-3 rollback substrate are demonstrated in QEMU — including
       a maintenance-initiated restore with user data byte-intact —
       in the [recovery-gates record](validation/recovery-gates-2026-10-27/README.md).
-      Tier 4 (forgotten-password recovery factor) remains a draft
-      specification awaiting an owner-approved design. For this
-      disposable test media the documented recovery procedure is a
-      media rewrite ([owner guide](OWNER_FIRST_BOOT_TEST.md)). The
-      gate stays open for installed systems.
+      Tier 4 (forgotten-password recovery factor) was approved by
+      the owner on 2026-10-27 (ADR 0020), implemented, and
+      demonstrated in QEMU at `06e5a7b`
+      ([tier-4 record](validation/recovery-factor-2026-10-27/README.md)).
+      This test-media package predates that work and does not
+      contain the recovery path, so for this media the documented
+      recovery procedure remains a media rewrite
+      ([owner guide](OWNER_FIRST_BOOT_TEST.md)). The gate stays
+      open for installed systems: physical validation and the A/B
+      installation milestone are still ahead.
 - [x] Signed or otherwise owner-verified release/image provenance, with
       clear test-media identification and checksums.
       Owner-verified route (2026-10-25): the image is **unsigned**;

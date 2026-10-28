@@ -33,8 +33,10 @@ assembled. What remains blocked is a first **install** — persistent
 use on hardware — which still requires the complete independent
 owner recovery path (ADR 0010: tiers 1–3 demonstrated in QEMU on
 2026-10-27, [recovery-gates record](validation/recovery-gates-2026-10-27/README.md);
-the tier-4 recovery factor is still a draft specification awaiting
-owner approval), the A/B installation milestone, and physical
+tier 4 — the recovery factor — approved by the owner, implemented,
+and demonstrated in QEMU at `06e5a7b`,
+[tier-4 record](validation/recovery-factor-2026-10-27/README.md)),
+the A/B installation milestone, and physical
 validation on the target machine. Production-safe
 first-user enrollment and a real window manager — previously on the
 blocked list — are implemented and proven in QEMU in the joined
@@ -85,12 +87,16 @@ backing-device tracing, the actual DRM driver vs the simpledrm path,
 complete-image USB boot evidence, and precise recovery/Windows-safety
 wording); their resolution, with evidence, is recorded in the
 [review-resolution record](validation/review-resolution-2026-10-25/README.md).
-A 2026-10-27 recovery pass demonstrated ADR 0010 tiers 1–3 in QEMU
-([recovery-gates record](validation/recovery-gates-2026-10-27/README.md)),
-but it does not clear the install blockers above: the tier-4 recovery
-factor remains unimplemented pending owner approval of its design,
-no recovery evidence exists on physical hardware, and rewriting
-disposable test media is not a substitute for the complete path.
+2026-10-27 recovery passes demonstrated ADR 0010 tiers 1–3 in QEMU
+([recovery-gates record](validation/recovery-gates-2026-10-27/README.md))
+and tier 4 at `06e5a7b`
+([tier-4 record](validation/recovery-factor-2026-10-27/README.md)),
+but they do not clear the install blockers above: no recovery
+evidence exists on physical hardware, the A/B installation
+milestone is still ahead, and rewriting disposable test media is
+not a substitute for the complete path. The shipped test-media
+package predates the tier-4 work and does not contain the recovery
+path.
 
 ## Native authenticated Files browser (development)
 
