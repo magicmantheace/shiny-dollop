@@ -25,7 +25,8 @@ on a disposable copy of the proof disk:
                  generation 2; DATA hashed once more
   7. host checks all DATA hashes equal; the STATE audit log records
                  the reset and the rotation; the record shows
-                 generation 2
+                 generation 3 (enrollment 1, reset revocation 2,
+                 rotation 3)
 
 Evidence logs and a verdict JSON are written under
 out/recovery-factor-ab/. QEMU evidence only; no hardware claimed.
@@ -84,11 +85,21 @@ def esp_swap(disk, uki_path):
 
 
 def data_hashes(disk, tag):
-    """(whole-partition sha256, probe-file sha256) for DATA (p5)."""
+    """(whole-partition sha256, probe-file sha256) for DATA (p5).
+
+    The partition hash is taken from the RAW extraction: replaying
+    the journal with e2fsck stamps the extracted copy's superblock
+    timestamps (s_mtime/s_wtime/s_lastcheck), which would make the
+    measurement differ by itself. DATA is never mounted by the
+    recovery boots (its superblock mount count stays 0), so no
+    journal is pending and the raw bytes are the guest-visible
+    bytes; the probe read still goes through the replayed copy.
+    """
     data = extract_partition(disk, 5, OUT / f"data-{tag}.img")
+    partition_hash = sha256_bytes(data.read_bytes())
     replay_journal(data)
     probe = debugfs_read(data, "/owner-probe.txt")
-    return sha256_bytes(data.read_bytes()), sha256_bytes(probe or b"")
+    return partition_hash, sha256_bytes(probe or b"")
 
 
 def main():
@@ -185,7 +196,10 @@ def main():
                               VERIFY_TIMEOUT)
     new_factor, flow_ok = factor_smoke.rotate_flow(instance, "confirm")
     ok = ok and flow_ok and new_factor is not None
-    ok = ok and instance.wait("SYNVEIL_RECOVERY_ROTATE_OK generation=2",
+    # Revision sequence on this disk: enrollment wrote generation 1,
+    # the successful reset's automatic revocation wrote revision 2,
+    # so this rotation commits generation 3.
+    ok = ok and instance.wait("SYNVEIL_RECOVERY_ROTATE_OK generation=3",
                               VERIFY_TIMEOUT)
     instance.send("exit")
     ok = ok and instance.wait("SYNVEIL_RECOVERY_MAINT_DONE", 60)
@@ -205,8 +219,8 @@ def main():
     replay_journal(state)
     record = debugfs_read(
         state, "/lib/synveil/auth/recovery.json").decode("utf-8", "replace")
-    results["record-generation-2"] = '"generation": 2' in record \
-        or '"generation":2' in record
+    results["record-generation-3"] = '"generation": 3' in record \
+        or '"generation":3' in record
     audit_log = debugfs_read(
         state, "/log/synveil/recovery-maintenance.log").decode(
             "utf-8", "replace")
