@@ -4,7 +4,7 @@ import io
 import json
 import unittest
 from developmental_ai.environment_api import EnvironmentSession, FAMILIES, digest
-from developmental_ai.environment_service import EnvironmentService, SERVICE_SCHEMA, serve
+from developmental_ai.environment_service import EnvironmentService, MAX_INPUT, SERVICE_SCHEMA, serve
 
 
 class EnvironmentApiTests(unittest.TestCase):
@@ -74,6 +74,34 @@ class EnvironmentApiTests(unittest.TestCase):
         req("close")
         self.assertEqual(req("restore",checkpoint=checkpoint)["frame"]["tick"],1)
         with self.assertRaises(ValueError): service.handle({"schema":SERVICE_SCHEMA,"request_id":"x","op":"run_shell", "command":"whoami"})
+
+    def test_stdio_service_restores_maximal_checkpoint(self):
+        # Regression: serve() rejected checkpoints the service itself had
+        # produced once the replay log passed the old 64 KiB input cap
+        # (this scenario's restore request is ~89 KB), while a direct
+        # EnvironmentSession.restore of the same checkpoint succeeded.
+        session = EnvironmentSession("grid", 17, "test", 0)
+        for _ in range(128):
+            session.step(4, expected_tick=session.tick)
+        checkpoint = session.checkpoint()
+        request = json.dumps({"schema": SERVICE_SCHEMA, "request_id": "big-1",
+                              "op": "restore", "checkpoint": checkpoint})
+        self.assertGreater(len(request.encode()), 65536)
+        target = io.StringIO()
+        serve(io.BytesIO((request + "\n").encode()), target)
+        row = json.loads(target.getvalue().splitlines()[0])
+        self.assertNotIn("error", row)
+        expected = EnvironmentSession.restore(checkpoint)
+        self.assertEqual(row["result"]["frame"], expected.frame())
+        self.assertEqual(row["result"]["frame"]["tick"], 128)
+
+    def test_stdio_service_still_rejects_oversized_input(self):
+        # The raised cap remains a bound: lines past it are refused.
+        target = io.StringIO()
+        serve(io.BytesIO(b"x" * (MAX_INPUT + 1) + b"\n"), target)
+        row = json.loads(target.getvalue().splitlines()[0])
+        self.assertEqual(row["error"]["code"], "invalid_request")
+        self.assertEqual(row["error"]["message"], "request too large")
 
     def test_stdio_service_handles_invalid_input_without_exiting(self):
         valid = json.dumps({"schema":SERVICE_SCHEMA,"request_id":"t1","op":"start","config":{"family":"delayed","seed":4,"split":"test","index":0,"variant":"short"}})

@@ -12,7 +12,17 @@ from typing import Any
 from developmental_ai.environment_api import EnvironmentSession, canonical
 
 SERVICE_SCHEMA = "developmental-ai.environment-service/v1"
-MAX_INPUT = 65536  # includes bounded checkpoint replay records
+# Input bound, sized from the largest request a caller can legitimately
+# send: a restore request embedding a full checkpoint. A checkpoint holds
+# at most MAX_ACTIONS (200) replay entries, each entry carrying two frames
+# of small scalar observations; the largest entry measured across all
+# families, variants, seeds and action policies is 695 bytes. Allowing
+# 768 bytes per entry plus 2 KiB for the request envelope, checkpoint
+# wrapper and digests gives 152 KiB -- above every producible checkpoint
+# (the largest observed, a full 128-step grid episode, is ~89 KB) while
+# still rejecting unbounded input. The previous 64 KiB cap rejected the
+# service's own checkpoints.
+MAX_INPUT = 152 * 1024  # 200 entries * 768 B + 2 KiB envelope
 
 
 class EnvironmentService:
