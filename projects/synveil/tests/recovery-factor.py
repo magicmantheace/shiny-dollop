@@ -76,6 +76,17 @@ class RecoveryProgramContract(unittest.TestCase):
         ):
             self.assertIn(marker, self.source)
 
+    def test_reset_transaction_is_crash_consistent(self):
+        # The reset runs through the journaling transaction in the
+        # library; a revocation failure is an incomplete outcome
+        # with a failure exit, and the old "OK on revoke failure"
+        # marker must never come back.
+        self.assertIn("execute_reset_transaction", self.source)
+        self.assertIn("settle_reset_journal", self.source)
+        self.assertIn("SYNVEIL_RECOVERY_RESET_INCOMPLETE", self.source)
+        self.assertIn("state=reset-incomplete", self.source)
+        self.assertNotIn("RESET_OK_REVOKE_FAILED", self.source)
+
     def test_only_subprocess_is_stty(self):
         commands = re.findall(r'Command::new\("([^"]+)"\)', self.source)
         self.assertEqual(set(commands), {"/bin/stty"})
@@ -117,6 +128,16 @@ class LibraryContract(unittest.TestCase):
             "/var/lib/synveil/installation-anchor.json",
             "synveil-recovery-v1",
             "MAX_FAILED_ATTEMPTS",
+        ):
+            self.assertIn(needle, self.source)
+
+    def test_reset_journal_constants(self):
+        for needle in (
+            "synveil.reset-journal/v1",
+            "/var/lib/synveil/auth/reset-journal.json",
+            "execute_reset_transaction",
+            "settle_pending_reset",
+            "complete_pending_reset_at",
         ):
             self.assertIn(needle, self.source)
 

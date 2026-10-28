@@ -17,6 +17,12 @@ rootfs, disposable state disks, serial console):
   t6 corrupt/missing/foreign anchor denied, nothing initialized
   t7 rotation: old factor denied, new factor verifies, cold reboots
   t8 a factor used in a successful reset is revoked (decision D7)
+  t8b/t8c an interrupted reset transaction (durable journal
+     planted host-side in the exact guest shape, with and without
+     the credential replacement landed) is completed at the next
+     recovery entry: the consumed factor is revoked, the journal
+     is cleared, and the password in effect is the one whose
+     replacement actually landed
   t9 audit entries present, no secret material in the log
   t10 serial probes get no shell at any locked stage
   t12 no interface re-displays a factor; factors appear only inside
@@ -399,6 +405,7 @@ RECORD_PATH = "/lib/synveil/auth/recovery.json"
 CREDENTIAL_PATH = "/lib/synveil/auth/credential.phc"
 ANCHOR_PATH = "/lib/synveil/installation-anchor.json"
 AUDIT_PATH = "/log/synveil/recovery-maintenance.log"
+JOURNAL_PATH = "/lib/synveil/auth/reset-journal.json"
 
 
 def fresh_disk(name):
@@ -723,6 +730,62 @@ def main():
     ok = ok and PASSWORD_NEW not in audit_log
     ok = ok and PASSWORD_A not in audit_log
     results["t9-audit-log"] = ok
+
+    # ---- Tests 8b/8c: interrupted reset transactions settle ----
+    # A journaled reset whose revocation never landed (power cut
+    # or storage failure between the credential replacement and
+    # the revocation) is completed at the next recovery entry: the
+    # consumed factor is revoked and the journal cleared. The
+    # journal is planted with the host surgery helpers in exactly
+    # the shape the guest writes (strict JSON record, mode 0600).
+    record1 = json.loads(state_read(base1, "journal-src", RECORD_PATH))
+    journal1 = (json.dumps({
+        "schema": "synveil.reset-journal/v1",
+        "factor_generation": record1["generation"],
+        "installation_id": record1["installation_id"],
+        "begun_unix": 1761600000,
+    }, separators=(",", ":")) + "\n").encode()
+
+    # 8b: interruption AFTER the credential replacement landed —
+    # the disk's credential record is installation 2's, i.e. the
+    # replacement password is PASSWORD_B. The next reset entry
+    # completes the revocation (the consumed factor is refused as
+    # revoked, the journal is gone), and the new password is the
+    # one that authenticates.
+    d = clone(base1, "reset-interrupted-replaced")
+    state_write_file(d, "ri-journal", JOURNAL_PATH, journal1)
+    cred2 = state_read(base2, "ri-cred-src", CREDENTIAL_PATH)
+    state_write_file(d, "ri-cred", CREDENTIAL_PATH, cred2)
+    results["t8b-interrupted-reset-completed"] = (
+        reset_denied_preinput(
+            "reset-interrupted-replaced", fx_reset, d, "factor-revoked")
+        and state_read(d, "ri-journal-after", JOURNAL_PATH) is None)
+    b = boot("reset-interrupted-maint", fx_maint, d)
+    ok = maint_auth(b, PASSWORD_B)
+    b.send("status")
+    ok = ok and b.wait("SYNVEIL_RECOVERY_MAINT_FACTOR state=revoked", 60)
+    b.send("exit")
+    ok = ok and b.wait("SYNVEIL_RECOVERY_MAINT_DONE", 60)
+    ok = ok and locked_and_probed(b)
+    results["t8b-new-password-in-effect"] = ok
+
+    # 8c: interruption BEFORE the credential replacement — the
+    # journal alone. Settling still consumes the factor (the
+    # durable journal is the point of no return), and the old
+    # password remains in effect because the replacement never
+    # landed.
+    d = clone(base1, "reset-interrupted-journal")
+    state_write_file(d, "rj-journal", JOURNAL_PATH, journal1)
+    results["t8c-journal-only-completed"] = (
+        reset_denied_preinput(
+            "reset-interrupted-journal", fx_reset, d, "factor-revoked")
+        and state_read(d, "rj-journal-after", JOURNAL_PATH) is None)
+    b = boot("reset-interrupted-journal-maint", fx_maint, d)
+    ok = maint_auth(b, PASSWORD_A)
+    b.send("exit")
+    ok = ok and b.wait("SYNVEIL_RECOVERY_MAINT_DONE", 60)
+    ok = ok and locked_and_probed(b)
+    results["t8c-old-password-still-in-effect"] = ok
 
     # ---- Test 7: rotation ----
     d = clone(base1, "rotation-abort")
