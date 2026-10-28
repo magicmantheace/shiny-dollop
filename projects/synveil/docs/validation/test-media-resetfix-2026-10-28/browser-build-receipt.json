@@ -1,0 +1,150 @@
+{
+  "schema": "synveil.ab-proof-build/v1",
+  "source_commit": "db32105b05d24ecaf6d08cf11e796f2892a1b67a",
+  "boot_target": "qemu",
+  "publisher": {
+    "key_id": "synveil-dev-2026-01",
+    "development": true,
+    "public_key_hex": "fe5eaee2ad1841293f05b42bb76399df4d1ec9e1bf3af567ab6ab634e7296d72"
+  },
+  "generations": {
+    "1": {
+      "version": 1,
+      "generation_id": "synveil-gen-v1",
+      "uki": "/home/hatch/workspace/_build-synveil/projects/synveil/out/browser-proof/gen-v1/synveil-x86_64.efi",
+      "uki_sha256": "a7d1be1c90441a2c9e126802a2648a80ab060cfb3b89de33a011e7d2b9f09fde",
+      "uki_bytes": 261538816,
+      "background": "0xFF101820",
+      "seat_stub": false,
+      "state_format": 1
+    },
+    "2": {
+      "version": 2,
+      "generation_id": "synveil-gen-v2",
+      "uki": "/home/hatch/workspace/_build-synveil/projects/synveil/out/browser-proof/gen-v2/synveil-x86_64.efi",
+      "uki_sha256": "11eab87a544009d9b89cd5e46764349bbd563c1a0d3ef9ba6f18dd85dbebd1d0",
+      "uki_bytes": 261538816,
+      "background": "0xFF0B3D2E",
+      "seat_stub": false,
+      "state_format": 1
+    },
+    "3": {
+      "version": 3,
+      "generation_id": "synveil-gen-v3",
+      "uki": "/home/hatch/workspace/_build-synveil/projects/synveil/out/browser-proof/gen-v3/synveil-x86_64.efi",
+      "uki_sha256": "87a1b9adf5f0cd358caeaa73c695a2e96bd9cbb8ea4c94cae28911d527a38eb2",
+      "uki_bytes": 260862976,
+      "background": "0xFF3D0B0B",
+      "seat_stub": true,
+      "state_format": 1
+    }
+  },
+  "recovery": {
+    "uki": "/home/hatch/workspace/_build-synveil/projects/synveil/out/browser-proof/recovery/synveil-x86_64.efi",
+    "uki_sha256": "3be36d4c8e9c24712b35fc25eb96a3f38a73c4f7e5bcf886e1f2d641ae700709",
+    "uki_bytes": 62841856
+  },
+  "maintenance": {
+    "uki": "/home/hatch/workspace/_build-synveil/projects/synveil/out/browser-proof/maintenance/synveil-x86_64.efi",
+    "uki_sha256": "0176ebf3ec50a6e50a227fadf71fa0685bad8cba069c01fb95f0a6b898dd55e6",
+    "uki_bytes": 62845952
+  },
+  "reset": {
+    "uki": "/home/hatch/workspace/_build-synveil/projects/synveil/out/browser-proof/reset/synveil-x86_64.efi",
+    "uki_sha256": "e9ae92facb64c68168e667a6c95eb80b424ae7b13931114a5f3eaf05978c550b",
+    "uki_bytes": 62841856
+  },
+  "disk": {
+    "path": "/home/hatch/workspace/_build-synveil/projects/synveil/out/browser-proof/synveil-ab.img",
+    "sha256": "0bcbf279e7877a8fcd7c2aa31346f2a25a71a78a2545ce48a8bd85e1249fed1a",
+    "bytes": 4169138176,
+    "layout": [
+      {
+        "number": 1,
+        "name": "ESP",
+        "partuuid": "ab000000-0000-4000-8000-0000000000e5",
+        "size_mb": 1024
+      },
+      {
+        "number": 2,
+        "name": "SYSTEM_A",
+        "partuuid": "ab000000-0000-4000-8000-00000000000a",
+        "size_mb": 768
+      },
+      {
+        "number": 3,
+        "name": "SYSTEM_B",
+        "partuuid": "ab000000-0000-4000-8000-00000000000b",
+        "size_mb": 768
+      },
+      {
+        "number": 4,
+        "name": "STATE",
+        "partuuid": "7c9e2d41-8b3a-4f5e-a6d1-2e8c4b7f9053",
+        "size_mb": 256
+      },
+      {
+        "number": 5,
+        "name": "DATA",
+        "partuuid": "ab000000-0000-4000-8000-0000000000da",
+        "size_mb": 384
+      },
+      {
+        "number": 6,
+        "name": "RECOVERY",
+        "partuuid": "ab000000-0000-4000-8000-0000000000ec",
+        "size_mb": 768
+      }
+    ]
+  },
+  "releases": {
+    "release-v2": {
+      "media": "/home/hatch/workspace/_build-synveil/projects/synveil/out/browser-proof/release-v2.img",
+      "media_sha256": "135bf15bd92fc5886580715bd5bf2fd360993b2f3c52b676f04ee44940887b31",
+      "version": 2,
+      "generation_id": "synveil-gen-v2",
+      "payload_sha256": "11eab87a544009d9b89cd5e46764349bbd563c1a0d3ef9ba6f18dd85dbebd1d0",
+      "payload_bytes": 261538816,
+      "key_id": "synveil-dev-2026-01",
+      "corrupt_signature": false
+    },
+    "release-v3": {
+      "media": "/home/hatch/workspace/_build-synveil/projects/synveil/out/browser-proof/release-v3.img",
+      "media_sha256": "b71b2db4cd450b6301729e6335bcfaa312ec015583a4dd8689746731f5759f60",
+      "version": 3,
+      "generation_id": "synveil-gen-v3",
+      "payload_sha256": "87a1b9adf5f0cd358caeaa73c695a2e96bd9cbb8ea4c94cae28911d527a38eb2",
+      "payload_bytes": 260862976,
+      "key_id": "synveil-dev-2026-01",
+      "corrupt_signature": false
+    },
+    "release-v2-badsig": {
+      "media": "/home/hatch/workspace/_build-synveil/projects/synveil/out/browser-proof/release-v2-badsig.img",
+      "media_sha256": "13ac39e348e7250fcef163a4c34cf71a4fa910e26d3db1f63b81443575eb896e",
+      "version": 2,
+      "generation_id": "synveil-gen-v2",
+      "payload_sha256": "11eab87a544009d9b89cd5e46764349bbd563c1a0d3ef9ba6f18dd85dbebd1d0",
+      "payload_bytes": 261538816,
+      "key_id": "synveil-dev-2026-01",
+      "corrupt_signature": true
+    }
+  },
+  "browser": {
+    "stage_schema": "synveil.distro-chromium-stage/v1",
+    "stage_validation_sha256": "ff25d00d93b52e469d9fa5a1b361c978fd74d3f61282eba8bbf2123d0a425f86",
+    "chromium_version": "156.0.8078.47-1~deb13u1",
+    "deb_packages": 217,
+    "payload_files": 1290,
+    "payload_bytes": 488609498,
+    "assets_copied": 1290,
+    "assets_identical_to_baseline": 0,
+    "link_closure_files_checked": 160,
+    "test_ca_sha256": "195b4fd4508e1d88fc89efa28852c119de1832c33145a0b35c4e06afdedb46fd",
+    "test_host": {
+      "address": "10.0.2.2",
+      "name": "test.synveil.invalid"
+    },
+    "start_url": "https://test.synveil.invalid:8443/"
+  },
+  "physical_boot_validated": false
+}

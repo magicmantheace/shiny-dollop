@@ -1,0 +1,10 @@
+{
+    "attempt_made": true,
+    "esp_maintenance_sha256": "6e32499aff38691f7a8921d35a2a0b8ae438dc86e40e35abfafa678457e91ca3",
+    "esp_matches_receipt": true,
+    "esp_reset_matches_receipt": true,
+    "esp_reset_sha256": "9b19927aa9b0832e64e623230a70df906fd17dab9f2fdfc348a957cc19c45375",
+    "receipt_maintenance_sha256": "6e32499aff38691f7a8921d35a2a0b8ae438dc86e40e35abfafa678457e91ca3",
+    "receipt_reset_sha256": "9b19927aa9b0832e64e623230a70df906fd17dab9f2fdfc348a957cc19c45375",
+    "screen_settled_after_polls": 5
+}
