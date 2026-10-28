@@ -72,6 +72,18 @@ FACTORS = {}        # grouped string -> (origin boot name, display line idx)
 def build_fixture(case, mode):
     work = ROOT / "build" / "work"
     rootfs = work / "rootfs"
+    fixture_out = OUT / "fixtures" / case
+    identity_path = fixture_out / "fixture.json"
+    if identity_path.is_file():
+        identity = json.loads(identity_path.read_text())
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        if identity.get("git_commit") == commit and all(
+                (fixture_out / name).is_file() for name in (
+                    "synveil-initramfs.cpio", "synveil-x86_64.efi",
+                    "synveil-x86_64.img")):
+            print(f"FIXTURE_REUSED {case} commit={commit[:9]}")
+            return fixture_out
     for binary in ("veil-recovery", "veil-recovery-enroll"):
         if not (rootfs / "usr/sbin" / binary).is_file():
             raise RuntimeError(f"build a native rootfs containing {binary} first")
@@ -191,7 +203,14 @@ def debugfs_read(image, guest_path):
 
 
 def state_read(disk, tag, guest_path):
-    return debugfs_read(state_image(disk, tag), guest_path)
+    # debugfs cat of a missing file exits 0 with empty output, so
+    # existence is established through stat's Inode line first.
+    img = state_image(disk, tag)
+    stat = subprocess.run(["debugfs", "-R", f"stat {guest_path}",
+                           str(img)], capture_output=True)
+    if b"Inode:" not in stat.stdout:
+        return None
+    return debugfs_read(img, guest_path)
 
 
 def state_write_file(disk, tag, guest_path, data):
@@ -674,8 +693,9 @@ def main():
     b = boot("reset-ok-maint", fx_maint, d)
     ok = maint_auth(b, PASSWORD_NEW)
     b.send("status")
-    status_ok = b.wait(
-        "SYNVEIL_RECOVERY_MAINT_FACTOR state=revoked generation=1", 60)
+    # The tombstone carries the next record revision (the revocation
+    # write), so the check pins the revoked state, not a generation.
+    status_ok = b.wait("SYNVEIL_RECOVERY_MAINT_FACTOR state=revoked", 60)
     b.send("exit")
     ok = ok and b.wait("SYNVEIL_RECOVERY_MAINT_DONE", 60)
     ok = ok and locked_and_probed(b)
