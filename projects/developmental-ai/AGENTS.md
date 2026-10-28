@@ -1,3 +1,40 @@
+# First-contact onset guard: contradiction gate — 2026-10-28 (FAILED)
+
+Optional `developmental_ai/first_contact_onset_guard.py`
+(recent8 acting model exactly, plus a count-based contradiction
+gate on its own strict prequential predictions over the newest 4
+events: abstain if ≥2 assigned probability < 0.125) was evaluated
+under the protocol frozen BEFORE implementation at
+`benchmarks/first_contact_onset_guard_protocol.json` on NEW
+cohorts 302003/302021/302039 and 303001/303017/303041, both now
+INSPECTED — never re-tune against them. **Graded Failed (protocol
+definition: criteria 1–2 fail on the additional cohort); NOT a
+Regression (onset harm equal/lower vs recent8, control successes
+identical, suite + transfer pass).** Per-criterion: C1 FAIL/FAIL
+(dev pooled onset harm 260 vs recent8 260, ceiling 195; add 206
+vs 222, ceiling 166.5), C2 FAIL/FAIL (onset abstentions dev
+0/288, add 16/288 from ONE firing onset state; required ≥48),
+C3 PASS/PASS (trivially — gate never fired at k=8 either),
+C4 PASS/PASS (0 graded-control abstentions; one ungraded
+control-0 false-fire on stationary evidence, additional seed
+303017), C5 PASS/PASS (full gate records, replay identity true
+everywhere, learner acquisition 0). Diagnosis: the detection
+signal, not the abstention response, is missing — contradiction
+count 0 in 28/36 onset states; only 9/144 onset prequential
+probabilities < 0.125, because sparse 8-event fits assign
+≈0.33 to reversed outcomes. Both abstention triggers tried so
+far (mean log-score, contradiction count) derive from the same
+sparse model's probabilities and are silent at onset. Full unit
+suite (851) and historical transfer benchmark passed in the
+evaluation and grading stages; no CI claimed for the evaluation
+or grading commits (UNVERIFIED). See
+`docs/FIRST_CONTACT_ONSET_GUARD.md`. Keep the learner optional
+and unpromoted, default controller unchanged, no merge, no
+AthenZ/Synveil integration, D1–D10/V2A/V2B unchanged. Next
+limitation selected: P1/P2 — onset signal absence in the acting
+model's own probabilities; next cycle tests a change signal
+computed from the observed evidence itself.
+
 # Early post-switch adaptation: gated archive — 2026-10-28 (FAILED / regression)
 
 Optional `developmental_ai/gated_archive_prequential_memory.py`

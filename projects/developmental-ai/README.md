@@ -1122,6 +1122,29 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### October 28 — First-contact onset guard: contradiction-gated abstention (FAILED)
+
+Optional `FirstContactGuardMemory` acts through recent8 exactly,
+plus a count-based contradiction gate on the acting model's own
+strict prequential predictions over the newest 4 events (abstain
+if ≥2 were assigned probability < 0.125), under a protocol frozen
+before implementation (new cohorts 302003-family / 303001-family,
+now INSPECTED). **Graded Failed (not a regression vs recent8):**
+criteria 1 (onset harm ≤75% of recent8) and 2 (gate non-vacuous,
+≥48/288 onset abstentions) FAIL on both cohorts — development
+onset harm **260 = recent8 260** with **0/288** onset abstentions;
+additional **206 vs 222** with **16/288**, from a single firing
+onset state. Criteria 3, 4 and 5 pass on both cohorts, 3 and 4
+largely vacuously. Diagnosis from the recorded gate records: the
+signal itself is absent — contradiction count 0 in **28 of 36**
+onset states, only **9 of 144** onset prequential probabilities
+below the 0.125 floor, because sparse 8-event fits assign middling
+probabilities to reversed outcomes. Learner acquisition actions
+zero; external TRAIN actor harm published in full in the report.
+Optional only, no promotion, no merge.
+[Full graded report](docs/FIRST_CONTACT_ONSET_GUARD.md).
+
+
 ### October 28 — Early post-switch adaptation: gated archive (FAILED / regression)
 
 Optional `GatedArchivePrequentialMemory` protected an immutable
