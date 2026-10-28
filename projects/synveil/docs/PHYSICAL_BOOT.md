@@ -4,7 +4,28 @@
 full-stack test-media package — not an install, not yet physically
 validated.**
 
-**Full-stack refresh (2026-10-27):** the owner test-media package
+**Recovery-inclusive refresh (2026-10-27):** the package was
+rebuilt again from source `5fd76c0`, the head containing ADR
+0010 gates A–C and the tier-4 recovery factor (ADR 0020). The
+image (SHA-256
+`83fc83a562d2224007b279e8aa63c22b8c2e6a9f5b08bd61db3b390649d2bebd`,
+4,169,138,176 bytes) now carries the recovery path on its ESP —
+the veil-recovery maintenance entry and the tier-4 reset UKI,
+both digest-verified from the packaged ESP against the build
+receipt — alongside everything in the refresh below. The full
+acceptance was re-proven on this image in QEMU: joined
+framebuffer and emulated-USB sequences pass with the
+destroyed-STATE leg failing closed on both variants; the
+maintenance entry was booted from the packaged ESP and denied
+access with `reason=no-credential` on the unenrolled state; the
+browser/downloads acceptance was re-proven at this head on its
+QEMU-profile proof disk. Record:
+[test-media recovery record](validation/test-media-recovery-2026-10-27/README.md).
+The superseded `9dbeda0` package below must not be written for a
+boot test any more.
+
+**Full-stack refresh (2026-10-27, superseded by the
+recovery-inclusive rebuild above):** the owner test-media package
 was rebuilt from source `9dbeda0` and now contains the whole
 current stack — the A/B updater with graphical update controls,
 Chromium stock-configured (no connection blocking in any layer,
@@ -198,12 +219,17 @@ a claim of boot success on the physical machine.
       the owner on 2026-10-27 (ADR 0020), implemented, and
       demonstrated in QEMU at `06e5a7b`
       ([tier-4 record](validation/recovery-factor-2026-10-27/README.md)).
-      This test-media package predates that work and does not
-      contain the recovery path, so for this media the documented
-      recovery procedure remains a media rewrite
-      ([owner guide](OWNER_FIRST_BOOT_TEST.md)). The gate stays
-      open for installed systems: physical validation and the A/B
-      installation milestone are still ahead.
+      **Update (2026-10-27, recovery-inclusive rebuild):** the
+      current test-media package (source `5fd76c0`, image
+      `83fc83a5…`) contains the recovery path; its maintenance
+      entry was exercised on the packaged image itself up to the
+      no-credential denial, and the authenticated session and
+      reset flows stand on the QEMU-profile acceptance of the
+      same source
+      ([record](validation/test-media-recovery-2026-10-27/README.md)).
+      The gate stays open for installed systems: physical
+      validation and the A/B installation milestone are still
+      ahead.
 - [x] Signed or otherwise owner-verified release/image provenance, with
       clear test-media identification and checksums.
       Owner-verified route (2026-10-25): the image is **unsigned**;

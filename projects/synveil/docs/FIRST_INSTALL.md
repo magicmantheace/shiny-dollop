@@ -94,9 +94,15 @@ and tier 4 at `06e5a7b`
 but they do not clear the install blockers above: no recovery
 evidence exists on physical hardware, the A/B installation
 milestone is still ahead, and rewriting disposable test media is
-not a substitute for the complete path. The shipped test-media
-package predates the tier-4 work and does not contain the recovery
-path.
+not a substitute for the complete path. The test-media package
+was rebuilt from `5fd76c0` on 2026-10-27 and now contains the
+recovery path — maintenance and tier-4 reset entries on the ESP,
+digest-verified from the packaged image, the maintenance entry
+exercised on the packaged image up to its no-credential denial,
+and the joined + browser acceptances re-proven at this head
+([test-media recovery record](validation/test-media-recovery-2026-10-27/README.md)) —
+without changing the install blockers: the packaged-image boot
+test remains a boot test, not an install.
 
 ## Native authenticated Files browser (development)
 

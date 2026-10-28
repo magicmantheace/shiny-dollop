@@ -6,7 +6,9 @@ anywhere, the drive's previous contents are erased by the media
 write, and the Windows disk, its ESP and the firmware boot order are
 not modified by the test. The image is the current full Synveil
 stack — A/B updater with graphical update controls, the Chromium
-browser with its privacy configuration, and persistent Downloads —
+browser (stock-configured; no connection blocking), persistent
+Downloads, and the ADR 0010 recovery path (a maintenance entry
+and a recovery-key password-reset entry on the drive's ESP) —
 boot-validated end to end in QEMU on this exact image (graphical
 enrollment, cold reboot, wrong password denied, login, desktop with
 the browser, relock, state persisted; once on the firmware-
@@ -17,13 +19,13 @@ test establishes, one way or the other.
 Image identity (verify before writing, and again if anything looks
 off): `synveil-test-media` package, image `synveil-x86_64.img`,
 SHA-256
-`283b1974be9e292d6e28f5ec9848bf5427ffc9e8f5c690a16e502378df3e6c83`,
-3,900,702,720 bytes (≈3.63 GiB — use an 8 GB or larger stick/drive),
-source commit `9be2404b27cc9980362ff5d2cedcaecec5de0b72`.
+`83fc83a562d2224007b279e8aa63c22b8c2e6a9f5b08bd61db3b390649d2bebd`,
+4,169,138,176 bytes (≈3.88 GiB — use an 8 GB or larger stick/drive),
+source commit `5fd76c0aca406b64ef8a37a35f1ba683172363ec`.
 The package also carries `synveil-release-v2.img` (SHA-256
-`7dcdc68e2f7b2b9724af34f5969151cf9942f0a76d7e10bb31c470be9bcdc755`),
+`ad126ad87ec638478255b5b106c7c604f4350259634cd1e1d352a756bd170682`),
 the signed v2 update used by the update test below. Validation
-evidence: [test-media record](validation/test-media-2026-10-27/README.md).
+evidence: [test-media record](validation/test-media-recovery-2026-10-27/README.md).
 
 **Publisher key:** updates are verified against the Synveil
 **development** publisher key `synveil-dev-2026-01`. It is a flagged
@@ -81,7 +83,7 @@ Linux alternative: `write-test-media.sh` in the package does the
 same write with the digest pin, whole-removable-USB-only,
 backing-traced mount/swap refusal, exact-name confirmation and
 read-back verification enforced by the script:
-`sudo bash write-test-media.sh --image synveil-x86_64.img --device /dev/sdX --expected-sha256 283b1974be9e292d6e28f5ec9848bf5427ffc9e8f5c690a16e502378df3e6c83`
+`sudo bash write-test-media.sh --image synveil-x86_64.img --device /dev/sdX --expected-sha256 83fc83a562d2224007b279e8aa63c22b8c2e6a9f5b08bd61db3b390649d2bebd`
 (Replace `/dev/sdX` with the drive's whole-disk device; repeat with
 the release image and its digest for the second stick.)
 
@@ -183,18 +185,16 @@ note which.
   hardware (wired NIC or Wi-Fi) is **unverified** — if the
   browser cannot reach anything, note it and continue with the
   other steps; that is a finding, not a mistake on your part.
-- **Browser privacy configuration:** Chromium ships with the
-  vendor's phone-home endpoints null-routed at the OS name layer
-  (component updates, Safe Browsing, translate and similar
-  services are unreachable by design) and a managed policy that
-  disables telemetry, variations and sync. One disclosed
-  exception, by the owner's decision of 2026-10-27:
-  **accounts.google.com is reachable, so Google sign-in works**
-  in this browser — know that Chromium's identity service also
-  contacts it unprompted at startup, and that this traffic
-  leaving the machine is the accepted cost of the exception.
-  The other nine vendor endpoints stay null-routed. Browser
-  updates arrive only through Synveil's signed A/B releases.
+- **Browser configuration:** Chromium ships stock-configured —
+  no managed policy, no blocked hosts, no disabled features
+  (owner decision, 2026-10-27: no connection blocking at all).
+  Component updates, Safe Browsing, sync, sign-in and the rest
+  behave exactly as the distribution's Chromium does, and the
+  browser will contact the vendor's services the way a stock
+  browser does. Its sandbox and TLS verification are fully
+  intact. (Browser updates also still arrive through Synveil's
+  signed A/B releases, since the whole system image is what
+  updates.)
 - **Desktop scope:** the demo window, terminal, Files and System
   Updates windows, and Chromium. There is no launcher or
   settings app beyond those.
@@ -203,14 +203,25 @@ note which.
   insufficient-space download outcome is proven). If you try a
   large download, note what happens rather than treating an odd
   result as your error.
-- **Password loss = rewrite the media.** There is deliberately
-  no password-reset or recovery shell in this image (see ADR
-  0010). The drive holds only a disposable test credential, so
-  recovery from any failure of *this test* is: rewrite the media
-  and start over. Rewriting disposable media is **not** an
-  installed-system recovery mechanism — it works here only
-  because the media is disposable; ADR 0010's independent
-  recovery for an installed system remains unimplemented.
+- **Password loss and recovery.** This image carries ADR
+  0010's recovery path: a text-mode maintenance entry and a
+  recovery-key password-reset entry on the drive's ESP, reached
+  by selecting them at boot instead of the normal system. The
+  reset entry works only if a recovery key was enrolled (the
+  printed key offered as a separate, explicit step of setup —
+  declining it leaves the state honestly recorded as
+  unrecoverable). There is no recovery *shell*: the maintenance
+  entry authenticates against the credential store and offers
+  only enumerated operations, and with no credential enrolled
+  it refuses access outright (exactly what the QEMU validation
+  of this image observed). The full recovery flows were
+  demonstrated in QEMU (see the validation record); they were
+  exercised on this image's maintenance entry only up to that
+  refusal, because the acceptance drivers for the authenticated
+  session speak the serial console the hardware profile does
+  not carry. For *this test* the drive holds only a disposable
+  test credential, so the simplest recovery from any failure
+  remains: rewrite the media and start over.
 - **What protects the Windows installation — specifically, not
   absolutely.** (1) The running test image writes only to the
   test drive itself: it mounts for writing only the partitions
