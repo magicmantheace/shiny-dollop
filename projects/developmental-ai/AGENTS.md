@@ -1,3 +1,33 @@
+# Early post-switch adaptation: gated archive — 2026-10-28 (FAILED / regression)
+
+Optional `developmental_ai/gated_archive_prequential_memory.py`
+(immutable 192-event archive, displacement margin 1.0, contradiction
+override ≥2/4 at archive p<0.125, adequacy gate at mean prequential
+log-score −1.2) was evaluated under the protocol frozen BEFORE
+implementation at `benchmarks/early_post_switch_adaptation_protocol.json`
+on NEW cohorts 292003/292021/292039 and 293001/293017/293041, both
+now INSPECTED — never re-tune against them. **Graded Failed (protocol
+definition: criteria 1–3 fail on the additional cohort) and a
+Regression vs recent8 (criteria 1 and 2 worse on both cohorts).**
+Per-criterion: C1 FAIL/FAIL (dev B2-8 5 vs recent8 9; add B1-8 9 vs
+15, B2-8 0 vs 15), C2 FAIL/FAIL (harm exceeds recent8 at 10/21 dev
+and 9/21 add stage-checkpoints; onset harm 48/96 at most onsets),
+C3 PASS dev (29 vs required 27) / FAIL add (24 vs 32), C4 PASS/PASS
+vacuously (**0 abstentions at every checkpoint in both cohorts —
+the adequacy gate never fired**), C5 FAIL/FAIL (no archive selected
+at B-64, but B-64 harm 10–28/96 vs ≤8 limit; dev control archive
+only 15/18 vs ≥17), C6 PASS/PASS (full per-seed TRAIN/TEST
+accounting, learner acquisition 0, replay identity true everywhere).
+Early contradiction override routes to recent32, still A-dominated
+at k≤4, reproducing obsolete-model harm. Full unit suite and
+historical transfer benchmark passed in the evaluation stage; no
+CI claimed for the evaluation or grading commits (UNVERIFIED).
+See `docs/EARLY_POST_SWITCH_ADAPTATION.md`. Keep the learner
+optional and unpromoted, default controller unchanged, no merge,
+no AthenZ/Synveil integration, D1–D10/V2A/V2B unchanged. Next
+limitation selected: P1 first-contact onset behavior (k=0–4) —
+acting without abstention on contradicted models.
+
 # Paired public outcome witness verification — 2026-10-22
 
 Research-only `developmental_ai/paired_witness.py` requires

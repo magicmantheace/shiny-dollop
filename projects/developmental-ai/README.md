@@ -1122,6 +1122,26 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### October 28 — Early post-switch adaptation: gated archive (FAILED / regression)
+
+Optional `GatedArchivePrequentialMemory` protected an immutable
+192-event archive with a displacement margin, a contradiction
+override and an adequacy abstention gate, under a protocol frozen
+before implementation (new cohorts 292003-family / 293001-family,
+now INSPECTED). **Graded Failed, and a regression vs the simple
+recent8 baseline:** criteria 1 (early adaptation), 2 (harm never
+worse than recent8) and 5 (no false reversion) FAIL on both
+cohorts; criterion 3 (retention) passes on development only
+(29/96 vs required 27) and fails on additional (24/96 vs 32).
+The adequacy gate **never fired — 0 abstentions at every
+checkpoint in both cohorts** — while onset harm was **48/96** at
+most switch onsets. Only the abstention-budget (vacuously) and
+full-accounting criteria pass on both cohorts. Learner
+acquisition actions zero; external TRAIN actor harm published
+in full in the report. Optional only, no promotion, no merge.
+[Full graded report](docs/EARLY_POST_SWITCH_ADAPTATION.md).
+
+
 ### October 23 — Selecting different causal feature laws (experimental)
 
 New optional `FeatureHypothesisMemory` compares **four developer-supplied
