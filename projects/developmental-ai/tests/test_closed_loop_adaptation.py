@@ -88,6 +88,22 @@ class ClosedLoopTests(unittest.TestCase):
                 restarted = db.load(self.proposal, self.receipt)
             self.assertEqual(restarted.snapshot(), s.snapshot())
 
+    def test_snapshot_is_detached_from_later_advances(self):
+        # Regression: snapshot() stored the live log list, so advancing
+        # the session afterwards silently grew the saved snapshot's log
+        # and its digest stopped matching -- restore() then failed with
+        # 'invalid or altered session snapshot' even though the caller
+        # never modified the record.
+        s = self.make()
+        s.advance(s.select_action(), self.observation())
+        saved = s.snapshot()
+        s.advance(s.select_action(), self.observation())
+        self.assertEqual(len(saved["state"]["log"]), 1)
+        restored = NavigationSession.restore(saved, self.proposal, self.receipt)
+        self.assertEqual(restored.snapshot(), saved)
+        self.assertEqual(restored.nav.steps, 1)
+        self.assertEqual(len(restored.log), 1)
+
     def test_reject_forged_posterior_even_with_new_digest(self):
         s = self.make()
         a=s.select_action()

@@ -83,9 +83,17 @@ class NavigationSession:
                 "finished": self.finished}
 
     def snapshot(self):
+        # Detach mutable state: advance() appends to self.log in place, so
+        # storing the live list would let later advances silently mutate
+        # this record and break its digest. The navigator record holds
+        # mutable containers too; its implementation currently rebinds
+        # rather than mutates them, but the copy keeps the snapshot's
+        # integrity independent of that detail. Scalars need no copy.
         state = {"schema": SCHEMA, "mode": self.mode, "proposal_digest": self.proposal_digest,
-                 "receipt_digest": self.receipt_digest, "navigator": self.nav.snapshot(),
-                 "log": self.log, "pending": self.pending, "finished": self.finished}
+                 "receipt_digest": self.receipt_digest,
+                 "navigator": copy.deepcopy(self.nav.snapshot()),
+                 "log": copy.deepcopy(self.log),
+                 "pending": self.pending, "finished": self.finished}
         return {"state": state, "sha256": _digest(state)}
 
     @classmethod
