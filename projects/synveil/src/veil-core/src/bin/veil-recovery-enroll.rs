@@ -132,6 +132,23 @@ fn main() -> ExitCode {
         RootCredentialState::Absent => return refused("no-credential"),
         RootCredentialState::Invalid => return refused("corrupt-credential"),
     }
+    // Settle a reset journal left by an interrupted reset before
+    // judging the factor state: completion turns the consumed
+    // factor's record into its tombstone, and an unsettleable
+    // journal refuses enrollment outright (fail closed).
+    match recovery::settle_pending_reset(recovery::now_unix()) {
+        Ok(recovery::ResetSettleOutcome::NoJournal) => {}
+        Ok(recovery::ResetSettleOutcome::Completed { factor_generation }) => {
+            let _ = audit(
+                "reset-journal-completed",
+                &format!("factor_generation={factor_generation}"),
+            );
+        }
+        Err(_) => {
+            let _ = audit("reset-journal-unresolved", "");
+            return refused("reset-incomplete");
+        }
+    }
     match recovery::recovery_factor_state() {
         RecoveryFactorState::Absent => {}
         RecoveryFactorState::NoState => return refused("no-state"),

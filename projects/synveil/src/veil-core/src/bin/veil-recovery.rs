@@ -39,6 +39,15 @@
 //! (bad check group) is rejected without consuming an attempt and
 //! without running the verifier.
 //!
+//! The replacement and the revocation are one crash-consistent
+//! transaction (see `recovery::execute_reset_transaction`): a
+//! durable journal entry naming the consumed factor generation is
+//! written before the credential changes, success is reported only
+//! when both writes are durable, and every entry into either mode
+//! of this program settles a journal left by an interrupted or
+//! partially failed reset before anything else proceeds. A journal
+//! that cannot be settled denies all factor use (fail closed).
+//!
 //! Input is never interpreted as shell text, never passed to a shell,
 //! and no other program is executed except /bin/stty with fixed
 //! arguments to switch console echo off while secrets are read.
@@ -160,6 +169,30 @@ fn kernel_cmdline_has(word: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// Settle a reset journal left by an interrupted or partially
+/// failed reset transaction, before any other operation in either
+/// mode of this program. Returns true when a journal exists but
+/// could not be settled: factor use is then denied (fail closed)
+/// and factor state is reported as reset-incomplete, while
+/// password-authenticated operations that do not touch the factor
+/// remain available.
+fn settle_reset_journal() -> bool {
+    match recovery::settle_pending_reset(recovery::now_unix()) {
+        Ok(recovery::ResetSettleOutcome::NoJournal) => false,
+        Ok(recovery::ResetSettleOutcome::Completed { factor_generation }) => {
+            let _ = recovery::append_audit(
+                "reset-journal-completed",
+                &format!("factor_generation={factor_generation}"),
+            );
+            false
+        }
+        Err(_) => {
+            let _ = recovery::append_audit("reset-journal-unresolved", "");
+            true
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if !args.is_empty() {
@@ -175,6 +208,9 @@ fn main() -> ExitCode {
 fn run_maint() -> ExitCode {
     out("SYNVEIL_RECOVERY_MAINT_V1");
     audit("session-start", "");
+    // An interrupted reset is completed before anything else; if
+    // it cannot be completed, factor operations stay denied.
+    let journal_blocked = settle_reset_journal();
 
     // Store-state denials happen before any prompt: there is nothing
     // a password could authenticate against.
@@ -242,9 +278,9 @@ fn run_maint() -> ExitCode {
                     continue;
                 };
                 match command {
-                    "status" => action_status(),
+                    "status" => action_status(journal_blocked),
                     "restore" => action_restore(),
-                    "rotate" => action_rotate(&mut reader),
+                    "rotate" => action_rotate(&mut reader, journal_blocked),
                     "reboot" => {
                         out("SYNVEIL_RECOVERY_MAINT_REBOOT");
                         audit("action", "name=reboot result=initiated");
@@ -280,7 +316,7 @@ fn run_maint() -> ExitCode {
 /// Bounded read-only status: the fixed state lines plus the A/B
 /// agent's own status value (control record contents are size-capped
 /// by the A/B schema: history is capped at 32 entries).
-fn action_status() {
+fn action_status(journal_blocked: bool) {
     out("SYNVEIL_RECOVERY_MAINT_STATUS_BEGIN");
     out("SYNVEIL_RECOVERY_STATE_MOUNTED");
     match ab::status() {
@@ -316,7 +352,16 @@ fn action_status() {
     }
     // Recovery-factor state, bounded exactly as specification
     // section 6 step 6 allows: enrollment state, generation and
-    // enrollment date only — never the factor or its record.
+    // enrollment date only — never the factor or its record. An
+    // unsettled reset journal is reported as what it is: the
+    // factor's state cannot be honestly summarized until the
+    // journal is resolved under normal authentication.
+    if journal_blocked {
+        out("SYNVEIL_RECOVERY_MAINT_FACTOR state=reset-incomplete");
+        out("SYNVEIL_RECOVERY_MAINT_STATUS_END");
+        audit("action", "name=status result=ok");
+        return;
+    }
     match recovery::recovery_factor_state() {
         RecoveryFactorState::Active {
             generation,
@@ -435,7 +480,15 @@ fn group_matches(line: &[u8], expected: &str) -> bool {
 /// check group and the designated middle group, then confirms
 /// explicitly — and only then is the new record committed, so an
 /// abandoned rotation leaves the previous factor in force.
-fn action_rotate(reader: &mut BufReader<io::Stdin>) {
+fn action_rotate(reader: &mut BufReader<io::Stdin>, journal_blocked: bool) {
+    if journal_blocked {
+        // Rotating over an unsettled reset journal would orphan
+        // it; the journal must be resolved first (entry settling
+        // retries on every boot of this program).
+        out("SYNVEIL_RECOVERY_ROTATE_REFUSED");
+        audit("factor-rotation-refused", "reason=reset-incomplete");
+        return;
+    }
     let (prior_generation, new_generation) = match recovery::recovery_factor_state() {
         RecoveryFactorState::Active { generation, .. }
         | RecoveryFactorState::Revoked { generation } => {
@@ -580,6 +633,14 @@ fn reset_denied(reason: &str, category: &str) -> ExitCode {
 fn run_reset() -> ExitCode {
     out("SYNVEIL_RECOVERY_RESET_V1");
     let _ = recovery::append_audit("reset-session-start", "");
+    // A journaled reset from an earlier boot is completed before
+    // any factor is accepted; one that cannot be completed denies
+    // this session outright. After a successful completion the
+    // record checks below see the consumed factor as revoked,
+    // which is the honest answer for its presenter.
+    if settle_reset_journal() {
+        return reset_denied("reset-incomplete", "journal-unresolved");
+    }
     let record = match recovery::recovery_factor_state() {
         RecoveryFactorState::NoState => return reset_denied("no-state", "no-state"),
         RecoveryFactorState::Absent => {
@@ -719,30 +780,53 @@ fn run_reset() -> ExitCode {
         out("SYNVEIL_RECOVERY_RESET_UNAVAILABLE");
         return ExitCode::FAILURE;
     }
-    if replace_root_credential(&password).is_err() {
-        secret::clear(&mut password);
-        out("SYNVEIL_RECOVERY_RESET_FAILED");
-        let _ = recovery::append_audit("reset-failed", "stage=password-replace");
-        return ExitCode::FAILURE;
-    }
+    // The crash-consistent reset transaction (journal, replacement,
+    // revocation — see veil_core::recovery). Decision D7: the used
+    // factor is revoked; re-enrollment happens in the new session
+    // under normal authentication. Success is reported only when
+    // the replacement AND the revocation are both durable.
+    let outcome = recovery::execute_reset_transaction(recovery::now_unix(), || {
+        replace_root_credential(&password)
+    });
     secret::clear(&mut password);
-    let _ = recovery::append_audit("password-replaced", "");
-    // Decision D7: the used factor is revoked; re-enrollment happens
-    // in the new session under normal authentication.
-    match recovery::revoke_factor(recovery::now_unix()) {
-        Ok(generation) => {
-            let _ = recovery::append_audit("factor-revoked", &format!("generation={generation}"));
+    match outcome {
+        Ok(recovery::ResetTransactionOutcome::Completed { revoked_generation }) => {
+            let _ = recovery::append_audit("password-replaced", "");
+            let _ = recovery::append_audit(
+                "factor-revoked",
+                &format!("generation={revoked_generation}"),
+            );
+            let _ = recovery::append_audit("reset-completed", "");
+            out("SYNVEIL_RECOVERY_RESET_OK");
+            out("SYNVEIL_RECOVERY_RESET_DONE");
+            ExitCode::SUCCESS
+        }
+        Ok(recovery::ResetTransactionOutcome::Aborted) => {
+            // The replacement failed atomically; nothing changed
+            // and the factor remains valid.
+            out("SYNVEIL_RECOVERY_RESET_FAILED");
+            let _ = recovery::append_audit("reset-failed", "stage=password-replace");
+            ExitCode::FAILURE
+        }
+        Ok(recovery::ResetTransactionOutcome::Incomplete) => {
+            // The password WAS replaced; the revocation could not
+            // be made durable in this session. The journal remains
+            // and keeps the used factor dead; the next entry into
+            // this program completes the revocation. This is a
+            // failure outcome, never a success.
+            let _ = recovery::append_audit("password-replaced", "");
+            let _ = recovery::append_audit("reset-incomplete", "stage=revocation");
+            out("SYNVEIL_RECOVERY_RESET_INCOMPLETE");
+            ExitCode::FAILURE
         }
         Err(_) => {
-            let _ = recovery::append_audit("factor-revoke-failed", "");
-            out("SYNVEIL_RECOVERY_RESET_OK_REVOKE_FAILED");
-            return ExitCode::SUCCESS;
+            // The transaction could not even be journaled (or its
+            // preconditions no longer hold): nothing was mutated.
+            out("SYNVEIL_RECOVERY_RESET_UNAVAILABLE");
+            let _ = recovery::append_audit("reset-failed", "stage=journal");
+            ExitCode::FAILURE
         }
     }
-    let _ = recovery::append_audit("reset-completed", "");
-    out("SYNVEIL_RECOVERY_RESET_OK");
-    out("SYNVEIL_RECOVERY_RESET_DONE");
-    ExitCode::SUCCESS
 }
 
 fn verify_restore_postcondition(result: &serde_json::Value) -> bool {

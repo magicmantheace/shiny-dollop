@@ -527,9 +527,22 @@ pub fn anchor_state() -> AnchorState {
     anchor_state_at(Path::new(STATE_BASE), 0)
 }
 
-/// The strictly validated active record, for the reset flow.
+/// The strictly validated active record, for the reset flow. A
+/// record named by a pending reset journal is consumed (decision
+/// D7) and never loads as verifiable — see the reset journal
+/// section below — so any journal at all, pending or too corrupt
+/// to interpret, blocks verification until entry settling resolves
+/// it.
 pub fn load_active_record() -> Option<RecoveryRecord> {
-    match load_record_at(Path::new(STATE_BASE), 0) {
+    load_active_record_at(Path::new(STATE_BASE), 0)
+}
+
+fn load_active_record_at(base: &Path, uid: u32) -> Option<RecoveryRecord> {
+    match load_journal_at(base, uid) {
+        Loaded::Absent => {}
+        _ => return None,
+    }
+    match load_record_at(base, uid) {
         Loaded::Value(record) if !record.revoked => Some(record),
         _ => None,
     }
@@ -596,6 +609,14 @@ fn commit_factor_at(
     let auth = base.join("auth");
     if !private_directory(&auth, uid) {
         return Err(unsafe_path());
+    }
+    // An unsettled reset journal means a consumed factor's
+    // revocation is not yet durable; committing a new factor over
+    // that state would orphan the journal. Enrollment and rotation
+    // entry points settle the journal before reaching this point.
+    match load_journal_at(base, uid) {
+        Loaded::Absent => {}
+        _ => return Err(unsafe_path()),
     }
     // A corrupt existing record is never silently overwritten: the
     // flows refuse and a normally authenticated owner resolves it.
@@ -687,8 +708,11 @@ pub fn record_failed_attempt(now: u64) -> io::Result<u32> {
 /// the tombstone keeps the generation counter so a later
 /// re-enrollment continues it). Returns the tombstone generation.
 pub fn revoke_factor(now: u64) -> io::Result<u64> {
-    let base = Path::new(STATE_BASE);
-    let Loaded::Value(mut record) = load_record_at(base, 0) else {
+    revoke_factor_at(Path::new(STATE_BASE), 0, now)
+}
+
+fn revoke_factor_at(base: &Path, uid: u32, now: u64) -> io::Result<u64> {
+    let Loaded::Value(mut record) = load_record_at(base, uid) else {
         return Err(unsafe_path());
     };
     if record.revoked {
@@ -700,8 +724,347 @@ pub fn revoke_factor(now: u64) -> io::Result<u64> {
     record.generation = record.generation.checked_add(1).ok_or_else(unsafe_path)?;
     record.updated_unix = now;
     let generation = record.generation;
-    rewrite_record_at(base, 0, &record)?;
+    rewrite_record_at(base, uid, &record)?;
     Ok(generation)
+}
+
+// ---------------------------------------------------------------------
+// Reset journal: the crash-consistent reset transaction
+// ---------------------------------------------------------------------
+//
+// Decision D7 makes a used factor single-use, but the reset itself
+// is two durable writes — replace the credential record, then
+// revoke the factor record — and no ordering of two writes is
+// atomic. The journal closes the gap:
+//
+//   1. Before any mutation, the reset flow durably writes a
+//      journal entry naming the factor generation it is about to
+//      consume (write_record_atomically: temp file, fsync, rename,
+//      directory fsync — the credential store's own discipline).
+//   2. From the moment the journal is durable, the named factor is
+//      consumed: load_active_record_at refuses to hand it out as
+//      verifiable while any journal exists, so enforcement never
+//      depends on the revocation write having landed.
+//   3. The credential replacement runs (atomic on its own). A live
+//      error return aborts the transaction exactly: the journal is
+//      cleared and the factor remains valid, because the caller
+//      knows the replacement did not happen.
+//   4. The revocation runs. If it fails, one completion attempt is
+//      made through the settling path; if that also fails the
+//      outcome is Incomplete — never success — and the journal
+//      remains as the enforcement.
+//   5. On every later entry into a recovery environment the
+//      journal is settled before anything else: the revocation is
+//      made durable and the journal cleared. A journal that
+//      disagrees with the record, or cannot be interpreted, is
+//      never cleared and never ignored: settling fails and factor
+//      use stays denied (fail closed).
+//
+// Interruption semantics, stated once and tested: after the
+// journal write, a crash leaves the factor consumed in every case.
+// If the credential replacement had not landed, the old password
+// remains in effect; if it had, the new password is in effect.
+// Settling at the next entry makes the revocation durable either
+// way. The journal holds no secret material.
+
+pub const RESET_JOURNAL_PATH: &str = "/var/lib/synveil/auth/reset-journal.json";
+
+const JOURNAL_SCHEMA: &str = "synveil.reset-journal/v1";
+const JOURNAL_NAME: &str = "reset-journal.json";
+const MAX_JOURNAL_BYTES: usize = 512;
+
+/// A durable reset-in-progress journal entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResetJournal {
+    /// The recovery-record generation this transaction consumes.
+    pub factor_generation: u64,
+    pub installation_id: [u8; FACTOR_BYTES],
+    pub begun_unix: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResetJournalState {
+    /// No journal entry exists.
+    Absent,
+    /// Something exists at the journal path but strict loading
+    /// rejected it. Treated exactly as an unresolved journal:
+    /// factor use is denied until it is resolved under normal
+    /// authentication.
+    Invalid,
+    /// A journaled reset transaction is incomplete.
+    Pending(ResetJournal),
+}
+
+/// Outcome of settling a pending reset journal at entry into a
+/// recovery environment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResetSettleOutcome {
+    /// No journal was present.
+    NoJournal,
+    /// The journaled revocation is now durable (or the record it
+    /// named no longer exists) and the journal is cleared.
+    Completed { factor_generation: u64 },
+}
+
+/// Outcome of the reset transaction itself. Success is reported to
+/// the caller only as `Completed`, which requires both the
+/// credential replacement and the factor revocation to be durable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResetTransactionOutcome {
+    /// Credential replaced, factor revocation durable.
+    Completed { revoked_generation: u64 },
+    /// The credential replacement failed before anything changed;
+    /// the journal was cleared and the factor remains valid.
+    Aborted,
+    /// The credential was replaced but the revocation could not be
+    /// made durable in this session. The journal remains and keeps
+    /// the used factor dead; the next recovery-environment entry
+    /// completes the revocation before proceeding.
+    Incomplete,
+}
+
+fn parse_journal(bytes: &[u8]) -> Option<ResetJournal> {
+    let value: serde_json::Value = serde_json::from_slice(bytes).ok()?;
+    if !exact_keys(
+        &value,
+        &[
+            "schema",
+            "factor_generation",
+            "installation_id",
+            "begun_unix",
+        ],
+    ) {
+        return None;
+    }
+    if value.get("schema")?.as_str()? != JOURNAL_SCHEMA {
+        return None;
+    }
+    let factor_generation = value.get("factor_generation")?.as_u64()?;
+    if factor_generation == 0 {
+        return None;
+    }
+    let installation_id = hex_decode_32(value.get("installation_id")?.as_str()?)?;
+    let begun_unix = value.get("begun_unix")?.as_u64()?;
+    Some(ResetJournal {
+        factor_generation,
+        installation_id,
+        begun_unix,
+    })
+}
+
+fn journal_json(journal: &ResetJournal) -> String {
+    format!(
+        "{{\"schema\":\"{JOURNAL_SCHEMA}\",\"factor_generation\":{},\
+         \"installation_id\":\"{}\",\"begun_unix\":{}}}\n",
+        journal.factor_generation,
+        hex_encode(&journal.installation_id),
+        journal.begun_unix,
+    )
+}
+
+fn load_journal_at(base: &Path, uid: u32) -> Loaded<ResetJournal> {
+    let path = base.join("auth").join(JOURNAL_NAME);
+    match read_strict_file(&path, uid, MAX_JOURNAL_BYTES, true) {
+        Some(bytes) => match parse_journal(&bytes) {
+            Some(journal) => Loaded::Value(journal),
+            None => Loaded::Invalid,
+        },
+        None => {
+            if fs::symlink_metadata(&path).is_ok() {
+                Loaded::Invalid
+            } else {
+                Loaded::Absent
+            }
+        }
+    }
+}
+
+fn reset_journal_state_at(base: &Path, uid: u32) -> ResetJournalState {
+    match load_journal_at(base, uid) {
+        Loaded::Value(journal) => ResetJournalState::Pending(journal),
+        Loaded::Invalid => ResetJournalState::Invalid,
+        Loaded::Absent => ResetJournalState::Absent,
+    }
+}
+
+/// Coarse reset-journal state for status surfaces: whether a
+/// journaled reset transaction is still incomplete.
+pub fn reset_journal_state() -> ResetJournalState {
+    if !has_persistent_state() {
+        return ResetJournalState::Absent;
+    }
+    reset_journal_state_at(Path::new(STATE_BASE), 0)
+}
+
+fn begin_reset_journal_at(base: &Path, uid: u32, journal: &ResetJournal) -> io::Result<()> {
+    let auth = base.join("auth");
+    if !private_directory(base, uid) || !private_directory(&auth, uid) {
+        return Err(unsafe_path());
+    }
+    // One transaction at a time: any existing journal name — file,
+    // symlink, anything — is a refusal, like the anchor's
+    // write-once discipline. Entry settling resolves a leftover
+    // journal before a new transaction may begin.
+    if fs::symlink_metadata(auth.join(JOURNAL_NAME)).is_ok() {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "reset journal already present",
+        ));
+    }
+    write_record_atomically(
+        &auth,
+        &auth.join(JOURNAL_NAME),
+        journal_json(journal).as_bytes(),
+    )
+}
+
+fn clear_reset_journal_at(base: &Path, uid: u32) -> io::Result<()> {
+    let auth = base.join("auth");
+    if !private_directory(base, uid) || !private_directory(&auth, uid) {
+        return Err(unsafe_path());
+    }
+    match fs::remove_file(auth.join(JOURNAL_NAME)) {
+        Ok(()) => fs::File::open(&auth)?.sync_all(),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
+/// Complete a journaled reset transaction: make the revocation of
+/// the journal's factor generation durable, then clear the
+/// journal. The journal is cleared only when the post-state is
+/// provably the one the transaction intended — the named record
+/// revoked at the next generation, or no record at all. Every
+/// other shape (corrupt journal, corrupt record, disagreement
+/// between journal and record) is an error and leaves the journal
+/// in place, so factor use stays denied.
+fn complete_pending_reset_at(base: &Path, uid: u32, now: u64) -> io::Result<ResetSettleOutcome> {
+    let journal = match load_journal_at(base, uid) {
+        Loaded::Absent => return Ok(ResetSettleOutcome::NoJournal),
+        Loaded::Invalid => return Err(unsafe_path()),
+        Loaded::Value(journal) => journal,
+    };
+    let completed = ResetSettleOutcome::Completed {
+        factor_generation: journal.factor_generation,
+    };
+    match load_record_at(base, uid) {
+        // The record the journal named is gone entirely: no factor
+        // remains to protect, so the journal is debris.
+        Loaded::Absent => {
+            clear_reset_journal_at(base, uid)?;
+            Ok(completed)
+        }
+        Loaded::Invalid => Err(unsafe_path()),
+        Loaded::Value(record) => {
+            if record.installation_id != journal.installation_id {
+                return Err(unsafe_path());
+            }
+            if !record.revoked && record.generation == journal.factor_generation {
+                revoke_factor_at(base, uid, now)?;
+                clear_reset_journal_at(base, uid)?;
+                Ok(completed)
+            } else if record.revoked
+                && journal.factor_generation.checked_add(1) == Some(record.generation)
+            {
+                // The revocation landed before the interruption;
+                // only the journal cleanup was lost.
+                clear_reset_journal_at(base, uid)?;
+                Ok(completed)
+            } else {
+                Err(unsafe_path())
+            }
+        }
+    }
+}
+
+/// Settle any pending reset journal. Recovery environments call
+/// this before any other factor operation; an error means factor
+/// use must be denied (fail closed).
+pub fn settle_pending_reset(now: u64) -> io::Result<ResetSettleOutcome> {
+    if !has_persistent_state() {
+        return Ok(ResetSettleOutcome::NoJournal);
+    }
+    complete_pending_reset_at(Path::new(STATE_BASE), 0, now)
+}
+
+fn execute_reset_transaction_at(
+    base: &Path,
+    uid: u32,
+    now: u64,
+    replace_password: impl FnOnce() -> io::Result<()>,
+) -> io::Result<ResetTransactionOutcome> {
+    let record = match load_record_at(base, uid) {
+        Loaded::Value(record) if !record.revoked => record,
+        _ => return Err(unsafe_path()),
+    };
+    match load_journal_at(base, uid) {
+        Loaded::Absent => {}
+        _ => return Err(unsafe_path()),
+    }
+    // Journal BEFORE mutation: from the moment this write is
+    // durable, the factor is consumed (decision D7), whatever
+    // happens next — revocation failure, power loss, anything.
+    begin_reset_journal_at(
+        base,
+        uid,
+        &ResetJournal {
+            factor_generation: record.generation,
+            installation_id: record.installation_id,
+            begun_unix: now,
+        },
+    )?;
+    if replace_password().is_err() {
+        // The replacement is atomic and reported its own failure,
+        // so nothing changed: abort exactly and leave the factor
+        // valid. If even the abort cannot be written, the journal
+        // stays and the transaction fails safe as Incomplete.
+        return Ok(match clear_reset_journal_at(base, uid) {
+            Ok(()) => ResetTransactionOutcome::Aborted,
+            Err(_) => ResetTransactionOutcome::Incomplete,
+        });
+    }
+    match revoke_factor_at(base, uid, now) {
+        Ok(revoked_generation) => {
+            // Both security-relevant writes are durable. A journal
+            // cleanup failure here leaves the cleanup to entry
+            // settling, which recognizes the landed revocation.
+            let _ = clear_reset_journal_at(base, uid);
+            Ok(ResetTransactionOutcome::Completed { revoked_generation })
+        }
+        Err(_) => {
+            // One completion attempt through the settling path. If
+            // storage refuses again, the journal remains as the
+            // enforcement and the outcome is Incomplete — never
+            // success.
+            match complete_pending_reset_at(base, uid, now) {
+                Ok(ResetSettleOutcome::Completed { .. }) => match load_record_at(base, uid) {
+                    Loaded::Value(record) => Ok(ResetTransactionOutcome::Completed {
+                        revoked_generation: record.generation,
+                    }),
+                    _ => Ok(ResetTransactionOutcome::Incomplete),
+                },
+                _ => Ok(ResetTransactionOutcome::Incomplete),
+            }
+        }
+    }
+}
+
+/// Run the crash-consistent reset transaction against the live
+/// state: journal, credential replacement (the caller's closure —
+/// in production `credential::replace_root_credential`), factor
+/// revocation. The caller reports success only on
+/// `ResetTransactionOutcome::Completed`.
+pub fn execute_reset_transaction(
+    now: u64,
+    replace_password: impl FnOnce() -> io::Result<()>,
+) -> io::Result<ResetTransactionOutcome> {
+    if !has_persistent_state() {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "persistent state unavailable",
+        ));
+    }
+    execute_reset_transaction_at(Path::new(STATE_BASE), 0, now, replace_password)
 }
 
 // ---------------------------------------------------------------------
@@ -1034,6 +1397,305 @@ mod tests {
         fs::write(&anchor_path, b"{}").unwrap();
         fs::set_permissions(&anchor_path, fs::Permissions::from_mode(0o600)).unwrap();
         assert_eq!(anchor_state_at(&base, uid), AnchorState::Invalid);
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    fn enrolled_base() -> (PathBuf, u32, [u8; FACTOR_BYTES], [u8; FACTOR_BYTES]) {
+        let (base, uid) = private_base();
+        let id = [7u8; FACTOR_BYTES];
+        let key = fixture_key();
+        write_anchor_at(&base, uid, &id, 100).unwrap();
+        commit_factor_at(&base, uid, &key, &id, 1, 100).unwrap();
+        (base, uid, id, key)
+    }
+
+    #[test]
+    fn reset_journal_roundtrip_and_strictness() {
+        let (base, uid, id, _key) = enrolled_base();
+        let journal = ResetJournal {
+            factor_generation: 1,
+            installation_id: id,
+            begun_unix: 500,
+        };
+        assert_eq!(
+            reset_journal_state_at(&base, uid),
+            ResetJournalState::Absent
+        );
+        begin_reset_journal_at(&base, uid, &journal).unwrap();
+        assert_eq!(
+            reset_journal_state_at(&base, uid),
+            ResetJournalState::Pending(journal)
+        );
+        // A second begin while one is pending is refused.
+        assert_eq!(
+            begin_reset_journal_at(&base, uid, &journal)
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::AlreadyExists
+        );
+        clear_reset_journal_at(&base, uid).unwrap();
+        assert_eq!(
+            reset_journal_state_at(&base, uid),
+            ResetJournalState::Absent
+        );
+        // Clearing an absent journal is not an error.
+        clear_reset_journal_at(&base, uid).unwrap();
+        // Garbage at the journal path is Invalid, never ignored,
+        // and settling refuses to clear it.
+        let journal_path = base.join("auth").join(JOURNAL_NAME);
+        fs::write(&journal_path, b"{\"schema\":\"synveil.reset-journal/v1\"}").unwrap();
+        fs::set_permissions(&journal_path, fs::Permissions::from_mode(0o600)).unwrap();
+        assert_eq!(
+            reset_journal_state_at(&base, uid),
+            ResetJournalState::Invalid
+        );
+        assert!(complete_pending_reset_at(&base, uid, 600).is_err());
+        assert_eq!(
+            reset_journal_state_at(&base, uid),
+            ResetJournalState::Invalid
+        );
+        // A symlinked journal is Invalid too, never followed.
+        fs::remove_file(&journal_path).unwrap();
+        std::os::unix::fs::symlink("/nonexistent", &journal_path).unwrap();
+        assert_eq!(
+            reset_journal_state_at(&base, uid),
+            ResetJournalState::Invalid
+        );
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn reset_transaction_completes_with_durable_revocation() {
+        let (base, uid, id, key) = enrolled_base();
+        let base_for_closure = base.clone();
+        let outcome = execute_reset_transaction_at(&base, uid, 500, move || {
+            // Journal-before-mutation, observed from inside the
+            // replacement step: the journal naming generation 1
+            // must already be durable here.
+            match load_journal_at(&base_for_closure, uid) {
+                Loaded::Value(journal) => {
+                    assert_eq!(journal.factor_generation, 1);
+                    assert_eq!(journal.installation_id, id);
+                    Ok(())
+                }
+                _ => panic!("journal not durable before credential replacement"),
+            }
+        })
+        .unwrap();
+        assert_eq!(
+            outcome,
+            ResetTransactionOutcome::Completed {
+                revoked_generation: 2
+            }
+        );
+        assert_eq!(
+            reset_journal_state_at(&base, uid),
+            ResetJournalState::Absent
+        );
+        assert_eq!(
+            factor_state_at(&base, uid),
+            RecoveryFactorState::Revoked { generation: 2 }
+        );
+        let Loaded::Value(tombstone) = load_record_at(&base, uid) else {
+            panic!("tombstone did not load");
+        };
+        assert!(!verify_factor(&key, &tombstone, &id));
+        assert!(load_active_record_at(&base, uid).is_none());
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn reset_transaction_aborts_when_replacement_fails() {
+        let (base, uid, id, key) = enrolled_base();
+        let outcome = execute_reset_transaction_at(&base, uid, 500, || {
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                "injected replace failure",
+            ))
+        })
+        .unwrap();
+        assert_eq!(outcome, ResetTransactionOutcome::Aborted);
+        // Nothing changed: journal cleared, factor still verifies.
+        assert_eq!(
+            reset_journal_state_at(&base, uid),
+            ResetJournalState::Absent
+        );
+        assert_eq!(
+            factor_state_at(&base, uid),
+            RecoveryFactorState::Active {
+                generation: 1,
+                enrolled_unix: 100,
+                failed_attempts: 0
+            }
+        );
+        let record = load_active_record_at(&base, uid).expect("record must stay active");
+        assert!(verify_factor(&key, &record, &id));
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn revocation_failure_is_incomplete_and_journal_keeps_factor_dead() {
+        // The external-review fault scenario: the credential
+        // replacement succeeds, then every revocation write fails.
+        // The outcome must not be success, and the used factor must
+        // not verify afterwards — enforcement comes from the
+        // journal, not from the failed revocation write.
+        let (base, uid, id, key) = enrolled_base();
+        let auth = base.join("auth");
+        let auth_for_closure = auth.clone();
+        let outcome = execute_reset_transaction_at(&base, uid, 500, move || {
+            // Storage fails from here on: record rewrites cannot
+            // create their temp file in a non-writable directory.
+            fs::set_permissions(&auth_for_closure, fs::Permissions::from_mode(0o500)).unwrap();
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(outcome, ResetTransactionOutcome::Incomplete);
+        // The journal survived: while storage is broken it does
+        // not even load (the strict directory discipline rejects
+        // the faulted directory), but it is never Absent — and
+        // while any journal exists, the record does not load as
+        // verifiable, so the factor cannot be used again.
+        assert_ne!(
+            reset_journal_state_at(&base, uid),
+            ResetJournalState::Absent
+        );
+        assert!(load_active_record_at(&base, uid).is_none());
+        // Storage recovers; the journal names the consumed
+        // generation, and the next entry settles the transaction.
+        fs::set_permissions(&auth, fs::Permissions::from_mode(0o700)).unwrap();
+        assert_eq!(
+            reset_journal_state_at(&base, uid),
+            ResetJournalState::Pending(ResetJournal {
+                factor_generation: 1,
+                installation_id: id,
+                begun_unix: 500,
+            })
+        );
+        assert_eq!(
+            complete_pending_reset_at(&base, uid, 600).unwrap(),
+            ResetSettleOutcome::Completed {
+                factor_generation: 1
+            }
+        );
+        assert_eq!(
+            reset_journal_state_at(&base, uid),
+            ResetJournalState::Absent
+        );
+        assert_eq!(
+            factor_state_at(&base, uid),
+            RecoveryFactorState::Revoked { generation: 2 }
+        );
+        let Loaded::Value(tombstone) = load_record_at(&base, uid) else {
+            panic!("tombstone did not load");
+        };
+        assert!(!verify_factor(&key, &tombstone, &id));
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn interrupted_reset_completes_at_next_settling() {
+        // Interruption after the journal write: neither the
+        // credential replacement nor the revocation landed (the
+        // journal state is identical whichever of the two writes
+        // the interruption preceded; the credential side is
+        // covered by the guest cases). Settling revokes the
+        // consumed factor and clears the journal.
+        let (base, uid, id, key) = enrolled_base();
+        begin_reset_journal_at(
+            &base,
+            uid,
+            &ResetJournal {
+                factor_generation: 1,
+                installation_id: id,
+                begun_unix: 500,
+            },
+        )
+        .unwrap();
+        assert!(load_active_record_at(&base, uid).is_none());
+        assert_eq!(
+            complete_pending_reset_at(&base, uid, 600).unwrap(),
+            ResetSettleOutcome::Completed {
+                factor_generation: 1
+            }
+        );
+        assert_eq!(
+            reset_journal_state_at(&base, uid),
+            ResetJournalState::Absent
+        );
+        let Loaded::Value(tombstone) = load_record_at(&base, uid) else {
+            panic!("tombstone did not load");
+        };
+        assert!(!verify_factor(&key, &tombstone, &id));
+        // Settling with nothing pending is a no-op.
+        assert_eq!(
+            complete_pending_reset_at(&base, uid, 700).unwrap(),
+            ResetSettleOutcome::NoJournal
+        );
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn landed_revocation_with_lost_cleanup_settles() {
+        // Interruption after the revocation write but before the
+        // journal cleanup: settling recognizes the tombstone at
+        // journal generation + 1 and only clears the journal.
+        let (base, uid, id, _key) = enrolled_base();
+        begin_reset_journal_at(
+            &base,
+            uid,
+            &ResetJournal {
+                factor_generation: 1,
+                installation_id: id,
+                begun_unix: 500,
+            },
+        )
+        .unwrap();
+        assert_eq!(revoke_factor_at(&base, uid, 550).unwrap(), 2);
+        assert_eq!(
+            complete_pending_reset_at(&base, uid, 600).unwrap(),
+            ResetSettleOutcome::Completed {
+                factor_generation: 1
+            }
+        );
+        assert_eq!(
+            reset_journal_state_at(&base, uid),
+            ResetJournalState::Absent
+        );
+        assert_eq!(
+            factor_state_at(&base, uid),
+            RecoveryFactorState::Revoked { generation: 2 }
+        );
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn journal_disagreement_fails_closed() {
+        // A journal naming another installation, or a generation
+        // the record does not have, is never cleared and never
+        // ignored: settling errors and verification stays blocked.
+        let (base, uid, _id, _key) = enrolled_base();
+        begin_reset_journal_at(
+            &base,
+            uid,
+            &ResetJournal {
+                factor_generation: 1,
+                installation_id: [9u8; FACTOR_BYTES],
+                begun_unix: 500,
+            },
+        )
+        .unwrap();
+        assert!(complete_pending_reset_at(&base, uid, 600).is_err());
+        assert!(matches!(
+            reset_journal_state_at(&base, uid),
+            ResetJournalState::Pending(_)
+        ));
+        assert!(load_active_record_at(&base, uid).is_none());
+        // Committing a new factor over the unsettled journal is
+        // refused as well.
+        assert!(
+            commit_factor_at(&base, uid, &fixture_key(), &[7u8; FACTOR_BYTES], 2, 600).is_err()
+        );
         fs::remove_dir_all(base).unwrap();
     }
 }
