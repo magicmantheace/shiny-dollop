@@ -1,10 +1,31 @@
 # Physical UEFI boot bring-up
 
-**Status (2026-10-27): Ready for the owner's first boot test of the
+**Status (2026-10-28): Ready for the owner's first boot test of the
 full-stack test-media package — not an install, not yet physically
 validated.**
 
-**Recovery-inclusive refresh (2026-10-27):** the package was
+**Reset-fix refresh (2026-10-28):** the package was rebuilt again
+from source `db32105`, the head containing the ADR 0021
+crash-consistent tier-4 reset transaction. The image (SHA-256
+`27603d90bc09d685819ca3a369745cb21751c094e712ae3cfdb69f8665da5696`,
+4,169,138,176 bytes) carries the same full stack and recovery
+path as the refresh below, with the fixed reset code: the
+packaged `veil-recovery` binary was verified to carry the ADR
+0021 transaction (journal-before-mutation; the defective success
+marker no longer exists) before packaging, and the full
+acceptance was re-proven on this image in QEMU: joined
+framebuffer and emulated-USB sequences pass with the
+destroyed-STATE leg failing closed on both variants; the
+maintenance and reset ESP entries digest-match the build receipt
+and the maintenance entry was booted from the packaged ESP to its
+locked no-credential denial; the browser/downloads acceptance
+passed at this head on its QEMU-profile proof disk. Record:
+[test-media reset-fix record](validation/test-media-resetfix-2026-10-28/README.md).
+The superseded `5fd76c0` package below contains the defective
+reset code and must not be written for a boot test any more.
+
+**Recovery-inclusive refresh (2026-10-27, superseded by the
+reset-fix rebuild above):** the package was
 rebuilt again from source `5fd76c0`, the head containing ADR
 0010 gates A–C and the tier-4 recovery factor (ADR 0020). The
 image (SHA-256
@@ -220,13 +241,19 @@ a claim of boot success on the physical machine.
       demonstrated in QEMU at `06e5a7b`
       ([tier-4 record](validation/recovery-factor-2026-10-27/README.md)).
       **Update (2026-10-27, recovery-inclusive rebuild):** the
-      current test-media package (source `5fd76c0`, image
+      test-media package (source `5fd76c0`, image
       `83fc83a5…`) contains the recovery path; its maintenance
       entry was exercised on the packaged image itself up to the
       no-credential denial, and the authenticated session and
       reset flows stand on the QEMU-profile acceptance of the
       same source
       ([record](validation/test-media-recovery-2026-10-27/README.md)).
+      **Update (2026-10-28, reset-fix rebuild):** the current
+      test-media package is now built from `db32105` (image
+      `27603d90…`) and carries the ADR 0021 crash-consistent
+      reset transaction; the `5fd76c0` package, whose reset code
+      was defective, is superseded
+      ([record](validation/test-media-resetfix-2026-10-28/README.md)).
       The gate stays open for installed systems: physical
       validation and the A/B installation milestone are still
       ahead.

@@ -111,7 +111,18 @@ source (ADR 0021) and re-evidenced in QEMU at `5e9e240`
 but the shipped package still contains the defective code until a
 rebuild or A/B update delivers the fix; the packaged-image boot
 test does not exercise the reset flow, so the boot test itself is
-unaffected.
+unaffected. **That rebuild has since landed (2026-10-28):** the
+current test-media package is built from `db32105` and ships the
+ADR 0021 fixed reset transaction — the packaged `veil-recovery`
+binary verified to carry the journal-before-mutation transaction,
+the maintenance/reset ESP entries digest-verified from the
+packaged image, and the joined + browser acceptances re-proven at
+this head
+([test-media reset-fix record](validation/test-media-resetfix-2026-10-28/README.md)).
+The install blockers above are unchanged: no recovery evidence
+exists on physical hardware, the A/B installation milestone is
+still ahead, and the packaged-image boot test remains a boot
+test, not an install.
 
 ## Native authenticated Files browser (development)
 

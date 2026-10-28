@@ -142,6 +142,16 @@ Guest (QEMU, this pass, at evidence commit `5e9e240`):
   reaches installed systems only through a future A/B update or a package
   rebuild; first install remains blocked on TG01 physical validation, the
   A/B installation milestone, and owner authorization in any case.
+  **Addendum (2026-10-28): the package rebuild has landed.** The current
+  test-media package is built from `db32105` (image SHA-256
+  `27603d90bc09d685819ca3a369745cb21751c094e712ae3cfdb69f8665da5696`) and
+  ships this fix — the packaged binary verified to carry the ADR 0021
+  transaction before packaging, ESP entries digest-verified from the
+  packaged image, acceptances re-proven at that head
+  (`docs/validation/test-media-resetfix-2026-10-28/`). The fix is
+  therefore no longer source-only for test media; it reaches *installed*
+  systems only through a future A/B update, and the first-install
+  blockers above are unchanged.
 - The development publisher key caveat is unchanged.
 - The tier-4 record's stated boundary is unchanged: a post-reset login was
   proven at session level; a graphical desktop login with a reset

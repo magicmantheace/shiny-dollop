@@ -19,13 +19,13 @@ test establishes, one way or the other.
 Image identity (verify before writing, and again if anything looks
 off): `synveil-test-media` package, image `synveil-x86_64.img`,
 SHA-256
-`83fc83a562d2224007b279e8aa63c22b8c2e6a9f5b08bd61db3b390649d2bebd`,
+`27603d90bc09d685819ca3a369745cb21751c094e712ae3cfdb69f8665da5696`,
 4,169,138,176 bytes (≈3.88 GiB — use an 8 GB or larger stick/drive),
-source commit `5fd76c0aca406b64ef8a37a35f1ba683172363ec`.
+source commit `db32105b05d24ecaf6d08cf11e796f2892a1b67a`.
 The package also carries `synveil-release-v2.img` (SHA-256
-`ad126ad87ec638478255b5b106c7c604f4350259634cd1e1d352a756bd170682`),
+`d58961fb43d9fa6bf04fb94db169beb4e2e6967b43204fcf578a8bd5d31593c7`),
 the signed v2 update used by the update test below. Validation
-evidence: [test-media record](validation/test-media-recovery-2026-10-27/README.md).
+evidence: [test-media record](validation/test-media-resetfix-2026-10-28/README.md).
 
 **Publisher key:** updates are verified against the Synveil
 **development** publisher key `synveil-dev-2026-01`. It is a flagged
@@ -83,7 +83,7 @@ Linux alternative: `write-test-media.sh` in the package does the
 same write with the digest pin, whole-removable-USB-only,
 backing-traced mount/swap refusal, exact-name confirmation and
 read-back verification enforced by the script:
-`sudo bash write-test-media.sh --image synveil-x86_64.img --device /dev/sdX --expected-sha256 83fc83a562d2224007b279e8aa63c22b8c2e6a9f5b08bd61db3b390649d2bebd`
+`sudo bash write-test-media.sh --image synveil-x86_64.img --device /dev/sdX --expected-sha256 27603d90bc09d685819ca3a369745cb21751c094e712ae3cfdb69f8665da5696`
 (Replace `/dev/sdX` with the drive's whole-disk device; repeat with
 the release image and its digest for the second stick.)
 
@@ -210,7 +210,13 @@ note which.
   reset entry works only if a recovery key was enrolled (the
   printed key offered as a separate, explicit step of setup —
   declining it leaves the state honestly recorded as
-  unrecoverable). There is no recovery *shell*: the maintenance
+  unrecoverable). The reset in this image is the ADR 0021
+  crash-consistent transaction: the key being consumed is
+  journaled before the password changes, so a used key cannot
+  survive a reset whose revocation step fails or is interrupted,
+  and an incomplete reset is settled (or fails closed) at the
+  next recovery entry rather than reporting success. There is
+  no recovery *shell*: the maintenance
   entry authenticates against the credential store and offers
   only enumerated operations, and with no credential enrolled
   it refuses access outright (exactly what the QEMU validation
