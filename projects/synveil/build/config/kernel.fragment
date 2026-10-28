@@ -1,0 +1,71 @@
+# Synveil Phase 1 QEMU/UEFI bootstrap kernel fragment
+
+CONFIG_64BIT=y
+CONFIG_LOCALVERSION="-synveil"
+# CONFIG_LOCALVERSION_AUTO is not set
+CONFIG_EFI=y
+CONFIG_EFI_STUB=y
+CONFIG_BLK_DEV_INITRD=y
+
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+CONFIG_PROC_FS=y
+CONFIG_PROC_CHILDREN=y
+CONFIG_SYSFS=y
+CONFIG_TMPFS=y
+
+CONFIG_UNIX=y
+CONFIG_NET=y
+CONFIG_INET=y
+
+CONFIG_VIRTIO=y
+CONFIG_VIRTIO_PCI=y
+CONFIG_VIRTIO_BLK=y
+CONFIG_EXT4_FS=y
+CONFIG_VIRTIO_NET=y
+
+# Minimal QEMU graphics and input foundation for the first desktop target.
+CONFIG_DRM=y
+CONFIG_DRM_VIRTIO_GPU=y
+CONFIG_DRM_VIRTIO_GPU_KMS=y
+CONFIG_DRM_FBDEV_EMULATION=y
+CONFIG_DRM_CLIENT_DEFAULT_FBDEV=y
+# Linux 6.18 separates fbdev emulation from the actual /dev/fb* nodes.
+CONFIG_FB_DEVICE=y
+CONFIG_VT=y
+CONFIG_VT_CONSOLE=y
+CONFIG_FRAMEBUFFER_CONSOLE=y
+CONFIG_INPUT_EVDEV=y
+CONFIG_USB=y
+CONFIG_USB_XHCI_HCD=y
+CONFIG_USB_XHCI_PCI=y
+CONFIG_HID_GENERIC=y
+CONFIG_USB_HID=y
+CONFIG_VIRTIO_CONSOLE=y
+
+CONFIG_SERIAL_8250=y
+CONFIG_SERIAL_8250_CONSOLE=y
+
+CONFIG_CGROUPS=y
+CONFIG_NAMESPACES=y
+CONFIG_UTS_NS=y
+CONFIG_IPC_NS=y
+CONFIG_USER_NS=y
+CONFIG_PID_NS=y
+CONFIG_NET_NS=y
+CONFIG_PSI=y
+CONFIG_SECCOMP=y
+CONFIG_SECCOMP_FILTER=y
+CONFIG_BPF_SYSCALL=y
+
+CONFIG_CMDLINE_BOOL=y
+CONFIG_CMDLINE_OVERRIDE=y
+
+# A/B updater chain loading (docs/AB_UPDATER.md): the init hook of
+# whichever generation the firmware loads chain-loads the desired
+# slot's image with kexec_file_load. No firmware variables are
+# written by the updater, so boot selection needs this syscall.
+CONFIG_KEXEC_FILE=y
+
+# Keep early bring-up simple.
+# CONFIG_MODULES is not set

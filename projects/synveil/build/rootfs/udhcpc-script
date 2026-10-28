@@ -1,0 +1,56 @@
+#!/bin/sh
+# SPDX-License-Identifier: MPL-2.0
+# Strict IPv4 BusyBox udhcpc callback for the selected local wired NIC.
+set -ef
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+if [ -n "$SYNVEIL_NETWORK_PATH" ]; then PATH="$SYNVEIL_NETWORK_PATH"; fi
+export PATH
+
+valid_ipv4() (
+    case "$1" in ""|*[!0-9.]*|.*|*..*|*.) return 1 ;; esac
+    IFS=.
+    set -- $1
+    [ "$#" -eq 4 ] || return 1
+    for part do
+        case "$part" in ""|*[!0-9]*) return 1 ;; esac
+        [ "$part" -le 255 ] || return 1
+    done
+)
+
+valid_interface() {
+    case "$1" in
+        ''|lo|.*|*[!a-zA-Z0-9_.-]*) return 1 ;;
+    esac
+    [ "${#1}" -le 15 ]
+}
+
+interface="${interface:-}"
+valid_interface "$interface" || exit 1
+case "$1" in
+    deconfig)
+        ifconfig "$interface" 0.0.0.0 up
+        ;;
+    bound|renew)
+        valid_ipv4 "$ip" && valid_ipv4 "$subnet" || exit 1
+        ifconfig "$interface" "$ip" netmask "$subnet" up
+        for gateway in $router; do
+            valid_ipv4 "$gateway" || continue
+            route del default dev "$interface" >/dev/null 2>&1 || true
+            route add default gw "$gateway" dev "$interface"
+            break
+        done
+        target=/etc/resolv.conf
+        if [ -n "$SYNVEIL_RESOLV_CONF" ]; then target="$SYNVEIL_RESOLV_CONF"; fi
+        temp="$target.new.$$"
+        trap 'rm -f "$temp"' EXIT HUP INT TERM
+        : > "$temp"
+        for server in $dns; do
+            if valid_ipv4 "$server"; then
+                printf 'nameserver %s\n' "$server" >> "$temp"
+            fi
+        done
+        mv -f "$temp" "$target"
+        trap - EXIT HUP INT TERM
+        ;;
+    *) exit 1 ;;
+esac

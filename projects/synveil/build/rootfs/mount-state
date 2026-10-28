@@ -1,0 +1,146 @@
+#!/bin/sh
+# SPDX-License-Identifier: MPL-2.0
+# Persistent state lives on the unique partition carrying the project's
+# fixed GPT identity: partition name "Synveil State" and the PARTUUID
+# below. A device name such as /dev/sda2 or /dev/vdb1 is never trusted,
+# so the same policy covers the state partition inside the install
+# image and a separately attached partitioned state disk. The GUID is a
+# role label, not a secret; authenticity of install media belongs to
+# the signed installer milestone. No guest-side formatting: a missing,
+# ambiguous, or unformatted state partition simply disables persistence.
+# Keep the GUID in sync with tools/state_disk.py,
+# src/veil-core/src/credential.rs, and src/veil-display/enroll.c.
+state_partuuid=7c9e2d41-8b3a-4f5e-a6d1-2e8c4b7f9053
+state_partname='Synveil State'
+
+scan_state_partitions() {
+    scan_count=0
+    scan_found=''
+    for entry in /sys/class/block/*; do
+        [ -f "$entry/uevent" ] || continue
+        partuuid=''
+        partname=''
+        while IFS='=' read -r key value; do
+            case $key in
+                PARTUUID) partuuid=$value ;;
+                PARTNAME) partname=$value ;;
+            esac
+        done < "$entry/uevent"
+        if [ "$partuuid" = "$state_partuuid" ] &&
+           [ "$partname" = "$state_partname" ]; then
+            scan_count=$((scan_count + 1))
+            scan_found="/dev/${entry##*/}"
+        fi
+    done
+}
+
+# The install target is removable USB media, whose partitions can
+# appear seconds after init starts (USB enumeration is asynchronous),
+# while a directly attached disk is present immediately. Poll while
+# no designated partition exists, for a bounded ~10 seconds; finding
+# more than one fails closed at once. The notice goes to stderr so
+# the command substitution below captures only the device path.
+wait_for_state_device() {
+    waited=0
+    while :; do
+        scan_state_partitions
+        if [ "$scan_count" -eq 1 ]; then
+            printf '%s\n' "$scan_found"
+            return 0
+        fi
+        [ "$scan_count" -gt 1 ] && return 1
+        [ "$waited" -ge 40 ] && return 1
+        if [ "$waited" -eq 0 ]; then
+            echo "[synveil-state] waiting for the designated state partition; removable media can enumerate late" >&2
+        fi
+        sleep 0.25
+        waited=$((waited + 1))
+    done
+}
+
+state=$(wait_for_state_device) || state=''
+
+# Check each component *before* mkdir/chmod/chown. A writable state image
+# might contain symlinks; mkdir -p and chmod follow them if used unchecked.
+root_directory() {
+    [ ! -L "$1" ] && [ -d "$1" ] || return 1
+    [ "$(stat -c '%u:%g' "$1" 2>/dev/null)" = 0:0 ] || return 1
+    permissions=$(stat -c '%a' "$1") || return 1
+    case "$permissions" in ''|*[!0-7]*) return 1 ;; esac
+    [ "$((0$permissions & 0022))" -eq 0 ]
+}
+
+private_directory() {
+    if [ ! -e "$1" ] && [ ! -L "$1" ]; then
+        mkdir "$1" || return 1
+    fi
+    root_directory "$1" && chmod 0700 "$1"
+}
+
+# /var/tmp is the only deliberately world-writable state directory.
+sticky_directory() {
+    if [ ! -e "$1" ] && [ ! -L "$1" ]; then
+        mkdir "$1" || return 1
+    fi
+    [ ! -L "$1" ] && [ -d "$1" ] &&
+        [ "$(stat -c '%u:%g' "$1" 2>/dev/null)" = 0:0 ] || return 1
+    permissions=$(stat -c '%a' "$1") || return 1
+    if [ "$permissions" != 1777 ]; then
+        root_directory "$1" || return 1
+    fi
+    chmod 1777 "$1"
+}
+
+if [ ! -b "$state" ]; then
+    echo "[synveil-state] no designated state partition; booting without persistence"
+    exit 1
+fi
+if [ -L /var ] || [ ! -d /var ]; then
+    echo "[synveil-state] unsafe /var mountpoint; booting without persistence"
+    exit 1
+fi
+if ! mount -t ext4 -o nosuid,nodev,noatime "$state" /var; then
+    echo "[synveil-state] ext4 mount failed; recovery remains available"
+    exit 1
+fi
+
+# Fail closed and unmount the state volume if its privileged parents are
+# suspicious. Do not let core audit logging write through an untrusted link.
+if ! root_directory /var ||
+   ! private_directory /var/log ||
+   ! private_directory /var/log/synveil ||
+   ! private_directory /var/lib ||
+   ! private_directory /var/lib/synveil ||
+   ! sticky_directory /var/tmp; then
+    echo "[synveil-state] unsafe state directory; disabling persistence"
+    umount /var || true
+    exit 1
+fi
+
+# Keep the home parent root-private: the demo account may write to its own
+# directory but must not be able to replace the mount source with a symlink.
+if [ -d /home/synveil ]; then
+    if private_directory /var/lib/synveil/home &&
+       [ ! -L /var/lib/synveil/home/synveil ] &&
+       [ ! -L /home/synveil ] &&
+       { [ -d /var/lib/synveil/home/synveil ] ||
+         mkdir /var/lib/synveil/home/synveil; } &&
+       [ "$(stat -c '%F' /var/lib/synveil/home/synveil)" = directory ] &&
+       { [ "$(stat -c '%u:%g' /var/lib/synveil/home/synveil)" = 0:0 ] ||
+         [ "$(stat -c '%u:%g' /var/lib/synveil/home/synveil)" = 1000:1000 ]; } &&
+       [ "$((0$(stat -c '%a' /var/lib/synveil/home/synveil) & 0022))" -eq 0 ] &&
+       chown 1000:1000 /var/lib/synveil/home/synveil &&
+       chmod 0700 /var/lib/synveil/home/synveil &&
+       mount -o bind /var/lib/synveil/home/synveil /home/synveil; then
+        if mount -o remount,bind,nosuid,nodev /home/synveil; then
+            echo SYNVEIL_HOME_READY
+        else
+            umount /home/synveil || true
+            echo SYNVEIL_HOME_UNAVAILABLE
+        fi
+    else
+        echo "[synveil-state] persistent demo home unavailable; console recovery remains"
+        echo SYNVEIL_HOME_UNAVAILABLE
+    fi
+fi
+echo SYNVEIL_STATE_READY

@@ -1,0 +1,9 @@
+{
+  "esp_maintenance_sha256": "e95e53a26a15043c52f5908c02747c948bb3684eaec2cf3ee89fe8872199aad2",
+  "receipt_maintenance_sha256": "e95e53a26a15043c52f5908c02747c948bb3684eaec2cf3ee89fe8872199aad2",
+  "esp_matches_receipt": true,
+  "esp_reset_sha256": "bf2cffb5256ba92bc33dd05f016f95238fcd0d301be78b8fca7b9d8009d55b72",
+  "esp_reset_matches_receipt": true,
+  "screen_settled_after_polls": 6,
+  "attempt_made": true
+}
