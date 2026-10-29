@@ -280,10 +280,10 @@ class IdentityStore:
 
     def export(self) -> dict:
         """Export user-controlled identity data; output contains sensitive content."""
-        return {"schema": 2, "identity": self.list_items("identity"),
-                "identity_revisions": self.list_items("identity_revisions"),
-                "decisions": self.list_items("decisions"),
-                "writing_samples": self.list_items("writing_samples"),
+        return {"schema": 2, "identity": self.list_items("identity", limit=100000),
+                "identity_revisions": self.list_items("identity_revisions", limit=100000),
+                "decisions": self.list_items("decisions", limit=100000),
+                "writing_samples": self.list_items("writing_samples", limit=100000),
                 "messages": self.list_items("messages", limit=100000),
                 "feedback": self.list_items("feedback", limit=100000),
                 "train_pairs": self.list_items("train_pairs", limit=100000),
