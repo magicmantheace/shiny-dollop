@@ -1122,6 +1122,34 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### October 29 — Evidence-opposition onset guard: evidence-count abstention (DEMONSTRATED, simulator-bounded)
+
+Optional `EvidenceOppositionGuardMemory` acts through recent8 exactly,
+plus a gate computed from the observed evidence itself — hard
+span-majority expectations from the 24 events preceding the newest 2,
+abstain iff both newest events are matched and opposed; NO fitted
+probabilities anywhere in the signal — under a protocol frozen before
+implementation (new cohorts 312003-family / 313001-family, now
+INSPECTED). **Graded Demonstrated under the protocol's own definitions
+(all six criteria PASS on both cohorts; full suite and historical
+transfer pass) — the campaign's first Demonstrated result, at handoff
+generalization level 2–3 in this simulator only:** signal separation
+onset mean opposed_count **1.056 / 1.000** vs control **0.000 / 0.167**
+(development / additional); gate fired at **5/18 onset states and 0/15
+graded control states** on both cohorts; pooled onset harm **185 vs
+recent8 250** (development) and **198 vs 270** (additional) — just over
+the pre-registered 25% reduction, margins of 2.5 / 4.5 actions under
+the ceiling; release complete by k=32 with stationary-evidence
+behavior identical to recent8. Honest limits: absolute onset harm
+remains high, the gate covers only ~1/3 of onset states
+(opposed_count 1 in roughly half), k=8/16 persistence costs real
+successes, and onset successes fall vs recent8 because abstention —
+not adaptation — is the response. Learner acquisition actions zero;
+external TRAIN actor harm published in full in the report. Optional
+only, no promotion, no merge.
+[Full graded report](docs/EVIDENCE_OPPOSITION_ONSET_GUARD.md).
+
+
 ### October 28 — First-contact onset guard: contradiction-gated abstention (FAILED)
 
 Optional `FirstContactGuardMemory` acts through recent8 exactly,

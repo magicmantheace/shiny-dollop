@@ -1,3 +1,48 @@
+# Evidence-opposition onset guard: evidence-count gate — 2026-10-29 (DEMONSTRATED, simulator-bounded)
+
+Optional `developmental_ai/evidence_opposition_onset_guard.py`
+(recent8 acting model exactly, plus a gate from the observed
+evidence itself: hard span-majority expectation from the 24 events
+preceding the newest 2; abstain iff both newest events are matched
+and opposed; NO fitted probabilities in the signal) was evaluated
+under the protocol frozen BEFORE implementation at
+`benchmarks/evidence_opposition_onset_guard_protocol.json` on NEW
+cohorts 312003/312021/312039 and 313001/313017/313041, both now
+INSPECTED — never re-tune against them. **Graded Demonstrated under
+the protocol's own definitions (all six criteria PASS on both
+cohorts, full suite + transfer pass); NOT a general-intelligence
+or calibrated-uncertainty claim — handoff level 2–3, this
+simulator only.** Per-criterion, development / additional: C1
+signal separation PASS/PASS (onset mean opposed 1.056 / 1.000 vs
+control (k=2,4) 0.000 / 0.167; gaps 1.056 / 0.833 vs ≥0.5
+required), C2 gate firing PASS/PASS (5/18 onset states, 0/15
+graded control states, both cohorts), C3 onset harm PASS/PASS
+narrowly (185 vs recent8 250, ceiling 187.5; 198 vs 270, ceiling
+202.5; 6/6 cells ≤ recent8 both cohorts), C4 release PASS/PASS
+(0/144 abstentions at k=32; successes 65=65 dev, 59=59 add),
+C5 stationary selectivity PASS/PASS (0/240 abstentions; successes
+and harm identical to recent8), C6 full accounting PASS/PASS
+(signal records complete, replay identity true everywhere,
+learner acquisition 0). The two preceding probability-derived
+gates were silent at onset; the evidence-count signal is not.
+Honest limits: absolute onset harm remains high (185 / 198 of
+288 onset episode-checkpoints); the gate fires at only ~1/3 of
+onset states (opposed_count 1 in 9/18 dev and 8/18 add onset
+states); k=8/16 persistence costs successes (dev B1-16 5 vs
+recent8 26; add B1-8 10 vs 27); onset successes fall vs recent8
+(23 vs 38 dev; 10 vs 18 add) because abstention, not adaptation,
+is the response; at return-A onset frozen_A scores 68 / 70 pooled
+successes vs the candidate's 10 / 4 — detection without recovery.
+Full unit suite (873) and historical transfer benchmark passed
+in the evaluation and grading stages; no CI claimed for the
+evaluation or grading commits (UNVERIFIED). See
+`docs/EVIDENCE_OPPOSITION_ONSET_GUARD.md`. Keep the learner
+optional and unpromoted, default controller unchanged, no merge,
+no AthenZ/Synveil integration, D1–D10/V2A/V2B unchanged. Next
+limitation selected: P1 detection without recovery — at a return
+to a previously learned rule the only protective response is
+abstention, forfeiting immediately usable retained knowledge.
+
 # First-contact onset guard: contradiction gate — 2026-10-28 (FAILED)
 
 Optional `developmental_ai/first_contact_onset_guard.py`
