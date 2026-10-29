@@ -58,6 +58,10 @@ class IdentityStore:
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA foreign_keys = ON")
         self.db.execute("PRAGMA journal_mode = WAL")
+        # Deleted personal content is zeroed in the b-tree at deletion time;
+        # scrub_erased_content() removes the copies deletion leaves behind
+        # in freelist pages and the write-ahead log.
+        self.db.execute("PRAGMA secure_delete = ON")
         self._migrate()
         try:
             self.path.chmod(0o600)
@@ -159,6 +163,19 @@ class IdentityStore:
             self._event("revised", "identity", item_id)
         return True
 
+    def scrub_erased_content(self) -> None:
+        """Physically remove erased personal content from the SQLite files.
+
+        A committed DELETE alone leaves the erased bytes recoverable in
+        freelist pages and in the write-ahead log. Truncating the WAL and
+        rebuilding the database with VACUUM drops every residue copy, so a
+        later raw-file read or backup cannot resurrect forgotten content.
+        Owner-initiated erasure paths call this after their transaction
+        commits; it is deliberately not used on hot paths.
+        """
+        self.db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        self.db.execute("VACUUM")
+
     def delete(self, table: str, item_id: int) -> bool:
         if table not in {"identity", "decisions", "writing_samples"}:
             raise ValueError("Unsupported deletion table")
@@ -168,6 +185,8 @@ class IdentityStore:
             cur = self.db.execute(f"DELETE FROM {table} WHERE id=?", (item_id,))
             if cur.rowcount:
                 self._event("deleted", table, item_id)
+        if cur.rowcount:
+            self.scrub_erased_content()
         return bool(cur.rowcount)
 
     def add_decision(self, scenario: str, choice: str, rationale: str, *, source: str,
@@ -232,6 +251,8 @@ class IdentityStore:
                                       (source, source_ref))
                 counts[table] = cur.rowcount
             self._event("source-purged", "source", None)
+        if any(counts.values()):
+            self.scrub_erased_content()
         return counts
 
     def list_items(self, table: str, status: str | None = None, limit: int = 200) -> list[dict]:
