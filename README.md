@@ -8,6 +8,7 @@ This repository is a permanent, **multi-project** workspace. Its root is an inde
 | --- | --- | --- |
 | Universal PC Game Launcher | [`projects/universal-game-launcher/`](projects/universal-game-launcher/README.md) | Existing development; unmerged review branch/PR — do not overwrite |
 | GitHub Development Command Center | [`projects/github-development-command-center/`](projects/github-development-command-center/README.md) | PARKED — do not implement without new authorization |
+| AthenZ | [`projects/athenz/`](projects/athenz/README.md) | Imported copy of the standalone AthenZ repo (main `ff3b407`); unmerged review PR — do not overwrite |
 
 ## New Muse application queue — specifications only
 
