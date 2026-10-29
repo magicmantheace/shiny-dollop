@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "athenz-local"
+version = "0.6.0a1"
+description = "Local-first digital twin with approval-gated memory and supervised coding"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+athenz = "athenz.cli:main"
+athenz-worker = "athenz.work_cli:main"
+athenz-controller = "athenz.controller_cli:main"
+athenz-sequence = "athenz.sequence_cli:main"
+athenz-training = "athenz.train_cli:main"
+athenz-desktop = "athenz.desktop:main"
+athenz-onboarding = "athenz.onboarding:main"
+athenz-doctor = "athenz.preflight:main"
+athenz-backup = "athenz.backup:main"
+athenz-profile = "athenz.profile_bundle:main"
+athenz-scheduler = "athenz.schedule_cli:main"
+athenz-verify-portable = "athenz.portable_integrity:main"
+athenz-stage-portable = "athenz.portable_stage:main"
+athenz-release-readiness = "athenz.release_readiness:main"
+athenz-profile-health = "athenz.profile_health:main"
+athenz-rehearse-backup = "athenz.recovery_drill:main"
+athenz-conflicts = "athenz.conflict_review:main"
+athenz-inference-check = "athenz.inference_readiness:main"
+athenz-chat-smoke = "athenz.synthetic_chat_smoke:main"
+athenz-voice = "athenz.voice:main"
+athenz-style-compare = "athenz.style_comparison:main"
+athenz-decision-compare = "athenz.paired_decisions:main"
+athenz-decision-timeline = "athenz.decision_longitudinal:main"
+
+[tool.setuptools.packages.find]
+include = ["athenz*"]
