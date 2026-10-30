@@ -1,3 +1,50 @@
+# Evidence-opposition retained recovery: signal-gated archive recovery — 2026-10-30 (FAILED)
+
+Optional `developmental_ai/evidence_opposition_retained_recovery.py`
+(recent8 acting model exactly; graded guard's evidence-opposition
+signal reused unchanged; plus a retained-archive concordance test —
+act through an archive-only relation model iff both newest events
+are archive-concordant AND at least one is opposed; else abstain iff
+opposed_count == 2; else recent8) was evaluated under the protocol
+frozen BEFORE implementation at
+`benchmarks/evidence_opposition_retained_recovery_protocol.json` on
+NEW cohorts 322003/322021/322039 and 323001/323017/323041, both now
+INSPECTED — never re-tune against them. **Graded Failed under the
+protocol's own definitions (criteria 1–4 FAIL on both cohorts);
+NOT a Regression (pooled onset harm equal to recent8 on development,
+below on additional; control successes equal/above; suite +
+transfer pass). The cumulative-dominance cap is also triggered on
+both cohorts.** Per-criterion, development / additional: C1 return-A
+successes FAIL/FAIL (23 vs frozen_A 64, floor 25.6 and guard+16=30;
+18 vs 66, floor 26.4 and 29), C2 engagement FAIL/FAIL (recovery
+fired 1/6 return-A onset states both cohorts, required ≥2; B1 0/6),
+C3 pooled onset harm FAIL/FAIL (262 vs guard 255 and recent8 262,
+ceiling 196.5; 231 vs guard 236 PASS but ceiling 190.5 FAIL),
+C4 return-A harm FAIL/FAIL (73 vs guard 66 and ceiling 43.8; 78 vs
+guard 83 PASS but ceiling 49.8 FAIL), C5 release PASS/PASS
+(0/144 abstentions at k=32; successes 57 vs recent8 62, 65=65),
+C6 stationary selectivity PASS/PASS (0/240 abstentions; dev
+identical to recent8, add 148 vs 146 successes / 92 vs 94 harm),
+C7 full accounting PASS/PASS (decision records complete incl.
+archive concordance records, replay identity true everywhere,
+learner acquisition 0). Diagnosis: the both-events concordance
+requirement squares a per-event rate realized at ~1/2–2/3 —
+concordant_count == 1 in 5/6 return-A onset states in BOTH cohorts,
+the protocol's pre-registered failure mode 1. Where recovery fired
+it converted as designed (additional firing state 11 succ / 5 harm
+vs recent8 6 / 10); false recovery at B1 never occurred. Plain
+cumulative retention (return-A 58 / 66 successes at 38 / 30 harm)
+dominates the gated recovery — at a first return, retained knowledge
+did not need this sparse gate. Full unit suite (895) and historical
+transfer benchmark passed in the evaluation and grading stages; no
+CI claimed for the evaluation or grading commits (UNVERIFIED). See
+`docs/EVIDENCE_OPPOSITION_RETAINED_RECOVERY.md`. Keep the learner
+optional and unpromoted, default controller unchanged, no merge,
+no AthenZ/Synveil integration, D1–D10/V2A/V2B unchanged. Next
+limitation selected: P1 recovery engagement sparsity — whether a
+less sparse concordance test can engage at materially more return-A
+states and beat cumulative, on NEW cohorts under a NEW protocol.
+
 # Evidence-opposition onset guard: evidence-count gate — 2026-10-29 (DEMONSTRATED, simulator-bounded)
 
 Optional `developmental_ai/evidence_opposition_onset_guard.py`

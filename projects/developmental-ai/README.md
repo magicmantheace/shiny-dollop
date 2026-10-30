@@ -1122,6 +1122,34 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### October 30 — Evidence-opposition retained recovery: signal-gated archive recovery (FAILED)
+
+Optional `EvidenceOppositionRecoveryMemory` acts through recent8
+exactly, reuses the graded guard's evidence-opposition signal
+unchanged, and adds a retained-archive concordance test — act through
+an archive-only relation model when both newest events are
+archive-concordant and at least one is opposed; else abstain when
+both are opposed; else recent8 — under a protocol frozen before
+implementation (new cohorts 322003-family / 323001-family, now
+INSPECTED). **Graded Failed (not a regression vs recent8):**
+criteria 1–4 FAIL on both cohorts, 5–7 PASS on both, and the
+protocol's cumulative-dominance cap is triggered on both cohorts.
+Recovery fired at only **1/6 return-A onset states per cohort**
+(concordant_count == 1 in **5/6** states in both cohorts — the
+pre-registered both-events squaring failure mode); return-A pooled
+successes **23 / 18** vs frozen_A **64 / 66**, guard **14 / 13**,
+and plain cumulative **58 / 66** at return-A harm **38 / 30** vs the
+candidate's **73 / 78**; pooled onset harm **262 = recent8 262**
+(development) and **231 vs guard 236 / recent8 254** (additional).
+Where recovery did fire it converted as designed (additional firing
+state +5 successes / −5 harm vs recent8), and false recovery at B1
+never occurred — the gate is selective; its sensitivity failed.
+Learner acquisition actions zero; external TRAIN actor harm
+published in full in the report. Optional only, no promotion, no
+merge.
+[Full graded report](docs/EVIDENCE_OPPOSITION_RETAINED_RECOVERY.md).
+
+
 ### October 29 — Evidence-opposition onset guard: evidence-count abstention (DEMONSTRATED, simulator-bounded)
 
 Optional `EvidenceOppositionGuardMemory` acts through recent8 exactly,
