@@ -1,3 +1,53 @@
+# Joint concordance recovery: per-event joint archive recovery — 2026-10-30 (FAILED)
+
+Optional `developmental_ai/joint_concordance_recovery.py`
+(identical to the graded retained-recovery candidate in acting
+model, signal, archive, concordance definition and recovery model;
+the SINGLE change is a per-event JOINT recovery test — recovery iff
+at least one newest event is both archive-concordant and
+reference-opposed on the SAME event) was evaluated under the
+protocol frozen BEFORE implementation at
+`benchmarks/joint_concordance_recovery_protocol.json` on NEW
+cohorts 332003/332021/332039 and 333001/333017/333041, both now
+INSPECTED — never re-tune against them. **Graded Failed under the
+protocol's own definitions (criterion 1 FAILs on the additional
+cohort — in fact on both, on the exceed-cumulative sub-condition
+alone; criterion 4 FAIL development; criterion 5 FAIL both);
+NOT a Regression (pooled onset harm well below recent8 on both
+cohorts, control successes above recent8, suite + transfer pass).**
+Per-criterion, development / additional: C1 return-A successes
+FAIL/FAIL (56 vs frozen_A 68 and guard+16=38 — both floors PASS —
+but cumulative 60, required >60; 52 vs 60 / 23 PASS, cumulative
+64), C2 engagement PASS/PASS (recovery 5/6 return-A states both
+cohorts vs the preceding candidate's 1/6; B1 1/6 and 0/6; pooled
+rule records-only would-fire 3/6 and 2/6), C3 pooled onset harm
+PASS/PASS (165 vs guard 166 — by one action — 5/6 cells ≤ recent8;
+156 vs 185, 6/6), C4 return-A harm FAIL/PASS (40 vs guard 42 PASS
+but ceiling 37.8; 44 vs 73 and ceiling 51.6 PASS), C5 release
+FAIL/FAIL (abstentions 0/144 and 16/144 PASS, but k=32 successes
+58 vs recent8 77 and 77 vs 86 — required ≥69 / ≥78), C6 stationary
+selectivity PASS/PASS (0/240 abstentions; 97 vs 91 successes /
+143 vs 149 harm; 130 vs 120 / 110 vs 120; control recovery 1/15
+and 3/15 graded states), C7 full accounting PASS/PASS (decision
+records incl. per-event joint flags complete, replay identity
+true everywhere, learner acquisition 0). Diagnosis: engagement is
+solved — in every firing state the candidate matched cumulative
+exactly, and the whole C1 deficit is the single
+opposed_count == 0 blind-spot state per cohort (−4 / −12). The
+new failure is persistence: the gate never expires, so at k=32
+two development stale-archive routings scored 0/16 each (B1 and
+B2) and one additional B1 abstention cost 9 successes, failing
+C5 on both cohorts. Full unit suite (920) and historical transfer
+benchmark passed in the evaluation and grading stages; no CI
+claimed for the evaluation or grading commits (UNVERIFIED). See
+`docs/JOINT_CONCORDANCE_RECOVERY.md`. Keep the learner optional
+and unpromoted, default controller unchanged, no merge, no
+AthenZ/Synveil integration, D1–D10/V2A/V2B unchanged. Next
+limitation selected: P1 gate persistence without expiry —
+whether an evidence-derived onset-bounded gate can keep the
+onset profile while restoring k=32 productivity, on NEW cohorts
+under a NEW protocol.
+
 # Evidence-opposition retained recovery: signal-gated archive recovery — 2026-10-30 (FAILED)
 
 Optional `developmental_ai/evidence_opposition_retained_recovery.py`

@@ -1122,6 +1122,35 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### October 30 — Joint concordance recovery: per-event joint archive recovery (FAILED)
+
+Optional `JointConcordanceRecoveryMemory` is identical to the graded
+retained-recovery candidate in acting model, evidence-opposition
+signal, retained archive, concordance definition and recovery model;
+the SINGLE change is the recovery test — a per-event JOINT flag (one
+newest event both archive-concordant AND reference-opposed) with
+recovery at joint_count >= 1 — under a protocol frozen before
+implementation (new cohorts 332003-family / 333001-family, now
+INSPECTED). **Graded Failed (not a regression vs recent8):** criteria
+2, 3, 6, 7 PASS on both cohorts, criterion 4 FAIL development / PASS
+additional, criteria 1 and 5 FAIL on both. The joint test **solved
+engagement**: recovery fired at **5/6 return-A onset states per
+cohort** (vs 1/6 for the pooled test; records-only pooled-rule
+derivation 3/6 and 2/6 on the same records), B1 false recovery 1/6
+and 0/6, pooled onset harm **165 vs guard 166 / recent8 248**
+(development) and **156 vs 185 / 261** (additional), and in every
+firing state the candidate matched cumulative exactly. Criterion 1
+still fails on its exceed-cumulative sub-condition alone (**56 vs
+cumulative 60**; **52 vs 64**) — the entire deficit is the single
+opposed_count == 0 blind-spot state per cohort. Criterion 5 fails
+because the gate never expires: two stale-archive routings at k=32
+scored **0/16 each** in development (k=32 successes **58 vs recent8
+77**; additional **77 vs 86** via one late abstention). Learner
+acquisition actions zero; external TRAIN actor harm published in
+full in the report. Optional only, no promotion, no merge.
+[Full graded report](docs/JOINT_CONCORDANCE_RECOVERY.md).
+
+
 ### October 30 — Evidence-opposition retained recovery: signal-gated archive recovery (FAILED)
 
 Optional `EvidenceOppositionRecoveryMemory` acts through recent8
