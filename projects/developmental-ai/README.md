@@ -1122,6 +1122,42 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### October 31 — Bounded authority joint recovery: evidence-derived gate expiry (FAILED)
+
+Optional `BoundedAuthorityJointRecoveryMemory` is identical to the
+graded joint candidate in acting model, evidence-opposition signal,
+retained archive, joint recovery test, recovery model and abstention
+trigger; the SINGLE change is branch AUTHORITY (expiry) computed from
+observed events only — abstention armed iff no stable local-archive
+disagreement (strict majority of comparable span majorities in the
+last 26 events disagree with the archive), recovery armed iff no
+stable disagreement OR at least 2 archive-concordant events among
+the last 8 — under a protocol frozen before implementation (new
+cohorts 342003-family / 343001-family, now INSPECTED). **Graded
+Failed (not a regression vs recent8):** the PRIMARY criterion 5
+(release by k=32) FAILs development / PASSes additional, criteria
+1, 3, 6, 7 PASS on both cohorts, criterion 2 PASS/FAIL and
+criterion 4 PASS/FAIL. The expiry works in its built direction:
+development onset is preserved *exactly* (recovery taken at **6/6
+return-A states**, pooled onset harm **155 vs guard 188 / recent8
+239**, return-A harm **28**), and k=32 productivity is restored
+fully on additional (**63 = recent8**, 0/9 non-recent8 states, vs
+the unexpired gate's 52) and substantially on development (42 → 56
+of recent8's 69; the entire remaining deficit is one residual late
+false recovery re-armed at corroboration count exactly 2, **0/16**
+vs recent8 13/3). The cost is the pre-registered central risk —
+**over-expiry at return onset**: the corroboration count is weakest
+at k=2 (only 2 of the last 8 events follow the returned rule), so
+on additional, recovery was taken at only **2/6 return-A states**
+(3 disarmed at count == 1), return-A successes fell to **30** vs
+the unexpired gate's 64 and cumulative's 74, and return-A harm
+**66** breached its 60%-of-recent8 ceiling (52.2) because abstention
+is disarmed at a return by the same flag. Learner acquisition
+actions zero; external TRAIN actor harm published in full in the
+report. Optional only, no promotion, no merge.
+[Full graded report](docs/BOUNDED_AUTHORITY_JOINT_RECOVERY.md).
+
+
 ### October 30 — Joint concordance recovery: per-event joint archive recovery (FAILED)
 
 Optional `JointConcordanceRecoveryMemory` is identical to the graded

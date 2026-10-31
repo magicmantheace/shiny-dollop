@@ -1,3 +1,62 @@
+# Bounded authority joint recovery: evidence-derived gate expiry — 2026-10-31 (FAILED)
+
+Optional `developmental_ai/bounded_authority_joint_recovery.py`
+(identical to the graded joint candidate in acting model, signal,
+archive, concordance definition, joint recovery test, recovery model
+and abstention trigger; the SINGLE change is branch AUTHORITY —
+abstention armed iff no stable local-archive disagreement, recovery
+armed iff no stable disagreement OR at least 2 archive-concordant
+events among the last 8) was evaluated under the protocol frozen
+BEFORE implementation at
+`benchmarks/bounded_authority_joint_recovery_protocol.json` on NEW
+cohorts 342003/342021/342039 and 343001/343017/343041, both now
+INSPECTED — never re-tune against them. **Graded Failed under the
+protocol's own definitions (criterion 2 and criterion 4 FAIL on the
+additional cohort); NOT a Regression (pooled onset harm well below
+recent8 on both cohorts, control successes at/above recent8, k=32
+successes above the joint candidate's deficit line, suite + transfer
+pass).** Per-criterion, development / additional, with the PRIMARY
+criterion 5 reported first: C5 release FAIL/PASS (dev abstentions
+0/144 and records 1/9 non-recent8 k=32 states PASS, but successes
+56 vs recent8 69, required ≥61 — the entire deficit is ONE residual
+late false recovery at B2-32 seed 342021, re-armed at
+recent_concordant_count == 2 with a joint event, 0/16 vs recent8
+13/3; add 63 = recent8 63, 0/9 states, +11 over the unexpired
+gate's 52), C1 return-A successes PASS/PASS (68 vs frozen_A 64 and
+guard+16=19; 30 vs 62 / 25 — floors pass, but cumulative 72 / 74
+reported in full; additional candidate 30 vs joint 64), C2
+engagement PASS/FAIL (recovery TAKEN 6/6 return-A states dev with
+0/6 would-fire-disarmed; add only 2/6 taken, 3/6
+would-fire-but-disarmed — all at recent_concordant_count == 1, one
+short of the threshold, both k=2 joint states among them — and 1/6
+joint-silent; B1 0/6 both), C3 pooled onset harm PASS/PASS (155 vs
+guard 188, 6/6 cells ≤ recent8; 174 vs 195, 6/6), C4 return-A harm
+PASS/FAIL (28 vs guard 61 and ceiling 54.0; 66 vs guard 87 PASS but
+ceiling 52.2 FAIL — disarmed states act through stale recent8
+because abstention is disarmed at a return by design), C6
+stationary selectivity PASS/PASS (16/240 abstentions, 121 vs 117
+successes, 103 vs 123 harm; 0/240, 115 = 115, 125 = 125, candidate
+downstream-identical to recent8), C7 full accounting PASS/PASS
+(full decision records incl. the expiry record complete, replay
+identity true everywhere, learner acquisition 0). Diagnosis: the
+expiry works in its built direction — onset profile preserved
+exactly on development, k=32 restored fully on additional and
+42 → 56 on development — but the corroboration leg starves at
+k=2, where only 2 of the last 8 events follow the returned rule:
+over-expiry (the protocol's pre-registered central risk) failed
+engagement and return-A harm on the additional cohort. Full unit
+suite (944) and historical transfer benchmark passed in the
+evaluation and grading stages; no CI claimed for the evaluation
+or grading commits (UNVERIFIED). See
+`docs/BOUNDED_AUTHORITY_JOINT_RECOVERY.md`. Keep the learner
+optional and unpromoted, default controller unchanged, no merge,
+no AthenZ/Synveil integration, D1–D10/V2A/V2B unchanged. Next
+limitation selected: P1 return-onset authority starvation —
+whether a recovery-authority condition that does not starve at
+the earliest onset checkpoint, while still expiring late, can
+restore return-A engagement and return-A harm on NEW cohorts
+under a NEW protocol.
+
 # Joint concordance recovery: per-event joint archive recovery — 2026-10-30 (FAILED)
 
 Optional `developmental_ai/joint_concordance_recovery.py`
