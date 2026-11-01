@@ -1122,6 +1122,41 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 1 — Long disagreement joint recovery: disagreement-age authority (FAILED)
+
+Optional `LongDisagreementJointRecoveryMemory` is identical to the
+graded bounded-authority candidate in acting model,
+evidence-opposition signal, retained archive, joint recovery test,
+recovery model, abstention trigger and the first two
+recovery-authority legs; the SINGLE change is a third
+recovery-authority leg — LONG DISAGREEMENT (the preceding 26-event
+window also disagreeing with the archive under the same
+strict-majority span machinery) — under a protocol frozen before
+implementation (new cohorts 352003-family / 353001-family, now
+INSPECTED). **Graded Failed (not a regression vs recent8):** the
+PRIMARY criterion 2 FAILs additional / PASSes development,
+criterion 5 FAILs development / PASSes additional, criteria 1, 6, 7
+PASS on both cohorts, criterion 3 PASS/FAIL, criterion 4 FAILs both.
+The decisive finding is a null result about the mechanism itself:
+**the long leg changed no outcome** — the candidate's scores are
+identical to the bounded-authority baseline at every checkpoint in
+both cohorts (0/72 diffs per cohort), there were **zero**
+would-fire-but-disarmed return-A states to restore, the long flag
+was set at all 12 return-A onset states, and every taken state was
+already armed by corroboration. What actually capped engagement is
+upstream of authority: at return-A k=2 the newest-2 window is
+joint-silent with opposed_count == 0 in **5 of 6 states** across
+cohorts, so neither recovery nor abstention can fire there and
+return-A k=2 harm runs 40/48 (development) and 48/48 (additional)
+through stale recent8; at k=4 recovery takes in 6/6 states. Plain
+cumulative still dominates every gated variant at return-A
+(**65/62 successes at 31/34 harm** vs the candidate's 38/31 at
+58/65). Learner acquisition actions zero; external TRAIN actor harm
+published in full in the report. Optional only, no promotion, no
+merge.
+[Full graded report](docs/LONG_DISAGREEMENT_JOINT_RECOVERY.md).
+
+
 ### October 31 — Bounded authority joint recovery: evidence-derived gate expiry (FAILED)
 
 Optional `BoundedAuthorityJointRecoveryMemory` is identical to the

@@ -1,3 +1,62 @@
+# Long disagreement joint recovery: disagreement-age authority — 2026-11-01 (FAILED)
+
+Optional `developmental_ai/long_disagreement_joint_recovery.py`
+(identical to the graded bounded-authority candidate in acting
+model, signal, archive, concordance definition, joint recovery
+test, recovery model, abstention trigger, abstention authority and
+the first two recovery-authority legs; the SINGLE change is a third
+recovery-authority leg — long disagreement: the preceding 26-event
+window also disagreeing with the archive under the same
+strict-majority span machinery) was evaluated under the protocol
+frozen BEFORE implementation at
+`benchmarks/long_disagreement_joint_recovery_protocol.json` on NEW
+cohorts 352003/352021/352039 and 353001/353017/353041, both now
+INSPECTED — never re-tune against them. **Graded Failed under the
+protocol's own definitions (PRIMARY criterion 2 FAILs on the
+additional cohort; criterion 3 FAILs additional; criterion 4 FAILs
+both; criterion 5 FAILs development); NOT a Regression (pooled
+onset harm well below recent8 on both cohorts, control successes
+at/above recent8, k=32 successes above the bounded candidate's
+worse-cohort deficit line, suite + transfer pass).** Per-criterion,
+development / additional, PRIMARY criterion 2 first: C2 engagement
+PASS/FAIL (recovery TAKEN 4/6 return-A states dev — exactly the
+threshold — and 3/6 add, required ≥4; B1 0/6 both), C5 release
+FAIL/PASS (dev abstentions 16/144 and records 1/9 PASS, successes
+33 vs recent8 42, required ≥34 — fails by 1, the single non-recent8
+state being one late abstention at return-A k=32 seed 352003; add
+67 vs 73, 0/144 abstentions, 1/9 states), C1 return-A successes
+PASS/PASS (38 vs frozen_A 54, floors 21.6 and guard+16=19; 31 vs
+54 / 16 — cumulative 65 / 62 reported in full), C3 pooled onset
+harm PASS/FAIL (198 vs guard 201, 6/6 cells ≤ recent8; 163 vs
+guard 162 — fails by 1 — 6/6), C4 return-A harm FAIL/FAIL (58 vs
+guard 61 PASS but ceiling 55.8 FAIL; 65 vs guard 64 and ceiling
+57.0 FAIL), C6 stationary selectivity PASS/PASS (0/240
+abstentions; 134 vs 129 successes, 106 vs 111 harm; 121 = 121,
+119 = 119), C7 full accounting PASS/PASS (full decision records
+incl. the complete authority record with preceding-window records
+and long flag, replay identity true everywhere, learner
+acquisition 0). **Decisive null result: the long leg changed NO
+outcome — candidate scores identical to the bounded-authority
+baseline at every checkpoint in both cohorts (0/72 diffs per
+cohort), zero would-fire-but-disarmed return-A states, long flag
+set at all 12 return-A onset states, and every taken state also
+armed by corroboration (recent_concordant_count ≥ 2), so the
+development PASS on C2 is NOT credited to the long leg.** The
+binding constraint has moved upstream of authority: at return-A
+k=2 the newest-2 window is joint-silent with opposed_count == 0
+in 5 of 6 states across cohorts — no branch of this gate family
+can fire there — while at k=4 recovery takes in 6/6 states. Full
+unit suite (969) and historical transfer benchmark passed in the
+evaluation and grading stages; no CI claimed for the evaluation
+or grading commits (UNVERIFIED). See
+`docs/LONG_DISAGREEMENT_JOINT_RECOVERY.md`. Keep the learner
+optional and unpromoted, default controller unchanged, no merge,
+no AthenZ/Synveil integration, D1–D10/V2A/V2B unchanged. Next
+limitation selected: P1 return-onset signal absence at k=2 —
+whether an onset signal populated at the earliest checkpoint can
+engage recovery or abstention at return-A k=2, on NEW cohorts
+under a NEW protocol.
+
 # Bounded authority joint recovery: evidence-derived gate expiry — 2026-10-31 (FAILED)
 
 Optional `developmental_ai/bounded_authority_joint_recovery.py`
