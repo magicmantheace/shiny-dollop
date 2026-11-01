@@ -1,3 +1,74 @@
+# Extended reference joint recovery: widened onset-signal reference — 2026-11-01 (PARTIALLY DEMONSTRATED)
+
+Optional `developmental_ai/extended_reference_joint_recovery.py`
+(identical to the graded long-disagreement candidate in acting
+model, archive, concordance definition, joint recovery test,
+recovery model, abstention trigger and the full three-leg authority
+condition; the SINGLE change is the immediate signal's REFERENCE
+WINDOW — span-majority expectation over the 50 events preceding the
+newest 2 instead of 24, with the legacy reference-24 records carried
+records-only) was evaluated under the protocol frozen BEFORE
+implementation at
+`benchmarks/extended_reference_joint_recovery_protocol.json` on NEW
+cohorts 362003/362021/362039 and 363001/363017/363041, both now
+INSPECTED — never re-tune against them. **Graded Partially
+demonstrated under the protocol's own definitions (PRIMARY
+criterion 2 and criterion 7 PASS on both cohorts, but criterion 3
+FAILs on the development cohort); NOT Failed (no criterion among
+1/3/4/5 FAILs on the additional cohort) and NOT a Regression
+(pooled onset harm below recent8 on both cohorts, control
+successes equal to recent8, k=32 successes above the graded long
+candidate's deficit line, suite + transfer pass).** Per-criterion,
+development / additional, PRIMARY criterion 2 first (its
+checkpoint-2 sub-condition (a) first within it), then the co-graded
+guards 4 and 5: C2 engagement PASS/PASS ((a) recovery TAKEN at
+return-A k=2 alone in 2/3 dev and 3/3 add states, required ≥2;
+(b) pooled k=2,4 TAKEN 4/6 dev and 6/6 add, required ≥4; (c) B1
+0/6 both; B2 0/6 both; would-fire-but-disarmed 0/6 both), C4
+return-A harm PASS/PASS (52 vs guard 58 and ceiling 54.0; 34 vs
+guard 45 and ceiling 49.2), C5 release PASS/PASS (dev abstentions
+0/144, successes 54 vs recent8 58 required ≥50, records 1/9; add
+97 = recent8 97, 0/144, 1/9), C1 return-A successes PASS/PASS (44
+vs frozen_A 66, floors 26.4 and guard+16=22; 62 vs 70 / 19 —
+cumulative 66 / 68 at 30 / 28 harm reported in full and beats the
+candidate on both axes on both cohorts), C3 pooled onset harm
+FAIL/PASS (192 vs guard 182 — fails by 10, the entire margin at
+B2: candidate 94 = recent8 vs guard 78, no branch fired at B2
+onset on development, opposed_count ≤1 in all 6 states; add 125
+vs guard 162, 6/6 cells ≤ recent8 both cohorts), C6 stationary
+selectivity PASS/PASS (0/240 abstentions; 135 = 135 successes,
+105 = 105 harm; 115 = 115, 125 = 125; control recovery 0/15
+graded states both), C7 full accounting PASS/PASS (full decision
+records incl. extended-reference records, legacy reference-24
+records and the complete authority record, replay identity true
+everywhere, learner acquisition 0). **Decisive null result: the
+widened reference changed NO return-A recovery engagement — the
+candidate's taken states are identical to the records-only legacy
+reference-24 derivation at every return-A onset state in both
+cohorts (k=2: 2/3 dev, 3/3 add; pooled: 4/6, 6/6), so the C2 PASS
+is NOT credited to the widening; the single non-taken development
+k=2 state (seed 362003) was information-empty under both
+references (joint 0, opposed 0, concordant 0). Realized widening
+effects are elsewhere and small: score diffs vs the long baseline
+method at 2/72 checkpoints dev (extended-only late recovery at
+return-A k=16/32 seed 362021) and 5/72 add (abstention-branch
+differences at B1/B2); branch diffs vs the legacy derivation 3 dev
+/ 6 add, none a return-A onset state.** Two successive mechanisms
+(authority age, reference width) have now changed no return-A
+outcome; what binds k=2 engagement is the newest draws' own
+information content. Full unit suite (995) and historical transfer
+benchmark passed in the evaluation and grading stages; no CI
+claimed for the evaluation or grading commits (UNVERIFIED). See
+`docs/EXTENDED_REFERENCE_JOINT_RECOVERY.md`. Keep the learner
+optional and unpromoted, default controller unchanged, no merge,
+no AthenZ/Synveil integration, D1–D10/V2A/V2B unchanged. Next
+limitation selected: P1 second-switch (B2) onset non-protection —
+at the second inversion neither recovery (pre-registered not
+expected: global archive, B1 segment a minority inside it) nor,
+on the development cohort, abstention fires at onset, so B2 harm
+runs at recent8's level and fails pooled onset harm; on NEW
+cohorts under a NEW protocol.
+
 # Long disagreement joint recovery: disagreement-age authority — 2026-11-01 (FAILED)
 
 Optional `developmental_ai/long_disagreement_joint_recovery.py`

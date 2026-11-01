@@ -1122,6 +1122,40 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 1 — Extended reference joint recovery: widened onset-signal reference (PARTIALLY DEMONSTRATED)
+
+Optional `ExtendedReferenceJointRecoveryMemory` is identical to the
+graded long-disagreement candidate in acting model, retained archive,
+archive concordance, joint recovery test, recovery model, abstention
+trigger and the full three-leg authority condition; the SINGLE change
+is the immediate signal's REFERENCE WINDOW — the span-majority
+expectation for each newest-2 event is computed over the 50 events
+preceding the newest window instead of 24 — under a protocol frozen
+before implementation (new cohorts 362003-family / 363001-family, now
+INSPECTED). **Graded Partially demonstrated (not a regression vs
+recent8):** PRIMARY criterion 2 PASSes on both cohorts (recovery
+TAKEN at return-A checkpoint 2 alone in 2/3 development and 3/3
+additional states; pooled 4/6 and 6/6; B1 0/6 both), criteria 1, 4,
+5, 6, 7 PASS on both cohorts, and criterion 3 FAILs on development
+only (pooled onset harm 192 vs the guard's 182 — the entire margin
+at the B2 stage, 94 vs 78, where no branch fired). The decisive
+finding is a second successive null result about the mechanism
+itself: **the widened reference changed no return-A recovery
+engagement** — the candidate's taken states are identical to the
+records-only legacy reference-24 derivation at every return-A onset
+state in both cohorts, so criterion 2's PASS is NOT credited to the
+widening; the one non-taken development k=2 state was
+information-empty under both references (concordant_count 0). What
+binds k=2 engagement, when it binds, is the information content of
+the first two post-return draws themselves. Plain cumulative still
+dominates every gated variant at return-A on both axes
+(**66/68 successes at 30/28 harm** vs the candidate's 44/62 at
+52/34). Learner acquisition actions zero; external TRAIN actor harm
+published in full in the report. Optional only, no promotion, no
+merge.
+[Full graded report](docs/EXTENDED_REFERENCE_JOINT_RECOVERY.md).
+
+
 ### November 1 — Long disagreement joint recovery: disagreement-age authority (FAILED)
 
 Optional `LongDisagreementJointRecoveryMemory` is identical to the
