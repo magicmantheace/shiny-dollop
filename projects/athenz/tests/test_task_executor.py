@@ -2,19 +2,24 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import io
 import json
 import os
 from contextlib import redirect_stdout
 from pathlib import Path
+import py_compile
+import struct
 import subprocess
+import sys
 import tempfile
 import unittest
 
 from athenz.project_planner import SCHEMA as PLAN_SCHEMA
 from athenz.task_executor import (EditorBlocked, ExecutorError,
                                   ScriptedEditor, TaskExecutor,
-                                  build_command)
+                                  _fresh_pycache_prefix, _scrubbed_env,
+                                  build_command, purge_bytecode_caches)
 from athenz.task_executor_cli import main as cli_main
 from athenz.task_grants import TaskGrantStore
 
@@ -43,6 +48,75 @@ TEST_SLOW = (
 ITEM = {'id': 'roadmap-1', 'title': 'Fix the add function',
         'success_criteria': 'tests.test_calc passes',
         'scope': ['calc.py'], 'source': {'file': 'ROADMAP.md', 'line': 3}}
+
+# Same byte length, different behavior: the exact shape of the
+# stale-bytecode flaw (a same-size rewrite Python's mtime+size cache
+# check cannot distinguish from the original).
+VALUE_V1 = "def value():\n    return 1111\n"
+VALUE_V2 = "def value():\n    return 2222\n"
+TEST_VALUE = (
+    "import unittest\n"
+    "from calc import value\n\n"
+    "class ValueTests(unittest.TestCase):\n"
+    "    def test_value(self):\n"
+    "        self.assertEqual(value(), 2222)\n\n"
+    "if __name__ == '__main__':\n"
+    "    unittest.main()\n")
+
+FORGED_MTIME = 1_600_000_000
+
+
+def plant_stale_cache(worktree: Path, rel: str, stale_source: str,
+                      current_source: str | None = None) -> Path:
+    """Forge a bytecode cache Python's mtime+size check accepts for
+    the bytes on disk while the cache actually holds *stale_source*'s
+    bytecode.
+
+    Deterministic — no timing race: if *current_source* is given it
+    is written over the target first; the target's mtime is then
+    pinned with os.utime and the cache header (mtime + size fields)
+    is rewritten to match it exactly. (Patching the size field is
+    precisely the state a genuine same-size rewrite within one mtime
+    tick produces on its own.)
+    """
+    target = worktree / rel
+    handle, stale_path = tempfile.mkstemp(suffix='.py')
+    try:
+        with os.fdopen(handle, 'w', encoding='utf-8') as fh:
+            fh.write(stale_source)
+        cache = Path(importlib.util.cache_from_source(str(target)))
+        py_compile.compile(stale_path, cfile=str(cache), doraise=True)
+    finally:
+        os.unlink(stale_path)
+    if current_source is not None:
+        target.write_bytes(current_source.encode())
+    current = target.read_bytes()
+    os.utime(target, (FORGED_MTIME, FORGED_MTIME))
+    header = bytearray(cache.read_bytes())
+    header[8:16] = struct.pack('<II', FORGED_MTIME, len(current))
+    cache.write_bytes(bytes(header))
+    return cache
+
+
+def naive_import(worktree: Path, expression: str) -> str:
+    """Run a plain, unprotected import (no -B, no pycache prefix,
+    caches intact) — the control proving a planted trap is armed."""
+    env = {k: v for k, v in os.environ.items()
+           if k not in ('PYTHONPYCACHEPREFIX',
+                        'PYTHONDONTWRITEBYTECODE')}
+    proc = subprocess.run([sys.executable, '-c', expression],
+                          cwd=worktree, capture_output=True, text=True,
+                          env=env)
+    if proc.returncode != 0:
+        raise RuntimeError(f'control import failed: {proc.stderr}')
+    return proc.stdout.strip()
+
+
+def bytecode_leftovers(root: Path) -> list[str]:
+    return sorted(
+        str(p.relative_to(root)) for p in root.rglob('*')
+        if '.git' not in p.parts
+        and (p.name == '__pycache__' or p.suffix in ('.pyc', '.pyo')))
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -265,6 +339,152 @@ class ExecutorTests(unittest.TestCase):
         self.assertTrue(full['timed_out'])
         self.assertIsNone(full['exit_code'])
         self.assertLess(full['duration_seconds'], 30)
+
+
+class BytecodeFreshnessTests(unittest.TestCase):
+    """Verification must mean the bytes on disk (stale-cache flaw).
+
+    Python's timestamp cache validation compares only source mtime
+    (whole seconds) and size, so a same-size rewrite within one tick
+    is served stale bytecode by a plain interpreter. The runner's
+    layered defense — purge, fresh empty pycache prefix, no cache
+    writes — is exercised end to end against a deterministically
+    forged cache.
+    """
+
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.base = Path(temp.name)
+        self.home = self.base / 'profile'
+        self.repo = make_repo(self.base)
+        self.grants = TaskGrantStore(self.home)
+        self.executor = TaskExecutor(self.home)
+
+    def create_grant(self, repo, **overrides):
+        kwargs = dict(
+            objective='Synthetic objective', repository=repo,
+            queue_item_ids=['roadmap-1'], task_classes=['implement'],
+            allowed_files=['calc.py', 'tests/*.py'],
+            permitted_tools=['edit', 'run_tests'],
+            max_tasks=3, max_test_runs=50, max_retries_per_task=2,
+            max_wall_clock_seconds=3600, duration_seconds=3600,
+            confirmed=True)
+        kwargs.update(overrides)
+        return self.grants.create(**kwargs)
+
+    def test_templates_and_env_disable_bytecode_caches(self):
+        for template, kwargs in (('syntax', {'files': ['a.py']}),
+                                 ('targeted',
+                                  {'modules': ['tests.test_calc']}),
+                                 ('full', {})):
+            argv = build_command(template, self.repo, **kwargs)
+            self.assertEqual(argv[1], '-B', template)
+        prefix = self.base / 'some-prefix'
+        env = _scrubbed_env(self.repo, prefix)
+        self.assertEqual(env['PYTHONDONTWRITEBYTECODE'], '1')
+        self.assertEqual(env['PYTHONPYCACHEPREFIX'], str(prefix))
+        # Without a prefix the variable is simply absent (the caller
+        # passes a fresh one per run).
+        self.assertNotIn('PYTHONPYCACHEPREFIX',
+                         _scrubbed_env(self.repo))
+
+    def test_fresh_pycache_prefix_is_empty_and_removed(self):
+        with _fresh_pycache_prefix() as prefix:
+            self.assertTrue(prefix.is_dir())
+            self.assertEqual(list(prefix.iterdir()), [])
+        self.assertFalse(prefix.exists())
+
+    def test_purge_removes_only_bytecode_caches(self):
+        tree = self.base / 'tree'
+        (tree / 'pkg' / '__pycache__').mkdir(parents=True)
+        (tree / '__pycache__').mkdir()
+        (tree / '.git' / '__pycache__').mkdir(parents=True)
+        (tree / 'pkg' / 'mod.py').write_text('x = 1\n', encoding='utf-8')
+        (tree / 'pkg' / '__pycache__' / 'mod.cpython-312.pyc') \
+            .write_bytes(b'cache')
+        (tree / '__pycache__' / 'top.cpython-312.pyc').write_bytes(b'c')
+        (tree / '.git' / '__pycache__' / 'git.cpython-312.pyc') \
+            .write_bytes(b'cache')
+        (tree / 'loose.pyc').write_bytes(b'cache')
+        (tree / 'loose.pyo').write_bytes(b'cache')
+        (tree / 'keep.pyc.txt').write_text('not a cache',
+                                           encoding='utf-8')
+        removed = purge_bytecode_caches(tree)
+        # Two __pycache__ directories + the two loose cache files;
+        # the .git tree is never descended into.
+        self.assertEqual(removed, 4)
+        self.assertEqual(bytecode_leftovers(tree), [])
+        self.assertTrue((tree / '.git' / '__pycache__'
+                         / 'git.cpython-312.pyc').exists())
+        self.assertEqual((tree / 'pkg' / 'mod.py').read_text(
+            encoding='utf-8'), 'x = 1\n')
+        self.assertEqual((tree / 'keep.pyc.txt').read_text(
+            encoding='utf-8'), 'not a cache')
+
+    def test_purge_never_follows_symlinks_out_of_the_tree(self):
+        tree = self.base / 'tree'
+        (tree / 'sub').mkdir(parents=True)
+        outside = self.base / 'outside'
+        (outside / '__pycache__').mkdir(parents=True)
+        (outside / '__pycache__' / 'evil.pyc').write_bytes(b'cache')
+        try:
+            os.symlink(outside / '__pycache__',
+                       tree / 'sub' / '__pycache__',
+                       target_is_directory=True)
+            os.symlink(outside, tree / 'vendor',
+                       target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest('symlinks unavailable')
+        purge_bytecode_caches(tree)
+        # The symlinks are left in place and nothing outside the
+        # tree was removed.
+        self.assertTrue((tree / 'sub' / '__pycache__').is_symlink())
+        self.assertTrue((tree / 'vendor').is_symlink())
+        self.assertEqual(
+            (outside / '__pycache__' / 'evil.pyc').read_bytes(),
+            b'cache')
+
+    def test_runner_executes_disk_bytes_not_stale_cache(self):
+        stale_base = self.base / 'stalecase'
+        stale_base.mkdir()
+        stale_repo = make_repo(stale_base, {
+            'calc.py': VALUE_V1, 'tests/test_calc.py': TEST_VALUE})
+        grant = self.create_grant(stale_repo)
+        control = []
+
+        def plant_and_edit(item, worktree, diagnostics):
+            # Arm the trap inside the fresh worktree: the cache holds
+            # V1's bytecode, forged to match the same-size V2 source
+            # now on disk. A plain interpreter serves V1 (control);
+            # the constrained runner must serve the V2 bytes.
+            plant_stale_cache(worktree, 'calc.py', VALUE_V1, VALUE_V2)
+            control.append(naive_import(
+                worktree, 'from calc import value; print(value())'))
+            # An authorized edit so the attempt has stages to run:
+            # a same-content rewrite of the test file.
+            return [{'path': 'tests/test_calc.py',
+                     'content': TEST_VALUE}]
+
+        record = self.executor.execute(
+            grant['id'], ITEM, ScriptedEditor([plant_and_edit]))
+        self.assertEqual(control, ['1111'])  # trap armed, stale served
+        self.assertEqual(record['outcome'], 'succeeded')
+        runs = [r for r in record['attempts'][0]['runs']
+                if not r['skipped']]
+        self.assertTrue(runs)
+        self.assertTrue(all(r['exit_code'] == 0 for r in runs))
+        self.assertEqual(
+            bytecode_leftovers(Path(record['worktree'])), [])
+
+    def test_run_leaves_no_bytecode_caches_in_worktree(self):
+        grant = self.create_grant(self.repo)
+        record = self.executor.execute(
+            grant['id'], ITEM,
+            ScriptedEditor([[{'path': 'calc.py', 'content': FIXED}]]))
+        self.assertEqual(record['outcome'], 'succeeded')
+        self.assertEqual(
+            bytecode_leftovers(Path(record['worktree'])), [])
 
 
 class ExecutorCliTests(unittest.TestCase):

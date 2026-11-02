@@ -55,8 +55,9 @@ from .experience import ExperienceStore
 from .store import utc_now
 from .task_executor import (DEFAULT_COMMAND_TIMEOUT, ExecutorError,
                             RUN_TESTS_TOOL, TaskExecutionStore,
+                            _fresh_pycache_prefix,
                             _git as _executor_git, _scrubbed_env, _tail,
-                            build_command)
+                            build_command, purge_bytecode_caches)
 from .task_grants import TaskGrantStore
 from .task_operations import TaskOperationStore
 
@@ -417,12 +418,21 @@ class TaskPromoter:
             return run
         argv = build_command('full', worktree)
         run['argv'] = argv
+        # Bytecode freshness, exactly as in A3's runner: purge caches
+        # before and after the run, and run with a fresh empty
+        # pycache prefix plus the template's -B / the scrubbed
+        # environment's PYTHONDONTWRITEBYTECODE, so the verdict is
+        # earned by the candidate bytes on disk, never by a stale
+        # __pycache__ entry.
+        purge_bytecode_caches(worktree)
         started = time.monotonic()
         try:
-            proc = subprocess.run(
-                argv, cwd=worktree, env=_scrubbed_env(worktree),
-                capture_output=True, text=True,
-                timeout=self.command_timeout)
+            with _fresh_pycache_prefix() as prefix:
+                proc = subprocess.run(
+                    argv, cwd=worktree,
+                    env=_scrubbed_env(worktree, prefix),
+                    capture_output=True, text=True,
+                    timeout=self.command_timeout)
             run['exit_code'] = proc.returncode
             run['stdout_tail'] = _tail(proc.stdout)
             run['stderr_tail'] = _tail(proc.stderr)
@@ -435,6 +445,8 @@ class TaskPromoter:
             run['run_reason'] = 'runner_unavailable'
             run['duration_seconds'] = round(time.monotonic() - started, 3)
             return run
+        finally:
+            purge_bytecode_caches(worktree)
         run['duration_seconds'] = round(time.monotonic() - started, 3)
         run['ran'] = True
         run['green'] = run['exit_code'] == 0 and not run['timed_out']

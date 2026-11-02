@@ -29,6 +29,17 @@ Isolation:
   (never a shell string), a scrubbed environment, a timeout, and no
   network by construction. Only tools named in the grant's
   ``permitted_tools`` can be invoked at all.
+- Verification means the bytes on disk: before and after every
+  runner invocation, :func:`purge_bytecode_caches` removes any
+  ``__pycache__``/``*.pyc`` under the worktree; each run's scrubbed
+  environment points ``PYTHONPYCACHEPREFIX`` at a fresh empty
+  directory so every cache lookup misses and imports always compile
+  from source; and ``-B``/``PYTHONDONTWRITEBYTECODE=1`` stop runner
+  processes writing caches at all. A stale cache — Python's
+  mtime+size check can serve one when a same-size file is rewritten
+  within one mtime tick — can therefore never substitute old
+  bytecode for the candidate bytes being verified. (``-B`` alone
+  would not suffice: it governs writing, not reading.)
 - This module has no code path that reads the private Twin/identity
   stores. Its only profile access is the grant store (for
   ``authorize()``) and its own execution-record tables, in the same
@@ -55,8 +66,10 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 
@@ -343,24 +356,125 @@ def build_command(template: str, worktree: Path, *,
 
     There is deliberately no way to build an arbitrary command: an
     unknown template raises :class:`ExecutorError`.
+
+    Every template carries ``-B`` so the interpreter never *writes*
+    bytecode caches. Reading is governed separately: the scrubbed
+    environment points ``PYTHONPYCACHEPREFIX`` at a fresh empty
+    directory per run (every cache lookup misses, so imports compile
+    from the source bytes on disk) and the pre/post-run purge removes
+    any caches already in the tree. Together these make Python's
+    mtime+size cache check irrelevant to runner verdicts.
     """
     if template == 'syntax':
-        return [sys.executable, '-m', 'py_compile', *files]
+        return [sys.executable, '-B', '-m', 'py_compile', *files]
     if template == 'targeted':
-        return [sys.executable, '-m', 'unittest', '-v', *modules]
+        return [sys.executable, '-B', '-m', 'unittest', '-v', *modules]
     if template == 'full':
-        return [sys.executable, '-m', 'unittest', 'discover',
+        return [sys.executable, '-B', '-m', 'unittest', 'discover',
                 '-s', 'tests']
     raise ExecutorError(f'Unknown runner template: {template!r}')
 
 
-def _scrubbed_env(worktree: Path) -> dict:
+def _scrubbed_env(worktree: Path,
+                  pycache_prefix: Path | None = None) -> dict:
     env = {name: os.environ[name] for name in _ENV_ALLOWLIST
            if name in os.environ}
     env['HOME'] = str(worktree)
     env['PYTHONNOUSERSITE'] = '1'
     env['PYTHONIOENCODING'] = 'utf-8'
+    # Bytecode freshness, layered with the -B flag in every argv
+    # template and the pre/post-run purge: PYTHONDONTWRITEBYTECODE
+    # stops runner processes (and Python children inheriting this
+    # environment) writing caches, and a fresh empty
+    # PYTHONPYCACHEPREFIX makes every cache *read* miss, so imports
+    # always compile the source bytes currently on disk.
+    env['PYTHONDONTWRITEBYTECODE'] = '1'
+    if pycache_prefix is not None:
+        env['PYTHONPYCACHEPREFIX'] = str(pycache_prefix)
     return env
+
+
+@contextmanager
+def _fresh_pycache_prefix():
+    """Yield a fresh empty directory for one run's PYTHONPYCACHEPREFIX.
+
+    The directory is created outside the candidate worktree and
+    removed when the run ends, whatever the outcome. Because it
+    starts empty and bytecode writing is disabled, it stays empty:
+    its only job is to make cache lookups miss.
+    """
+    path = Path(tempfile.mkdtemp(prefix='athenz-pycache-'))
+    try:
+        yield path
+    finally:
+        shutil.rmtree(path, ignore_errors=True)
+
+
+# Bound on the cache-purge walk, so a pathological tree cannot make
+# a runner invocation scan forever. No single layer is load-bearing:
+# the purge removes caches already in the tree, the fresh empty
+# PYTHONPYCACHEPREFIX makes runner cache reads miss, and -B /
+# PYTHONDONTWRITEBYTECODE stop runner processes writing new ones.
+_MAX_PURGE_ENTRIES = 100_000
+
+
+def purge_bytecode_caches(root: Path) -> int:
+    """Remove bytecode caches under *root*; return the count removed.
+
+    Only directories named ``__pycache__`` and files ending in
+    ``.pyc``/``.pyo`` are removed — never source files or anything
+    else. The walk never follows symlinks: a symlinked ``__pycache__``
+    directory or cache file is left untouched, symlinked directories
+    are not descended into, and ``.git`` is not descended into
+    (bytecode there is never imported). Every removal is
+    containment-checked against the resolved *root* first, in the
+    same path-safety discipline as :func:`_resolve_edit_path`.
+
+    Removal is best-effort per entry: an entry that cannot be removed
+    is skipped rather than failing the run, because the run's fresh
+    empty ``PYTHONPYCACHEPREFIX`` independently makes any surviving
+    cache invisible to the verification process's imports.
+    """
+    root = Path(root)
+    if root.is_symlink() or not root.is_dir():
+        return 0
+    resolved_root = root.resolve()
+    removed = 0
+    seen = 0
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+        seen += len(dirnames) + len(filenames)
+        if seen > _MAX_PURGE_ENTRIES:
+            break
+        base = Path(dirpath)
+        descend = []
+        for name in dirnames:
+            candidate = base / name
+            if name == '__pycache__':
+                if not candidate.is_symlink() \
+                        and candidate.resolve().is_relative_to(
+                            resolved_root):
+                    shutil.rmtree(candidate, ignore_errors=True)
+                    if not candidate.exists():
+                        removed += 1
+                continue  # never descend into a cache directory
+            if name == '.git' or candidate.is_symlink():
+                continue
+            descend.append(name)
+        dirnames[:] = descend
+        for name in filenames:
+            if not name.endswith(('.pyc', '.pyo')):
+                continue
+            candidate = base / name
+            if candidate.is_symlink() \
+                    or not candidate.resolve().is_relative_to(
+                        resolved_root):
+                continue
+            try:
+                candidate.unlink()
+                removed += 1
+            except OSError:
+                continue
+    return removed
 
 
 class _Clock:
@@ -469,12 +583,21 @@ class TaskExecutor:
             raise _StopRun(
                 _deny_outcome(check['reason'], phase='run'),
                 check['reason'])
+        # Bytecode freshness: drop any pre-existing caches, run with
+        # a fresh empty pycache prefix so cache reads miss, and drop
+        # whatever the run leaves so the kept worktree carries no
+        # caches into later stages, proposals or owner review. (The
+        # layers are independent: py_compile writes its cache even
+        # under -B, and -B alone does not stop cache reads.)
+        purge_bytecode_caches(worktree)
         started = time.monotonic()
         try:
-            proc = subprocess.run(
-                argv, cwd=worktree, env=_scrubbed_env(worktree),
-                capture_output=True, text=True,
-                timeout=self.command_timeout)
+            with _fresh_pycache_prefix() as prefix:
+                proc = subprocess.run(
+                    argv, cwd=worktree,
+                    env=_scrubbed_env(worktree, prefix),
+                    capture_output=True, text=True,
+                    timeout=self.command_timeout)
             run['exit_code'] = proc.returncode
             run['stdout_tail'] = _tail(proc.stdout)
             run['stderr_tail'] = _tail(proc.stderr)
@@ -485,6 +608,8 @@ class TaskExecutor:
         except OSError as exc:
             run['stderr_tail'] = f'runner unavailable: {exc}'
             run['exit_code'] = None
+        finally:
+            purge_bytecode_caches(worktree)
         run['duration_seconds'] = round(time.monotonic() - started, 3)
         return run
 

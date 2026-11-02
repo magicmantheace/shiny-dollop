@@ -2,12 +2,16 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import io
 import json
 import os
 from contextlib import redirect_stdout
 from pathlib import Path
+import py_compile
+import struct
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -77,6 +81,56 @@ def make_repo(base: Path, calc_content: str) -> Path:
     _git(repo, 'add', '-A')
     _git(repo, 'commit', '-q', '-m', 'fixture')
     return repo
+
+
+FORGED_MTIME = 1_600_000_000
+
+
+def plant_stale_cache(worktree: Path, rel: str,
+                      stale_source: str) -> Path:
+    """Forge a bytecode cache Python's mtime+size check accepts for
+    the bytes currently on disk while the cache actually holds
+    *stale_source*'s bytecode. Deterministic: the target's mtime is
+    pinned with os.utime and the cache header is rewritten to match
+    (the state a same-size rewrite within one mtime tick produces
+    naturally). Mirrors the helper in tests/test_task_executor.py.
+    """
+    target = worktree / rel
+    handle, stale_path = tempfile.mkstemp(suffix='.py')
+    try:
+        with os.fdopen(handle, 'w', encoding='utf-8') as fh:
+            fh.write(stale_source)
+        cache = Path(importlib.util.cache_from_source(str(target)))
+        py_compile.compile(stale_path, cfile=str(cache), doraise=True)
+    finally:
+        os.unlink(stale_path)
+    current = target.read_bytes()
+    os.utime(target, (FORGED_MTIME, FORGED_MTIME))
+    header = bytearray(cache.read_bytes())
+    header[8:16] = struct.pack('<II', FORGED_MTIME, len(current))
+    cache.write_bytes(bytes(header))
+    return cache
+
+
+def naive_import(worktree: Path, expression: str) -> str:
+    """Run a plain, unprotected import — the control proving a
+    planted stale-cache trap is armed."""
+    env = {k: v for k, v in os.environ.items()
+           if k not in ('PYTHONPYCACHEPREFIX',
+                        'PYTHONDONTWRITEBYTECODE')}
+    proc = subprocess.run([sys.executable, '-c', expression],
+                          cwd=worktree, capture_output=True, text=True,
+                          env=env)
+    if proc.returncode != 0:
+        raise RuntimeError(f'control import failed: {proc.stderr}')
+    return proc.stdout.strip()
+
+
+def bytecode_leftovers(root: Path) -> list[str]:
+    return sorted(
+        str(p.relative_to(root)) for p in root.rglob('*')
+        if '.git' not in p.parts
+        and (p.name == '__pycache__' or p.suffix in ('.pyc', '.pyo')))
 
 
 class PromotionTests(unittest.TestCase):
@@ -179,10 +233,11 @@ class PromotionTests(unittest.TestCase):
     def break_worktree_tests(self, record):
         """Break the worktree's tests after the execution ran.
 
-        The broken file has the same size as the original, so its
-        mtime is moved forward explicitly — otherwise Python would
-        (correctly, by its own rules) reuse the stale bytecode cache
-        and the fresh regression would not see the break.
+        The broken file has the same size as the original; its mtime
+        is moved forward explicitly so the change is unambiguous even
+        to a plain interpreter's bytecode-cache check. (The A3/A5
+        runner itself no longer consults caches at all — see
+        test_regression_ignores_stale_bytecode_cache.)
         """
         broken = Path(record['worktree']) / 'tests' / 'test_calc.py'
         broken.write_text(TEST_CALC_BROKEN, encoding='utf-8')
@@ -201,6 +256,26 @@ class PromotionTests(unittest.TestCase):
         self.assertTrue(regression['ran'])
         self.assertFalse(regression['green'])
         self.assertEqual(regression['exit_code'], 1)
+
+    def test_regression_ignores_stale_bytecode_cache(self):
+        record = self.run_success()
+        worktree = Path(record['worktree'])
+        # Forge the stale-cache trap against the candidate: the
+        # cache holds the BUGGY bytecode, but its header matches the
+        # FIXED bytes on disk, so a plain interpreter serves the
+        # buggy module and the regression would wrongly run red.
+        plant_stale_cache(worktree, 'calc.py', BUGGY)
+        control = naive_import(
+            worktree, 'from calc import add; print(add(2, 3))')
+        self.assertEqual(control, '-1')  # trap armed: stale served
+        proposal = self.promoter.prepare_proposal(record['id'])
+        # The fresh regression judged the bytes on disk: green.
+        self.assertTrue(proposal['promotable'])
+        self.assertEqual(proposal['not_promotable_reason'], '')
+        self.assertTrue(proposal['regression']['green'])
+        self.assertEqual(proposal['regression']['exit_code'], 0)
+        # And it left no caches behind in the kept worktree.
+        self.assertEqual(bytecode_leftovers(worktree), [])
 
     # -- checkpoint commit ---------------------------------------------------
 

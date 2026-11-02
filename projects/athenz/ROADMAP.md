@@ -128,6 +128,13 @@ existing supervised/manual behavior remains the default.
   fixed-template, environment-scrubbed host runner (not yet a container);
   the editor interface ships with a deterministic scripted editor — no
   model editor is integrated yet.*
+  *Hardening (2026-11-02): runner verdicts are bytecode-fresh — worktree
+  caches are purged around every run, cache reads are redirected to a
+  fresh empty per-run `PYTHONPYCACHEPREFIX`, and cache writes are
+  disabled (`-B`/`PYTHONDONTWRITEBYTECODE`), closing the stale-bytecode
+  case where a same-size rewrite within one mtime tick could otherwise
+  be verified against old bytecode. The same layers cover slice A5's
+  regression-at-proposal run, which shares this runner.*
 - [x] **A4 — Durable, inspectable operations:** persist the task queue, model/
   code/permission fingerprints, stage state, output summaries and checkpoints
   across shutdowns or model changes. Verify grants, file scope and base

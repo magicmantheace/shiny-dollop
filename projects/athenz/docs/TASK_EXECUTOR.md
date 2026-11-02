@@ -93,8 +93,29 @@ will get no wider powers than this interface and the grant allow.
 - **Scrubbed environment.** A test command inherits only `PATH`,
   `PATHEXT`, `SYSTEMROOT`, `WINDIR`, `COMSPEC`, `TEMP`/`TMP`/`TMPDIR`,
   `LANG`, `LC_*` and `TZ`. `HOME` is redirected into the worktree;
-  `PYTHONNOUSERSITE=1` is set. Credentials, tokens, `ATHENZ_HOME` and
-  `PYTHONPATH` never reach a test process.
+  `PYTHONNOUSERSITE=1`, `PYTHONDONTWRITEBYTECODE=1` and a per-run
+  `PYTHONPYCACHEPREFIX` (see bytecode freshness below) are set.
+  Credentials, tokens, `ATHENZ_HOME` and `PYTHONPATH` never reach a
+  test process.
+- **Bytecode freshness.** A verdict is earned by the source bytes on
+  disk, never by a `__pycache__` entry. Python's timestamp-based
+  cache validation compares only the source's mtime (whole seconds)
+  and size, so a same-size file rewritten within one mtime tick is
+  served *stale* bytecode by a plain interpreter — meaning a
+  verification run could pass or fail against code that is no longer
+  on disk. The runner defends in independent layers: (1) bytecode
+  caches under the worktree are purged before and after every
+  invocation (only `__pycache__` directories and `*.pyc`/`*.pyo`
+  files; symlinks are never followed out of the tree); (2) the
+  scrubbed environment points `PYTHONPYCACHEPREFIX` at a fresh
+  empty directory created per run and removed afterwards, so every
+  cache lookup misses and imports compile from source; (3) `-B` in
+  every argv template and `PYTHONDONTWRITEBYTECODE=1` stop runner
+  processes writing caches at all. Note `-B` alone would not
+  suffice — it governs writing, not reading — which is why the
+  layers are combined. A side benefit: runs leave no `__pycache__`
+  behind in the kept worktree. Slice A5's regression-at-proposal run
+  shares this runner and gets the same guarantee.
 - **Timeout.** Every invocation is bounded (`--command-timeout`,
   default 120 s); a timeout is recorded as a failed run with
   `timed_out: true`, not as an executor crash.

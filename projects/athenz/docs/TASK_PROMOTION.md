@@ -160,8 +160,15 @@ its fresh regression did not earn.
 - **The regression is the repository's own test suite**, run with
   the owner's privileges minus A3's scrubbed environment — the same
   honest limit A3 documents for its runner. It is evidence, not a
-  sandbox verdict, and it inherits Python's own bytecode-cache
-  semantics for files rewritten inside one mtime tick.
+  sandbox verdict. (An earlier version of this note flagged that the
+  regression inherited Python's bytecode-cache semantics for files
+  rewritten inside one mtime tick — a same-size rewrite could be
+  judged against stale bytecode. That is **fixed**: the shared A3
+  runner now purges worktree caches around every run, redirects
+  cache reads to a fresh empty per-run `PYTHONPYCACHEPREFIX`, and
+  disables cache writes, so the regression judges the candidate
+  bytes on disk. See "Bytecode freshness" in
+  `docs/TASK_EXECUTOR.md`.)
 - **No composition.** Each proposal is one execution's candidate.
   Combining several items' candidates into one landing is owner
   work at landing time, not something this module stages.
