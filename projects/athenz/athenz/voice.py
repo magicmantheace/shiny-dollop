@@ -402,6 +402,29 @@ def evaluate_wav(path: Path, model_dir: Path, reference: Path, *,
             'model_downloaded': False, 'training_authorized': False}
 
 
+def _require_voice_connector() -> None:
+    """Consult the local-connectors registry before CLI transcription.
+
+    Since v0.8's connector framework, the builtin ``voice-transcription``
+    integration is owner-controlled through ``athenz-connectors``: it is
+    enabled under the documented legacy rule (the owner validated this
+    exact flow on hardware before the registry existed) until the owner
+    disables it, after which transcription refuses here until an
+    explicit re-opt-in. This gate is ADDITIONAL to — never a replacement
+    for — the per-use ``--confirm`` and every privacy check inside
+    ``transcribe_wav``/``evaluate_wav``.
+    """
+    from .local_connectors import LocalConnectorStore, VOICE_INTEGRATION_ID
+    decision = LocalConnectorStore().require(VOICE_INTEGRATION_ID, 'read')
+    if not decision['allowed']:
+        raise VoiceError(
+            'Voice transcription is refused by the local connector '
+            f"registry: integration 'voice-transcription' state is "
+            f"{decision['state']} ({decision['reason']}). Re-enable with: "
+            'athenz-connectors opt-in voice-transcription --tier read '
+            '--confirm')
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         prog='athenz-voice', description='Offline, opt-in transcription of an existing local WAV')
@@ -438,6 +461,7 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == 'inspect-model':
         report = inspect_local_model(args.model)
     elif args.command == 'evaluate':
+        _require_voice_connector()
         report = evaluate_wav(args.wav, args.model, args.reference,
                               confirmed=args.confirm, device=args.device,
                               language=args.language)
@@ -445,6 +469,7 @@ def main(argv: list[str] | None = None) -> None:
         report = score_text_files(args.reference, args.hypothesis,
                                   confirmed=args.confirm)
     else:
+        _require_voice_connector()
         report = transcribe_wav(args.wav, args.model, confirmed=args.confirm,
                                 device=args.device, language=args.language)
     print(json.dumps(report, ensure_ascii=False, indent=2))

@@ -1216,6 +1216,45 @@ owner profile data or unattended coding action implied by this milestone.
   ground-truth corpus are not verified by public synthetic tests.
 
 
+### 2026-11-02 — Local connectors framework and unified opt-in/disable controls (v0.8)
+
+- [x] New `athenz/local_connectors.py` registry is the single control
+  plane for local integrations: every integration starts
+  `not_opted_in`, opt-in is an explicit owner action recorded **per
+  tier** (approving `read` never approves `write`), and disable is
+  frictionless, clears the approved tiers and takes effect on the very
+  next gate check — approvals are read from the private profile store
+  at check time, never cached. Every gate decision (allow and refuse,
+  with distinct reasons `unknown_integration` / `not_opted_in` /
+  `disabled` / `tier_not_approved`) and every state change is
+  append-only audit-logged. Owner CLI: `athenz-connectors`
+  (list / show / opt-in / disable / audit).
+  *Implementation (2026-11-02): `athenz/local_connectors.py` +
+  `athenz/local_connectors_cli.py` + `docs/LOCAL_CONNECTORS.md`,
+  implemented on the post-v1-development branch, pending owner
+  review; not merged.*
+- [x] Voice legacy rule, implemented exactly as documented: the
+  builtin `voice-transcription` integration is seeded `enabled`
+  (read tier, provenance `legacy-owner-validated`) the first time
+  the registry is consulted, because the owner already validated
+  that exact flow on hardware pre-registry; every other integration
+  starts `not_opted_in` with no exceptions, and once the owner
+  disables voice it behaves like any other integration.
+  `athenz-voice transcribe`/`evaluate` consult the gate before any
+  transcription work; the per-use `--confirm` and all existing
+  privacy gates are untouched.
+- [x] One real reference connector ships with the framework:
+  `local-notes` reads text/markdown files from ONE owner-configured
+  directory (bare names only, symlink and `..` escapes refused,
+  size-bounded) and, only under a separately approved write tier,
+  creates new note files there — create-only, never overwrite.
+  Connectors in this slice are LOCAL ONLY; any network integration
+  is a separate future design requiring its own review.
+- [ ] Voice hardware acceptance remains the owner's: real
+  faster-whisper accuracy/CPU/CUDA behavior and accessible voice
+  controls on the owner PC are still unverified, as recorded in the
+  2026-10-13 v0.8 voice entries above.
+
 ### 2026-10-14 — v0.7 repeated held-out scenario preflight
 
 - [x] Reject punctuation/Unicode-equivalent duplicates and strong lexical

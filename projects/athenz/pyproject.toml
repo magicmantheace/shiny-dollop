@@ -42,6 +42,7 @@ athenz-task-promote = "athenz.task_promotion_cli:main"
 athenz-decision-timeline = "athenz.decision_longitudinal:main"
 athenz-artifact-attestations = "athenz.artifact_attestations_cli:main"
 athenz-contradiction-review = "athenz.contradiction_review_cli:main"
+athenz-connectors = "athenz.local_connectors_cli:main"
 
 [tool.setuptools.packages.find]
 include = ["athenz*"]

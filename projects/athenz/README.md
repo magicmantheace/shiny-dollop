@@ -408,6 +408,20 @@ recorded against exact bytes; it does not prove the issuing runner
 was honest. See
 [the artifact attestations doc](docs/ARTIFACT_ATTESTATIONS.md).
 
+`athenz-connectors` is the v0.8 control plane for local integrations:
+every integration starts opted out, the owner opts in per tier
+(approving `read` never approves `write`), and disabling is immediate
+and needs no confirmation. The one reference connector,
+`local-notes`, reads text/markdown notes from a single
+owner-configured directory and — only under a separately approved
+write tier — creates new notes there without ever overwriting.
+Offline voice transcription is grandfathered as enabled under a
+documented legacy rule (it was owner-validated before the registry
+existed); every other integration starts opted out, and a disabled
+voice behaves like any other integration. Connectors in this slice
+are local only. See
+[the local connectors doc](docs/LOCAL_CONNECTORS.md).
+
 Your reviewed feedback and independently checked results may inform future
 prompt context. Experimental QLoRA updates require separate owner consent,
 training evaluation and explicit selection; no model is auto-promoted.
