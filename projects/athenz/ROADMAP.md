@@ -128,12 +128,19 @@ existing supervised/manual behavior remains the default.
   fixed-template, environment-scrubbed host runner (not yet a container);
   the editor interface ships with a deterministic scripted editor — no
   model editor is integrated yet.*
-- [ ] **A4 — Durable, inspectable operations:** persist the task queue, model/
+- [x] **A4 — Durable, inspectable operations:** persist the task queue, model/
   code/permission fingerprints, stage state, output summaries and checkpoints
   across shutdowns or model changes. Verify grants, file scope and base
   revisions on resume; avoid duplicate commits or replayed side effects.
   Detect loops and stalls, enforce time/compute budgets and allow the owner
   to see what was attempted, changed, tested, blocked or left unfinished.
+  *Implementation (2026-11-02): `athenz/task_operations.py` +
+  `athenz-task-operations` CLI + `docs/TASK_OPERATIONS.md`, implemented on
+  the post-v1-development branch, pending owner review; not merged, and
+  owner-device acceptance (A6) has not been performed. Items execute as
+  independent A3 worktree executions (no composition of uncommitted
+  edits — that is A5 promotion), under a documented single-driver
+  assumption.*
 - [ ] **A5 — Promotion and self-development boundary:** candidate edits and
   explicitly granted *local checkpoint commits* may occur only in isolated
   branches. No unattended remote push, merge to a protected branch, release,

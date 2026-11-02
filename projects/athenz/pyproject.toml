@@ -37,6 +37,7 @@ athenz-heldout-import = "athenz.heldout_import:main"
 athenz-project-planner = "athenz.project_planner:main"
 athenz-task-grants = "athenz.task_grants_cli:main"
 athenz-task-executor = "athenz.task_executor_cli:main"
+athenz-task-operations = "athenz.task_operations_cli:main"
 athenz-decision-timeline = "athenz.decision_longitudinal:main"
 
 [tool.setuptools.packages.find]

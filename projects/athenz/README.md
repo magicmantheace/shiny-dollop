@@ -356,6 +356,16 @@ attempt — failures included — is recorded in the private profile.
 The scratch branch is kept for owner review; nothing is committed,
 merged or pushed. See [the task executor doc](docs/TASK_EXECUTOR.md).
 
+`athenz-task-operations` is slice A4 of the same track: it runs an
+ordered list of planner items under one grant as a durable operation,
+checkpointing per-item state in the private profile before and after
+each item. A crash mid-item leaves the item suspect — never silently
+succeeded — and resume re-verifies the grant's permission fingerprint
+and each item's base revision, never re-executes completed items,
+detects stalls from repeated identical failures, and reports exactly
+what was attempted, changed, tested, blocked or left unfinished. See
+[the task operations doc](docs/TASK_OPERATIONS.md).
+
 Your reviewed feedback and independently checked results may inform future
 prompt context. Experimental QLoRA updates require separate owner consent,
 training evaluation and explicit selection; no model is auto-promoted.
