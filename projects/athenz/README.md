@@ -152,6 +152,24 @@ The audit is limited to 5,000 approved records and displays at most 80 pairs
 and most natural-language contradictions will not be detected. See
 [consistency audit protocol](docs/MEMORY_CONSISTENCY.md).
 
+## Adjudicate contradiction candidates over approved memory
+
+`athenz-contradiction-review` (or **Review memory → Review
+contradictions…** in the desktop) goes one step further than the audit
+above: a deterministic lexical scan over **approved** identity records,
+decisions and episodes proposes candidate pairs that share a topic
+signal *and* an opposition signal — negation asymmetry, opposite
+first-person preference markers, or a conflicting structured slot
+(identical decision scenario with a different choice, a reversed
+"prefer A over B", the same "my favourite … is" slot). Detection never
+changes a record. The owner adjudicates each candidate — keep A, keep
+B (the loser is superseded through the existing status/event
+machinery, with the candidate recorded as provenance), keep both with
+a note, dismiss, or defer — and every adjudication is logged in the
+private profile. Matching is lexical, not understanding: false
+positives are expected and paraphrased contradictions are missed. See
+[the contradiction review doc](docs/CONTRADICTION_REVIEW.md).
+
 ## Same-session conversational continuity (local, unverified)
 
 AthenZ now retains its recent ten chat turns and, when an older **user-written**

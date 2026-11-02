@@ -730,7 +730,18 @@ See [docs/TWIN_STYLE_COMPARISON.md](docs/TWIN_STYLE_COMPARISON.md).
   `athenz-artifact-attestations` CLI + `docs/ARTIFACT_ATTESTATIONS.md`,
   implemented on the post-v1-development branch, pending owner review;
   not merged.*
-- [ ] Semantic contradiction matching and explicit owner adjudication UI.
+- [x] Semantic contradiction matching and explicit owner adjudication UI.
+  *Implementation (2026-11-02): `athenz/contradiction_review.py` +
+  `athenz-contradiction-review` CLI + desktop Review contradictions panel
+  (`athenz/contradiction_panel.py`) + `docs/CONTRADICTION_REVIEW.md`,
+  implemented on the post-v1-development branch, pending owner review;
+  not merged. Detection is deterministic lexical matching (negation
+  asymmetry, opposite-preference markers, three conservative slot
+  shapes) over approved identity/decision/episode records; it proposes
+  candidates only. Owner adjudication (keep A / keep B / keep both /
+  dismiss / defer) is recorded with candidate provenance, and a
+  confirmed keep supersedes the loser through the existing status +
+  append-only event machinery. Nothing auto-resolves.*
 - [ ] Scoped, isolated worktree coding runner and autonomous scheduler (v0.4).
 
 ## v0.5 private offline QLoRA groundwork (2026-10-11)

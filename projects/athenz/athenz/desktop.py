@@ -287,6 +287,37 @@ class DesktopService:
         finally:
             store.close()
 
+    def contradiction_candidates(self, *, limit: int = 80) -> dict:
+        """Owner-triggered scan + actionable candidate list; changes no record.
+
+        Detection stores candidate proposals only. A candidate is a lexical
+        hint, never a verdict; records change solely through an explicitly
+        confirmed adjudication below.
+        """
+        from .contradiction_review import ContradictionStore
+        store = ContradictionStore(self.home)
+        report = store.scan()
+        return {'scan': report,
+                'candidates': store.candidates(state='actionable', limit=limit)}
+
+    def contradiction_detail(self, candidate_id: int) -> dict:
+        """Complete PRIVATE records behind one candidate, for owner review."""
+        if type(candidate_id) is not int or candidate_id <= 0:
+            raise DesktopError('Choose a valid contradiction candidate')
+        from .contradiction_review import ContradictionStore
+        return ContradictionStore(self.home).detail(candidate_id)
+
+    def adjudicate_contradiction(self, candidate_id: int, action: str, *,
+                                 resolution: str | None = None, note: str = '',
+                                 confirmed: bool = False) -> dict:
+        """Apply one owner decision; supersession uses the existing machinery."""
+        if type(candidate_id) is not int or candidate_id <= 0 or confirmed is not True:
+            raise DesktopError('Inspect the candidate and explicitly confirm a decision')
+        from .contradiction_review import ContradictionStore
+        return ContradictionStore(self.home).adjudicate(
+            candidate_id, action=action, resolution=resolution, note=note,
+            confirmed=True)
+
     def approved_memories(self, *, limit: int = 100) -> list[dict]:
         """Private, bounded owner-management view; never exposes pending claims as facts."""
         if type(limit) is not int or not 1 <= limit <= 200:
@@ -1120,6 +1151,9 @@ def launch(home: Path | None = None, *, smoke_duration_ms: int | None = None) ->
     conflict_toolbar.pack(fill='x', pady=(0, 6))
     from .conflict_panel import mount_conflict_review_button
     mount_conflict_review_button(conflict_toolbar, window, review_tree, home, reload_reviews)
+    from .contradiction_panel import mount_contradiction_review_button
+    contradiction_button = mount_contradiction_review_button(
+        conflict_toolbar, window, service, set_status, reload_reviews)
 
     from .desktop_tasks import DesktopTasks
     from .task_panel import mount_task_panel
@@ -1384,6 +1418,9 @@ def launch(home: Path | None = None, *, smoke_duration_ms: int | None = None) ->
         if cancel_button.cget('text') != 'Cancel reply' or str(cancel_button.cget('state')) != 'disabled':
             window.destroy()
             raise DesktopError('GUI smoke did not start with reply cancellation disabled')
+        if contradiction_button.cget('text') != 'Review contradictions…':
+            window.destroy()
+            raise DesktopError('GUI smoke did not mount the contradiction review')
         window.after(smoke_duration_ms, window.destroy)
     def on_close() -> None:
         # Closing the UI withdraws consent to persist a reply still in flight.
