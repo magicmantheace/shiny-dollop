@@ -40,6 +40,7 @@ athenz-task-executor = "athenz.task_executor_cli:main"
 athenz-task-operations = "athenz.task_operations_cli:main"
 athenz-task-promote = "athenz.task_promotion_cli:main"
 athenz-decision-timeline = "athenz.decision_longitudinal:main"
+athenz-artifact-attestations = "athenz.artifact_attestations_cli:main"
 
 [tool.setuptools.packages.find]
 include = ["athenz*"]

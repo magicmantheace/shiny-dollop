@@ -725,7 +725,11 @@ See [docs/TWIN_STYLE_COMPARISON.md](docs/TWIN_STYLE_COMPARISON.md).
 - [x] Current-test evidence gating for retrieved procedural lessons.
 - [x] Revision-checked, restart-safe task checkpoints; contents do not execute.
 - [x] Append-only metadata event triggers and synthetic lifecycle tests.
-- [ ] Verified artifact IDs and reproducible external test attestations.
+- [x] Verified artifact IDs and reproducible external test attestations.
+  *Implementation (2026-11-02): `athenz/artifact_attestations.py` +
+  `athenz-artifact-attestations` CLI + `docs/ARTIFACT_ATTESTATIONS.md`,
+  implemented on the post-v1-development branch, pending owner review;
+  not merged.*
 - [ ] Semantic contradiction matching and explicit owner adjudication UI.
 - [ ] Scoped, isolated worktree coding runner and autonomous scheduler (v0.4).
 

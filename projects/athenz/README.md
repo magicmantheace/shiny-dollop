@@ -378,6 +378,18 @@ deploy or self-update operation: landing a candidate remains a
 separate owner decision through the owner's own route. See
 [the task promotion doc](docs/TASK_PROMOTION.md).
 
+`athenz-artifact-attestations` closes a v0.3 item: any file can be
+registered under a verified artifact ID (the SHA-256 of its exact
+bytes), and the tool can attest it by running a `unittest` suite
+itself and recording the real result — failures included — in an
+append-only, digest-sealed record in the private profile.
+Verification recomputes the artifact hash and every record digest,
+and export/import moves an artifact's evidence between profiles with
+tampering detected on ingest. An attestation proves a result was
+recorded against exact bytes; it does not prove the issuing runner
+was honest. See
+[the artifact attestations doc](docs/ARTIFACT_ATTESTATIONS.md).
+
 Your reviewed feedback and independently checked results may inform future
 prompt context. Experimental QLoRA updates require separate owner consent,
 training evaluation and explicit selection; no model is auto-promoted.
