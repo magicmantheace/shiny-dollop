@@ -338,6 +338,14 @@ invents no priorities (items without an explicit ordering signal are
 reported `unranked`), and executes nothing. See
 [the project planner doc](docs/PROJECT_PLANNER.md).
 
+`athenz-task-grants` is slice A2 of the same track: the owner can turn a
+reviewed plan into a narrow, expiring standing grant (one repository,
+task classes, file globs, tools, network policy and budgets), stored in
+the private profile with a full audit log of every authorization check.
+Default is off, push/merge/release/package installs and private-data
+access can never be granted, and revocation is immediate and permanent.
+See [the task grants doc](docs/TASK_GRANTS.md).
+
 Your reviewed feedback and independently checked results may inform future
 prompt context. Experimental QLoRA updates require separate owner consent,
 training evaluation and explicit selection; no model is auto-promoted.

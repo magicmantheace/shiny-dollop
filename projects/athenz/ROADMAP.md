@@ -104,12 +104,16 @@ existing supervised/manual behavior remains the default.
   `athenz-project-planner` CLI + `docs/PROJECT_PLANNER.md`, implemented on
   the post-v1-development branch, pending owner review; not merged, and
   owner-device acceptance (A6) has not been performed.*
-- [ ] **A2 — Narrow standing authorization:** an explicit local review grants
+- [x] **A2 — Narrow standing authorization:** an explicit local review grants
   a *specific* repository/worktree, task classes, allowed files, permitted
   tools and network policy, duration, resource/test/retry limits and expiry.
   Store a provenance-linked revocable grant. Default to off; never treat
   remembered preferences or the AI's own ideas as permission. Support
   immediate pause, cancellation and audit of every attempted operation.
+  *Implementation (2026-11-02): `athenz/task_grants.py` +
+  `athenz-task-grants` CLI + `docs/TASK_GRANTS.md`, implemented on the
+  post-v1-development branch, pending owner review; not merged, and
+  owner-device acceptance (A6) has not been performed.*
 - [ ] **A3 — Isolated execution and feedback loop:** use disposable worktrees/
   branches and a constrained runner (e.g., a pinned, policy-limited test
   container), not unrestricted host shell commands. Iterate plan → edit →
