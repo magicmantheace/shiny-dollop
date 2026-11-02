@@ -1,3 +1,83 @@
+# Minority archive joint recovery: retained discordant-evidence recovery — 2026-11-02 (FAILED / REGRESSION at k=32)
+
+Optional `developmental_ai/minority_archive_joint_recovery.py`
+(identical to the graded extended-reference candidate in acting
+model, extended signal, archive, concordance definition, joint
+recovery test, recovery model, abstention trigger and the full
+three-leg authority condition; the SINGLE new element is a
+MINORITY-ARCHIVE recovery branch below regular recovery and above
+abstention — minority set = archive-matched archive events
+discordant with the archive's own per-span majorities, armed iff
+minority_fraction >= 0.25 AND discordant >= 8, minority recovery
+iff a newest event is minority-concordant AND reference-opposed
+on the same event, acting through a model fitted on the minority
+set only; the carried-over authority neither arms nor disarms it)
+was evaluated under the protocol frozen BEFORE implementation at
+`benchmarks/minority_archive_joint_recovery_protocol.json` on NEW
+cohorts 372003/372021/372039 and 373001/373017/373041, both now
+INSPECTED — never re-tune against them. **Graded Failed under the
+protocol's own definitions (criterion 5 FAILs on the additional
+cohort) and a Regression under its checkpoint-32 clause
+(additional k=32 successes 68 < recent8 − 4 = 82); the other
+Regression clauses do not trigger (pooled onset harm well below
+recent8 both cohorts, control successes within 6 both, suite +
+transfer pass).** Per-criterion, development / additional,
+PRIMARY criterion 1 first (engagement (a), selectivity (b), harm
+(c), productivity (d)), then the co-graded guards 4 and 5: C1 B2
+protection PASS/PASS ((a) minority recovery TAKEN 6/6 dev and
+5/6 add pooled B2 onset states, fractions 0.299–0.339 / 0.272–0.308,
+armed at all 6 both; the records-only extended derivation took NO
+B2 onset state via recovery on either cohort, so the engagement
+IS credited to the minority branch — the first non-null targeted
+engagement in this line; (b) minority TAKEN 0/6 B1 and 0/6
+return-A both — B1 unarmed in all 12 states across cohorts,
+would-fire-but-disarmed 5/6 dev and 6/6 add, return-A
+minority_joint_count 0 in every state; (c) B2 harm 30 vs guard
+52 and ceiling 42.0, 29 vs guard 76 and ceiling 54.6; (d) B2
+successes 66 vs guard+16=28, 67 vs 20), C4 return-A harm
+PASS/PASS (45 vs guard 69 and ceiling 51.0; 28 vs guard 59 and
+ceiling 45.0 — identical to the extended baseline both), C5
+release FAIL/FAIL (abstentions 0/144 both; dev successes 79 vs
+recent8 68 PASS but records 2/9 non-recent8 k=32 states, both
+productive there; add successes 68 vs recent8 86 required ≥78
+AND records 2/9 — both additional late states scored 0/16:
+return-A minority_archive seed 373041 and B2 retained_archive
+seed 373017), C2 return-A successes PASS/PASS (51 vs frozen_A
+56, floors 22.4 and guard+16=27; 68 vs 62 / 37 — cumulative
+64 / 68 at 32 / 28 harm reported in full, beats the candidate on
+both axes dev and matches it add), C3 pooled onset harm
+PASS/PASS (128 vs guard 174, 6/6 cells ≤ recent8; 120 vs guard
+200, 6/6 — the criterion B2 sank in the preceding experiment),
+C6 stationary selectivity FAIL/PASS (dev abstentions 0/240 and
+successes 90 vs 92 PASS, harm 150 vs recent8 148 FAIL by 2 —
+entirely one regular-recovery firing at control k=8 seed
+372039; minority never fired on the control arm either cohort,
+fractions 0.167–0.212 / 0.132–0.199 unarmed throughout; add
+111 = 111 successes, 129 = 129 harm), C7 full accounting
+PASS/PASS (full decision records incl. the complete minority
+record, replay identity true everywhere, learner acquisition
+0). **The positive finding is recorded as prominently as the
+failure: second-switch onset protection from retained discordant
+evidence is demonstrated on these cohorts (handoff level 2–3,
+inversion simulator only — the minority read exploits the
+simulator's exact-inversion structure); what failed is release —
+the minority branch has no expiry by design and the regular
+branch's authority did not disarm the additional B2 late state,
+so two stale k=32 routings converted onset gains into a k=32
+regression against recent8.** Full unit suite (1017) and
+historical transfer benchmark passed in the evaluation and
+grading stages; no CI claimed for the evaluation or grading
+commits (UNVERIFIED). See
+`docs/MINORITY_ARCHIVE_JOINT_RECOVERY.md`. Keep the learner
+optional and unpromoted, default controller unchanged, no merge,
+no AthenZ/Synveil integration, D1–D10/V2A/V2B unchanged. Next
+limitation selected: P1 late persistence of the recovery
+branches at checkpoint 32, now including the minority branch —
+whether an evidence-derived authority/expiry for the minority
+(and carried-over) branches can restore k=32 release without
+giving back B2 onset protection or the first-return profile, on
+NEW cohorts under a NEW protocol.
+
 # Extended reference joint recovery: widened onset-signal reference — 2026-11-01 (PARTIALLY DEMONSTRATED)
 
 Optional `developmental_ai/extended_reference_joint_recovery.py`

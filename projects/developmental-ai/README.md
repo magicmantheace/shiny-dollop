@@ -1122,6 +1122,46 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 2 — Minority archive joint recovery: retained discordant-evidence recovery (FAILED / REGRESSION at k=32)
+
+Optional `MinorityArchiveJointRecoveryMemory` is identical to the
+graded extended-reference candidate in acting model, extended
+signal, retained archive, archive concordance, joint recovery
+test, recovery model, abstention trigger and the full three-leg
+authority condition; the SINGLE new element is a minority-archive
+recovery branch (below regular recovery, above abstention) that
+retains the archive's own discordant events as a minority set,
+armed iff minority_fraction ≥ 0.25 (pure-segment expectation
+0.1625), and routes through a minority-set-only model when a
+newest event is minority-concordant AND reference-opposed —
+under a protocol frozen before implementation (new cohorts
+372003-family / 373001-family, now INSPECTED). **Graded Failed
+(criterion 5 FAILs on the additional cohort) and a Regression
+under the protocol's checkpoint-32 clause (additional k=32
+successes 68 vs recent8 86, below the recent8 − 4 line).** The
+PRIMARY criterion 1 PASSes on both cohorts, and the engagement
+is credited to the mechanism — the first non-null targeted
+engagement in this line: minority recovery TAKEN at 6/6
+development and 5/6 additional B2 onset states where the
+extended derivation took none, B2 harm 30/29 vs the guard's
+52/76, B2 successes 66/67 vs the guard's 12/4, minority TAKEN
+0/6 at B1 and 0/6 at return-A on both cohorts; criteria 2, 3, 4,
+7 PASS on both cohorts (pooled onset harm 128/120 vs the guard's
+174/200 — the criterion B2 sank last cycle). What failed is
+release: criterion 5 FAILs on both cohorts (2 of 9 non-recent8
+k=32 states each; on additional both late states scored 0/16 —
+a late minority routing at return-A and a late regular routing
+at B2) and criterion 6 FAILs on development (control harm 150
+vs recent8 148, one control recovery firing at k=8). The
+minority branch has no expiry by design; second-switch onset
+protection from retained discordant evidence is demonstrated on
+these cohorts (level 2–3, inversion simulator only), but an
+unarmed-late gate cannot be left armed at checkpoint 32.
+Learner acquisition actions zero; external TRAIN actor harm
+published in full in the report. Optional only, no promotion, no
+merge.
+[Full graded report](docs/MINORITY_ARCHIVE_JOINT_RECOVERY.md).
+
 ### November 1 — Extended reference joint recovery: widened onset-signal reference (PARTIALLY DEMONSTRATED)
 
 Optional `ExtendedReferenceJointRecoveryMemory` is identical to the
