@@ -366,6 +366,18 @@ detects stalls from repeated identical failures, and reports exactly
 what was attempted, changed, tested, blocked or left unfinished. See
 [the task operations doc](docs/TASK_OPERATIONS.md).
 
+`athenz-task-promote` is slice A5 of the same track: the promotion
+boundary. For a succeeded execution it prepares a durable proposal —
+the candidate's full diff, the linked attempt evidence, a fresh
+full-suite regression run at proposal time, the grant's state and a
+rollback plan — and, only under explicit owner confirmation, creates
+one local checkpoint commit on the isolated scratch branch (refused
+if the candidate changed since the proposal) or discards the
+candidate outright. It exposes no push, merge, tag, release, install,
+deploy or self-update operation: landing a candidate remains a
+separate owner decision through the owner's own route. See
+[the task promotion doc](docs/TASK_PROMOTION.md).
+
 Your reviewed feedback and independently checked results may inform future
 prompt context. Experimental QLoRA updates require separate owner consent,
 training evaluation and explicit selection; no model is auto-promoted.

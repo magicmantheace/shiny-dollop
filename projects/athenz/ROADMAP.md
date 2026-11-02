@@ -141,13 +141,23 @@ existing supervised/manual behavior remains the default.
   independent A3 worktree executions (no composition of uncommitted
   edits — that is A5 promotion), under a documented single-driver
   assumption.*
-- [ ] **A5 — Promotion and self-development boundary:** candidate edits and
+- [x] **A5 — Promotion and self-development boundary:** candidate edits and
   explicitly granted *local checkpoint commits* may occur only in isolated
   branches. No unattended remote push, merge to a protected branch, release,
   package installation, deployment, update of the running AthenZ executable,
   removal of safeguards or cross-project action. Those remain separately
   reviewed owner decisions with regression and rollback checks; an update
   must not replace the currently functioning Twin on its own.
+  *Implementation (2026-11-02): `athenz/task_promotion.py` +
+  `athenz-task-promote` CLI + `docs/TASK_PROMOTION.md`, implemented on the
+  post-v1-development branch, pending owner review; not merged, and
+  owner-device acceptance (A6) has not been performed. The module prepares
+  proposals only for succeeded executions (full diff, linked A3/A4
+  evidence, a fresh full-suite regression at proposal time, grant state,
+  rollback plan), creates owner-confirmed local checkpoint commits on the
+  isolated scratch branch only when the worktree diff still matches the
+  proposal, and discards candidates under owner confirmation; it exposes
+  no push/merge/tag/release/install/deploy/self-update operation.*
 - [ ] **A6 — Owner-device acceptance:** on the intended Windows/WSL2 host,
   complete at least two independently selected eligible roadmap/issue tasks
   from one reviewed objective, including a real failing-test/debug/retest
