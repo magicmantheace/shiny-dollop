@@ -330,6 +330,14 @@ Passing syntax checks do **not** prove behavior. Actual project tests require
 the `athenz-worker test` opt-in Docker runner with a trusted, digest-pinned image.
 There is no host-side project test command or Git commit/push action.
 
+`athenz-project-planner --repo /path/to/repo` is the read-only slice A1 of
+the coding-autonomy track: it inspects an explicitly selected repository's
+roadmap and an optional owner-approved issues file and proposes a bounded,
+prioritized task queue as JSON. It writes nothing into the target repo,
+invents no priorities (items without an explicit ordering signal are
+reported `unranked`), and executes nothing. See
+[the project planner doc](docs/PROJECT_PLANNER.md).
+
 Your reviewed feedback and independently checked results may inform future
 prompt context. Experimental QLoRA updates require separate owner consent,
 training evaluation and explicit selection; no model is auto-promoted.

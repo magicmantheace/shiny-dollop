@@ -96,10 +96,14 @@ existing supervised/manual behavior remains the default.
 
 ### Development slices and acceptance gates
 
-- [ ] **A1 — Read-only project planner:** inspect an explicitly selected Git
+- [x] **A1 — Read-only project planner:** inspect an explicitly selected Git
   repository, roadmap, tests and owner-approved issues; propose a bounded,
   prioritized task queue with dependencies, success criteria, risk and scope.
   Don't invent owner priorities, rewrite the roadmap or expand permitted files.
+  *Implementation (2026-11-02): `athenz/project_planner.py` +
+  `athenz-project-planner` CLI + `docs/PROJECT_PLANNER.md`, implemented on
+  the post-v1-development branch, pending owner review; not merged, and
+  owner-device acceptance (A6) has not been performed.*
 - [ ] **A2 — Narrow standing authorization:** an explicit local review grants
   a *specific* repository/worktree, task classes, allowed files, permitted
   tools and network policy, duration, resource/test/retry limits and expiry.

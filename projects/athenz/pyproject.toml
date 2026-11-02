@@ -34,6 +34,7 @@ athenz-style-compare = "athenz.style_comparison:main"
 athenz-decision-compare = "athenz.paired_decisions:main"
 athenz-twin-readiness = "athenz.twin_readiness:main"
 athenz-heldout-import = "athenz.heldout_import:main"
+athenz-project-planner = "athenz.project_planner:main"
 athenz-decision-timeline = "athenz.decision_longitudinal:main"
 
 [tool.setuptools.packages.find]
