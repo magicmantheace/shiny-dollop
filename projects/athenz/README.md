@@ -346,6 +346,16 @@ Default is off, push/merge/release/package installs and private-data
 access can never be granted, and revocation is immediate and permanent.
 See [the task grants doc](docs/TASK_GRANTS.md).
 
+`athenz-task-executor` is slice A3 of the same track: it runs one
+planner queue item under one grant in a disposable Git worktree on a
+scratch branch, iterating edit → syntax → targeted tests → full
+regression with grant-bounded retries. Every edit and test run is
+authorized against the grant first, tests run through fixed argv
+templates with a scrubbed environment and no network, and every
+attempt — failures included — is recorded in the private profile.
+The scratch branch is kept for owner review; nothing is committed,
+merged or pushed. See [the task executor doc](docs/TASK_EXECUTOR.md).
+
 Your reviewed feedback and independently checked results may inform future
 prompt context. Experimental QLoRA updates require separate owner consent,
 training evaluation and explicit selection; no model is auto-promoted.

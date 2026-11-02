@@ -114,13 +114,20 @@ existing supervised/manual behavior remains the default.
   `athenz-task-grants` CLI + `docs/TASK_GRANTS.md`, implemented on the
   post-v1-development branch, pending owner review; not merged, and
   owner-device acceptance (A6) has not been performed.*
-- [ ] **A3 — Isolated execution and feedback loop:** use disposable worktrees/
+- [x] **A3 — Isolated execution and feedback loop:** use disposable worktrees/
   branches and a constrained runner (e.g., a pinned, policy-limited test
   container), not unrestricted host shell commands. Iterate plan → edit →
   syntax/targeted tests → broader regression → diagnose → retry with bounded
   attempts. Record actual test results and diffs, including failures; do not
   substitute model self-assessment or passing unit tests for task success.
   Prevent access to private Twin data, credentials and other repositories.
+  *Implementation (2026-11-02): `athenz/task_executor.py` +
+  `athenz-task-executor` CLI + `docs/TASK_EXECUTOR.md`, implemented on
+  the post-v1-development branch, pending owner review; not merged, and
+  owner-device acceptance (A6) has not been performed. The runner is a
+  fixed-template, environment-scrubbed host runner (not yet a container);
+  the editor interface ships with a deterministic scripted editor — no
+  model editor is integrated yet.*
 - [ ] **A4 — Durable, inspectable operations:** persist the task queue, model/
   code/permission fingerprints, stage state, output summaries and checkpoints
   across shutdowns or model changes. Verify grants, file scope and base
