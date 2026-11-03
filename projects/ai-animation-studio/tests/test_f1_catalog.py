@@ -77,6 +77,56 @@ class ManifestTests(unittest.TestCase):
             )
 
 
+class CatalogStateTests(unittest.TestCase):
+    def test_every_asset_carries_version_and_hashes(self):
+        for asset in CATALOG["assets"]:
+            meta = asset["metadata"]
+            self.assertEqual(meta["version"], "1.0.0", asset["asset_id"])
+            if asset["uri"].endswith((".gltf", ".glb")):
+                self.assertEqual(len(meta["sha256"]), 64, asset["asset_id"])
+            else:  # directory pack: per-piece digests instead of one hash
+                self.assertGreaterEqual(len(meta["pieces"]), 14)
+                for digest in meta["pieces"].values():
+                    self.assertEqual(len(digest), 64)
+        for character in CATALOG["characters"]:
+            self.assertEqual(character["version"], "1.0.0")
+
+    def test_stage_pieces_are_catalogued_furniture(self):
+        stage = MANIFEST["stage"]
+        kit = next(a for a in CATALOG["assets"] if a["asset_id"] == stage["asset_id"])
+        names = {Path(p["file"]).name for p in stage["pieces"]}
+        self.assertTrue({"table.glb", "chair.glb", "kitchenBar.glb"} <= names)
+        for piece in stage["pieces"]:
+            self.assertTrue(piece["file"].startswith(kit["uri"]))
+            self.assertIn(Path(piece["file"]).name, kit["metadata"]["pieces"])
+            self.assertEqual(len(piece["position"]), 3)
+
+    def test_demo_export_attaches_library_state(self):
+        with tempfile.TemporaryDirectory() as temp:
+            db = Path(temp) / "state.db"
+            self.assertEqual(main(["register", "--db", str(db)]), 0)
+            out = Path(temp) / "scene_runtime.json"
+            code = main(["demo", "--scene", "scene_tavern_v2.json",
+                         "--db", str(db), "--out", str(out)])
+            self.assertEqual(code, 0)
+            exported = json.loads(
+                (Path(temp) / "asset_manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(len(exported["assets"]), 9)
+            body = exported["assets"]["assets/characters/Superhero_Male_FullBody.gltf"]
+            self.assertEqual(body["status"], "candidate")
+            self.assertEqual(body["version"], "1.0.0")
+            catalog_body = next(a for a in CATALOG["assets"]
+                                if a["asset_id"] == "superhero_male_fullbody")
+            self.assertEqual(body["sha256"], catalog_body["metadata"]["sha256"])
+            for recipe in exported["recipes"].values():
+                self.assertEqual(len(recipe["files"]), 3)
+                for entry in recipe["files"]:
+                    self.assertEqual(entry["status"], "candidate")
+            for piece in exported["stage"]["pieces"]:
+                self.assertEqual(piece["status"], "candidate")
+                self.assertEqual(len(piece["sha256"]), 64)
+
+
 class RegisterCliTests(unittest.TestCase):
     def test_register_is_idempotent(self):
         with tempfile.TemporaryDirectory() as temp:

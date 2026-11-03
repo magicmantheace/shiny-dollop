@@ -62,3 +62,58 @@ class Library:
             sql += " WHERE status='approved'"
         sql += " ORDER BY asset_id"
         return [dict(x) for x in self.db.execute(sql).fetchall()]
+
+    def get_asset(self, asset_id: str) -> dict | None:
+        row = self.db.execute(
+            "SELECT asset_id,kind,uri,rig_id,status,tags_json,metadata_json "
+            "FROM assets WHERE asset_id=?", (asset_id,)).fetchone()
+        if row is None:
+            return None
+        asset = dict(row)
+        asset["tags"] = json.loads(asset.pop("tags_json"))
+        asset["metadata"] = json.loads(asset.pop("metadata_json"))
+        return asset
+
+    def get_asset_by_uri(self, uri: str) -> dict | None:
+        row = self.db.execute(
+            "SELECT asset_id FROM assets WHERE uri=?", (uri,)).fetchone()
+        return self.get_asset(row["asset_id"]) if row else None
+
+    def list_assets_full(self) -> list[dict]:
+        ids = [r["asset_id"] for r in self.db.execute(
+            "SELECT asset_id FROM assets ORDER BY asset_id").fetchall()]
+        return [self.get_asset(asset_id) for asset_id in ids]
+
+    def list_characters(self) -> list[dict]:
+        rows = self.db.execute(
+            "SELECT recipe_json FROM characters ORDER BY character_id").fetchall()
+        return [json.loads(r["recipe_json"]) for r in rows]
+
+    def get_character(self, character_id: str) -> dict | None:
+        row = self.db.execute(
+            "SELECT recipe_json FROM characters WHERE character_id=?",
+            (character_id,)).fetchone()
+        return json.loads(row["recipe_json"]) if row else None
+
+    def set_asset_status(self, asset_id: str, status: str) -> None:
+        self.db.execute("UPDATE assets SET status=? WHERE asset_id=?",
+                        (status, asset_id))
+        self.db.commit()
+
+    def set_character_status(self, character_id: str, status: str) -> None:
+        character = self.get_character(character_id)
+        if character is None:
+            raise KeyError(f"unknown character {character_id}")
+        character["status"] = status
+        self.db.execute(
+            "UPDATE characters SET status=?, recipe_json=? WHERE character_id=?",
+            (status, json.dumps(character), character_id))
+        self.db.commit()
+
+    def record_validation(self, asset_id: str | None, check_name: str,
+                          passed: bool, detail: str) -> None:
+        self.db.execute(
+            "INSERT INTO validation_runs(asset_id, check_name, passed, detail) "
+            "VALUES(?,?,?,?)",
+            (asset_id, check_name, 1 if passed else 0, detail))
+        self.db.commit()

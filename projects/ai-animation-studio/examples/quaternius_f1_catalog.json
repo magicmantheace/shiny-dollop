@@ -17,6 +17,7 @@
         "source": "Quaternius",
         "source_uri": "https://quaternius.itch.io/universal-base-characters",
         "license": "CC0-1.0",
+        "version": "1.0.0",
         "pack": "Universal Base Characters [Standard]",
         "sha256": "e7fcea214ecf8855afbf910b50de6f9c7d1decfb71ca28bad8a4481452dafeb4",
         "joints": 65,
@@ -41,6 +42,7 @@
         "source": "Quaternius",
         "source_uri": "https://quaternius.itch.io/universal-base-characters",
         "license": "CC0-1.0",
+        "version": "1.0.0",
         "pack": "Universal Base Characters [Standard]",
         "sha256": "adedf28000a0716f689b009a70314506fc62f827498f77ba852acb5610f3f3f4",
         "joints": 65,
@@ -63,7 +65,10 @@
         "source": "Quaternius",
         "source_uri": "https://quaternius.itch.io/universal-base-characters",
         "license": "CC0-1.0",
-        "pack": "Universal Base Characters [Standard]"
+        "version": "1.0.0",
+        "pack": "Universal Base Characters [Standard]",
+        "sha256": "fe0f354d7f95d83d38e15c60794dcc063fa4d60550706f3d7ba51491cdc07c56",
+        "joints": 65
       }
     },
     {
@@ -81,7 +86,10 @@
         "source": "Quaternius",
         "source_uri": "https://quaternius.itch.io/universal-base-characters",
         "license": "CC0-1.0",
-        "pack": "Universal Base Characters [Standard]"
+        "version": "1.0.0",
+        "pack": "Universal Base Characters [Standard]",
+        "sha256": "27e2c63e8f98c79fb600268ffcc92b36c621b8653b5a7dcbadb08328f3f887a9",
+        "joints": 65
       }
     },
     {
@@ -100,6 +108,7 @@
         "source": "Quaternius",
         "source_uri": "https://quaternius.itch.io/universal-animation-library",
         "license": "CC0-1.0",
+        "version": "1.0.0",
         "sha256": "69591853d817488edaa8fd9bf8fc1d821eaeaf789f8627b3cd23b41c4ed67997",
         "joints": 65,
         "root_motion": false,
@@ -167,6 +176,7 @@
         "source": "Quaternius",
         "source_uri": "https://quaternius.itch.io/universal-animation-library",
         "license": "CC0-1.0",
+        "version": "1.0.0",
         "sha256": "be684571ed655a1b892c2c07e6e2aeca053b606c442d34004adaf1d944090d01",
         "joints": 65,
         "root_motion": true,
@@ -234,6 +244,7 @@
         "source": "Quaternius",
         "source_uri": "https://quaternius.itch.io/universal-animation-library-2",
         "license": "CC0-1.0",
+        "version": "1.0.0",
         "sha256": "8cee20ab1bc55130092447e810e26df22dd2803eccc54f52137a7d54d7ab88a8",
         "joints": 65,
         "root_motion": false,
@@ -301,6 +312,7 @@
         "source": "Quaternius",
         "source_uri": "https://quaternius.itch.io/universal-animation-library-2",
         "license": "CC0-1.0",
+        "version": "1.0.0",
         "sha256": "814eee878f82934992d3ea746c539df25e981487109c591f5efbb8dd03286f99",
         "joints": 65,
         "root_motion": true,
@@ -368,9 +380,26 @@
         "source": "Kenney",
         "source_uri": "https://kenney.nl/assets/furniture-kit",
         "license": "CC0-1.0",
+        "version": "1.0.0",
         "pack": "Furniture Kit",
         "pieces_selected": 14,
         "pieces_total": 140,
+        "pieces": {
+          "bench.glb": "ba05a6d23a5a5a44da016757632070e47ff7587ce10e2f6d6d52328b4cf5489b",
+          "bookcaseOpen.glb": "750702218d68c062b15dfef6ab06a4014d1cfa8bd05f02e57c53b7e13bec157c",
+          "chair.glb": "c8a11eec93e89e31250ba91afc1b8d56c3bec7ae86640fd1239f595ff4180883",
+          "coatRack.glb": "0f56540d57367ea6fea6b9aedf305d4fc58abeec8ff3b039dbff44360d819c76",
+          "floorFull.glb": "99fc5df646d8dc605d6fe35001fe5b15bb7b269cc5c65f4f7793fbc76ff3d822",
+          "kitchenBar.glb": "792c3d31e60c8a8d8c7a28cf7d1efe004c5a601adc1b163a8799dde32c1b559d",
+          "lampRoundTable.glb": "75bb644caaa3da003b4fcad7a931722dd61cd2858aab70cf660021d5061fa1b2",
+          "lampSquareFloor.glb": "6466993748d8e184de9ec5b6b0af613867c50c0ce320d1898b1db9e4c27c2561",
+          "plantSmall1.glb": "2b9c022feb47be857b2c4fdc29f36522766ba9b70c578c31d7c05d71b4377d15",
+          "rugRectangle.glb": "a989d2d59c04e3071e0c90388b113a9a8f339ce1814ef984c51cb6dcd7c8e0eb",
+          "stoolBar.glb": "a86167a9f92401a61fec7e509ad089ecc552d0f299743add3aeb919acb24e341",
+          "table.glb": "ff1a94498d023957f4bc3ff6f55a7a82977d336dbf01a573b3364f03afe5ff61",
+          "tableRound.glb": "f8daea9124a542a00b7bdacfddac82dc468573d43e44d7b54dd6316e9695754b",
+          "wall.glb": "69273d5d623bddfce41d12d4e5eeb5621ea04f1edcbd8f35c00a60c2fd3258b7"
+        },
         "note": "Tavern-suitable subset copied to the store; full kit remains in the local store under store/kenney/."
       }
     }
@@ -378,6 +407,7 @@
   "characters": [
     {
       "schema_version": "1.0.0",
+      "version": "1.0.0",
       "character_id": "traveler_01",
       "rig_id": "studio_humanoid_v1",
       "body_base": "superhero_male_fullbody",
@@ -398,6 +428,7 @@
     },
     {
       "schema_version": "1.0.0",
+      "version": "1.0.0",
       "character_id": "innkeeper_01",
       "rig_id": "studio_humanoid_v1",
       "body_base": "superhero_female_fullbody",
