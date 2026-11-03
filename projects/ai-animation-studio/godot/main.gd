@@ -14,15 +14,19 @@ var clock_ms: float = 0.0
 ## F1 asset resolution: examples/asset_manifest.json (copied next to the
 ## scene by `python -m studio demo`) maps recipe_id -> local GLB files under
 ## an asset store outside git, resolved through an environment variable.
-## When the manifest or the store is absent, actors fall back to capsules
-## and the in-git demo behaves exactly as before.
+## The demo export attaches library approval state (per-asset status,
+## pinned version, SHA-256) from the SQLite catalog; the preview resolves
+## ONLY approved, version-pinned files whose on-disk SHA-256 matches the
+## approved record. Any mismatch is named in the log and the actor falls
+## back to a capsule. When the manifest or the store is absent, actors
+## fall back to capsules and the in-git demo behaves exactly as before.
 var manifest: Dictionary = {}
 var asset_root := ""
 var clip_by_name: Dictionary = {}
 
 func _ready() -> void:
-    _build_stage()
     _load_manifest()
+    _build_stage()
     var source := "res://data/demo_scene.json"
     if FileAccess.file_exists("res://data/scene_runtime.json"):
         source = "res://data/scene_runtime.json"
@@ -140,40 +144,91 @@ func _load_gltf(path: String) -> Node:
         return null
     return doc.generate_scene(state)
 
+func _sha256_of_file(path: String) -> String:
+    var file := FileAccess.open(path, FileAccess.READ)
+    if file == null:
+        return ""
+    var ctx := HashingContext.new()
+    if ctx.start(HashingContext.HASH_SHA256) != OK:
+        return ""
+    while not file.eof_reached():
+        ctx.update(file.get_buffer(65536))
+    return ctx.finish().hex_encode()
+
+func _verify_recipe_file(pin: Dictionary) -> String:
+    # Returns "" when the pin agrees with the exported library state and
+    # the file on disk hashes to the approved record; otherwise a named
+    # rejection reason. Resolution is approved-only and version-pinned.
+    var uri := String(pin.get("uri", ""))
+    var assets: Dictionary = manifest.get("assets", {})
+    if not assets.has(uri):
+        return "no library state exported for " + uri
+    var record: Dictionary = assets[uri]
+    if String(record.get("status", "")) != "approved":
+        return uri + " status is '" + String(record.get("status", "")) + "' (approved required)"
+    if String(pin.get("status", "")) != "approved":
+        return uri + " pin status is '" + String(pin.get("status", "")) + "' (approved required)"
+    if String(pin.get("version", "")) != String(record.get("version", "")):
+        return uri + " version mismatch (pin " + String(pin.get("version", "")) + " vs library " + String(record.get("version", "")) + ")"
+    var pin_hash := String(pin.get("sha256", ""))
+    if pin_hash == "" or pin_hash != String(record.get("sha256", "")):
+        return uri + " catalog hash mismatch (pin vs library record)"
+    if _sha256_of_file(asset_root.path_join(uri)) != pin_hash:
+        return uri + " sha256 mismatch (file does not match the approved record)"
+    return ""
+
 func _make_visual(id: String, state: Dictionary) -> Node:
-    # GLB character when the manifest resolves this actor's recipe and the
-    # asset store is present; otherwise the procedural capsule stand-in.
+    # GLB character when the manifest resolves this actor's recipe through
+    # the approved, hash-verified path and the asset store is present;
+    # otherwise the procedural capsule stand-in.
     var recipes: Dictionary = manifest.get("recipes", {})
     var recipe: Dictionary = recipes.get(String(state.get("recipe_id", "")), {})
     if not recipe.is_empty() and asset_root != "":
         var body_path := asset_root.path_join(String(recipe.get("body", "")))
-        if FileAccess.file_exists(body_path):
-            var model := _load_gltf(body_path)
-            if model != null:
-                var player := AnimationPlayer.new()
-                model.add_child(player)
-                var lib := AnimationLibrary.new()
-                player.add_animation_library("", lib)
-                for anim_uri in recipe.get("animations", []):
-                    var anim_scene := _load_gltf(asset_root.path_join(String(anim_uri)))
-                    if anim_scene == null:
-                        continue
-                    var src_player := anim_scene.find_child("AnimationPlayer", true, false) as AnimationPlayer
-                    if src_player != null and src_player.has_animation_library(""):
-                        var src_lib := src_player.get_animation_library("")
-                        for clip_name in src_lib.get_animation_list():
-                            if lib.has_animation(clip_name):
-                                continue
-                            var anim := src_lib.get_animation(clip_name).duplicate() as Animation
-                            var info: Dictionary = clip_by_name.get(clip_name, {})
-                            if info.has("loop"):
-                                anim.loop_mode = Animation.LOOP_LINEAR if bool(info["loop"]) else Animation.LOOP_NONE
-                            lib.add_animation(clip_name, anim)
-                    anim_scene.free()
-                state["anim"] = player
-                print("Loaded character model for ", id, ": ", body_path)
-                return model
-        print("Capsule fallback for ", id, ": model unavailable at ", body_path)
+        var files: Array = recipe.get("files", [])
+        if files.is_empty():
+            print("Capsule fallback for ", id, ": manifest carries no approval state for recipe ", String(state.get("recipe_id", "")))
+        elif not FileAccess.file_exists(body_path):
+            print("Capsule fallback for ", id, ": model unavailable at ", body_path)
+        else:
+            var rejection := ""
+            for pin in files:
+                var uri := String(pin.get("uri", ""))
+                if not FileAccess.file_exists(asset_root.path_join(uri)):
+                    rejection = uri + " missing from asset store"
+                    break
+                rejection = _verify_recipe_file(pin)
+                if rejection != "":
+                    break
+            if rejection != "":
+                print("Capsule fallback for ", id, ": asset rejected — ", rejection)
+            else:
+                var model := _load_gltf(body_path)
+                if model != null:
+                    var player := AnimationPlayer.new()
+                    model.add_child(player)
+                    var lib := AnimationLibrary.new()
+                    player.add_animation_library("", lib)
+                    for anim_uri in recipe.get("animations", []):
+                        var anim_scene := _load_gltf(asset_root.path_join(String(anim_uri)))
+                        if anim_scene == null:
+                            continue
+                        var src_player := anim_scene.find_child("AnimationPlayer", true, false) as AnimationPlayer
+                        if src_player != null and src_player.has_animation_library(""):
+                            var src_lib := src_player.get_animation_library("")
+                            for clip_name in src_lib.get_animation_list():
+                                if lib.has_animation(clip_name):
+                                    continue
+                                var anim := src_lib.get_animation(clip_name).duplicate() as Animation
+                                var info: Dictionary = clip_by_name.get(clip_name, {})
+                                if info.has("loop"):
+                                    anim.loop_mode = Animation.LOOP_LINEAR if bool(info["loop"]) else Animation.LOOP_NONE
+                                lib.add_animation(clip_name, anim)
+                        anim_scene.free()
+                    state["anim"] = player
+                    print("Loaded character model for ", id, ": ", body_path)
+                    return model
+                print("Capsule fallback for ", id, ": model failed to load at ", body_path)
     var mesh := MeshInstance3D.new()
     var capsule := CapsuleMesh.new()
     capsule.radius = 0.35
@@ -224,6 +279,31 @@ func _vec3(v: Variant) -> Vector3:
         return Vector3.ZERO
     return parsed
 
+func _place_furniture(piece: Dictionary) -> void:
+    # Stage pieces load through the same approved, hash-verified path as
+    # characters; any failure skips the piece and leaves the bare stage.
+    var file := String(piece.get("file", ""))
+    var label := file.get_file()
+    var path := asset_root.path_join(file)
+    if not FileAccess.file_exists(path):
+        print("Furniture skipped: ", label, " (file unavailable at ", path, ")")
+        return
+    if String(piece.get("status", "")) != "approved":
+        print("Furniture skipped: ", label, " (asset rejected: status is '", String(piece.get("status", "")), "', approved required)")
+        return
+    var expected := String(piece.get("sha256", ""))
+    if expected == "" or _sha256_of_file(path) != expected:
+        print("Furniture skipped: ", label, " (asset rejected: sha256 mismatch)")
+        return
+    var node := _load_gltf(path)
+    if node == null:
+        print("Furniture skipped: ", label, " (glTF load failed)")
+        return
+    node.position = _vec3(piece.get("position", [0, 0, 0]))
+    node.rotation_degrees.y = float(piece.get("rotation_y_deg", 0))
+    add_child(node)
+    print("Placed furniture: ", label, " at ", node.position)
+
 func _build_stage() -> void:
     var floor_mesh := MeshInstance3D.new()
     var box := BoxMesh.new()
@@ -231,6 +311,10 @@ func _build_stage() -> void:
     floor_mesh.mesh = box
     floor_mesh.position.y = -0.1
     add_child(floor_mesh)
+    var stage: Dictionary = manifest.get("stage", {})
+    if not stage.is_empty() and asset_root != "":
+        for piece in stage.get("pieces", []):
+            _place_furniture(piece)
     var light := DirectionalLight3D.new()
     light.rotation_degrees = Vector3(-55, -25, 0)
     add_child(light)

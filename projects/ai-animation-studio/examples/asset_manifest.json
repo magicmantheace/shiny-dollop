@@ -1,1 +1,174 @@
-{"asset_root_env":"AI_ANIMATION_ASSET_ROOT","clips":{"carry_walk":{"clip":"Walk_Carry_Loop","duration_s":2.0,"file":"assets/animations/UAL2_Standard.glb","loop":true},"consume":{"clip":"Consume","duration_s":1.333,"file":"assets/animations/UAL2_Standard.glb","loop":false},"crouch_idle":{"clip":"Crouch_Idle_Loop","duration_s":2.933,"file":"assets/animations/UAL1_Standard.glb","loop":true},"dance":{"clip":"Dance_Loop","duration_s":1.0,"file":"assets/animations/UAL1_Standard.glb","loop":true},"emote_no":{"clip":"Idle_No_Loop","duration_s":2.5,"file":"assets/animations/UAL2_Standard.glb","loop":false},"emote_wave":{"clip":"Idle_Rail_Call","duration_s":2.5,"file":"assets/animations/UAL2_Standard.glb","loop":false},"emote_yes":{"clip":"Yes","duration_s":2.5,"file":"assets/animations/UAL2_Standard.glb","loop":false},"idle":{"clip":"Idle_Loop","duration_s":2.5,"file":"assets/animations/UAL1_Standard.glb","loop":true},"interact":{"clip":"Interact","duration_s":2.0,"file":"assets/animations/UAL1_Standard.glb","loop":false},"jog":{"clip":"Jog_Fwd_Loop","duration_s":0.933,"file":"assets/animations/UAL1_Standard.glb","loop":true},"pickup":{"clip":"PickUp_Table","duration_s":0.833,"file":"assets/animations/UAL1_Standard.glb","loop":false},"sit_enter":{"clip":"Sitting_Enter","duration_s":1.3,"file":"assets/animations/UAL1_Standard.glb","loop":false},"sit_exit":{"clip":"Sitting_Exit","duration_s":1.033,"file":"assets/animations/UAL1_Standard.glb","loop":false},"sit_idle":{"clip":"Sitting_Idle_Loop","duration_s":1.667,"file":"assets/animations/UAL1_Standard.glb","loop":true},"sit_talk":{"clip":"Sitting_Talking_Loop","duration_s":2.933,"file":"assets/animations/UAL1_Standard.glb","loop":true},"speak":{"clip":"Idle_Talking_Loop","duration_s":2.933,"file":"assets/animations/UAL1_Standard.glb","loop":false},"walk":{"clip":"Walk_Loop","duration_s":1.333,"file":"assets/animations/UAL1_Standard.glb","loop":true},"walk_formal":{"clip":"Walk_Formal_Loop","duration_s":1.333,"file":"assets/animations/UAL1_Standard.glb","loop":true}},"note":"Maps character recipes to local GLB files under the asset store (URIs relative to the store root) and reusable animation tags to verified clip names from the F1 inspection of the Quaternius Universal Animation Libraries. The Godot preview falls back to procedural capsules when the store is absent.","recipes":{"innkeeper_01":{"animations":["assets/animations/UAL1_Standard.glb","assets/animations/UAL2_Standard.glb"],"body":"assets/characters/Superhero_Female_FullBody.gltf"},"traveler_01":{"animations":["assets/animations/UAL1_Standard.glb","assets/animations/UAL2_Standard.glb"],"body":"assets/characters/Superhero_Male_FullBody.gltf"}},"rig_id":"studio_humanoid_v1","schema_version":"1.0.0"}
+{
+  "asset_root_env": "AI_ANIMATION_ASSET_ROOT",
+  "clips": {
+    "carry_walk": {
+      "clip": "Walk_Carry_Loop",
+      "duration_s": 2.0,
+      "file": "assets/animations/UAL2_Standard.glb",
+      "loop": true
+    },
+    "consume": {
+      "clip": "Consume",
+      "duration_s": 1.333,
+      "file": "assets/animations/UAL2_Standard.glb",
+      "loop": false
+    },
+    "crouch_idle": {
+      "clip": "Crouch_Idle_Loop",
+      "duration_s": 2.933,
+      "file": "assets/animations/UAL1_Standard.glb",
+      "loop": true
+    },
+    "dance": {
+      "clip": "Dance_Loop",
+      "duration_s": 1.0,
+      "file": "assets/animations/UAL1_Standard.glb",
+      "loop": true
+    },
+    "emote_no": {
+      "clip": "Idle_No_Loop",
+      "duration_s": 2.5,
+      "file": "assets/animations/UAL2_Standard.glb",
+      "loop": false
+    },
+    "emote_wave": {
+      "clip": "Idle_Rail_Call",
+      "duration_s": 2.5,
+      "file": "assets/animations/UAL2_Standard.glb",
+      "loop": false
+    },
+    "emote_yes": {
+      "clip": "Yes",
+      "duration_s": 2.5,
+      "file": "assets/animations/UAL2_Standard.glb",
+      "loop": false
+    },
+    "idle": {
+      "clip": "Idle_Loop",
+      "duration_s": 2.5,
+      "file": "assets/animations/UAL1_Standard.glb",
+      "loop": true
+    },
+    "interact": {
+      "clip": "Interact",
+      "duration_s": 2.0,
+      "file": "assets/animations/UAL1_Standard.glb",
+      "loop": false
+    },
+    "jog": {
+      "clip": "Jog_Fwd_Loop",
+      "duration_s": 0.933,
+      "file": "assets/animations/UAL1_Standard.glb",
+      "loop": true
+    },
+    "pickup": {
+      "clip": "PickUp_Table",
+      "duration_s": 0.833,
+      "file": "assets/animations/UAL1_Standard.glb",
+      "loop": false
+    },
+    "sit_enter": {
+      "clip": "Sitting_Enter",
+      "duration_s": 1.3,
+      "file": "assets/animations/UAL1_Standard.glb",
+      "loop": false
+    },
+    "sit_exit": {
+      "clip": "Sitting_Exit",
+      "duration_s": 1.033,
+      "file": "assets/animations/UAL1_Standard.glb",
+      "loop": false
+    },
+    "sit_idle": {
+      "clip": "Sitting_Idle_Loop",
+      "duration_s": 1.667,
+      "file": "assets/animations/UAL1_Standard.glb",
+      "loop": true
+    },
+    "sit_talk": {
+      "clip": "Sitting_Talking_Loop",
+      "duration_s": 2.933,
+      "file": "assets/animations/UAL1_Standard.glb",
+      "loop": true
+    },
+    "speak": {
+      "clip": "Idle_Talking_Loop",
+      "duration_s": 2.933,
+      "file": "assets/animations/UAL1_Standard.glb",
+      "loop": false
+    },
+    "walk": {
+      "clip": "Walk_Loop",
+      "duration_s": 1.333,
+      "file": "assets/animations/UAL1_Standard.glb",
+      "loop": true
+    },
+    "walk_formal": {
+      "clip": "Walk_Formal_Loop",
+      "duration_s": 1.333,
+      "file": "assets/animations/UAL1_Standard.glb",
+      "loop": true
+    }
+  },
+  "note": "Maps character recipes to local GLB files under the asset store (URIs relative to the store root) and reusable animation tags to verified clip names from the F1 inspection of the Quaternius Universal Animation Libraries. The Godot preview falls back to procedural capsules when the store is absent.",
+  "recipes": {
+    "innkeeper_01": {
+      "animations": [
+        "assets/animations/UAL1_Standard.glb",
+        "assets/animations/UAL2_Standard.glb"
+      ],
+      "body": "assets/characters/Superhero_Female_FullBody.gltf"
+    },
+    "traveler_01": {
+      "animations": [
+        "assets/animations/UAL1_Standard.glb",
+        "assets/animations/UAL2_Standard.glb"
+      ],
+      "body": "assets/characters/Superhero_Male_FullBody.gltf"
+    }
+  },
+  "rig_id": "studio_humanoid_v1",
+  "schema_version": "1.0.0",
+  "stage": {
+    "asset_id": "kenney_furniture_kit",
+    "note": "Minimal tavern set from the catalogued Kenney Furniture Kit. Positions are authored project data (metres, preview stage coordinates); pieces load only through the approved, hash-verified resolver path.",
+    "pieces": [
+      {
+        "file": "assets/environment/kenney_furniture/table.glb",
+        "position": [
+          0.0,
+          0.0,
+          1.7
+        ],
+        "rotation_y_deg": 0
+      },
+      {
+        "file": "assets/environment/kenney_furniture/chair.glb",
+        "position": [
+          -0.85,
+          0.0,
+          1.7
+        ],
+        "rotation_y_deg": 90
+      },
+      {
+        "file": "assets/environment/kenney_furniture/chair.glb",
+        "position": [
+          0.85,
+          0.0,
+          1.7
+        ],
+        "rotation_y_deg": -90
+      },
+      {
+        "file": "assets/environment/kenney_furniture/kitchenBar.glb",
+        "position": [
+          3.6,
+          0.0,
+          -2.0
+        ],
+        "rotation_y_deg": -90
+      }
+    ]
+  }
+}
