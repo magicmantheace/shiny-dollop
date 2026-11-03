@@ -8,6 +8,7 @@ python -m studio validate
 python -m unittest discover -s tests -v
 python -m studio init-db --db data/local-smoke.sqlite3
 python -m studio seed --db data/local-smoke.sqlite3
+python -m studio register --db data/local-smoke.sqlite3
 python -m studio list-assets --db data/local-smoke.sqlite3
 python -m studio demo
 ```
