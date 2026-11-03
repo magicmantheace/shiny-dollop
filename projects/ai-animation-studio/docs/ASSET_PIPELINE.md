@@ -38,3 +38,5 @@ Store: source_uri, SHA256, license SPDX/name and evidence, author, creation date
 ## Storage policy
 
 Git tracks code, docs and tiny metadata fixtures. Downloaded models, rigged asset packs, audio, rendered media and SQLite databases stay local or in a separate explicit artifact store. Backups must capture asset files and catalog together.
+
+**Local asset store (from 2026-11-03, F1):** `~/workspace/ai-animation-studio-assets/` on the development VM (outside git). Registered URIs are relative to that directory (`assets/characters/…`, `assets/animations/…`, `assets/environment/…`); original vendor zips and full extractions stay alongside under `downloads/` and `store/` for provenance. The Godot preview resolves the store through the `AI_ANIMATION_ASSET_ROOT` environment variable and falls back to procedural capsules when it is unset or files are missing. The store path is machine-local state, not a project constant — a different machine sets the variable to its own copy.
