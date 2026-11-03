@@ -4,7 +4,28 @@
 full-stack test-media package — not an install, not yet physically
 validated.**
 
-**Reset-fix refresh (2026-10-28):** the package was rebuilt again
+**Session-fix refresh (2026-11-02):** the package was rebuilt
+from source `a236213`, the head containing the ADR 0022 fixes:
+the carried Weston patch for the subsurface-order assert that
+killed desktop sessions on the owner's machine, the distro
+payload's generated gdk-pixbuf loaders cache and
+shared-mime-info database (the GTK image-format failure), and
+weston-session failure logging. The image (SHA-256
+`f45a79c3bdf0690b3670ef0971f0457e5511d4a1e659724b05d45c8bea767f38`,
+4,169,138,176 bytes) carries the same full stack, recovery path
+and ADR 0021 reset fix as the refresh below. The joined
+acceptance was re-proven on this image in QEMU (virtio variant:
+enrollment, login, the full Weston desktop proof — the session
+survived — power-cut recovery, destroyed-STATE fail-closed;
+Chromium launched with its profile and Downloads on DATA).
+Record:
+[test-media session-fix record](validation/test-media-fixpass-2026-11-02/README.md).
+The superseded `db32105` package below must not be written for
+a boot test any more. Owner-PC/TG01 re-verification of the
+filmed failures is still outstanding.
+
+**Reset-fix refresh (2026-10-28, superseded by the session-fix
+rebuild above):** the package was rebuilt again
 from source `db32105`, the head containing the ADR 0021
 crash-consistent tier-4 reset transaction. The image (SHA-256
 `27603d90bc09d685819ca3a369745cb21751c094e712ae3cfdb69f8665da5696`,

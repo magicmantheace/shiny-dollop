@@ -19,13 +19,13 @@ test establishes, one way or the other.
 Image identity (verify before writing, and again if anything looks
 off): `synveil-test-media` package, image `synveil-x86_64.img`,
 SHA-256
-`27603d90bc09d685819ca3a369745cb21751c094e712ae3cfdb69f8665da5696`,
+`f45a79c3bdf0690b3670ef0971f0457e5511d4a1e659724b05d45c8bea767f38`,
 4,169,138,176 bytes (≈3.88 GiB — use an 8 GB or larger stick/drive),
-source commit `db32105b05d24ecaf6d08cf11e796f2892a1b67a`.
+source commit `a2362132b722b6fdb15cb77d5829ae75ac9334ff`.
 The package also carries `synveil-release-v2.img` (SHA-256
-`d58961fb43d9fa6bf04fb94db169beb4e2e6967b43204fcf578a8bd5d31593c7`),
+`a40a0d26a80c754415c6dc7e9c50b7c525f9d3be2c3c0aa2a53b376b2f3e2e55`),
 the signed v2 update used by the update test below. Validation
-evidence: [test-media record](validation/test-media-resetfix-2026-10-28/README.md).
+evidence: [test-media record](validation/test-media-fixpass-2026-11-02/README.md).
 
 **Publisher key:** updates are verified against the Synveil
 **development** publisher key `synveil-dev-2026-01`. It is a flagged
@@ -83,7 +83,7 @@ Linux alternative: `write-test-media.sh` in the package does the
 same write with the digest pin, whole-removable-USB-only,
 backing-traced mount/swap refusal, exact-name confirmation and
 read-back verification enforced by the script:
-`sudo bash write-test-media.sh --image synveil-x86_64.img --device /dev/sdX --expected-sha256 27603d90bc09d685819ca3a369745cb21751c094e712ae3cfdb69f8665da5696`
+`sudo bash write-test-media.sh --image synveil-x86_64.img --device /dev/sdX --expected-sha256 f45a79c3bdf0690b3670ef0971f0457e5511d4a1e659724b05d45c8bea767f38`
 (Replace `/dev/sdX` with the drive's whole-disk device; repeat with
 the release image and its digest for the second stick.)
 

@@ -119,6 +119,14 @@ the maintenance/reset ESP entries digest-verified from the
 packaged image, and the joined + browser acceptances re-proven at
 this head
 ([test-media reset-fix record](validation/test-media-resetfix-2026-10-28/README.md)).
+**A further rebuild has since landed (2026-11-02):** the
+current test-media package is built from `a236213` and
+additionally ships the ADR 0022 fixes (Weston
+subsurface-order assert patch, the distro payload's generated
+pixbuf loaders cache and mime database, weston-session
+failure logging), with the joined acceptance re-proven at
+this head
+([test-media session-fix record](validation/test-media-fixpass-2026-11-02/README.md)).
 The install blockers above are unchanged: no recovery evidence
 exists on physical hardware, the A/B installation milestone is
 still ahead, and the packaged-image boot test remains a boot
