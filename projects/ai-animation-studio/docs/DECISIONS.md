@@ -53,3 +53,19 @@ files, which the studio's local asset library requires.
 - Media stays in a local asset store outside git (see
   `docs/ASSET_PIPELINE.md` storage policy); git carries the catalog and
   manifest metadata fixtures only.
+
+## ADR-008: Approved-only, hash-pinned runtime resolution (2026-11-03)
+
+**Accepted.** The Godot preview resolves character and stage assets
+only through the exported library state: an asset loads only when its
+catalog status is `approved`, the scene-side pin version equals the
+library record version, the pin SHA-256 equals the library record, and
+the file on disk hashes to that same SHA-256. Any mismatch is named in
+the log and the actor/piece falls back (capsule / skipped) — never a
+crash, never a silent load. Approval itself is an explicit
+`studio promote` step whose machine gates (source presence, hash,
+skeleton facts, clip inventory, per-piece pack hashes) are recorded in
+`validation_runs`; human gates (visual review, owner-hardware visual /
+FPS check) are recorded as pending and are never auto-passed, so an
+asset can be `approved` for local playback while those reviews remain
+honestly outstanding.

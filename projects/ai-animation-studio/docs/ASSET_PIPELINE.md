@@ -6,6 +6,8 @@
 
 Current database implements candidate/approved/retired. Detailed transitions, jobs and revision history are planned; do not confuse a candidate record with a usable media file.
 
+**Promotion as implemented (2026-11-03):** `studio register` intakes a catalog as candidates; `studio promote` runs the machine-checkable gates from the intake checklist (source present under the asset root, SHA-256 match, skeleton facts, clip inventory, per-piece pack hashes; recipe gates for characters) and records every result in `validation_runs`. Visual review and owner-hardware checks are recorded as pending human gates on each promotion, never auto-passed. The runtime resolver then loads only approved, version-pinned, hash-verified files (ADR-008).
+
 ## Intake checklist
 
 1. Record source, creator, license, restrictions, version, hash, rig family and dependencies.

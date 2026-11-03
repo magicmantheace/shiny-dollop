@@ -60,5 +60,21 @@ inspection of the downloaded files on 2026-11-03, not vendor copy.
   channel and body-language clips. A rig revision adding blendshapes
   (e.g. from a future pack or an owner-authored head) must keep the
   65-joint skeleton and clip compatibility to stay in this family.
-- **Sockets:** not yet defined on this rig; `hand_r/hand_l/head`
-  anchors remain to be measured and recorded before prop work.
+- **Sockets (measured 2026-11-03, F1 completion pass):** bind-pose
+  world positions of the joint node origins, in metres relative to the
+  character origin (floor centre, +Y up). Method: `studio/gltf.py`
+  composes each node's local translation/rotation/scale down the glTF
+  scene tree and reports the world translation of the skin's joint
+  nodes; reproducible with `python3 -m studio sockets [--body <uri>]`.
+
+  | anchor | male body | female body |
+  |---|---|---|
+  | `hand_l` | [0.706, 1.455, -0.065] | [0.641, 1.418, -0.052] |
+  | `hand_r` | [-0.706, 1.455, -0.065] | [-0.641, 1.418, -0.052] |
+  | `head` (`Head` joint) | [0.0, 1.600, -0.017] | [0.0, 1.550, -0.011] |
+
+  Reference points (same method): `neck_01` male [0.0, 1.520, -0.041],
+  female [0.0, 1.485, -0.041]; `pelvis` male [0.0, 0.949, -0.043],
+  female [0.0, 0.932, -0.046]. The bind pose holds the arms extended,
+  so the hand anchors sit at full arm reach; they are bone origins for
+  attachment, and per-prop grip offsets remain F4 work.
