@@ -25,8 +25,9 @@ tools/native_browser.py). This builder:
      distribution's libc and system directories never enter the
      payload — the image runs the project's own glibc;
   4. generates what maintainer scripts would have produced
-     (the CA bundle, the GLib schema cache) with recorded,
-     deterministic content;
+     (the CA bundle, the GLib schema cache, the gdk-pixbuf
+     loaders cache, the shared-mime-info database) with
+     recorded, deterministic content;
   5. seals the payload (tools/distro_chromium_assets.py) and
      writes validation.json.
 
@@ -118,6 +119,15 @@ def resolve_closure(pin):
         "-o", "APT::Architecture=amd64",
         "-o", "Acquire::Languages=none",
         "-o", "APT::Sandbox::User=root",
+        # The snapshot is immutable and every downloaded .deb is
+        # sha256-verified against both this manifest and the
+        # snapshot's own Packages index (verify_closure); a
+        # Valid-Until expiry check on a pinned historical snapshot
+        # can only ever fire spuriously (the trixie-security
+        # Release in the 20261024 snapshot expired 2026-10-31 and
+        # blocked all rebuilds). Freshness is not a property this
+        # stage takes from apt.
+        "-o", "Acquire::Check-Valid-Until=false",
     ]
     env = dict(os.environ, LC_ALL="C")
     run(["apt-get", *opts, "update"], env=env,
@@ -300,7 +310,41 @@ def prune(raw, staging, readelf):
     return copied
 
 
-def generate_derived(staging):
+PIXBUF_LOADERS_REL = "usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders"
+PIXBUF_CACHE_REL = "usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders.cache"
+MIME_REL = "usr/share/mime"
+
+
+def cache_modules(cache_text):
+    """Module basenames a loaders.cache lists. Only a module's
+    header line is its quoted .so path; pattern lines inside a
+    module block can also start with a quote (e.g. the XPM magic
+    "/*"), so match the full header shape."""
+    names = []
+    for line in cache_text.splitlines():
+        if line.startswith('"/') and line.endswith('.so"') \
+                and "libpixbufloader-" in line:
+            names.append(Path(line.strip('"')).name)
+    return sorted(names)
+
+
+def closure_tool(raw, argv, **kwargs):
+    """Run a binary from the extracted closure with the closure's
+    own loader and libraries. The host's loader/libc must never be
+    mixed into the pinned userland (observed host-side: the pinned
+    query-loaders binary aborts under a foreign libc), and the
+    build host is not required to carry these tools at all."""
+    multiarch = raw / "usr/lib/x86_64-linux-gnu"
+    loader = multiarch / "ld-linux-x86-64.so.2"
+    if not loader.is_file() or loader.stat().st_size == 0:
+        raise ValueError("closure dynamic loader missing from raw tree")
+    return subprocess.run(
+        [str(loader), "--library-path", str(multiarch),
+         *[str(a) for a in argv]],
+        check=True, **kwargs)
+
+
+def generate_derived(staging, raw):
     """What the packages' maintainer scripts would have made."""
     notes = []
     mozilla = staging / "usr/share/ca-certificates/mozilla"
@@ -325,6 +369,88 @@ def generate_derived(staging):
         if compiled.is_file():
             compiled.chmod(0o644)
         notes.append("gschemas.compiled generated for the payload")
+    # The gdk-pixbuf loaders cache (libgdk-pixbuf2.0-bin's trigger
+    # product). Without it the library registers only its compiled-
+    # in PNG/JPEG loaders; every module loader in the payload
+    # (gif, ico, bmp, ...) stays invisible to GTK/Chromium. The
+    # pinned query-loaders tool generates the content against the
+    # staging module dir; module paths are then rewritten from the
+    # staging prefix to the guest's absolute paths, exactly the
+    # relocation a package install on the target would produce.
+    loaders_dir = staging / PIXBUF_LOADERS_REL
+    if loaders_dir.is_dir():
+        query = raw / "usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0" \
+            / "gdk-pixbuf-query-loaders"
+        if not query.is_file():
+            raise ValueError("closure gdk-pixbuf-query-loaders missing")
+        # The tool prints module paths under the module dir it was
+        # given, canonicalized; anchor the rewrite on the resolved
+        # staging prefix so the sealed cache carries guest paths.
+        staging_abs = str(staging.resolve())
+        env = dict(os.environ, LC_ALL="C",
+                   GDK_PIXBUF_MODULEDIR=str(
+                       Path(staging_abs) / PIXBUF_LOADERS_REL))
+        out = closure_tool(raw, [query], env=env,
+                           stdout=subprocess.PIPE).stdout.decode()
+        prefix = staging_abs + "/"
+        lines = []
+        for line in out.splitlines():
+            if line.startswith(f'"{prefix}'):
+                line = '"/' + line[len(prefix) + 1:]
+            lines.append(line)
+        cache_text = "\n".join(lines) + "\n"
+        if any("libpixbufloader-" in line and
+               not line.startswith('"/usr/lib/x86_64-linux-gnu/'
+                                   'gdk-pixbuf-2.0/')
+               for line in lines):
+            raise ValueError("loaders.cache module paths did not "
+                             "rewrite to guest paths")
+        modules = sorted(p.name for p in loaders_dir.glob(
+            "libpixbufloader-*.so"))
+        listed = cache_modules(cache_text)
+        if listed != modules:
+            raise ValueError("generated loaders.cache does not list "
+                             "every sealed loader module")
+        cache_path = staging / PIXBUF_CACHE_REL
+        cache_path.write_text(cache_text)
+        cache_path.chmod(0o644)
+        notes.append("loaders.cache generated for the payload "
+                     f"({len(modules)} module loaders; PNG/JPEG are "
+                     "compiled into the pinned libgdk_pixbuf and "
+                     "need no cache entry)")
+    # The shared-mime-info database (shared-mime-info's postinst
+    # product, update-mime-database). gdk-pixbuf's file-format
+    # recognition goes through GIO content-type guessing, which is
+    # blind without mime.cache/globs/magic: in the sealed payload
+    # usr/share/mime held only the packages/ XML sources, so every
+    # image load in the guest failed with "Couldn't recognize the
+    # image file format" (gdk-pixbuf error 3) — the failure behind
+    # the GTK icon assertion crash on the owner's machine. The
+    # database is path-independent, so it is generated in place.
+    mime_dir = staging / MIME_REL
+    if (mime_dir / "packages").is_dir() and \
+            any((mime_dir / "packages").glob("*.xml")):
+        tool = raw / "usr/bin/update-mime-database"
+        if not tool.is_file():
+            raise ValueError("closure update-mime-database missing")
+        closure_tool(raw, [tool, str(mime_dir)],
+                     env=dict(os.environ, LC_ALL="C"),
+                     stdout=subprocess.DEVNULL)
+        # The generator also writes one XML per mime type under
+        # <type>/ subdirectories, all under the build umask; the
+        # seal requires other-read on every payload file, so
+        # normalize the whole generated tree.
+        for path in mime_dir.rglob("*"):
+            if path.is_file():
+                path.chmod(0o644)
+            elif path.is_dir():
+                path.chmod(0o755)
+        for required in ("mime.cache", "globs", "magic"):
+            if not (mime_dir / required).is_file():
+                raise ValueError("mime database generation did not "
+                                 f"produce {required}")
+        notes.append("shared-mime-info database generated for the "
+                     "payload (mime.cache, globs, magic, types)")
     return notes
 
 
@@ -340,10 +466,45 @@ def build():
     staging = OUT / "staging"
     extract_all(debs, raw)
     copied = prune(raw, staging, tools["readelf"])
-    notes = generate_derived(staging)
+    notes = generate_derived(staging, raw)
     entries = assets.seal(staging)
     if len(entries) < 200:
         raise ValueError(f"payload seal implausibly small: {len(entries)}")
+    # Pixbuf/mime gate: the guest failure these artifacts fix was
+    # invisible to every earlier check because the loaders and the
+    # XML sources were present while the two generated databases
+    # were not. Fail the build unless both are sealed, complete,
+    # and addressed at guest paths.
+    for required in (PIXBUF_CACHE_REL, f"{MIME_REL}/mime.cache",
+                     f"{MIME_REL}/globs", f"{MIME_REL}/magic"):
+        if required not in entries:
+            raise ValueError("generated pixbuf/mime artifact missing "
+                             f"from the sealed payload: {required}")
+    cache_text = (staging / PIXBUF_CACHE_REL).read_text()
+    sealed_modules = sorted(
+        p.name for p in (staging / PIXBUF_LOADERS_REL).glob(
+            "libpixbufloader-*.so"))
+    listed_modules = cache_modules(cache_text)
+    if listed_modules != sealed_modules or \
+            any(not line.startswith('"/usr/lib/x86_64-linux-gnu/'
+                                    'gdk-pixbuf-2.0/')
+                for line in cache_text.splitlines()
+                if line.startswith('"/') and line.endswith('.so"')
+                and "libpixbufloader-" in line):
+        raise ValueError("sealed loaders.cache does not match the "
+                         "sealed loader modules at guest paths")
+    pixbuf_gate = {
+        "loaders_cache_sha256": hashlib.sha256(
+            (staging / PIXBUF_CACHE_REL).read_bytes()).hexdigest(),
+        "module_loaders": listed_modules,
+        "builtin_loaders": ["png", "jpeg"],
+        "mime_database_files": sorted(
+            name for name in ("mime.cache", "globs", "globs2",
+                              "magic", "treemagic", "types", "aliases",
+                              "subclasses", "icons", "generic-icons",
+                              "XMLnamespaces", "version")
+            if f"{MIME_REL}/{name}" in entries),
+    }
     # The payload is system data the unprivileged browser reads:
     # nothing in it may be sealed without other-read (a generated
     # bundle once landed 0660 under the workspace umask and the
@@ -368,6 +529,7 @@ def build():
         "payload_files_copied": copied,
         "assets_sha256": assets.seal_digest(entries),
         "derived": notes,
+        "pixbuf_mime_gate": pixbuf_gate,
         "glibc": "baseline project glibc (distribution libc pruned)",
         "marker": "SYNVEIL_DISTRO_CHROMIUM_STAGED_NOT_BOOTED",
     }
