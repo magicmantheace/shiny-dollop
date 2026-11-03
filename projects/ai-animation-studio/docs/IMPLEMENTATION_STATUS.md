@@ -16,6 +16,7 @@
 - Live streaming IPC, dynamic camera behavior, persistent scene playback, asset generation and automation.
 - Full runtime JSON Schema enforcement or production approved-asset resolution.
 - Real performance profiling and Windows packaging.
+- Speak/camera timing semantics: proposed in `docs/SCENE_PROTOCOL.md` (2026-11-03, marked PROPOSED); awaiting owner sign-off before any validator or renderer implementation.
 
 ## Verified
 
@@ -46,9 +47,17 @@ Environment: Linux VM, Python 3.12.3, Godot 4.7.2.stable.official (official Linu
   - Boundary: headless uses a dummy rendering driver. This proves GDScript parsing, scene load and timeline/event execution; it does **not** prove rendering, editor/visual behavior, or performance.
 - **Owner-hardware FPS:** not run. 30 FPS remains an untested goal until measured on owner hardware.
 
+### F1 prep verification (same pass, 2026-11-03, Linux VM)
+
+- **Schema/validator conformance tests:** `tests/test_conformance.py` added (stdlib only) asserting the JSON Schemas and `studio/schema.py` agree on schema_version, op set, emotion set and camera shot set, plus accept/reject fixture scenes for `validate_scene`. Full suite after the addition: `python3 -m unittest discover -s tests` → `Ran 17 tests`, `OK`, exit 0. Drift guard proven by negative check: adding a rogue op to `scene.schema.json` in a scratch copy fails exactly the op-set conformance test (1 failure, as designed).
+- **Godot-side scene re-validation** (`godot/main.gd`): load now refuses unsupported `schema_version`, type-checks the actors/events containers and actor entries, skips events with unknown ops or malformed spawn/move vectors with an indexed `push_error`, and parses vectors through a checked helper instead of indexing blindly. Evidence (same Godot 4.7.2 headless setup as above):
+  - Unmodified demo scene re-run after the change: stdout identical to the pre-change run (same five lines, no errors) — valid-scene behavior unchanged.
+  - Rejection probes in a scratch copy (via `data/scene_runtime.json` variants): `schema_version: "9.9.9"` → `ERROR: Unsupported schema_version (expected 1.0.0)`, playback refused. Injected unknown op `explode` plus a 2-element spawn position → `ERROR: events[2]: unknown op 'explode'; event skipped` and `ERROR: events[1]: spawn position is not an array of exactly 3 numbers; event skipped`; the scene then completed without crashing (the unspawned actor's later events produced only the pre-existing "Actor not spawned" warnings).
+
 ## Known technical follow-ups
 
 - Godot import + headless playback verified on Godot 4.7.2 (Linux); editor/visual rendering compatibility on owner hardware still to confirm.
 - Wire actual rigged character assets through a pinned/approved asset resolver instead of demo capsules.
 - Add DB migrations, schema validators or proven equivalent, metadata provenance, integrity verification and command/event queues.
-- Tighten preview command rejection on the Godot side; current trusted preview assumes Python-validated plans.
+- ~~Tighten preview command rejection on the Godot side~~ — addressed 2026-11-03: the preview now re-validates schema version, container types, op whitelist and vector shapes at load and fails closed per event (see F1 prep verification above). Full semantic validation (ordering, spawn state, bounds) still lives only in `studio/schema.py`.
+- Godot 4.7 import generates `godot/main.gd.uid` (script UID file); currently untracked — commit or ignore per owner preference.
