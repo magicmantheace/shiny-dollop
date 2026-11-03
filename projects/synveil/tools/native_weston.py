@@ -27,6 +27,55 @@ OUT = ROOT / "out/native-weston"
 LOCK = ROOT / "build/manifests/native-weston.json"
 RECIPE_COMMIT = "7fdeadb3b9f12f78e5fccca914d7fef47090ab9a"
 WESTON_SHA256 = "551d039bfb0c837ba5a4d027cdb8ee16bded0eedb789821f8025d8a64b791f6d"
+# Carried patch against the pinned Weston tarball, applied by
+# Buildroot's global patch dir after the tarball's own hash check
+# (BR2_DOWNLOAD_FORCE_CHECK_HASHES stays on): Weston 15.0.1 aborts
+# the compositor when a client reorders a subsurface that has no
+# views yet (libweston/surface-state.c's apply_subsurface_order
+# assert); see docs/adr/0022-weston-subsurface-order-assert.md.
+PATCH_DIR = ROOT / "build/native/patches"
+PATCH_FILE = PATCH_DIR / "weston" / \
+    "weston-15.0.1-subsurface-order-assert.patch"
+PATCHED_SOURCE = "libweston/surface-state.c"
+ASSERT_LINE = "weston_assert_true(comp, comp->view_list_needs_rebuild);"
+
+
+def weston_patch():
+    if not PATCH_FILE.is_file():
+        raise ValueError("carried Weston patch missing: "
+                         + str(PATCH_FILE.relative_to(ROOT)))
+    return {"name": PATCH_FILE.name,
+            "sha256": hashlib.sha256(PATCH_FILE.read_bytes()).hexdigest()}
+
+
+def check_weston_patch_tree(build_dir):
+    """Gate: the source tree Buildroot is about to compile (or has
+    compiled) must carry the patch. Returns the patched file's
+    sha256. Fails the build if the assert is still in the function
+    or the replacement assignment is missing."""
+    trees = sorted((build_dir / "build").glob("weston-15.0.1"))
+    if len(trees) != 1:
+        raise ValueError("expected exactly one extracted Weston "
+                         "tree, found " + str(len(trees)))
+    path = trees[0] / PATCHED_SOURCE
+    if not path.is_file():
+        raise ValueError("patched Weston source missing: "
+                         + PATCHED_SOURCE)
+    text = path.read_text()
+    start = text.find("weston_surface_apply_subsurface_order")
+    end = text.find("\n}\n", start)
+    if start < 0 or end < 0:
+        raise ValueError("apply_subsurface_order not found in "
+                         "Weston source")
+    body = text[start:end]
+    if ASSERT_LINE in body:
+        raise ValueError("Weston subsurface-order assert still "
+                         "present in the tree being compiled; the "
+                         "carried patch was not applied")
+    if "comp->view_list_needs_rebuild = true;" not in body:
+        raise ValueError("Weston subsurface-order patch assignment "
+                         "missing from the tree being compiled")
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def source_pin():
@@ -56,6 +105,7 @@ def configuration(toolchain, overrides):
         'BR2_TOOLCHAIN_EXTERNAL_CUSTOM_GLIBC=y', 'BR2_TOOLCHAIN_EXTERNAL_CXX=y',
         '# BR2_TOOLCHAIN_EXTERNAL_INET_RPC is not set',
         'BR2_REPRODUCIBLE=y', 'BR2_DOWNLOAD_FORCE_CHECK_HASHES=y',
+        'BR2_GLOBAL_PATCH_DIR=' + json.dumps(str(PATCH_DIR)),
         'BR2_PACKAGE_OVERRIDE_FILE=' + json.dumps(str(overrides)),
         'BR2_INIT_NONE=y', 'BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_EUDEV=y',
         '# BR2_PACKAGE_BUSYBOX is not set', '# BR2_TARGET_ROOTFS_TAR is not set',
@@ -90,6 +140,9 @@ def check_configuration(text, toolchain):
                 "BR2_PACKAGE_SEATD_DAEMON"):
         if settings.get(key) != "y":
             raise ValueError("native Weston configuration lost required " + key)
+    if settings.get("BR2_GLOBAL_PATCH_DIR") != json.dumps(str(PATCH_DIR)):
+        raise ValueError("native Weston configuration lost the "
+                         "carried-patch directory")
     if settings.get("BR2_TOOLCHAIN_EXTERNAL_PATH") != json.dumps(str(toolchain)):
         raise ValueError("dependency builder substituted the native compiler")
     if settings.get("BR2_TOOLCHAIN_EXTERNAL_PREFIX") != json.dumps(ffi.TARGET):
@@ -167,6 +220,7 @@ def pristine_overrides(*, cached=False):
 
 def build(*, resume=False):
     pin = source_pin()
+    patch = weston_patch()
     atomic_proof = atomic.verify()
     if os.geteuid() == 0:
         raise ValueError("refusing privileged desktop dependency build")
@@ -235,6 +289,16 @@ def build(*, resume=False):
     env["LC_ALL"] = "C"
     run(base + ["BR2_DEFCONFIG=" + str(config), "defconfig"], env=env)
     check_configuration((build_dir / ".config").read_text(), ffi.TOOLCHAIN)
+    # A cached Weston tree predating the carried patch still holds
+    # the unpatched source under valid stamps; Buildroot would not
+    # re-extract it. Drop the package tree so the build re-extracts
+    # the hash-verified tarball and applies the global patch dir.
+    weston_trees = sorted((build_dir / "build").glob("weston-15.0.1"))
+    if weston_trees:
+        source_file = weston_trees[0] / PATCHED_SOURCE
+        if source_file.is_file() and \
+                ASSERT_LINE in source_file.read_text():
+            run(base + ["weston-dirclean"], env=env)
     # Deliberately invoke packages only, never `all`, `target-finalize`, or images.
     if resume and (build_dir / "host/bin" / (ffi.TARGET + "-gcc")).exists():
         # Refresh the private dependency sysroot with the newly source-built
@@ -247,6 +311,7 @@ def build(*, resume=False):
         if list((build_dir / "build").glob("cairo-*/.stamp_configured")):
             run(base + ["cairo-reconfigure"], env=env)
     run(base + ["-j4", "weston", "dejavu", "util-linux", "xkeyboard-config"], env=env)
+    patched_sha256 = check_weston_patch_tree(build_dir)
     target = build_dir / "target"
     required = ("usr/bin/weston", "usr/bin/weston-terminal", "usr/bin/weston-simple-shm",
                 "usr/libexec/weston-desktop-shell")
@@ -285,7 +350,10 @@ def build(*, resume=False):
     asset_hash = assets.seal(target, OUT / "runtime-assets.json")
     receipt = {"schema": "synveil.native-weston-stage/v1", "target": ffi.TARGET,
                "recipe_commit": commit, "weston_version": pin["weston"]["version"],
-               "weston_source_sha256": WESTON_SHA256, "native_sources": native_sources,
+               "weston_source_sha256": WESTON_SHA256,
+               "weston_patch": {**patch, "patched_file": PATCHED_SOURCE,
+                                "patched_file_sha256": patched_sha256},
+               "native_sources": native_sources,
                "executables_sha256": hashes, "native_glibc_sha256": libc_hashes,
                "runtime_assets_sha256": asset_hash,
                "native_atomic": atomic_proof,

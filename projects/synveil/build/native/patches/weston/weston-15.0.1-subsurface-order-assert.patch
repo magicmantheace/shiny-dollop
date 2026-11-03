@@ -1,0 +1,18 @@
+--- a/libweston/surface-state.c
++++ b/libweston/surface-state.c
+@@ -279,7 +279,14 @@
+ 		wl_list_for_each(view, &sub->surface->views, surface_link)
+ 			weston_view_geometry_dirty(view);
+ 	}
+-	weston_assert_true(comp, comp->view_list_needs_rebuild);
++	/* Applying a new subsurface order is itself a view-order change.
++	 * The geometry-dirty calls above only set this flag when a
++	 * reordered subsurface already has views; a subsurface reordered
++	 * before its first map has none, and the previous assert aborted
++	 * the compositor for that legitimate client pattern. Setting the
++	 * flag unconditionally is always safe: the rebuild is idempotent
++	 * and a no-op when no views exist. */
++	comp->view_list_needs_rebuild = true;
+ }
+ 
+ /* Translate pending damage in buffer co-ordinates to surface
