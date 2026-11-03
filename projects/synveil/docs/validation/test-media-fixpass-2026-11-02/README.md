@@ -103,7 +103,7 @@ contradict earlier notes:
 
 ## Local checks at this head
 
-- `cargo test` (full workspace): 191 passed, 0 failed.
+- `cargo test` (full workspace): 182 passed, 0 failed.
 - `tests/ab-update.py`: 18 tests OK.
 - `tests/offline-checks.py`: 8 tests OK.
 - `build/scripts/doctor.sh`: PASS.
