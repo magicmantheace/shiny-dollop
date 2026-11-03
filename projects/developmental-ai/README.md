@@ -1122,6 +1122,43 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 3 — Reference purity gated recovery: onset-bounded expiry for both recovery branches (PARTIALLY DEMONSTRATED)
+
+Optional `ReferencePurityGatedRecoveryMemory` is identical to the
+graded minority-archive candidate in acting model, extended
+signal, retained archive, archive concordance, joint recovery
+test, recovery model, abstention trigger, the full three-leg
+authority condition and the minority branch in full; the SINGLE
+new element is a reference-purity expiry gate on the two recovery
+branches ONLY (reference-concordant fraction over the extended
+reference window, armed iff ≥ 0.70; abstention NOT gated) —
+under a protocol frozen before implementation (new cohorts
+382003-family / 383001-family, now INSPECTED). **Graded
+Partially demonstrated (not Failed, not a Regression):**
+PRIMARY criterion 5 PASSes on both cohorts — the first expiry
+mechanism in this line to restore k=32 release (non-recent8
+branch in 1/9 states each; successes 73 vs recent8 74
+development, 64 vs 66 additional) — and criteria 1, 2, 3, 4, 7
+PASS on both cohorts, with the onset profile numerically
+identical to the ungated minority candidate on both cohorts
+(zero onset states disarmed by purity; minority TAKEN 5/6 and
+4/6 at B2; B2 harm 48/49 vs the guard's 64/78; pooled onset harm
+137/133 vs the guard's 195/218). Criterion 6 FAILs on additional
+only: one stationary control state at k=32 (seed 383017)
+abstained on all 16 tasks — the carried-over abstention branch,
+which the gate deliberately does not govern — costing the
+cohort's entire control deficit (successes 110 vs recent8 120,
+required ≥ 114). On additional the gate's release was decisive
+in the records (minority-rule derivation 4/9 → candidate 1/9,
+all four recoveries disarmed by purity) but blunt: those four
+late recoveries were productive for the ungated method (its k=32
+successes 80 vs the candidate's 64). Plain cumulative still
+dominates the candidate at return-A on both axes on both cohorts
+(68/78 successes at 28/18 harm vs 59/67 at 37/29). Learner
+acquisition actions zero; external TRAIN actor harm published
+in full in the report. Optional only, no promotion, no merge.
+[Full graded report](docs/REFERENCE_PURITY_GATED_RECOVERY.md).
+
 ### November 2 — Minority archive joint recovery: retained discordant-evidence recovery (FAILED / REGRESSION at k=32)
 
 Optional `MinorityArchiveJointRecoveryMemory` is identical to the

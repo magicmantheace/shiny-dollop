@@ -1,3 +1,91 @@
+# Reference purity gated recovery: onset-bounded expiry for both recovery branches — 2026-11-03 (PARTIALLY DEMONSTRATED)
+
+Optional `developmental_ai/reference_purity_gated_recovery.py`
+(identical to the graded minority-archive candidate in acting
+model, extended signal, archive, concordance definition, joint
+recovery test, recovery model, abstention trigger, the full
+three-leg authority condition, and the minority branch in full;
+the SINGLE new element is a REFERENCE-PURITY expiry gate on the
+two recovery branches ONLY — reference-concordant /
+reference-matched fraction over the extended 50-event reference
+window, armed iff >= 0.70; abstention is NOT purity-gated) was
+evaluated under the protocol frozen BEFORE implementation at
+`benchmarks/reference_purity_gated_recovery_protocol.json` on NEW
+cohorts 382003/382021/382039 and 383001/383017/383041, both now
+INSPECTED — never re-tune against them. **Graded Partially
+demonstrated under the protocol's own definitions (PRIMARY
+criterion 5 and criterion 7 PASS on both cohorts, criteria 1–4
+PASS on both, but criterion 6 FAILs on the additional cohort);
+NOT Failed (criterion 5 PASSes additional, none of criteria
+1/2/3/4 FAILs additional, criterion 7 PASSes both) and NOT a
+Regression (pooled onset harm well below recent8 both cohorts,
+k=32 successes 73/64 vs recent8 74/66 — above the recent8 − 4
+line both, control successes not below recent8 by more than 6
+on both, suite + transfer pass).** Per-criterion, development /
+additional, PRIMARY criterion 5 first, then co-graded guards 1
+and 4: C5 release PASS/PASS (abstentions 0/144 and 16/144;
+successes 73 vs recent8 74 required >= 66, 64 vs 66 required
+>= 58; non-recent8 branch in 1/9 k=32 states both — dev the one
+state is a B2 minority routing at purity 0.727 scoring 7/9 and
+the gate changed no dev k=32 outcome (candidate identical to
+the minority method there, minority-rule derivation also 1/9);
+add the records-only minority-rule derivation took 4/9 and
+recovery_disarmed_by_purity is recorded at all four, the
+candidate's one remaining state being the purity-UNGATED
+abstention at return-A seed 383041 — but the four disarmed add
+recoveries were PRODUCTIVE for the minority method, whose k=32
+successes are 80 vs the candidate's 64 at identical 64 harm:
+release by purity is records-level and blunt), C1 B2 protection
+PASS/PASS ((a) minority TAKEN 5/6 dev and 4/6 add pooled B2
+onset, fractions 0.272–0.325 / 0.273–0.301, purity armed at
+every B2 onset state and ZERO onset states purity-disarmed on
+either cohort — candidate identical to the minority method on
+every pooled onset figure both cohorts; (b) minority TAKEN 0/6
+B1 and 0/6 return-A both; (c) B2 harm 48 vs guard 64 ceiling
+57.6, 49 vs guard 78 ceiling 54.0; (d) B2 successes 48 vs
+guard+16=16, 47 vs 18), C4 return-A harm PASS/PASS (37 vs
+guard 79 ceiling 55.8; 29 vs guard 54 ceiling 46.8 — identical
+to the minority baseline both), C2 return-A successes PASS/PASS
+(59 vs frozen_A 70 floors 28.0 and guard+16=17; 67 vs 64 / 26 —
+cumulative 68 / 78 at 28 / 18 harm reported in full, beats the
+candidate on both axes on BOTH cohorts), C3 pooled onset harm
+PASS/PASS (137 vs guard 195, 6/6 cells <= recent8; 133 vs
+guard 218, 6/6), C6 stationary selectivity PASS/FAIL (dev
+abstentions 0/240, successes 124 vs recent8 118, harm 116 vs
+122, one productive control recovery at k=2 seed 382039; add
+abstentions 16/240 PASS and harm 114 vs 120 PASS but successes
+110 vs recent8 120 required >= 114 — the entire deficit is ONE
+stationary state, control k=32 seed 383017 abstained 16/16 at
+purity 0.886, candidate identical to the minority method and
+the guard on the control arm there; the gate changed nothing
+on the stationary arm on either cohort, by design), C7 full
+accounting PASS/PASS (full decision records incl. the complete
+purity record, replay identity true everywhere, learner
+acquisition 0). **The purity gate is the first expiry mechanism
+in this line to restore the k=32 records condition on both
+cohorts while leaving the onset profile numerically untouched;
+what it cannot do is distinguish stale late retained knowledge
+from still-productive late retained knowledge (additional
+counterweight above), and the family's sole remaining graded
+failure is now the abstention branch — the one branch with no
+expiry condition of any kind, deliberately left ungated here.**
+Full unit suite (1046) and historical transfer benchmark passed
+in the evaluation and grading stages; no CI claimed for the
+evaluation or grading commits (UNVERIFIED). See
+`docs/REFERENCE_PURITY_GATED_RECOVERY.md`. Keep the learner
+optional and unpromoted, default controller unchanged, no
+merge, no AthenZ/Synveil integration, D1–D10/V2A/V2B unchanged.
+Next limitation selected: P1 abstention-branch late /
+stationary firing without release — the ungated abstention
+branch is now the family's only branch with no expiry, and it
+alone produced both remaining failures (additional control
+k=32 abstention 16/16 failing C6; additional return-A k=32
+abstention as the candidate's sole non-recent8 k=32 state) —
+whether an evidence-derived condition on abstention can
+restore stationary selectivity and remove late abstention
+from the k=32 records without giving back onset harm
+protection, on NEW cohorts under a NEW protocol.
+
 # Minority archive joint recovery: retained discordant-evidence recovery — 2026-11-02 (FAILED / REGRESSION at k=32)
 
 Optional `developmental_ai/minority_archive_joint_recovery.py`
