@@ -10,6 +10,7 @@ import re
 VERSION = "1.0.0"
 OPS = frozenset({"spawn", "move", "speak", "emote", "camera"})
 EMOTIONS = frozenset({"neutral", "happy", "sad", "angry", "nervous", "surprised", "tired", "scared"})
+SHOTS = frozenset({"wide", "two_shot", "close_left", "close_right"})
 ID = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 
@@ -56,7 +57,7 @@ def validate_scene(scene: dict) -> dict:
         op = e.get("op")
         need(isinstance(op, str) and op in OPS, prefix + ": unknown operation")
         if op == "camera":
-            need(isinstance(e.get("shot"), str) and e.get("shot") in {"wide", "two_shot", "close_left", "close_right"}, prefix + ": invalid shot")
+            need(isinstance(e.get("shot"), str) and e.get("shot") in SHOTS, prefix + ": invalid shot")
             continue
         actor_id = e.get("actor_id")
         need(isinstance(actor_id, str) and actor_id in actor_ids, prefix + ": unknown actor")
