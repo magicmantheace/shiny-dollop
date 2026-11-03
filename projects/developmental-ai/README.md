@@ -1122,6 +1122,46 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 3 — Abstention release gated recovery: release gate on the abstention branch (PARTIALLY DEMONSTRATED)
+
+Optional `AbstentionReleaseGatedRecoveryMemory` is identical to the
+graded reference-purity candidate in acting model, extended
+signal, retained archive, archive concordance, joint recovery
+test, recovery model, abstention trigger, the full three-leg
+authority condition, the minority branch in full and the
+reference-purity gate on both recovery branches; the SINGLE new
+element is a RELEASE GATE on the ABSTENTION branch ONLY
+(abstention fires iff opposed_count == 2 AND carried-over
+authority armed AND reference_purity ≥ 0.70 AND
+acting_opposed_count ≥ 3 over the last 8 events) — under a
+protocol frozen before implementation (new cohorts 392003-family
+/ 393001-family, now INSPECTED). **Graded Partially demonstrated
+(not Failed, not a Regression):** all seven criteria PASS on the
+additional cohort — including PRIMARY criterion 6 (control
+0/240 abstentions, successes 122 = recent8) and criterion 5 with
+its new zero-abstention sub-condition (the gate disarmed, by
+BOTH legs, the exact return-A k=32 abstention configuration the
+purity experiment left standing; candidate k=32 69/75/0 vs the
+purity baseline method's 57/71/16) — and criteria 1, 2, 3, 5, 7
+PASS on development (minority TAKEN 5/6 at B2 on both cohorts;
+B2 harm 37/36 vs the guard's 77/40; pooled onset harm 160/148 vs
+the guard's 190/178). Criterion 6 FAILs on development by
+exactly 1 success: one stationary abstention SURVIVED both legs
+at control k=8 (seed 392039, purity 0.857, acting_opposed_count
+3 — the gate's minimum corroboration), costing the entire −7
+control deficit (successes 118 vs recent8 125, required ≥ 119);
+the gate blocked the cohort's other stationary trigger by leg S
+alone. Criterion 4 FAILs on development on the carried profile
+(return-A harm 44 vs the 41.4 ceiling; candidate identical to
+the purity baseline at return-A onset on both cohorts — not
+caused by the gate, charged unchanged). Plain cumulative and
+frozen_A now dominate the candidate at return-A on both axes on
+both cohorts (60/56 and 60/62 successes at 36/40 and 36/34 harm
+vs the candidate's 52/48 at 44/48). Learner acquisition actions
+zero; external TRAIN actor harm published in full in the
+report. Optional only, no promotion, no merge.
+[Full graded report](docs/ABSTENTION_RELEASE_GATED_RECOVERY.md).
+
 ### November 3 — Reference purity gated recovery: onset-bounded expiry for both recovery branches (PARTIALLY DEMONSTRATED)
 
 Optional `ReferencePurityGatedRecoveryMemory` is identical to the
