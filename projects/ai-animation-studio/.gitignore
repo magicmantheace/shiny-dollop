@@ -20,6 +20,7 @@ build/
 dist/
 godot/.godot/
 godot/data/scene_runtime.json
+godot/data/asset_manifest.json
 *.blend1
 *.blend2
 *.glb
