@@ -1,0 +1,79 @@
+name: Windows portable desktop (unsigned; manual only)
+
+# Costly frozen Windows builds must never start on push or pull requests.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: athenz-manual-windows-portable-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Build unsigned portable Windows directory
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check . 'pyinstaller==6.16.0'
+          python -m PyInstaller --noconfirm --clean --onedir --windowed --name AthenZ --collect-submodules athenz packaging/desktop_launcher.py
+      - name: Offline packaged application smoke test
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path 'dist/AthenZ/AthenZ.exe').Path
+          $process = Start-Process -FilePath $exe -ArgumentList '--self-test' -Wait -PassThru -NoNewWindow
+          if ($process.ExitCode -ne 0) { throw "Packaged desktop smoke failed with exit code $($process.ExitCode)" }
+          if (-not (Test-Path 'dist/AthenZ/_internal/tcl')) {
+            Write-Host 'Tcl resources not in standard path; import-based runtime smoke already passed.'
+          }
+      - name: Native desktop startup smoke with disposable profile
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path 'dist/AthenZ/AthenZ.exe').Path
+          $process = Start-Process -FilePath $exe -ArgumentList '--gui-self-test' -PassThru
+          if (-not $process.WaitForExit(20000)) {
+            Stop-Process -Id $process.Id -Force
+            throw 'Native desktop GUI smoke timed out'
+          }
+          if ($process.ExitCode -ne 0) {
+            throw "Native desktop GUI smoke failed with exit code $($process.ExitCode)"
+          }
+      - name: Bundle unsigned portable folder
+        shell: pwsh
+        run: |
+          Compress-Archive -Path 'dist/AthenZ' -DestinationPath 'AthenZ-windows-unsigned-portable.zip' -CompressionLevel Optimal
+      - name: Verify archive integrity and publish unsigned checksum
+        shell: pwsh
+        run: |
+          $zip = 'AthenZ-windows-unsigned-portable.zip'
+          $digest = (Get-FileHash -Path $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          python -m athenz.portable_integrity $zip --sha256 $digest
+          Set-Content -Path 'AthenZ-windows-unsigned-portable.sha256' -Value "$digest  $zip" -Encoding ascii
+      - name: Stage and reverify Windows ZIP without installing or launching it
+        shell: pwsh
+        run: |
+          $zip = 'AthenZ-windows-unsigned-portable.zip'
+          $digest = (Get-FileHash -Path $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $parent = Join-Path $env:RUNNER_TEMP 'athenz-portable-versions'
+          New-Item -ItemType Directory -Path $parent -Force | Out-Null
+          python -m athenz.portable_stage stage $zip $parent --sha256 $digest --name AthenZ-ci-smoke --confirm
+          python -m athenz.portable_stage verify (Join-Path $parent 'AthenZ-ci-smoke')
+          if (-not (Test-Path (Join-Path $parent 'AthenZ-ci-smoke/AthenZ/AthenZ.exe'))) {
+            throw 'The side-by-side staged portable exe was missing'
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AthenZ-windows-unsigned-portable-${{ github.sha }}
+          path: |
+            AthenZ-windows-unsigned-portable.zip
+            AthenZ-windows-unsigned-portable.sha256
+          retention-days: 7
+          if-no-files-found: error
