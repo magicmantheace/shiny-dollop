@@ -36,6 +36,12 @@ This repository is a permanent, **multi-project** workspace. Its root is an inde
 
 **Start implementation with:** [Universal Game Save Manager](projects/game-save-manager/docs/MUSE_HANDOFF.md). Begin its real MVP first; do not simultaneously scaffold or claim completion for all projects.
 
+## Independent project: AI Animation Studio
+
+| Project | Directory | Status |
+| --- | --- | --- |
+| Stylized 3D AI Animation Studio | [`projects/ai-animation-studio/`](projects/ai-animation-studio/README.md) | Foundation scaffold and documentation, not production-ready; separate development track |
+
 ## Repository rules
 
 1. Keep one application per `projects/<slug>/`; each owns its manifests, code, docs, tests and generated-file paths.
