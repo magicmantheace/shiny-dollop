@@ -1,4 +1,3 @@
-import copy
 import json
 import unittest
 from pathlib import Path
@@ -21,14 +20,24 @@ class SceneTests(unittest.TestCase):
 
     def test_reject_unsorted_time(self):
         s = sample("scene_demo.json")
-        s["events"][2]["at_ms"] = 0
-        s["events"][3]["at_ms"] = 0
+        s["events"][2]["at_ms"] = 2000
+        s["events"][3]["at_ms"] = 1000
         with self.assertRaises(ValidationError):
             validate_scene(s)
 
     def test_reject_bad_op(self):
         s = sample("scene_demo.json")
         s["events"][2]["op"] = "run_shell"
+        with self.assertRaises(ValidationError):
+            validate_scene(s)
+
+    def test_reject_unhashable_model_fields(self):
+        s = sample("scene_demo.json")
+        s["events"][2]["op"] = ["move"]
+        with self.assertRaises(ValidationError):
+            validate_scene(s)
+        s = sample("scene_demo.json")
+        s["events"][2]["actor_id"] = ["traveler"]
         with self.assertRaises(ValidationError):
             validate_scene(s)
 

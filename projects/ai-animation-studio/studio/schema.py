@@ -54,12 +54,12 @@ def validate_scene(scene: dict) -> dict:
         need(type(t) is int and 0 <= t <= 3_600_000 and t >= last_time, prefix + ": invalid ordering/time")
         last_time = t
         op = e.get("op")
-        need(op in OPS, prefix + ": unknown operation")
+        need(isinstance(op, str) and op in OPS, prefix + ": unknown operation")
         if op == "camera":
-            need(e.get("shot") in {"wide", "two_shot", "close_left", "close_right"}, prefix + ": invalid shot")
+            need(isinstance(e.get("shot"), str) and e.get("shot") in {"wide", "two_shot", "close_left", "close_right"}, prefix + ": invalid shot")
             continue
         actor_id = e.get("actor_id")
-        need(actor_id in actor_ids, prefix + ": unknown actor")
+        need(isinstance(actor_id, str) and actor_id in actor_ids, prefix + ": unknown actor")
         if op == "spawn":
             need(actor_id not in spawned, prefix + ": duplicate spawn")
             vec3(e.get("position"), prefix + ".position")
@@ -74,7 +74,7 @@ def validate_scene(scene: dict) -> dict:
             line = e.get("line")
             need(isinstance(line, str) and 1 <= len(line) <= 500, prefix + ": invalid line")
         elif op == "emote":
-            need(e.get("emotion") in EMOTIONS, prefix + ": unsupported emotion")
+            need(isinstance(e.get("emotion"), str) and e.get("emotion") in EMOTIONS, prefix + ": unsupported emotion")
             q = e.get("intensity")
             need(type(q) in (int, float) and 0 <= q <= 1, prefix + ": invalid intensity")
     need(bool(spawned), "scene never spawns an actor")
@@ -84,11 +84,11 @@ def validate_asset(asset: dict) -> dict:
     need(isinstance(asset, dict), "asset must be object")
     need(asset.get("schema_version") == VERSION, "unsupported asset version")
     identifier(asset.get("asset_id"), "asset_id")
-    need(asset.get("kind") in {"body", "head", "hair", "outfit", "prop", "motion", "environment", "voice", "material"}, "invalid kind")
+    need(isinstance(asset.get("kind"), str) and asset.get("kind") in {"body", "head", "hair", "outfit", "prop", "motion", "environment", "voice", "material"}, "invalid kind")
     uri = asset.get("uri")
     need(isinstance(uri, str) and len(uri) < 256 and uri.startswith("assets/"), "uri must be assets/ relative path")
     need(".." not in uri.split("/") and "\\" not in uri and not uri.startswith("/"), "unsafe path")
-    need(asset.get("status") in {"candidate", "approved", "retired"}, "invalid asset status")
+    need(isinstance(asset.get("status"), str) and asset.get("status") in {"candidate", "approved", "retired"}, "invalid asset status")
     tags = asset.get("tags")
     need(isinstance(tags, list) and len(tags) <= 32 and all(isinstance(t, str) and ID.fullmatch(t) for t in tags), "invalid tags")
     rig = asset.get("rig_id")
@@ -106,5 +106,5 @@ def validate_character(data: dict) -> dict:
     for item in outfits:
         identifier(item, "outfit[]")
     need(isinstance(data.get("colors"), dict), "colors must be object")
-    need(data.get("status") in {"candidate", "approved", "retired"}, "invalid character status")
+    need(isinstance(data.get("status"), str) and data.get("status") in {"candidate", "approved", "retired"}, "invalid character status")
     return data
