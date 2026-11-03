@@ -97,6 +97,23 @@ def validate_asset(asset: dict) -> dict:
     need(isinstance(asset.get("metadata"), dict), "invalid metadata")
     return asset
 
+def validate_catalog(data: dict) -> dict:
+    """A catalog is a bundle of asset + character records for bulk intake."""
+    need(isinstance(data, dict), "catalog must be object")
+    need(data.get("schema_version") == VERSION, "unsupported catalog version")
+    assets = data.get("assets")
+    characters = data.get("characters")
+    need(isinstance(assets, list) and 1 <= len(assets) <= 512, "catalog assets must contain 1..512 entries")
+    need(isinstance(characters, list) and len(characters) <= 512, "catalog characters must contain 0..512 entries")
+    seen = set()
+    for asset in assets:
+        validate_asset(asset)
+        need(asset["asset_id"] not in seen, "duplicate catalog asset id")
+        seen.add(asset["asset_id"])
+    for character in characters:
+        validate_character(character)
+    return data
+
 def validate_character(data: dict) -> dict:
     need(isinstance(data, dict), "character must be object")
     need(data.get("schema_version") == VERSION, "unsupported character version")
