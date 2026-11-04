@@ -1,8 +1,92 @@
 # TEST_PLAN — Milky Way Colonization Simulator
 
-What was actually run for S0, with results. Last updated 2026-11-04.
+What was actually run, with results. Last updated 2026-11-04 (S1).
 Nothing in this file is aspirational: every claim below was executed
-on this VM during the S0 build.
+on this VM during the S0/S1 builds.
+
+## S1 — sim core (Rust, `sim/`)
+
+```
+cd sim
+cargo test
+```
+
+Result: **19 passed, 0 failed** (6 unit + 13 integration in
+`sim/tests/s1.rs`). Environment: same rustup toolchain as §1.
+
+Unit coverage:
+- `rng` — same seed → same stream; per-star child streams repeatable
+  and star-specific.
+- `catalog` — distance/lookup over `StarRecord`s.
+- `profile` — real catalog planets stay `RealCatalog` and score by
+  measured equilibrium temperature/radius; generated profiles are
+  repeatable and every generated planet is labelled `Generated`.
+- `save` — save → load round trip preserves the canonical bytes and
+  state hash exactly.
+
+Integration coverage (`tests/s1.rs`):
+- **Determinism:** advancing 10 years as one `advance(3650)` call vs
+  365×`advance(10)` vs 3,650×`advance(1)` produces identical
+  canonical bytes and state hash.
+- **Save/load continuity:** a scripted-policy campaign saved at year
+  5, reloaded, and continued to year 10 ends with the identical state
+  hash as the uninterrupted run. Saves reject a different galaxy
+  (fingerprint mismatch).
+- **Fuel:** dispatch beyond the design range (120 ly vs 75 ly) is
+  refused; fuel burn is exactly distance × per-ly rate (10 ly → 20.0);
+  dispatch beyond the fuel aboard is refused; refuelling at a colony
+  restores a full tank; a deliberate unchecked one-way order strands
+  the ship en route at exactly the fuel-exhaustion point (15.0 ly on
+  30 fuel); a ship arriving on exactly empty tanks still surveys
+  (surveying is local sensor work — otherwise it deadlocks).
+- **Colonization rules:** colonizing an unsurveyed system is refused;
+  founding before claiming is refused, claiming then founding works;
+  colony growth over a year is positive and far below the logistic
+  carrying capacity.
+- **Construction:** a queued surveyor is delivered after its 90-day
+  build.
+- **Scripted campaign:** the policy expands from Sol in a synthetic
+  two-star galaxy (surveyed ≥ 2, colonized ≥ 2, population grows).
+- **Endurance:** `advance(36_500)` (100 years) completes; state hash
+  well-formed.
+
+### CLI demo — scripted 25-year campaign on the real table
+
+```
+cd sim && cargo run --release --bin sim-cli -- --years 25
+```
+
+Seed 42, real 113,393-star table, one summary line per year. Result:
+**99 systems surveyed, 13 colonized, population 1,200 → 1,676.56M,
+credits positive throughout (5,484.31 at year 25)**, final state hash
+`7e64c3223b1604eb9a1ee5f97401edfb3ee10a6741f14d7e554be638c8ea6bad`.
+Full verbatim output is reproduced in `docs/MUSE_HANDOFF.md`.
+
+### Performance (measured, this VM, release build)
+
+- Scripted 100-year campaign (`sim-cli --years 100`, daily policy
+  decisions + 36,500 ticks + monthly settlements on the real table):
+  **~0.78 s wall** end to end; ends at 256 surveyed / 34 colonized.
+  This is a VM CPU measurement of the core, not a frame-time claim.
+- No wall clock or external RNG in the core: a grep over `sim/src`
+  for `std::time`, `SystemTime`, `Instant`, `Utc::now`, `Local::now`,
+  `thread_rng`, `rand::` returns no matches.
+
+### S1 regressions found and fixed during the build
+
+- The scripted surveyor marooned itself at Teegarden's Star with
+  0.04 fuel by chaining single affordable legs — the policy now
+  requires a return-to-nearest-colony reserve before a survey hop
+  and falls back on the fuel actually aboard.
+- A ship arriving on exactly empty tanks deadlocked (could not
+  survey without fuel; nothing could reach it): arrival orders
+  (survey/found) now proceed on empty tanks; only departures wait
+  for fuel.
+- First demo balance ran the treasury deeply negative; colony upkeep
+  was rebalanced and the policy keeps a build reserve. The 25-year
+  run above is the post-balance result.
+
+## S0 sections (unchanged below)
 
 ## 1. Pipeline unit + integration tests (Rust)
 

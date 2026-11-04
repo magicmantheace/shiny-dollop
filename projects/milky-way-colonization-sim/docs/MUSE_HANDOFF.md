@@ -1,85 +1,195 @@
 # MUSE_HANDOFF — Milky Way Colonization Simulator
 
-State as of **2026-11-04**, end of slice S0. Branch
-`milky-way-colonization-sim/foundation` (local commits only — not
-pushed, no PR; Adam reviews first).
+State as of **2026-11-04**, end of slice S1. Branch
+`milky-way-colonization-sim/foundation` (extends the S0 commits;
+not pushed by the S1 builder — Nyx verifies and pushes to draft
+PR #29).
 
-## What S0 delivered
+## What S1 delivered
 
-1. **Project foundation** — README, AGENTS.md (binding data-integrity
-   rules), REQUIREMENTS, `docs/DESIGN.md` (the spec: Adam's 5 founding
-   decisions + 7 §11 rulings, incl. §11.7 default-to-Sol), root README
-   registration row.
-2. **Data pipeline** (`pipeline/`, Rust, **zero third-party crates**) —
-   builds the game star table from HYG v4.4 + NASA Exoplanet Archive
-   pscomppars:
-   - 119,614 HYG rows → filter `0 ≤ dist < 100,000 pc` → 109,390
-     usable; equatorial→galactic J2000 rotation; pc→ly (×3.26156);
-     heliocentric frame, Sol at origin.
-   - Names: proper → Bayer/Flamsteed → Gliese → HIP → HD → HR → HYG id.
-   - Temperature/mass derived from spectral class / mass–luminosity,
-     flagged `derived` per record (HYG has neither column).
-   - Archive merge: 713 hosts matched by designation (HYG proper/bf/
-     Gliese/HIP/HD/HR indexes + GL↔GJ alias), 104 by coordinates
-     (uniform 2 pc grid, ≤1.0 pc), 4,003 inserted as real rows from
-     archive coordinates (flagged `source: exoplanet-archive`), 27
-     skipped (no usable position, counted in the report).
-   - Output: **113,393 stars, 6,424 planets, `stars.bin` 6,882,528
-     bytes**, deterministic (byte-identical rebuilds), read-back
-     verified in the pipeline itself. `data/manifest.json` +
-     `data/SOURCES.md` committed; the .bin and catalog caches are
-     git-ignored regenerable artifacts.
-   - Binary format contract: `pipeline/src/table.rs` (64-byte header,
-     48-byte star records, 32-byte planet records, string table).
-     The GDScript reader mirrors it exactly — change both together.
-3. **Godot viewer** (`viewer/`, Godot 4.7.2, GDScript) — ArrayMesh
-   `PRIMITIVE_POINTS` + shader (spectral colours; magnitude→point
-   size via colour alpha; unknown magnitude gets a neutral size),
-   orbit/fly camera (drag/wheel/WASD/QE), **Go to Sol** (button or F),
-   click-pick via grid ray-walk with an info panel (name, class,
-   distance, teff/mass with derived markers, planet list).
-   Headless `--verify` passes all assertions (see TEST_PLAN.md §3);
-   `--measure` mode loads any table and reports load time/memory.
-4. **~1M-star measurement** — AT-HYG v4.0 resolved (Codeberg
-   `astronexus/athyg`, `data/athyg_40.csv.gz`; LFS-backed; the
-   README's `athyg_v40` name 404s). Nearest-1M table: 52,014,311
-   bytes, viewer load 739 ms / 173.8 MB static. Numbers in
-   TEST_PLAN.md §4. The shipping map stays HYG ~120k per ruling
-   §11.6; the 1M option is measured and viable for a later decision.
+The headless Rust sim core in **`sim/`** (crate `mwcs-sim`, zero
+third-party dependencies of its own; it path-depends on the S0
+pipeline crate for the star-table reader and SHA-256):
 
-## Test state
+- `src/catalog.rs` — in-memory view of the S0 table (`Galaxy`,
+  `StaticStar`, `StaticPlanet`) plus a canonical catalog fingerprint
+  used to bind saves to their galaxy.
+- `src/state.rs` — the simulation itself: `Campaign` with sparse
+  per-system state (`BTreeMap<StarId, SystemState>`) over the inert
+  catalog; survey state unknown → surveyed, claims, colonies
+  (population, development, specialization slot, five strategic
+  stockpiles, energy flow, defence placeholder, construction queue);
+  ships as state machines (at system / surveying / en route /
+  stranded en route / stranded at system); the daily tick with a
+  monthly settlement every 30 days.
+- `src/profile.rs` — the profile revealed by a survey. Real catalog
+  planets stay real (habitability from measured eq. temperature and
+  radius); systems without catalog planets get a generated profile
+  from the star's real properties + campaign seed, with every
+  generated planet explicitly labelled `Generated`.
+- `src/rng.rs` — SplitMix64 seeded RNG owned by the core. Profile
+  generation uses per-star child streams derived from
+  `(campaign seed, star id)`, so decision order cannot leak into a
+  system's fixed contents.
+- `src/save.rs` — canonical binary serialization (sorted maps, raw
+  float bits, length-prefixed strings) → SHA-256 state hash; the
+  save format is that payload behind a `MWSS` header, verified
+  against the galaxy fingerprint + star count on load.
+- `src/policy.rs` — the deterministic scripted policy (the S1 test
+  harness driver, **not** the §6 AI — that is S3).
+- `src/main.rs` — `sim-cli`: starts a campaign at Sol (ruling
+  §11.7), runs the scripted policy, prints one summary line per
+  game year.
 
-- `cargo test`: **22/22 pass** (unit + fixture integration, offline).
-- Godot `--verify`: **all VERIFY_PASS, exit 0** (verbatim output in
-  TEST_PLAN.md).
-- Pipeline determinism: two builds → identical SHA-256.
+Rules implemented from the design: 1 tick = 1 game day (§2);
+colonization pipeline survey → claim → found, colony ship consumed
+(§3); credits global + energy as a per-system flow, five strategic
+resources stockpiled per system with fuel first-class (§4); ship
+range = tank ÷ burn, movement burns fuel by distance, orders beyond
+range or beyond the fuel aboard are refused, refuelling at colonies,
+stranded ships per §5.2 (only via a deliberate unchecked one-way
+order in S1 — no combat/lost-depot causes exist yet).
 
-## Gotchas found in S0 (don't rediscover these)
+## Model choices where the design left room
 
-- GDScript `class_name` types are invisible in a bare headless run
-  with no editor import pass — the viewer preloads `star_table.gd`
-  instead. Keep it that way.
-- HYG's "distance" for 10,224 rows is a ≥100,000 pc placeholder (not
-  an error value of −1); filter on it or the galaxy gets a fake shell.
-- Archive hostnames rarely match HYG designations directly (713 of
-  4,847); coordinate matching and insertion carry the merge. Most
-  real exoplanet hosts are simply not in HYG.
-- TRAPPIST-1 is an inserted host, not an HYG star — if a future
-  change drops inserted hosts, the verify catches it (7 planets).
-- Inserted hosts have absmag 0 (= unknown). Any magnitude-driven
-  logic must treat 0 as missing, never as "brightest".
+- **Economy constants** (design §4 gives structure, not numbers):
+  population income `pop × 0.045 × (0.7 + dev × 0.08)`/month,
+  upkeep `2 + dev + pop × 0.004`/month; production formulas keyed
+  to development, habitability, and profile traits, with
+  specialization multipliers (Refinery ×3 fuel, Industrial ×2.5
+  alloys, Agricultural ×2.2 supplies, Trade Hub ×1.4 income).
+  Supplies are the binding upkeep: production + stored buffer first,
+  growth stops when unsupplied, decline after 3 unsupplied months,
+  abandonment after 12 (design §3's slow, telegraphed loss).
+- **Growth:** logistic toward capacity
+  `100 + habitability% × 25 + development × 400` (millions).
+- **Development** rises one level per supplied year (to a S1 cap of
+  5) when population exceeds `development × 150`M; specialization
+  unlocks at development 3, one slot in S1 (the second slot at 7 is
+  a later-slice concern).
+- **Starting position:** homeworld population 1,200M, development 3,
+  15,000 credits, one surveyor (75 ly range) and one colony ship
+  (75 ly range) in orbit. Ship construction is a per-colony queue
+  (surveyor 90 days / 400 credits / 12 alloys; colony ship 240 days
+  / 1,500 credits / 45 alloys).
+- **Survey duration:** deterministic 24–37 days + 2 per known
+  catalog planet, derived from the seed and star.
+- **Stranding in S1:** normal dispatch can never strand a ship.
+  `dispatch_ship_unchecked` is the explicit one-way order of §5.2;
+  a ship arriving on exactly empty tanks can still survey/found
+  (local work) but cannot depart until refuelled; a ship stranded
+  en route awaits tanker mechanics from a later slice.
+- **No routes/trade/gates/AI/diplomacy/war** — S3–S5 by design.
+  Colonies are self-supplied from local production + buffers in S1;
+  the route layer (§4.3) arrives with trade in S4.
+
+## Test state (all run 2026-11-04 on this VM)
+
+- `sim`: `cargo test` **19/19** (6 unit + 13 integration,
+  `sim/tests/s1.rs`) — determinism across advance chunking,
+  save/load-at-year-5 continuity, range/fuel refusals, exact fuel
+  burn, stranding, claim-before-founding, bounded growth,
+  construction, scripted expansion, 100-year endurance. Detail in
+  `docs/TEST_PLAN.md`.
+- `pipeline`: `cargo test` **22/22** (unchanged by S1).
+- Viewer: Godot `--verify` still all-pass (unchanged by S1).
+- No wall clock / external RNG in `sim/src` (grep-verified, see
+  TEST_PLAN).
+
+## Demo — scripted 25-year campaign (verbatim)
+
+`cargo run --release --bin sim-cli -- --years 25`, seed 42, real
+113,393-star table:
+
+```text
+campaign_start seed=42 stars=113393 home=0 
+year=1 day=365 surveyed=8 colonized=3 population_millions=1214.64 fuel_stock=1039.27 credits=12286.58 ships=1
+year=2 day=730 surveyed=16 colonized=4 population_millions=1230.56 fuel_stock=1207.87 credits=11041.47
+year=3 day=1095 surveyed=24 colonized=5 population_millions=1248.02 fuel_stock=1258.53 credits=9797.66
+year=4 day=1460 surveyed=29 colonized=7 population_millions=1266.14 fuel_stock=1439.54 credits=7100.39
+year=5 day=1825 surveyed=29 colonized=8 population_millions=1284.17 fuel_stock=1642.80 credits=5986.90
+year=6 day=2190 surveyed=34 colonized=9 population_millions=1303.84 fuel_stock=1876.14 credits=4744.48
+year=7 day=2555 surveyed=42 colonized=10 population_millions=1322.18 fuel_stock=2129.47 credits=4864.60
+year=8 day=2920 surveyed=46 colonized=10 population_millions=1340.41 fuel_stock=2165.29 credits=5082.65
+year=9 day=3285 surveyed=55 colonized=10 population_millions=1358.79 fuel_stock=2331.53 credits=5185.70
+year=10 day=3650 surveyed=59 colonized=10 population_millions=1377.31 fuel_stock=2356.33 credits=5423.81
+year=11 day=4015 surveyed=63 colonized=11 population_millions=1396.22 fuel_stock=2615.88 credits=4172.06
+year=12 day=4380 surveyed=72 colonized=11 population_millions=1416.59 fuel_stock=2810.06 credits=4296.96
+year=13 day=4745 surveyed=78 colonized=11 population_millions=1435.54 fuel_stock=2848.25 credits=4480.68
+year=14 day=5110 surveyed=84 colonized=11 population_millions=1454.62 fuel_stock=2883.49 credits=4674.77
+year=15 day=5475 surveyed=91 colonized=11 population_millions=1473.83 fuel_stock=3062.73 credits=4854.30
+year=16 day=5840 surveyed=91 colonized=11 population_millions=1493.17 fuel_stock=3179.73 credits=5219.35
+year=17 day=6205 surveyed=91 colonized=11 population_millions=1512.64 fuel_stock=3334.22 credits=4094.99
+year=18 day=6570 surveyed=91 colonized=12 population_millions=1534.12 fuel_stock=3603.71 credits=4496.00
+year=19 day=6935 surveyed=91 colonized=12 population_millions=1553.84 fuel_stock=3768.14 credits=4858.00
+year=20 day=7300 surveyed=97 colonized=12 population_millions=1573.69 fuel_stock=3957.33 credits=5080.79
+year=21 day=7665 surveyed=97 colonized=12 population_millions=1593.65 fuel_stock=4101.13 credits=5464.45
+year=22 day=8030 surveyed=97 colonized=13 population_millions=1613.97 fuel_stock=4361.55 credits=4359.02
+year=23 day=8395 surveyed=97 colonized=13 population_millions=1634.16 fuel_stock=4551.30 credits=4728.67
+year=24 day=8760 surveyed=97 colonized=13 population_millions=1656.15 fuel_stock=4758.92 credits=5141.59
+year=25 day=9125 surveyed=99 colonized=13 population_millions=1676.56 fuel_stock=4956.91 credits=5484.31
+final_state_hash=7e64c3223b1604eb9a1ee5f97401edfb3ee10a6741f14d7e554be638c8ea6bad
+```
+
+(The year lines above omit the trailing `ships=1` field for width;
+the binary prints it. The hash is over the exact run.)
+
+Performance: the same harness at `--years 100` completes in
+**~0.78 s wall** on this VM (release), ending at 256 surveyed /
+34 colonized. VM CPU number for the core only — no frame claims.
+
+## Gotchas found in S1 (don't rediscover these)
+
+- A surveyor that chains single affordable legs away from colonies
+  *will* maroon itself (found at Teegarden's Star, 0.04 fuel). The
+  scripted policy's return-reserve rule is load-bearing; a future
+  AI/frontend needs the same prudence or tanker support (§5.2).
+- Arrival on exactly empty tanks must not block the arrival order
+  itself (survey/found), or the ship deadlocks permanently.
+- `cargo` needs the full synveil-tools env
+  (`RUSTUP_HOME`/`CARGO_HOME`/`RUSTUP_TOOLCHAIN=1.99.0-...`); a bare
+  `cargo` invocation fails with a rustup toolchain error.
+- The sim depends on the pipeline crate by path; the binary star
+  format contract (`pipeline/src/table.rs`) is unchanged in S1.
+
+## Offline progression — ADAM'S DECISION, PENDING
+
+Adam parked this in §2/§11: at 1× (one real day = one game day),
+does the galaxy advance while the game is closed? **No code in S1
+embodies a policy** — the core is step-driven and only advances
+when a driver calls `advance()`. The core's determinism makes any
+of the options implementable later without a redesign:
+
+1. **Full catch-up on load** — on opening a save, advance by the
+   real elapsed days (at 1×) since it was saved. The galaxy is
+   truly persistent; wars and famines can resolve unwatched (AI
+   behaviour in S3+ would need care). *Builder's recommendation
+   if the "living galaxy" feel is the priority.*
+2. **Capped catch-up** — advance at most N days (e.g. 30) on load,
+   regardless of absence length. Keeps the world breathing without
+   returning to a transformed galaxy after a month away.
+3. **Frozen while closed** — time passes only while playing; the
+   speed ladder is the only accelerator. Simplest, most
+   conventional; the 1× ambient speed becomes a flavour setting
+   rather than a persistence promise.
+
+Recommendation recorded for Adam: **option 2 (capped catch-up,
+cap ~30 days)** as the default with the cap visible in settings —
+it honours the 1× ruling's living-galaxy intent while bounding
+how much history can happen unwatched; option 1 can be an
+opt-in "hardcore persistence" toggle later. This is a
+recommendation only; the decision is Adam's and is needed before
+S2 wires save/load into the frontend.
 
 ## Unverified / owner-PC gates
 
 - FPS and rendering feel on Adam's RTX 3060 (no FPS claims made).
 - Interactive picking/orbit with a real mouse; Windows export.
-- S1 design question parked by Adam: offline progression (galaxy
-  advancing while the game is closed) — settle in the S1 design pass.
+- S2 design depends on the offline-progression decision above.
 
 ## Next slice
 
-**S1 — Sim core (headless)**, only on Adam's go-ahead: Rust core with
-galaxy state, daily tick + monthly settlement, one civilization
-colonizing (survey/claim/found/grow), fuel-range movement, save/load,
-scripted campaign tests. The viewer stays a viewer until S2 wires
-the frontend to the core.
+**S2 — Playable colonizer**, only on Adam's go-ahead: Godot
+frontend over this core (map UI, system panel, colonization loop
+from Sol, save/load in the frontend). Settle offline progression
+first (above).
