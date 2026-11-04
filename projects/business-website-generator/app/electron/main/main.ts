@@ -27,12 +27,15 @@ function createWindow(): BrowserWindow {
     },
   });
 
+  // The compiled main lives in dist/electron/main, while Vite writes the
+  // renderer to dist/renderer — two levels up, not one. (The preload sits
+  // at dist/electron/preload.js, so its one-level-up path above is right.)
   if (isDev) {
     win.loadURL('http://localhost:5176').catch(() => {
-      win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+      win.loadFile(path.join(__dirname, '..', '..', 'renderer', 'index.html'));
     });
   } else {
-    win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+    win.loadFile(path.join(__dirname, '..', '..', 'renderer', 'index.html'));
   }
   return win;
 }

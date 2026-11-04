@@ -42,16 +42,34 @@ export function renderSiteFiles(site: Site): Record<string, string> {
   return theme.renderSite(site.profile).files;
 }
 
+/** The stylesheet link every theme emits into its pages' <head>. */
+const STYLESHEET_LINK = '<link rel="stylesheet" href="style.css" />';
+
+/**
+ * Preview documents are displayed in a `srcDoc` iframe, where the relative
+ * `style.css` link cannot resolve (nothing serves or writes that file at
+ * the editor's URL), so previews would render without any theme CSS.
+ * Inline the theme's stylesheet in place of the link. The exported files
+ * keep the external stylesheet untouched — the preview is approximate,
+ * the export is authoritative.
+ */
+function inlinePreviewCss(html: string, css: string): string {
+  const style = (): string => `<style>\n${css}\n</style>`;
+  if (html.includes(STYLESHEET_LINK)) return html.replace(STYLESHEET_LINK, style);
+  return html.replace('</head>', () => `${style()}</head>`);
+}
+
 /** Render a site to preview pages (HTML pages only, in theme page order). */
 export function renderPreviewPages(site: Site): RenderedPage[] {
   const theme = getTheme(site.themeId);
   if (!theme) throw new BwgError('THEME_NOT_FOUND', `Unknown theme "${site.themeId}".`);
   const files = theme.renderSite(site.profile).files;
+  const css = files['style.css'];
   const pages: RenderedPage[] = [];
   for (const p of theme.info.pages) {
     if (!p.endsWith('.html')) continue;
     const html = files[p];
-    if (html !== undefined) pages.push({ path: p, html });
+    if (html !== undefined) pages.push({ path: p, html: css ? inlinePreviewCss(html, css) : html });
   }
   return pages;
 }

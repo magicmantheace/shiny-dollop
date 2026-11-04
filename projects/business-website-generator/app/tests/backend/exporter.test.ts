@@ -7,7 +7,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openDb, type SiteStore } from '../../electron/main/db.js';
-import { runExport, validateSiteExport } from '../../electron/main/exporter.js';
+import { renderPreviewPages, renderSiteFiles, runExport, validateSiteExport } from '../../electron/main/exporter.js';
 import { makeProfile } from './fixtures.js';
 
 let tmp: string;
@@ -111,5 +111,28 @@ describe('validateSiteExport', () => {
     const result = validateSiteExport({ store }, site.id);
     expect(result.ok).toBe(false);
     expect(result.issues.length).toBeGreaterThan(0);
+  });
+});
+
+describe('renderPreviewPages', () => {
+  it('inlines the theme stylesheet so srcDoc previews render with theme CSS', () => {
+    const site = createValidSite();
+    const css = renderSiteFiles(site)['style.css'];
+    expect(css).toBeDefined();
+
+    const pages = renderPreviewPages(site);
+    expect(pages.map((p) => p.path)).toEqual(['index.html', 'services.html', 'contact.html']);
+    for (const page of pages) {
+      expect(page.html).toContain('<style>');
+      expect(page.html).toContain(css!);
+      expect(page.html).not.toContain('href="style.css"');
+    }
+  });
+
+  it('leaves the exported rendering untouched (external stylesheet link kept)', () => {
+    const site = createValidSite();
+    const files = renderSiteFiles(site);
+    expect(files['index.html']).toContain('<link rel="stylesheet" href="style.css" />');
+    expect(files['style.css']).toBeDefined();
   });
 });

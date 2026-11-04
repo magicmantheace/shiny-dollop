@@ -27,6 +27,7 @@
     "node": ">=22"
   },
   "license": "MIT",
+  "main": "dist/electron/main/main.js",
   "name": "business-website-generator",
   "private": true,
   "scripts": {

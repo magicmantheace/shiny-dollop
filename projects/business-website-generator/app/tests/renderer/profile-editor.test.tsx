@@ -199,4 +199,32 @@ describe('ProfileEditor', () => {
     expect(screen.getByText(/site name is required/i)).toBeInTheDocument();
     expect(mock.calls.updateProfile).toHaveLength(0);
   });
+
+  it('flushes pending valid edits when the editor unmounts inside the debounce window', async () => {
+    const { unmount } = renderEditor();
+
+    const tagline = screen.getByLabelText('Tagline');
+    fireEvent.change(tagline, { target: { value: 'Edited just before switching tabs' } });
+    expect(mock.calls.updateProfile).toHaveLength(0);
+
+    // SiteWorkspace renders the editor conditionally, so a tab switch
+    // unmounts it; the pending edit must be saved, not silently dropped.
+    unmount();
+    await act(async () => {});
+
+    expect(mock.calls.updateProfile).toHaveLength(1);
+    expect(mock.calls.updateProfile[0]!.patch.tagline).toBe('Edited just before switching tabs');
+  });
+
+  it('does not flush invalid edits on unmount', async () => {
+    const { unmount } = renderEditor();
+
+    const email = screen.getByLabelText('Email');
+    fireEvent.change(email, { target: { value: 'not-an-email' } });
+
+    unmount();
+    await act(async () => {});
+
+    expect(mock.calls.updateProfile).toHaveLength(0);
+  });
 });

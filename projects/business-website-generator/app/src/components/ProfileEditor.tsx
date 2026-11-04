@@ -148,6 +148,32 @@ export function ProfileEditor({ site, onSaved, focusSectionId, onFocusSectionDon
     };
   }, [draftJson, isDirty, doSave]);
 
+  // Flush pending edits on unmount. SiteWorkspace unmounts this editor on
+  // every tab switch and the draft exists only in this component, so an
+  // edit still inside the debounce window would otherwise be silently
+  // lost. Mirrors doSave's rule: invalid drafts are never persisted.
+  const pendingFlushRef = useRef<{
+    siteId: string;
+    draft: BusinessProfile;
+    isDirty: boolean;
+    hasErrors: boolean;
+    onSaved: (site: Site) => void;
+  } | null>(null);
+  pendingFlushRef.current = { siteId: site.id, draft, isDirty, hasErrors, onSaved };
+  useEffect(() => {
+    return () => {
+      const pending = pendingFlushRef.current;
+      if (!pending || !pending.isDirty || pending.hasErrors) return;
+      void getApi()
+        .sites.updateProfile(pending.siteId, pending.draft)
+        .then((updated) => pending.onSaved(updated))
+        .catch(() => {
+          // Best-effort flush: the editor is gone, so there is nowhere to
+          // surface a failure; never throw from an unmount cleanup.
+        });
+    };
+  }, []);
+
   // Focus a section when an export issue links to it.
   useEffect(() => {
     if (!focusSectionId) return;
