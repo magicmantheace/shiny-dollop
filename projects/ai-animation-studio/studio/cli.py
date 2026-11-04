@@ -8,7 +8,8 @@ from pathlib import Path
 from . import gltf
 from .library import Library, ROOT, DEFAULT_DB
 from .promotion import DEFAULT_ASSET_ROOT, PromotionError, promote_asset, promote_character
-from .recipes import RecipeError, assemble_character, unapproved_parts
+from .recipes import (RecipeError, assemble_character, edit_character,
+                      require_character, unapproved_parts)
 from .schema import validate_scene, validate_asset, validate_character, validate_catalog, ValidationError
 
 EXAMPLES = ROOT / "examples"
@@ -56,7 +57,7 @@ def enrich_manifest(manifest: dict, lib: Library, asset_root: Path | None) -> di
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="AI Animation Studio foundation")
-    parser.add_argument("command", choices=["validate", "init-db", "seed", "register", "promote", "assemble", "list-assets", "demo", "sockets"])
+    parser.add_argument("command", choices=["validate", "init-db", "seed", "register", "promote", "assemble", "show-character", "edit-character", "export-character", "list-assets", "demo", "sockets"])
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--catalog", default="quaternius_f1_catalog.json",
                         help="catalog fixture in examples/ (register/promote commands)")
@@ -70,8 +71,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--spec", type=Path, default=None,
                         help="character spec JSON file (assemble command)")
     parser.add_argument("--require-approved", action="store_true",
-                        help="assemble command: refuse recipes with unapproved parts")
-    parser.add_argument("--out", type=Path, default=ROOT / "godot" / "data" / "scene_runtime.json")
+                        help="assemble/edit-character: refuse recipes with unapproved parts")
+    parser.add_argument("--character", default=None,
+                        help="character id (show/edit/export-character commands)")
+    parser.add_argument("--body-base", default=None,
+                        help="edit-character: new body_base part id")
+    parser.add_argument("--head", default=None,
+                        help="edit-character: new head part id")
+    parser.add_argument("--hair", default=None,
+                        help="edit-character: new hair part id")
+    parser.add_argument("--outfit", default=None,
+                        help="edit-character: new outfit as comma-separated part ids "
+                             "(empty string clears the outfit)")
+    parser.add_argument("--colors", default=None,
+                        help="edit-character: new colors as a JSON object, "
+                             "e.g. '{\"hair\": \"#663e32\"}'")
+    parser.add_argument("--out", type=Path, default=None,
+                        help="output file (demo: scene runtime JSON, default godot/data/scene_runtime.json; "
+                             "export-character: recipe spec file, required)")
     args = parser.parse_args(argv)
     asset_root = args.asset_root or DEFAULT_ASSET_ROOT
     if args.command == "validate":
@@ -93,12 +110,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "demo":
         scene = validate_scene(load(args.scene))
-        args.out.parent.mkdir(parents=True, exist_ok=True)
-        args.out.write_text(json.dumps(scene, indent=2) + "\n", encoding="utf-8")
-        print(f"Saved {len(scene['events'])} validated events to {args.out}")
+        out_path = args.out or (ROOT / "godot" / "data" / "scene_runtime.json")
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps(scene, indent=2) + "\n", encoding="utf-8")
+        print(f"Saved {len(scene['events'])} validated events to {out_path}")
         manifest = EXAMPLES / "asset_manifest.json"
         if manifest.exists():
-            target = args.out.parent / "asset_manifest.json"
+            target = out_path.parent / "asset_manifest.json"
             base = json.loads(manifest.read_text(encoding="utf-8"))
             if args.db.exists():
                 lib = Library(args.db)
@@ -173,6 +191,45 @@ def main(argv: list[str] | None = None) -> int:
                       f"{', '.join(pending)}")
             else:
                 print("  all parts approved")
+        elif args.command == "show-character":
+            if args.character is None:
+                parser.error("show-character requires --character <id>")
+            recipe = require_character(lib, args.character)
+            print(json.dumps(recipe, indent=2))
+        elif args.command == "edit-character":
+            if args.character is None:
+                parser.error("edit-character requires --character <id>")
+            changes = {}
+            if args.body_base is not None:
+                changes["body_base"] = args.body_base
+            if args.head is not None:
+                changes["head"] = args.head
+            if args.hair is not None:
+                changes["hair"] = args.hair
+            if args.outfit is not None:
+                changes["outfit"] = [p for p in args.outfit.split(",") if p]
+            if args.colors is not None:
+                changes["colors"] = json.loads(args.colors)
+            recipe = edit_character(lib, args.character, changes,
+                                    require_approved=args.require_approved)
+            print(f"Edited character {recipe['character_id']} "
+                  f"(rig {recipe['rig_id']}) in {args.db}")
+            pending = unapproved_parts(lib, recipe)
+            if pending:
+                print(f"  unapproved parts (not playable until promoted): "
+                      f"{', '.join(pending)}")
+            else:
+                print("  all parts approved")
+        elif args.command == "export-character":
+            if args.character is None:
+                parser.error("export-character requires --character <id>")
+            if args.out is None:
+                parser.error("export-character requires --out <spec JSON file>")
+            recipe = require_character(lib, args.character)
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(json.dumps(recipe, indent=2) + "\n",
+                                encoding="utf-8")
+            print(f"Exported character {recipe['character_id']} to {args.out}")
         elif args.command == "list-assets":
             for item in lib.list_assets():
                 print(f"{item['asset_id']} [{item['status']}] {item['uri']}")
