@@ -62,6 +62,7 @@ and token to Muse **out-of-band** — never via git.
 | `tests/test_bridge.py` | end-to-end suite: boots the real server on loopback |
 | `docs/DESIGN.md` | architecture, wire protocol, threat model |
 | `docs/INSTALL_WINDOWS.md` | exact Windows install + verification steps |
+| `docs/CHATGPT_INSTALL_HANDOFF.md` | delegated install (D: drive) that stops before the owner's token/final-setup steps |
 | `docs/TEST_PLAN.md` | what the tests prove — and what they cannot |
 | `docs/MUSE_HANDOFF.md` | current state, decisions, next steps |
 | `REQUIREMENTS.md` | Python >= 3.11, stdlib only, Tailscale |
