@@ -1,9 +1,12 @@
 # Local runtime and generated files — never commit personal or customer data
+# (union of intake scaffold and MVP implementation ignores; applies to this
+# project and descendants only)
 .env
 .env.*
 !.env.example
 node_modules/
 dist/
+out/
 build/
 release/
 coverage/
@@ -12,20 +15,32 @@ coverage/
 venv/
 __pycache__/
 .pytest_cache/
+playwright-report/
+test-results/
 *.pyc
 *.log
 *.sqlite
 *.sqlite3
 *.db
 *.db-*
+*.db-journal
+*.db-wal
+*.db-shm
 *.bak
 *.zip
 *.7z
 *.tar
 *.exe
 *.msi
+*.appx
+*.msix
+*.dmg
+*.AppImage
+*.asar
 *.dmp
 *.tmp
+.DS_Store
+Thumbs.db
 .local/
 user-data/
 backups/

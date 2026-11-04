@@ -1,0 +1,24 @@
+appId: com.magicmantheace.game-save-manager
+productName: Game Save Manager
+directories:
+  output: release
+files:
+  # Compiled app. The main process requires('zod') at runtime, so it ships too.
+  # node:sqlite is provided by the Electron runtime itself.
+  - dist/**/*
+  - package.json
+  - node_modules/zod/**/*
+asar: true
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-${version}-win-x64.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Game Save Manager
+# NOTE: installer build is configured but not yet run. Code signing is
+# intentionally not configured — no release without owner approval.
