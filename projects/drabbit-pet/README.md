@@ -1,8 +1,9 @@
 # Drabbit Pet
 
-**Status:** IN DEVELOPMENT — P0 (foundation + design) and P1 (pet-brain
-core) built on a review branch; desktop, server, and Android slices
-planned. See [the handoff](docs/MUSE_HANDOFF.md) for the honest
+**Status:** IN DEVELOPMENT — P0 (foundation + design), P1 (pet-brain
+core), and P2 (Electron desktop pet) built on a review branch; the
+companion server (P3) and Android app (P4) are still planned. See
+[the handoff](docs/MUSE_HANDOFF.md) for the honest
 verified/unverified split.
 
 A Tamagotchi-style virtual pet whose creature is the **renfaire
@@ -31,17 +32,22 @@ advance call, identically to having ticked live.
 | Folder | Contents | Slice |
 | --- | --- | --- |
 | `core/` | The pet brain: simulation, actions, persistence, tests, headless demo | P1 |
-| `desktop/` | Electron desktop pet + companion server host | P2/P3 |
+| `desktop/` | Electron desktop pet (P2) + companion server host (P3) | P2/P3 |
 | `android/` | Kotlin companion app | P4 |
 | `assets/` | Replaceable sprite/art assets | P2 |
 | `docs/` | [Pet design bible](docs/PET_DESIGN.md), [architecture](docs/DESIGN.md), [test plan](docs/TEST_PLAN.md), [handoff](docs/MUSE_HANDOFF.md) | P0 |
 
-## Try the brain (no UI yet)
+## Try it
 
 ```sh
 npm --prefix core install   # dev dependencies only; the core itself has no runtime deps
-npm --prefix core test      # vitest suite
+npm --prefix core test      # brain vitest suite
 npm --prefix core run demo  # scripted egg→adult lifecycle diary
+
+npm --prefix desktop install
+npm --prefix desktop test   # desktop headless suites
+npm --prefix desktop run build   # build the Electron app into desktop/dist
+npm --prefix desktop run smoke   # headless launch smoke (Xvfb on Linux)
 ```
 
 ## Start point for agents

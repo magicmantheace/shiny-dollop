@@ -20,12 +20,21 @@ touches a real clock.
 | Persistence | serialize→parse→serialize round-trip is byte-identical; parse rejects garbage and unknown future schema versions; envelope carries lineage. |
 | Demo | `npm --prefix core run demo` runs a scripted egg→adult lifecycle with periodic care and prints a readable diary; must exit 0. (Manual check, not a unit test.) |
 
-## P2 — desktop pet (planned)
+## P2 — desktop pet (`desktop/`)
 
-- Unit: state→sprite-state mapping, care panel wiring against core.
-- Headless build on the VM (`npm run build` / package smoke).
-- **Owner-PC only:** transparent window behaviour, perch rendering,
-  tray, always-on-top, multi-monitor — never claimed from VM runs.
+Automated: vitest suites in `desktop/tests/`, run with
+`npm --prefix desktop test`. The Electron-free modules are the test
+surface; the GUI itself is not faked in tests.
+
+| Area | Coverage |
+| --- | --- |
+| Save store | Round-trip byte-identical; missing file → fresh; corrupt file → recovery with the corrupt bytes preserved at the renamed-aside path and a fresh egg returned; valid-JSON/invalid-shape also recovers; atomic write leaves no `.tmp`. |
+| Tick service | Fresh egg persisted once at startup; a tick that changes nothing writes nothing; crossing the incubation boundary persists and emits `egg_ready`; scheduler wiring (5 s default, start/stop, no double-schedule); a dead pet is never advanced or persisted; `onChanged` fires only on change. |
+| Roaming planner | Bounds respected under adversarial randomness (always-right / scripted-left), out-of-bounds starts clamped; never moves while asleep, panel-open, paused, an egg, or dead; hop → arrive exactly on target → sit; sit bias gives long idle sits. |
+| IPC action mapping | Payload validation accepts all nine UI kinds and rejects malformed payloads (`bad_payload`); each kind maps to the right core action with exact need deltas (snack +8, meal +35/clamp, play −7 energy…); wrong-stage/state actions raise the core's typed errors (`not_ready`, `asleep`, `not_sick`, `not_dead`, `is_egg`); clean is allowed while asleep; medicine cures an injected sick pet; new-egg starts generation 2. |
+| Visual state | state→animation mapping (egg/egg-ready/idle/sleeping/sick/dead), transient eating/playing from events, resolution priority (base > transient > hopping > idle). |
+| Build + smoke | `npm run build` clean (core tsc, main/preload tsc strict, Vite production build of both windows). `npm run smoke`: the real Electron binary launches under Xvfb, creates a fresh save in a throwaway userData, and loads both windows (`SMOKE_OK`). |
+| **Owner-PC only** | Transparent window behaviour, perching/roaming feel on a real desktop, tray, always-on-top over real windows, multi-monitor, high-DPI — never claimed from VM runs. |
 
 ## P3 — companion server (planned)
 

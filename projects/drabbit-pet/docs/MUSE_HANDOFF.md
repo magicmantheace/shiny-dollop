@@ -25,8 +25,32 @@ forms (radiant/content/scruffy), messes, sickness, death + lineage,
 canonical JSON persistence with schema versioning and a migration
 stub, append-only capped event log, headless demo.
 
-**P2–P4: NOT STARTED.** Desktop shell, companion server, and Android
-app are placeholders plus the protocol draft in DESIGN.md.
+**P2 — desktop pet (`desktop/`): DONE on this branch** (pending Nyx
+verification, then the owner's first visual check on Windows).
+Electron 45 + React 19 + TS strict + Vite, consuming `drabbit-core`
+via a `file:` dependency — **the core is unchanged**; no core edits
+were needed. Main process owns the one pet state: save in Electron
+`userData` (`drabbit-save.json`, atomic temp+rename writes; a corrupt
+save is renamed aside, never destroyed, and a fresh egg starts), a
+5 s tick service that advances with `Date.now()` (the shell is the
+only place clocks live) and persists only on change, plus a final
+advance+persist on quit. Frameless transparent always-on-top pet
+window (220×220, bottom-right start) roaming the work-area bottom via
+a pure, tested planner — long sits, short hops, paused while the pet
+sleeps / the care panel is open / tray pause is on. Care-panel
+window (single instance, hide-on-close), tray icon (Show pet / Care
+panel / Pause roaming / Quit), single-instance lock. Typed IPC
+(`pet:getSummary` / `pet:action` / `pet:events` / `pet:openPanel` +
+`pet:changed` / `pet:roamState` pushes), contextIsolation on,
+nodeIntegration off, sandboxed preload, hand-rolled payload
+validation; core `PetError`s return as IPC error results. The pet is
+rendered as a hand-drawn inline SVG (all six fur variants, adult-form
+flavour, idle/hop/sleep/eat/play/sick/egg/ghost animation states) —
+**v1 placeholder art**, structured for later sprite replacement.
+Packaging (electron-builder) is future work, out of P2 scope.
+
+**P3–P4: NOT STARTED.** Companion server and Android app are
+placeholders plus the protocol draft in DESIGN.md.
 
 ## Verified (this Linux VM, Node v24.22.1, 2026-11-04)
 
@@ -44,14 +68,35 @@ app are placeholders plus the protocol draft in DESIGN.md.
   "Pip" from egg to a **radiant** adult over ~19 simulated hours,
   printing a diary of hatches, stage changes, messes, sleeps, and
   status lines (35 events, 3,253-byte save).
+- `npm --prefix desktop run typecheck` → clean (main, preload,
+  renderer, tests — all `tsc` strict).
+- `npm --prefix desktop test` → **29 tests, 29 passed** (vitest
+  3.2.7): save-store round-trip / missing / corrupt-recovery (bytes
+  preserved aside), tick persistence (writes only on change, never
+  for a dead pet, scheduler wiring), roaming planner (bounds under
+  adversarial randomness, blocked contexts never move, hop→arrive→
+  sit), IPC action mapping (every UI kind → the right core action;
+  wrong-stage actions raise the core's typed errors) + payload
+  validation, and visual-state derivation.
+- `npm --prefix desktop run build` → clean: core `tsc`, desktop
+  `tsc` (main + preload), Vite production build of both windows.
+- `npm --prefix desktop run smoke` → **SMOKE_OK**: the real Electron
+  45 binary launched headlessly under Xvfb against a throwaway
+  userData, created and persisted a fresh save (canonical JSON with
+  the egg's `created` event), and loaded both production windows.
 
 ## NOT verified (no evidence exists yet)
 
-- Anything Windows: the Electron shell doesn't exist yet (P2).
+- The desktop pet **on Windows**: transparency, always-on-top over
+  real windows, tray behaviour, roaming feel, multi-monitor,
+  high-DPI. The Xvfb smoke proves launch + window load + save
+  creation on Linux — not the Windows desktop experience. That is
+  the owner's first-visual-check checkpoint.
 - Anything Android: no app, no SDK check, no device run (P4).
 - The companion protocol is a **draft on paper only** — no server has
   run (P3).
-- Sprite/art assets: none exist; `assets/` is a placeholder (P2).
+- Sprite assets: the pet is inline SVG (v1 placeholder art);
+  `assets/` holds only the generated app/tray icon.
 
 ## Working rules for the next agent
 
@@ -65,6 +110,8 @@ app are placeholders plus the protocol draft in DESIGN.md.
 
 ## Next step
 
-P2 — the Electron desktop pet (see the build queue). Owner-side
-checkpoint after P2: first visual check of the pet on the owner's
-Windows PC.
+P3 — the companion server inside the desktop app (protocol drafted
+in DESIGN.md). Owner-side checkpoint, still open: first visual check
+of the P2 pet on the owner's Windows PC (look, roaming feel,
+transparency) — do it whenever convenient; it doesn't block P3's
+headless work.
