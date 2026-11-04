@@ -60,3 +60,53 @@
 2. Worker A: add renderer typecheck to `npm run typecheck`.
 3. Re-run `npm run smoke` after (1); then `npm run package:win` on Windows hardware and follow `docs/WINDOWS_INSTALL.md`.
 4. Owner review via PR (do not merge without approval).
+
+---
+
+## Codex PR #8 fix pass — 2026-11-04 (Nyx PR fix queue, item 11)
+
+**Ground truth (GitHub API, checked first):** 3 Codex reviews, 8 inline findings. The
+summary comment's review of the current head has been stuck at "running" since
+2026-10-24 — the cycle-2 head was never re-reviewed — so each finding was checked
+against the current code individually:
+
+| Round (review) | Findings | State at head `3c96d94` |
+|---|---|---|
+| 1 — `5633182139` on `ac72f4519` | Preload sandbox bundling (P1); chart shared month axis (P2); root index must not advertise MVP status (P1) | First two **live** — fixed in this pass. Root-index item already satisfied: the root README lists this project as "Planned", and this document + the project README state "MVP — not end-to-end verified". |
+| 2 — `5638224349` on `b4c4af504` | Revert cross-project handoff edit; wire dev runner to Vite via `FS_DEV_SERVER`; zero-balance debts render as already paid | Already fixed by `8bd8544` (verified in history + current `dev.mjs` / `formatPayoffMonth`). |
+| 3 — `5638520323` on `8bd85444a` | Windows-safe dev launch (no `.cmd` shims, child `error` handler); horizon banner wording | Already fixed by `3c96d94` (verified in current `dev.mjs` / `formatUnpaidWithinHorizon`). |
+
+**Fixes in this pass:**
+
+1. **Preload bundled for the sandbox (P1).** `app/electron/main.ts` sets
+   `sandbox: true`; a sandboxed preload cannot `require` relative modules, but the
+   plain-tsc build emitted `require("../shared/ipc-channels")` into
+   `dist/electron/preload.js` (reproduced at the old head), so the preload died
+   before exposing `window.sim`. New `app/vite.preload.config.ts` bundles the
+   preload + its local imports into a single `dist/electron/preload.js` with
+   `electron` external; `build:preload` uses it; `tsconfig.main.json` excludes
+   `electron/preload.ts` so the main tsc build no longer emits a competing
+   unbundled copy; the dev runner rebuilds the preload with the same config in
+   watch mode (`vitePreloadWatchCommand`). New `app/tests/preload-bundle.test.ts`
+   builds the real artifact and executes it with only a stub `electron`
+   resolvable — the sandbox environment — asserting `window.sim` is exposed,
+   channels are inlined, and error envelopes surface.
+2. **Comparison chart shares a month axis (P2).** `balancePolyline` plotted each
+   strategy by point index against its own series length, so a 3-month and a
+   5-month payoff both ended at the right edge. It now plots each point's `month`
+   against a shared maximum (new `chartMaxMonth`, mirroring `chartMaxBalance`);
+   `BalanceChart` passes the shared max for both strategies. Downsampled points
+   keep their real months, so spacing stays truthful.
+
+**Verification (Linux VM, this pass):** `npm test` **127/127** (14 files; baseline
+118/13 — +5 chart, +1 dev-commands, +3 preload-bundle), typecheck clean, lint
+clean, `npm run build` clean (final `dist/electron/preload.js` contains exactly
+one `require`: `"electron"`), `npm run smoke` **PASS** (SMOKE_OK). Negative
+checks: exactly the 5 new chart tests fail with the chart fix stashed; all 3
+preload-bundle tests fail with `build:preload` reverted to tsc.
+
+**Note on the Worker-B sections above:** their "open issues" (smoke session
+ordering, 2 engine failures, renderer missing from typecheck) predate the
+cycle-1/2 commits — at this head the suite is fully green, typecheck covers the
+renderer, and smoke passes. Still unverified, unchanged: packaged-app run on
+Windows hardware.
