@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Game } from '../../shared/types';
-import { parseArgsString } from '../../shared/args';
+import { parseArgsString, serializeArgs } from '../../shared/args';
 import { ApiCallError, formatDateTime, formatDuration, getApi, unwrap } from '../api';
 
 interface Props {
@@ -13,7 +13,10 @@ interface Props {
 export default function GameDetails({ game, onClose, onChanged }: Props) {
   const [title, setTitle] = useState(game.title);
   const [workingDir, setWorkingDir] = useState(game.workingDir ?? '');
-  const [argsText, setArgsText] = useState(game.args.join(' '));
+  // Serialize (not join): joining with spaces is lossy — an unrelated
+  // title edit would silently rewrite args containing spaces, quotes,
+  // or backslashes when the dialog saves.
+  const [argsText, setArgsText] = useState(serializeArgs(game.args));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);

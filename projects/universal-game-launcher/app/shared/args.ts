@@ -16,6 +16,26 @@ export class ArgsParseError extends Error {
   }
 }
 
+/**
+ * Serialize an argv array back into the text form parseArgsString
+ * accepts — the exact inverse of the parser. Any argument that is empty
+ * or contains whitespace, quotes, or backslashes is wrapped in double
+ * quotes with `\` and `"` escaped, so parseArgsString(serializeArgs(a))
+ * always deep-equals `a`. Joining with plain spaces is NOT reversible:
+ * ['--name', 'My Game'] would re-parse as three arguments, and a
+ * Windows path's backslashes would be eaten as escape characters.
+ */
+export function serializeArgs(args: readonly string[]): string {
+  return args.map(serializeArg).join(' ');
+}
+
+function serializeArg(arg: string): string {
+  if (arg.length > 0 && !/[\s"'\\]/.test(arg)) {
+    return arg;
+  }
+  return `"${arg.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
 export function parseArgsString(input: string): string[] {
   const args: string[] = [];
   let current = '';
