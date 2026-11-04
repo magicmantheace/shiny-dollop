@@ -21,7 +21,14 @@ export function Editor({ docId, onBack }: EditorProps) {
   const [manifest, setManifest] = useState<TemplateManifest | null>(null);
   const [doc, setDoc] = useState<DocumentRecord | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  // Failed saves, tracked per field/token key: an entry means the newest
+  // local value for that key is visible in the editor but was REJECTED by
+  // the backend, so it is not in the persisted document (and export would
+  // not include it). An entry is cleared only when that key's newest edit
+  // is successfully saved — never by an unrelated edit's save.
+  const [saveErrors, setSaveErrors] = useState<ReadonlyMap<string, string>>(
+    () => new Map(),
+  );
   const [saving, setSaving] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -41,6 +48,7 @@ export function Editor({ docId, onBack }: EditorProps) {
     let cancelled = false;
     async function load() {
       setLoadError(null);
+      setSaveErrors(new Map());
       docRef.current = null;
       latestFieldEditsRef.current.clear();
       latestTokenEditsRef.current.clear();
@@ -138,10 +146,29 @@ export function Editor({ docId, onBack }: EditorProps) {
     [finalizeRecord],
   );
 
+  function recordSaveError(key: string, message: string) {
+    setSaveErrors((prev) => {
+      if (prev.get(key) === message) return prev;
+      const next = new Map(prev);
+      next.set(key, message);
+      return next;
+    });
+  }
+
+  function clearSaveError(key: string) {
+    setSaveErrors((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Map(prev);
+      next.delete(key);
+      return next;
+    });
+  }
+
   function beginSave() {
     inFlightRef.current += 1;
     setSaving(true);
-    setSaveError(null);
+    // Deliberately does NOT clear save errors: a failed save stays
+    // reported until its own key is successfully saved (see saveErrors).
   }
 
   function endSave() {
@@ -162,10 +189,20 @@ export function Editor({ docId, onBack }: EditorProps) {
     try {
       const record = await api.updateField(current.id, key, value);
       applyFieldRecord(record, manifest, key, seq);
+      // The failure warning for this key clears only once its NEWEST local
+      // edit has been acknowledged; if a newer edit is still in flight, its
+      // own outcome decides (a stale success must not hide a newer value
+      // that may yet be rejected).
+      const latest = latestFieldEditsRef.current.get(key);
+      if (!latest || latest.seq <= seq) clearSaveError(key);
     } catch (err) {
       // The local draft stays visible (and stays the newest local edit, so a
       // later response for another field cannot silently revert it either).
-      setSaveError(`Could not save “${key}”: ${errorText(err)}`);
+      // Record the failure only if this edit is still the key's newest —
+      // a superseded edit's failure is governed by the newer edit's save.
+      if (latestFieldEditsRef.current.get(key)?.seq === seq) {
+        recordSaveError(key, `Could not save “${key}”: ${errorText(err)}`);
+      }
     } finally {
       endSave();
     }
@@ -193,8 +230,19 @@ export function Editor({ docId, onBack }: EditorProps) {
     try {
       const record = await api.updateTokens(current.id, partial);
       applyTokenRecord(record, manifest, entries.map(([k]) => k), seq);
+      // Same per-key rule as field saves: a token's failure warning clears
+      // only when this save acknowledged that token's newest local edit.
+      for (const [key] of entries) {
+        const latest = latestTokenEditsRef.current.get(key);
+        if (!latest || latest.seq <= seq) clearSaveError(key);
+      }
     } catch (err) {
-      setSaveError(`Could not save design tokens: ${errorText(err)}`);
+      const message = `Could not save design tokens: ${errorText(err)}`;
+      for (const [key] of entries) {
+        if (latestTokenEditsRef.current.get(key)?.seq === seq) {
+          recordSaveError(key, message);
+        }
+      }
     } finally {
       endSave();
     }
@@ -262,11 +310,11 @@ export function Editor({ docId, onBack }: EditorProps) {
         </button>
       </header>
 
-      {saveError && (
-        <p role="alert" className="alert alert-error">
-          <code>{saveError}</code>
+      {[...new Set(saveErrors.values())].map((message) => (
+        <p key={message} role="alert" className="alert alert-error">
+          <code>{message}</code>
         </p>
-      )}
+      ))}
 
       <div className="editor-layout">
         <div className="editor-left">

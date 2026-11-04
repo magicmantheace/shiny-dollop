@@ -164,6 +164,114 @@ describe('Editor', () => {
     expect(clientName).toHaveValue('a');
   });
 
+  it('keeps a field save error until that field itself saves successfully (regression)', async () => {
+    const dtf = mockDtf();
+    dtf.documents.get.mockResolvedValue(makeDoc());
+    const clientSaves: Array<Deferred<DocumentRecord>> = [];
+    let clientSavesFail = true;
+    dtf.documents.updateField.mockImplementation(
+      (input: { id: string; key: string; value: unknown }) => {
+        if (input.key === 'clientName' && clientSavesFail) {
+          const d = deferred<DocumentRecord>();
+          clientSaves.push(d);
+          return d.promise;
+        }
+        // Every other save succeeds immediately, echoing the saved value.
+        return Promise.resolve(
+          makeDoc({ data: { ...makeDoc().data, [input.key]: input.value } }),
+        );
+      },
+    );
+    const user = userEvent.setup();
+    render(<Editor docId="doc-1" onBack={() => {}} />);
+
+    const clientName = await screen.findByLabelText(/Client name/);
+    await user.clear(clientName);
+    await user.type(clientName, 'Z');
+    expect(clientSaves).toHaveLength(2);
+
+    // The superseded "" save resolves; the newest "Z" save is REJECTED.
+    clientSaves[0]!.resolve(docWithClientName(''));
+    clientSaves[1]!.reject(new Error('FIELD_INVALID'));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(/Could not save/);
+    expect(alert).toHaveTextContent(/clientName/);
+
+    // An unrelated field edit whose save SUCCEEDS must not clear the
+    // warning: the rejected "Z" is still only a local draft.
+    const invoiceNumber = screen.getByLabelText(/Invoice number/);
+    await user.clear(invoiceNumber);
+    await user.type(invoiceNumber, 'INV-002');
+    await waitFor(() => {
+      expect(screen.getByText(/Last saved/)).toBeInTheDocument();
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent(/clientName/);
+    expect(clientName).toHaveValue('Z');
+
+    // Saving the failed field itself (now successfully) clears it.
+    clientSavesFail = false;
+    await user.type(clientName, 'z');
+    await waitFor(() => {
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+    expect(clientName).toHaveValue('Zz');
+  });
+
+  it('keeps a token save error until the tokens save successfully (regression)', async () => {
+    const dtf = mockDtf();
+    dtf.documents.get.mockResolvedValue(makeDoc());
+    dtf.documents.updateField.mockImplementation(
+      (input: { id: string; key: string; value: unknown }) =>
+        Promise.resolve(
+          makeDoc({ data: { ...makeDoc().data, [input.key]: input.value } }),
+        ),
+    );
+    const tokenSaves: Array<Deferred<DocumentRecord>> = [];
+    let tokenSavesFail = true;
+    dtf.documents.updateTokens.mockImplementation(() => {
+      if (tokenSavesFail) {
+        const d = deferred<DocumentRecord>();
+        tokenSaves.push(d);
+        return d.promise;
+      }
+      return Promise.resolve(
+        makeDoc({ tokens: { ...fixtureTokens, bg: '#445566' } }),
+      );
+    });
+    const user = userEvent.setup();
+    render(<Editor docId="doc-1" onBack={() => {}} />);
+
+    await screen.findByLabelText(/Client name/);
+    // Only the complete valid hex value is forwarded: one token save.
+    const bg = screen.getByLabelText('Background');
+    await user.clear(bg);
+    await user.type(bg, '#112233');
+    expect(tokenSaves).toHaveLength(1);
+    tokenSaves[0]!.reject(new Error('TOKEN_INVALID'));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /Could not save design tokens/,
+    );
+
+    // An unrelated field save succeeds — the token warning must survive.
+    const clientName = screen.getByLabelText(/Client name/);
+    await user.clear(clientName);
+    await user.type(clientName, 'Globex');
+    await waitFor(() => {
+      expect(screen.getByText(/Last saved/)).toBeInTheDocument();
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /Could not save design tokens/,
+    );
+
+    // A later successful token save clears it.
+    tokenSavesFail = false;
+    await user.clear(bg);
+    await user.type(bg, '#445566');
+    await waitFor(() => {
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+
   it('shows a load error when the document cannot be fetched', async () => {
     mockDtf({ documents: { get: vi.fn().mockRejectedValue(new Error('DOC_NOT_FOUND')) } });
     render(<Editor docId="missing" onBack={() => {}} />);
