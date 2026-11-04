@@ -36,6 +36,9 @@ export class FakeSpectator implements SpectatorApi {
   profileGate: Promise<void> | null = null;
   /** Per-id gates for getProfile (superseded-selection tests). */
   profileGates = new Map<string, Promise<void>>();
+  /** Mutable profile/history stores so tests can simulate the world moving on after selection. */
+  profiles = new Map<string, Descender>([['mira-vane', mira], ['ossian-rell', ossian]]);
+  histories = new Map<string, LedgerEvent[]>([['mira-vane', [damageEvent]], ['ossian-rell', []]]);
   private statusListeners = new Set<(s: ConnectionStatus) => void>();
 
   constructor(mode: 'live' | 'demo' = 'demo') {
@@ -66,9 +69,9 @@ export class FakeSpectator implements SpectatorApi {
     const gate = this.profileGates.get(id);
     if (gate) await gate;
     if (this.profileGate) await this.profileGate;
-    return id === 'mira-vane' ? mira : ossian;
+    return this.profiles.get(id) ?? (id === 'mira-vane' ? mira : ossian);
   }
-  async getHistory(id: string): Promise<LedgerEvent[]> { return id === 'mira-vane' ? [damageEvent] : []; }
+  async getHistory(id: string): Promise<LedgerEvent[]> { return this.histories.get(id) ?? []; }
   async search(_query: string): Promise<{ query: string; descenders: Descender[]; events: LedgerEvent[] }> {
     return { query: _query, descenders: [mira], events: [] };
   }
@@ -96,6 +99,11 @@ export class FakeSpectator implements SpectatorApi {
   onStatusChanged(listener: (s: ConnectionStatus) => void): () => void {
     this.statusListeners.add(listener);
     return () => this.statusListeners.delete(listener);
+  }
+  /** Push a status update to subscribers, as the engine does when the tick advances. */
+  emitStatus(status: ConnectionStatus): void {
+    this.status = status;
+    for (const listener of this.statusListeners) listener(status);
   }
   onFeedChanged(): () => void { return () => undefined; }
 }

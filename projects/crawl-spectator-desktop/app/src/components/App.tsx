@@ -46,9 +46,14 @@ export function App(): React.JSX.Element {
   // so a slow profile/history response for Descender A would otherwise
   // pass the guard and overwrite Descender B selected after it.
   const selectionGenRef = useRef(0);
+  // Mirror of the selected id for the refresh path: refreshData is a
+  // stable callback, so it reads the CURRENT selection from this ref
+  // instead of closing over state.
+  const selectedIdRef = useRef<string | null>(null);
 
   const clearSourceSpecificState = useCallback(() => {
     selectionGenRef.current += 1; // invalidate any in-flight selection request
+    selectedIdRef.current = null;
     setDescenders([]);
     setParties([]);
     setSelectedId(null);
@@ -64,6 +69,13 @@ export function App(): React.JSX.Element {
   }, []);
 
   const refreshData = useCallback(async (gen: number = connectionGenRef.current) => {
+    // The open profile is part of the refresh path too: without this,
+    // the selected Descender's profile/history froze at selection time
+    // while the directory and Live Ledger moved on. Capture the
+    // selection (id + token) up front so its response can be
+    // revalidated against both guards before it is applied.
+    const selId = selectedIdRef.current;
+    const selGen = selectionGenRef.current;
     try {
       const [list, partyList, snapshot, hl] = await Promise.all([
         api().listDescenders(),
@@ -78,6 +90,21 @@ export function App(): React.JSX.Element {
       setHighlights(hl);
     } catch (err) {
       if (gen === connectionGenRef.current) setActionError(errText(err));
+      return;
+    }
+    if (!selId) return;
+    try {
+      const [p, h] = await Promise.all([api().getProfile(selId), api().getHistory(selId)]);
+      if (gen !== connectionGenRef.current) return; // stale: previous connection
+      if (selGen !== selectionGenRef.current) return; // stale: superseded selection
+      if (selectedIdRef.current !== selId) return; // selection cleared/changed mid-refresh
+      if (p.descender_id !== selId) return; // response does not match the request
+      setProfile(p);
+      setHistory(h);
+    } catch {
+      // Background refresh: keep the last shown profile and let the
+      // next refresh retry. The directory above already updated, and a
+      // transient profile failure must not block it or spam errors.
     }
   }, []);
 
@@ -130,6 +157,7 @@ export function App(): React.JSX.Element {
   const selectDescender = (id: string): void => {
     const gen = connectionGenRef.current;
     const selectionGen = ++selectionGenRef.current;
+    selectedIdRef.current = id;
     setSelectedId(id);
     void run(async () => {
       const [p, h] = await Promise.all([api().getProfile(id), api().getHistory(id)]);

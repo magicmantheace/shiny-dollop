@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { App } from '../../src/components/App';
-import { FakeSpectator } from './fake';
+import { FakeSpectator, makeEvent, mira } from './fake';
 
 function install(fake: FakeSpectator): void {
   (window as unknown as Record<string, unknown>).spectator = fake;
@@ -116,6 +116,51 @@ describe('App — descenders, profile, feed', () => {
     // A's history (the damage event in the profile history list) must not
     // replace B's empty history either: the event appears only in the feed.
     expect((await screen.findAllByText(/Mira Vane was damaged by a falling bell clapper/)).length).toBe(1);
+  });
+
+  it('refreshes the selected profile and history on subsequent live updates', async () => {
+    const fake = new FakeSpectator('demo');
+    install(fake);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: /^mira-vane active/ }));
+    expect(await screen.findByText('Reach the Stratum 3 exit')).toBeInTheDocument();
+
+    // The world moves on: Mira is hurt, retargets, and gains a history event.
+    fake.profiles.set('mira-vane', { ...mira, health: 41, current_objective: 'Flee to the Stratum 2 stairs' });
+    fake.histories.set('mira-vane', [
+      ...(fake.histories.get('mira-vane') ?? []),
+      makeEvent('evt-000200', 1250, 'DESCENDER_DAMAGED', ['mira-vane'], 'Mira Vane was struck by a cave-in.'),
+    ]);
+    // A routine connected-status update arrives (same connection identity).
+    fake.emitStatus({ ...fake.status, tick: 1250 });
+
+    // The open profile follows the refresh instead of freezing at selection time.
+    expect(await screen.findByText('Flee to the Stratum 2 stairs')).toBeInTheDocument();
+    expect(screen.getByText(/Mira Vane was struck by a cave-in/)).toBeInTheDocument();
+    expect(screen.queryByText('Reach the Stratum 3 exit')).not.toBeInTheDocument();
+  });
+
+  it('drops a refresh profile response that resolves after the selection changed', async () => {
+    const fake = new FakeSpectator('demo');
+    install(fake);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: /^mira-vane active/ }));
+    expect(await screen.findByText('Reach the Stratum 3 exit')).toBeInTheDocument();
+
+    // Gate Mira's NEXT profile fetch, change her data, then trigger a refresh.
+    let releaseMira!: () => void;
+    fake.profileGates.set('mira-vane', new Promise<void>((resolve) => { releaseMira = resolve; }));
+    fake.profiles.set('mira-vane', { ...mira, current_objective: 'Refreshed Mira objective' });
+    fake.emitStatus({ ...fake.status, tick: 1251 });
+    // While the refresh is in flight, the user selects Ossian instead.
+    await user.click(await screen.findByRole('button', { name: /^ossian-rell active/ }));
+    expect(await screen.findByText('Guard the party flank')).toBeInTheDocument();
+    releaseMira(); // the stale refresh response for Mira arrives late
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.getByText('Guard the party flank')).toBeInTheDocument();
+    expect(screen.queryByText('Refreshed Mira objective')).not.toBeInTheDocument();
   });
 
   it('search narrows the descender list via the API', async () => {
