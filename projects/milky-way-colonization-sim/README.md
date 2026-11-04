@@ -13,7 +13,7 @@ ruling is Adam's (2026-11-04) — lives in [`docs/DESIGN.md`](docs/DESIGN.md).
 
 | Slice | State |
 |---|---|
-| **S0 — Data pipeline proof** | **Built 2026-11-04** (this slice). Pipeline + star table + Godot viewer with headless `--verify`. Awaiting Nyx firsthand verification. |
+| **S0 — Data pipeline proof** | **Complete 2026-11-04.** 113,393-star table built from live catalogs; cargo tests 22/22; Godot `--verify` all-pass (see `docs/TEST_PLAN.md`). The ~1M-star AT-HYG option was measured (52 MB table, 739 ms load). Awaiting Adam's review; S1 needs his go-ahead. |
 | S1 — Sim core (headless) | Not started — needs Adam's go-ahead |
 | S2 — Playable colonizer | Not started |
 | S3–S5 — AI races, trade/diplomacy, war/victory | Not started |
@@ -46,8 +46,10 @@ cd ..
 # 2. Run the tests
 cd pipeline && cargo test
 
-# 3. Verify the viewer headlessly (prints VERIFY_PASS lines)
-godot --headless --path viewer -- --verify --data ../data/stars.bin
+# 3. Verify the viewer headlessly (prints VERIFY_PASS lines; the
+#    viewer finds ../data/stars.bin relative to the project by default,
+#    or pass --data=<absolute path>)
+godot --headless --path viewer -- --verify
 ```
 
 ## Data sources & license
