@@ -1,0 +1,15 @@
+{
+  "format": "mwcs-stars",
+  "format_version": 1,
+  "built_utc": "2026-11-04T18:11:27Z",
+  "pipeline": "mwcs-pipeline 0.1.0",
+  "sources": {
+    "hyg": {"version": "v4.4", "url": "https://codeberg.org/astronexus/hyg/media/branch/main/data/hyg/CURRENT/hyg_v44.csv.gz", "rows": 119614, "csv_sha256": "ea0e1699a1e7d48daa197b5fe567fcf447420e367f37619862ee1d6f077599cd"},
+    "exoplanet_archive": {"table": "pscomppars", "note": "live TAP pull (cached)", "planet_rows": 6451, "systems": 4847, "csv_sha256": "57c776009d8e66825cd5ba20ebffe864b589dee03e2c9e950a8970b957d911ea"}
+  },
+  "filter": "HYG rows with 0 <= dist < 100000 pc (placeholder distances dropped)",
+  "frame": "heliocentric, galactic axes, light-years",
+  "table": {"file": "stars.bin", "bytes": 6882528, "stars": 113393, "planets": 6424, "sha256": "03993d9951e2ad1d550ddddcbe3ded24435ffd4d06258b9b6487ce034cadecc3"},
+  "merge": {"matched_by_name": 713, "matched_by_coords": 104, "hosts_inserted": 4003, "hosts_skipped_no_position": 27},
+  "stats": {"hyg_named_proper_usable": 541, "stars_with_planets": 4816, "median_distance_ly": 645.9, "max_distance_ly": 27723.3}
+}
