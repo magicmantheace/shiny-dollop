@@ -130,6 +130,14 @@ def compute_schedule(events: list, timing: TimingConfig = DEFAULT_TIMING) -> lis
       window for move, and for emote the span from its effective time to
       the same actor's next event (or the end of the schedule). Gaze
       never changes any scheduling value. Both are None without look_at.
+    - interact events only (F4.2): ``action`` and ``prop_id`` passed
+      through, the occupancy ``window_start_ms`` / ``window_end_ms`` set
+      like a speak's, ``phases`` (the composite's phase windows — see
+      below), ``attach_ms`` (pick_up: when the prop reaches the hand) and
+      ``release_ms`` (put_down: when the prop leaves the hand). Every
+      non-camera record also carries ``holding_after`` (the prop the
+      actor holds once this event has run, else None) and
+      ``seated_after`` (True from a sit until the actor's next move).
 
     Semantics (docs/SCENE_PROTOCOL.md, ADR-009 + F3.3 dialogue runtime):
     camera is never gated; spawn is never gated; any other event for an
@@ -140,10 +148,26 @@ def compute_schedule(events: list, timing: TimingConfig = DEFAULT_TIMING) -> lis
     there (the earlier speak keeps the floor up to the cut, no further).
     An interrupt at or after the window's end changes nothing. Processing
     is a single pass in scene order, exactly as the preview computes it.
+
+    Interact composites (F4.2) occupy their actor for the event's
+    ``duration_ms`` exactly like a speak hold: the window gates later
+    same-actor events (including speaks) and is itself gated by an open
+    speak/interact window. The phases inside the window are fixed:
+    pick_up is ``reach`` for the first half, then the prop attaches at
+    the midpoint (``attach_ms``) and the ``hold`` phase runs to the
+    window end — the attachment itself persists past the window until a
+    put_down; drink is a single ``consume`` phase; put_down is a single
+    ``lower`` phase with the release at the window end (``release_ms``);
+    sit is a single ``enter`` phase (the actor is seated from the window
+    end until its next move). An interrupting speak truncates speak
+    windows only: one landing inside an interact window starts at its
+    at_ms and runs concurrently with the composite.
     """
     records = []
-    hold_until: dict = {}  # actor_id -> end of the actor's current speak window
+    hold_until: dict = {}  # actor_id -> end of the actor's current occupancy window
     open_speak: dict = {}  # actor_id -> record of the actor's latest speak
+    held_now: dict = {}  # actor_id -> prop_id currently held (F4.2)
+    seated_now: dict = {}  # actor_id -> True while seated (F4.2)
     for index, e in enumerate(events):
         op = e["op"]
         at = e["at_ms"]
@@ -162,6 +186,13 @@ def compute_schedule(events: list, timing: TimingConfig = DEFAULT_TIMING) -> lis
             "look_at": e.get("look_at"),
             "gaze_window_start_ms": None,
             "gaze_window_end_ms": None,
+            "action": None,
+            "prop_id": None,
+            "phases": [],
+            "attach_ms": None,
+            "release_ms": None,
+            "holding_after": None,
+            "seated_after": False,
         }
         if op != "camera":
             actor_id = e.get("actor_id")
@@ -186,6 +217,46 @@ def compute_schedule(events: list, timing: TimingConfig = DEFAULT_TIMING) -> lis
                 record["window_end_ms"] = start + hold
                 hold_until[actor_id] = start + hold
                 open_speak[actor_id] = record
+            if op == "interact":
+                # Composite expansion (F4.2): the actor is occupied for
+                # duration_ms (gated above like any non-spawn event), and
+                # the window gates later same-actor events via hold_until.
+                action = e.get("action")
+                start = record["effective_ms"]
+                duration = int(e.get("duration_ms", 0))
+                end = start + duration
+                record["action"] = action
+                record["prop_id"] = e.get("prop_id")
+                record["window_start_ms"] = start
+                record["window_end_ms"] = end
+                hold_until[actor_id] = end
+                if action == "pick_up":
+                    attach = start + duration // 2
+                    record["attach_ms"] = attach
+                    record["phases"] = [
+                        {"name": "reach", "start_ms": start, "end_ms": attach},
+                        {"name": "hold", "start_ms": attach, "end_ms": end},
+                    ]
+                    held_now[actor_id] = e.get("prop_id")
+                elif action == "drink":
+                    record["phases"] = [
+                        {"name": "consume", "start_ms": start, "end_ms": end},
+                    ]
+                elif action == "put_down":
+                    record["release_ms"] = end
+                    record["phases"] = [
+                        {"name": "lower", "start_ms": start, "end_ms": end},
+                    ]
+                    held_now.pop(actor_id, None)
+                elif action == "sit":
+                    record["phases"] = [
+                        {"name": "enter", "start_ms": start, "end_ms": end},
+                    ]
+                    seated_now[actor_id] = True
+            if op == "move":
+                seated_now.pop(actor_id, None)
+            record["holding_after"] = held_now.get(actor_id)
+            record["seated_after"] = bool(seated_now.get(actor_id))
         records.append(record)
     # Gaze windows (F4.1, docs/SCENE_PROTOCOL.md): gaze follows the event's
     # scheduled window and never changes it. Computed after the main pass

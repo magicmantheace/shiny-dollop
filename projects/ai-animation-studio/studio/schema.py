@@ -13,9 +13,18 @@ except ImportError:  # standalone module use (studio/ on sys.path)
     from timing import resolve_timing  # type: ignore[no-redef]
 
 VERSION = "1.0.0"
-OPS = frozenset({"spawn", "move", "speak", "emote", "camera"})
+OPS = frozenset({"spawn", "move", "speak", "emote", "camera", "interact"})
 EMOTIONS = frozenset({"neutral", "happy", "sad", "angry", "nervous", "surprised", "tired", "scared"})
 SHOTS = frozenset({"wide", "two_shot", "close_left", "close_right"})
+# Composite interaction actions (F4.2); mirrored in schemas/scene.schema.json.
+INTERACT_ACTIONS = frozenset({"pick_up", "put_down", "sit", "drink"})
+# Actions that take a prop_id; sit never does, pick_up/drink never take a
+# target, put_down may (its release position).
+PROP_ACTIONS = frozenset({"pick_up", "put_down", "drink"})
+# Hand sockets a declared prop attaches to (docs/RIG_CONTRACT.md names the
+# skeleton anchors hand_r/hand_l; the bone names match).
+PROP_SOCKETS = frozenset({"hand_r", "hand_l"})
+DEFAULT_PROP_SOCKET = "hand_r"
 # Asset license identifiers (F2.1); mirrored in schemas/asset.schema.json.
 LICENSES = frozenset({"CC0-1.0", "MIT", "proprietary", "unknown"})
 ID = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
@@ -48,6 +57,24 @@ def look_at(value: object, name: str, actor_ids: set) -> None:
     else:
         vec3(value.get("position"), f"{name}.look_at.position")
 
+def validate_props(props: object) -> dict:
+    """Scene prop registry (F4.2): id -> declaration. A prop is a stage
+    object an `interact` event can reference; its asset resolves through
+    the manifest's approved-asset path at runtime (ADR-008)."""
+    need(isinstance(props, list) and len(props) <= 32, "props must contain at most 32 entries")
+    registry = {}
+    for n, prop in enumerate(props):
+        prefix = f"props[{n}]"
+        need(isinstance(prop, dict), prefix + ": not object")
+        identifier(prop.get("id"), prefix + ".id")
+        identifier(prop.get("asset_id"), prefix + ".asset_id")
+        need(prop["id"] not in registry, prefix + ": duplicate prop id")
+        vec3(prop.get("position"), prefix + ".position")
+        socket = prop.get("socket", DEFAULT_PROP_SOCKET)
+        need(isinstance(socket, str) and socket in PROP_SOCKETS, prefix + ": invalid socket")
+        registry[prop["id"]] = prop
+    return registry
+
 def validate_scene(scene: dict) -> dict:
     need(isinstance(scene, dict), "scene must be object")
     need(scene.get("schema_version") == VERSION, "unsupported scene version")
@@ -58,6 +85,7 @@ def validate_scene(scene: dict) -> dict:
             raise ValidationError(str(exc)) from exc
     identifier(scene.get("scene_id"), "scene_id")
     identifier(scene.get("environment_id"), "environment_id")
+    prop_registry = validate_props(scene["props"]) if "props" in scene else {}
     actors = scene.get("actors")
     events = scene.get("events")
     need(isinstance(actors, list) and 1 <= len(actors) <= 32, "actors must contain 1..32 entries")
@@ -71,6 +99,8 @@ def validate_scene(scene: dict) -> dict:
         need(isinstance(actor.get("color"), str) and HEX.fullmatch(actor["color"]), "invalid actor color")
         actor_ids.add(actor["id"])
     spawned = set()
+    held_by: dict = {}    # actor_id -> prop_id currently held (F4.2)
+    holder_of: dict = {}  # prop_id -> actor_id currently holding it
     last_time = -1
     for n, e in enumerate(events):
         prefix = f"events[{n}]"
@@ -115,6 +145,39 @@ def validate_scene(scene: dict) -> dict:
             need(type(q) in (int, float) and 0 <= q <= 1, prefix + ": invalid intensity")
             if "look_at" in e:
                 look_at(e.get("look_at"), prefix, actor_ids)
+        elif op == "interact":
+            # Composite action macros (F4.2, docs/SCENE_PROTOCOL.md). The
+            # holding rules are checked in authored event order: gating
+            # delays never reorder one actor's events, so the authored
+            # pick_up -> drink -> put_down sequence is the executed one.
+            action = e.get("action")
+            need(isinstance(action, str) and action in INTERACT_ACTIONS, prefix + ": unknown action")
+            d = e.get("duration_ms")
+            need(type(d) is int and 100 <= d <= 60_000, prefix + ": invalid duration")
+            if action in PROP_ACTIONS:
+                prop_id = e.get("prop_id")
+                identifier(prop_id, prefix + ".prop_id")
+                need(prop_id in prop_registry, prefix + ": unknown prop")
+            else:
+                need("prop_id" not in e, prefix + ": prop_id not allowed on " + action)
+                prop_id = None
+            if action == "sit":
+                vec3(e.get("target"), prefix + ".target")
+            elif action == "put_down":
+                if "target" in e:
+                    vec3(e.get("target"), prefix + ".target")
+            else:
+                need("target" not in e, prefix + ": target not allowed on " + action)
+            if action == "pick_up":
+                need(holder_of.get(prop_id) is None, prefix + ": prop already held")
+                need(actor_id not in held_by, prefix + ": actor already holding a prop")
+                held_by[actor_id] = prop_id
+                holder_of[prop_id] = actor_id
+            elif action in ("drink", "put_down"):
+                need(held_by.get(actor_id) == prop_id, prefix + ": actor is not holding this prop")
+                if action == "put_down":
+                    del held_by[actor_id]
+                    del holder_of[prop_id]
     need(bool(spawned), "scene never spawns an actor")
     return scene
 

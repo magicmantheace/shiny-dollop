@@ -30,7 +30,8 @@ def _asset_state(asset: dict) -> dict:
             "status": asset["status"], "version": meta.get("version", "1.0.0"),
             "sha256": meta.get("sha256")}
 
-def enrich_manifest(manifest: dict, lib: Library, asset_root: Path | None) -> dict:
+def enrich_manifest(manifest: dict, lib: Library, asset_root: Path | None,
+                    scene_props: list | None = None) -> dict:
     """Attach DB approval state (status/version/sha256) to a manifest.
 
     The base fixture carries the curated clip/stage data; everything the
@@ -38,9 +39,19 @@ def enrich_manifest(manifest: dict, lib: Library, asset_root: Path | None) -> di
     SHA-256 — is copied from the library database at export time, never
     re-typed by hand. Stage piece hashes come from the kit record's
     per-piece digests (verified against the store at promotion time).
+    Scene-declared props (F4.2) get a pin per prop id, resolved from the
+    prop's asset record; a prop whose asset is not registered gets no
+    pin, and the preview names it unavailable.
     """
     manifest = json.loads(json.dumps(manifest))
     manifest["assets"] = {a["uri"]: _asset_state(a) for a in lib.list_assets_full()}
+    if scene_props:
+        pins = {}
+        for prop in scene_props:
+            asset = lib.get_asset(prop["asset_id"])
+            if asset:
+                pins[prop["id"]] = {"uri": asset["uri"], **_asset_state(asset)}
+        manifest["props"] = pins
     for recipe in manifest.get("recipes", {}).values():
         files = []
         body = lib.get_asset_by_uri(recipe["body"])
@@ -165,7 +176,8 @@ def main(argv: list[str] | None = None) -> int:
                     # DB must be migrated first (idempotent; a pre-migration
                     # v1 database is upgraded in place, rows preserved).
                     lib.init()
-                    enriched = enrich_manifest(base, lib, asset_root)
+                    enriched = enrich_manifest(base, lib, asset_root,
+                                               scene.get("props"))
                 finally:
                     lib.close()
                 target.write_text(json.dumps(enriched, indent=2) + "\n", encoding="utf-8")

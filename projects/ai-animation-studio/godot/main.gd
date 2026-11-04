@@ -4,7 +4,15 @@ extends Node3D
 ## Wire constants; SCHEMA_VERSION must match VERSION in studio/schema.py
 ## and OPS must match its OPS set (guarded by tests/test_conformance.py).
 const SCHEMA_VERSION := "1.0.0"
-const VALID_OPS := ["spawn", "move", "speak", "emote", "camera"]
+const VALID_OPS := ["spawn", "move", "speak", "emote", "camera", "interact"]
+
+## Composite interactions (F4.2, docs/SCENE_PROTOCOL.md): the interact
+## actions, mirroring INTERACT_ACTIONS in studio/schema.py (parity
+## guarded by tests/test_interactions.py). A prop attaches to the hand
+## bone named by its declared socket — the bone origins ARE the sockets
+## measured into docs/RIG_CONTRACT.md.
+const INTERACT_ACTIONS := ["pick_up", "put_down", "sit", "drink"]
+const DEFAULT_PROP_SOCKET := "hand_r"
 
 ## Director-to-engine IPC (F2.4, studio/ipc.py): the runtime slot may carry
 ## a versioned envelope {ipc_version, kind: "scene", payload} instead of a
@@ -43,6 +51,11 @@ var events: Array = []
 var schedule: Array = []
 var next_event: int = 0
 var clock_ms: float = 0.0
+
+## Scene prop registry (F4.2): prop_id -> {"node", "available", "holder",
+## "socket", "attachment"} for props declared in the scene document and
+## resolved through the manifest's approved-asset path at load.
+var props_state: Dictionary = {}
 
 ## F1 asset resolution: examples/asset_manifest.json (copied next to the
 ## scene by `python -m studio demo`) maps recipe_id -> local GLB files under
@@ -109,7 +122,21 @@ func _ready() -> void:
         if op == "move" and _parse_vec3(e.get("target")) == null:
             push_error("events[" + str(i) + "]: move target is not an array of exactly 3 numbers; event skipped")
             continue
+        if op == "interact":
+            # Cheap shape checks for composites (F4.2); the semantic
+            # rules (declared props, holding sequence) stay Python-side.
+            var action := String(e.get("action", ""))
+            if action not in INTERACT_ACTIONS:
+                push_error("events[" + str(i) + "]: unknown interact action '" + action + "'; event skipped")
+                continue
+            if action == "sit" and _parse_vec3(e.get("target")) == null:
+                push_error("events[" + str(i) + "]: sit target is not an array of exactly 3 numbers; event skipped")
+                continue
+            if action == "put_down" and e.has("target") and _parse_vec3(e.get("target")) == null:
+                push_error("events[" + str(i) + "]: put_down target is not an array of exactly 3 numbers; event skipped")
+                continue
         events.append(e)
+    _build_props(scene_doc)
     _apply_timing(scene_doc)
     _build_schedule()
     print("AI Animation Studio preview: ", scene_doc.get("scene_id", "<unnamed>"))
@@ -250,6 +277,8 @@ func _build_schedule() -> void:
         e["_window_end_ms"] = -1
         e["_gaze_start_ms"] = -1
         e["_gaze_end_ms"] = -1
+        e["_attach_ms"] = -1
+        e["_release_ms"] = -1
         if op != "camera":
             var id := String(e.get("actor_id", ""))
             var flag: Variant = e.get("interrupt", false)
@@ -274,6 +303,21 @@ func _build_schedule() -> void:
                 e["_window_start_ms"] = eff
                 e["_window_end_ms"] = eff + hold
                 open_speak[id] = e
+            if op == "interact":
+                # Composite occupancy (F4.2), mirroring compute_schedule
+                # in studio/timing.py: gated above like any non-spawn
+                # event, the actor is occupied for duration_ms, and the
+                # window gates later same-actor events. pick_up attaches
+                # at the window midpoint; put_down releases at its end.
+                var duration := _event_duration_ms(e)
+                hold_until[id] = eff + duration
+                e["_window_start_ms"] = eff
+                e["_window_end_ms"] = eff + duration
+                var action := String(e.get("action", ""))
+                if action == "pick_up":
+                    e["_attach_ms"] = eff + duration / 2
+                elif action == "put_down":
+                    e["_release_ms"] = eff + duration
         e["_index"] = i
         e["_effective_ms"] = eff
         e["_hold_ms"] = hold
@@ -536,8 +580,153 @@ func _dispatch(e: Dictionary) -> void:
             get_tree().create_timer(maxf(0.05, float(occupied_ms) / 1000.0)).timeout.connect(_end_speak.bind(id))
     elif op == "emote":
         print(id, " emotion: ", e.get("emotion", "neutral"), " intensity: ", e.get("intensity", 0.0))
+    elif op == "interact":
+        _dispatch_interact(id, state, e)
     if op in ["speak", "emote", "move"] and typeof(e.get("look_at")) == TYPE_DICTIONARY:
         _begin_gaze(id, state, e)
+
+func _build_props(scene_doc: Dictionary) -> void:
+    # Prop resolution (F4.2): each scene-declared prop resolves through
+    # the manifest's ADR-008 approved-asset path — a pin exported by the
+    # demo command (status/version/SHA-256 from the library) plus the
+    # file's on-disk hash. Any failure is named and the prop is marked
+    # unavailable; composites referencing it complete without it.
+    props_state.clear()
+    var declared: Variant = scene_doc.get("props", [])
+    if typeof(declared) != TYPE_ARRAY:
+        return
+    var pins: Dictionary = manifest.get("props", {})
+    for entry in declared:
+        if typeof(entry) != TYPE_DICTIONARY:
+            continue
+        var prop_id := String(entry.get("id", ""))
+        if prop_id == "":
+            continue
+        var socket := String(entry.get("socket", DEFAULT_PROP_SOCKET))
+        var home := _vec3(entry.get("position", [0, 0, 0]))
+        var pstate := {"node": null, "available": false, "holder": "", "socket": socket, "attachment": null}
+        props_state[prop_id] = pstate
+        if asset_root == "":
+            print("Prop unavailable: ", prop_id, " (asset store not set)")
+            continue
+        if not pins.has(prop_id):
+            print("Prop unavailable: ", prop_id, " (no manifest pin; asset not registered or not exported)")
+            continue
+        var pin: Dictionary = pins[prop_id]
+        var uri := String(pin.get("uri", ""))
+        if String(pin.get("status", "")) != "approved":
+            print("Prop unavailable: ", prop_id, " (asset rejected: ", uri, " status is '", String(pin.get("status", "")), "', approved required)")
+            continue
+        var path := asset_root.path_join(uri)
+        if not FileAccess.file_exists(path):
+            print("Prop unavailable: ", prop_id, " (file unavailable at ", path, ")")
+            continue
+        var expected := String(pin.get("sha256", ""))
+        if expected == "" or _sha256_of_file(path) != expected:
+            print("Prop unavailable: ", prop_id, " (asset rejected: sha256 mismatch for ", uri, ")")
+            continue
+        var node := _load_gltf(path)
+        if node == null:
+            print("Prop unavailable: ", prop_id, " (glTF load failed at ", path, ")")
+            continue
+        add_child(node)
+        if node is Node3D:
+            (node as Node3D).position = home
+        pstate["node"] = node
+        pstate["available"] = true
+        props_state[prop_id] = pstate
+        print("Placed prop: ", prop_id, " (", uri, ") at ", home)
+
+func _dispatch_interact(id: String, state: Dictionary, e: Dictionary) -> void:
+    # Composite actions (F4.2): the schedule already fixed the window;
+    # this performs the window's beats — overlay clips, the midpoint
+    # attach, the end-of-window release, the seated transition. A beat
+    # whose prop or skeleton is missing was already named at load or is
+    # named here, and the composite still completes.
+    var action := String(e.get("action", ""))
+    var prop_id := String(e.get("prop_id", ""))
+    var eff := int(e.get("_effective_ms", 0))
+    if action == "pick_up":
+        var pstate: Dictionary = props_state.get(prop_id, {})
+        if not bool(pstate.get("available", false)):
+            print("Prop attach skipped: ", id, " -> ", prop_id, " (prop unavailable)")
+            return
+        if (state.get("skeleton") as Skeleton3D) == null:
+            print("Prop attach skipped: ", id, " -> ", prop_id, " (no skeleton)")
+            return
+        _play_overlay_tag(id, "pickup")
+        var delay := maxf(0.05, float(int(e.get("_attach_ms", eff)) - eff) / 1000.0)
+        get_tree().create_timer(delay).timeout.connect(_attach_prop.bind(id, prop_id))
+    elif action == "drink":
+        print("Drink: ", id, " from ", prop_id)
+        _play_overlay_tag(id, "consume")
+    elif action == "put_down":
+        _play_overlay_tag(id, "interact")
+        var delay := maxf(0.05, float(int(e.get("_release_ms", eff)) - eff) / 1000.0)
+        get_tree().create_timer(delay).timeout.connect(_release_prop.bind(id, prop_id, e))
+    elif action == "sit":
+        var target := _vec3(e.get("target", [0, 0, 0]))
+        print("Sit: ", id, " -> ", target)
+        var duration: float = max(0.1, float(e.get("duration_ms", 1000)) / 1000.0)
+        var tween := create_tween()
+        tween.tween_property(state["node"], "position", target, duration)
+        if state["anim"] != null:
+            _play_tag(id, "sit_enter")
+            tween.tween_callback(_play_tag.bind(id, "sit_idle"))
+
+func _attach_prop(id: String, prop_id: String) -> void:
+    # Attach at the pick_up midpoint: the prop node is re-parented to a
+    # BoneAttachment3D riding the actor's hand bone. The bone origin IS
+    # the socket measured into docs/RIG_CONTRACT.md, so the prop sits at
+    # the bone origin with no extra offset; per-prop grip offsets remain
+    # future work, as the contract notes.
+    var state: Dictionary = actors.get(id, {})
+    var skeleton: Skeleton3D = state.get("skeleton") as Skeleton3D
+    var pstate: Dictionary = props_state.get(prop_id, {})
+    var node: Node = pstate.get("node") as Node
+    if skeleton == null or node == null:
+        return
+    var socket := String(pstate.get("socket", DEFAULT_PROP_SOCKET))
+    if skeleton.find_bone(socket) < 0:
+        print("Prop attach skipped: ", id, " -> ", prop_id, " (no ", socket, " bone)")
+        return
+    var attachment := BoneAttachment3D.new()
+    attachment.bone_name = socket
+    skeleton.add_child(attachment)
+    node.reparent(attachment)
+    if node is Node3D:
+        (node as Node3D).transform = Transform3D.IDENTITY
+    pstate["holder"] = id
+    pstate["attachment"] = attachment
+    props_state[prop_id] = pstate
+    print("Prop attached: ", prop_id, " -> ", id, " ", socket, " socket (bone ", socket, ")")
+
+func _release_prop(id: String, prop_id: String, e: Dictionary) -> void:
+    # Release at the put_down window end: the prop returns to the stage
+    # at the event's target, or at the actor's feet when none is given.
+    var pstate: Dictionary = props_state.get(prop_id, {})
+    var node: Node = pstate.get("node") as Node
+    if node == null or String(pstate.get("holder", "")) != id:
+        print("Prop release skipped: ", prop_id, " (not attached to ", id, ")")
+        return
+    var attachment: BoneAttachment3D = pstate.get("attachment") as BoneAttachment3D
+    node.reparent(self)
+    if attachment != null:
+        attachment.queue_free()
+    var place := Vector3.ZERO
+    if e.has("target"):
+        place = _vec3(e.get("target"))
+    else:
+        var state: Dictionary = actors.get(id, {})
+        var actor_node: Node3D = state.get("node") as Node3D
+        if actor_node != null:
+            place = actor_node.position
+    if node is Node3D:
+        (node as Node3D).position = place
+    pstate["holder"] = ""
+    pstate["attachment"] = null
+    props_state[prop_id] = pstate
+    print("Prop released: ", prop_id, " from ", id, " at ", place)
 
 func _load_manifest() -> void:
     var path := "res://data/asset_manifest.json"

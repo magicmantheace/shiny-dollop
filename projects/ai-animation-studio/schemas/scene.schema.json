@@ -43,6 +43,44 @@
         }
       }
     },
+    "props": {
+      "type": "array",
+      "maxItems": 32,
+      "description": "Optional scene prop registry (F4.2): stage objects an interact event can reference. Each prop's asset resolves through the manifest's approved-asset path at runtime (ADR-008); socket names the hand anchor the prop attaches to (docs/RIG_CONTRACT.md), default hand_r.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "asset_id",
+          "position"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "asset_id": {
+            "$ref": "#/$defs/id"
+          },
+          "position": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number",
+              "minimum": -1000,
+              "maximum": 1000
+            }
+          },
+          "socket": {
+            "enum": [
+              "hand_r",
+              "hand_l"
+            ]
+          }
+        }
+      }
+    },
     "actors": {
       "type": "array",
       "minItems": 1,
@@ -91,8 +129,22 @@
               "move",
               "speak",
               "emote",
-              "camera"
+              "camera",
+              "interact"
             ]
+          },
+          "action": {
+            "enum": [
+              "pick_up",
+              "put_down",
+              "sit",
+              "drink"
+            ],
+            "description": "Composite action for op=interact (F4.2), required there and meaningless elsewhere. Per-action field rules (prop_id required for pick_up/put_down/drink and refused on sit; target required for sit, optional for put_down, refused elsewhere; holding sequence pick_up -> drink -> put_down) are enforced by studio/schema.py."
+          },
+          "prop_id": {
+            "$ref": "#/$defs/id",
+            "description": "For op=interact: the id of a prop declared in the scene's top-level props registry."
           },
           "actor_id": {
             "$ref": "#/$defs/id"
