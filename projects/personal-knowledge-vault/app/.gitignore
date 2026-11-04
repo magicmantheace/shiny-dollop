@@ -1,0 +1,18 @@
+# Build outputs
+/dist/
+/release/
+# Dependencies
+/node_modules/
+# SQLite databases (runtime state — never commit)
+/*.db
+/*.db-journal
+/*.db-wal
+/*.db-shm
+*.db*
+# Electron-builder caches
+/dist-electron/
+# Logs
+*.log
+# OS/editor noise
+.DS_Store
+Thumbs.db
