@@ -28,6 +28,15 @@
 - Event ordering on tied timestamps is stable in JSON array order.
 - Future: shot targets, animation IDs, state preconditions, cancellation, playback clocks, causality/acks, voice cues and bounded live IPC.
 
+## Director-to-engine IPC (F2.4, implemented 2026-11-03)
+
+The scene above reaches the engine inside a versioned envelope defined by `studio/ipc.py`. The transport is unchanged — offline, file-based: the director (CLI `demo`) writes the runtime scene document and the enriched asset manifest into `godot/data/`, and the preview picks them up at startup. What F2.4 adds is the formal contract around that exchange; live/streaming IPC remains future work (see `docs/ARCHITECTURE.md`).
+
+- **Scene envelope:** `{"ipc_version": "1.0.0", "kind": "scene", "issued_at": "<ISO-8601 UTC>", "payload": <scene>}`. `issued_at` is informational; the payload is a scene document exactly as defined above and is fully validated (`studio.schema.validate_scene`) on unwrap.
+- **Versioning rule:** `ipc_version` versions the *envelope* and is independent of the scene's `schema_version` — envelope `1.0.0` carries scene schema `1.0.0`. An unknown `ipc_version` or `kind` fails closed on both sides: `studio.ipc.unwrap_scene` raises `IpcError` with a named reason, and the preview refuses playback and records the rejection (below). The preview mirrors the version constant in `godot/main.gd` (parity guarded by `tests/test_ipc.py`).
+- **Result record (engine -> director):** when the preview loads an *enveloped* scene it writes `godot/data/scene_result.json`: `{"ipc_version": "1.0.0", "kind": "result", "scene_id": <id>, "accepted": true|false, "detail": "<reason>"}` — accepted once the scene has passed load validation and been scheduled, or refused with the rejection reason (unsupported envelope version/kind, unsupported scene schema version, malformed actors/events). The director reads it back with `studio.ipc.read_result`, which validates the same shape. The preview speaks its own `ipc_version` in the result even when rejecting a foreign-version envelope.
+- **Backward compatibility:** a bare scene document (no `ipc_version`/`kind` keys) still loads exactly as before and is *not* acknowledged — no result file is written for bare loads. ADR-008 approved-asset enforcement on the manifest is untouched by the envelope.
+
 ## AI adapter contract (future)
 
 LLM may propose intent objects, never direct engine operations. A deterministic translator expands intent to commands and a strict validator rejects anything outside the protocol. Model/tool output is untrusted input.
