@@ -47,15 +47,15 @@ class MigrationTests(unittest.TestCase):
     def test_fresh_db_migrates_to_latest(self):
         lib = self.open_lib()
         lib.init()
-        self.assertEqual(applied_versions(lib.db), [1, 2])
-        self.assertEqual(LATEST_VERSION, 2)
+        self.assertEqual(applied_versions(lib.db), [1, 2, 3])
+        self.assertEqual(LATEST_VERSION, 3)
         cols = [r[1] for r in lib.db.execute("PRAGMA table_info(assets)")]
         self.assertIn("source", cols)
         self.assertIn("license", cols)
         rows = lib.db.execute(
             "SELECT version, name FROM schema_migrations ORDER BY version"
         ).fetchall()
-        self.assertEqual([r[0] for r in rows], [1, 2])
+        self.assertEqual([r[0] for r in rows], [1, 2, 3])
         self.assertTrue(all(r[1] for r in rows))
 
     def test_v1_shaped_db_upgrades_with_rows_intact(self):
@@ -75,7 +75,7 @@ class MigrationTests(unittest.TestCase):
         raw.close()
         lib = self.open_lib("legacy.db")
         lib.init()
-        self.assertEqual(applied_versions(lib.db), [1, 2])
+        self.assertEqual(applied_versions(lib.db), [1, 2, 3])
         asset = lib.get_asset("legacy_prop")
         self.assertIsNotNone(asset)
         self.assertEqual(asset["status"], "approved")

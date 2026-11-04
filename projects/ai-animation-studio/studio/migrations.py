@@ -38,6 +38,25 @@ MIGRATIONS: list[tuple[int, str, object]] = [
         "ALTER TABLE assets ADD COLUMN source TEXT;\n"
         "ALTER TABLE assets ADD COLUMN license TEXT;",
     ),
+    (
+        3,
+        "jobs_queue",
+        "CREATE TABLE IF NOT EXISTS jobs (\n"
+        "  job_id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
+        "  kind TEXT NOT NULL,\n"
+        "  payload_json TEXT NOT NULL,\n"
+        "  state TEXT NOT NULL DEFAULT 'queued'\n"
+        "    CHECK(state IN ('queued','running','done','failed')),\n"
+        "  worker_id TEXT,\n"
+        "  attempts INTEGER NOT NULL DEFAULT 0,\n"
+        "  result_json TEXT,\n"
+        "  error TEXT,\n"
+        "  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,\n"
+        "  claimed_at TEXT,\n"
+        "  finished_at TEXT\n"
+        ");\n"
+        "CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state, job_id);",
+    ),
 ]
 
 LATEST_VERSION = MIGRATIONS[-1][0]

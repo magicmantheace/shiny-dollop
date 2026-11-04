@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shlex
 import shutil
 from pathlib import Path
@@ -10,6 +11,7 @@ from . import gltf
 from .director import (AdapterError, HttpAdapter, PlannerError, StubAdapter,
                        plan_scene)
 from .ipc import write_ipc
+from .jobs import JobError, enqueue, list_jobs, run_worker
 from .library import Library, ROOT, DEFAULT_DB
 from .promotion import DEFAULT_ASSET_ROOT, PromotionError, promote_asset, promote_character
 from .recipes import (RecipeError, assemble_character, edit_character,
@@ -75,7 +77,7 @@ def enrich_manifest(manifest: dict, lib: Library, asset_root: Path | None,
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="AI Animation Studio foundation")
-    parser.add_argument("command", choices=["validate", "init-db", "seed", "register", "promote", "assemble", "show-character", "edit-character", "export-character", "list-assets", "demo", "sockets", "plan", "speak"])
+    parser.add_argument("command", choices=["validate", "init-db", "seed", "register", "promote", "assemble", "show-character", "edit-character", "export-character", "list-assets", "demo", "sockets", "plan", "speak", "enqueue", "work", "jobs"])
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--catalog", default="quaternius_f1_catalog.json",
                         help="catalog fixture in examples/ (register/promote commands)")
@@ -140,6 +142,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--rate", type=float, default=None,
                         help="speak: speak rate in chars/sec — the ADR-009 "
                              "timing variable (default 15)")
+    parser.add_argument("--kind", default=None,
+                        help="enqueue: job kind (e.g. validate_scene, export_scene)")
+    parser.add_argument("--payload", type=Path, default=None,
+                        help="enqueue: JSON payload file for the job")
+    parser.add_argument("--worker", default=None,
+                        help="work: worker id recorded on claims "
+                             "(default worker-<pid>)")
+    parser.add_argument("--once", action="store_true",
+                        help="work: drain the queue and exit (the only mode "
+                             "in this slice; accepted for clarity)")
+    parser.add_argument("--stale-after", type=float, default=None,
+                        help="work: before claiming, requeue running jobs "
+                             "whose claim is older than this many seconds "
+                             "(jobs at max attempts are failed instead)")
+    parser.add_argument("--state", choices=["queued", "running", "done", "failed"],
+                        default=None,
+                        help="jobs: list only jobs in this state")
     args = parser.parse_args(argv)
     asset_root = args.asset_root or DEFAULT_ASSET_ROOT
     if args.command == "validate":
@@ -338,8 +357,36 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "list-assets":
             for item in lib.list_assets():
                 print(f"{item['asset_id']} [{item['status']}] {item['uri']}")
+        elif args.command == "enqueue":
+            if args.kind is None:
+                parser.error("enqueue requires --kind <job kind>")
+            if args.payload is None:
+                parser.error("enqueue requires --payload <JSON payload file>")
+            payload = json.loads(args.payload.read_text(encoding="utf-8"))
+            job_id = enqueue(lib, args.kind, payload)
+            print(f"Enqueued job {job_id} ({args.kind})")
+        elif args.command == "work":
+            worker_id = args.worker or f"worker-{os.getpid()}"
+            summaries = run_worker(lib, worker_id,
+                                   stale_after_s=args.stale_after)
+            for summary in summaries:
+                print(f"job {summary['job_id']} [{summary['kind']}] "
+                      f"{summary['state']}")
+            done = sum(1 for s in summaries if s["state"] == "done")
+            print(f"Worker {worker_id} ran {len(summaries)} job(s): "
+                  f"{done} done, {len(summaries) - done} failed")
+        elif args.command == "jobs":
+            for job in list_jobs(lib, state=args.state):
+                line = (f"job {job['job_id']} [{job['state']}] {job['kind']} "
+                        f"attempts={job['attempts']} "
+                        f"worker={job['worker_id'] or '-'} "
+                        f"created={job['created_at']}")
+                if job["error"]:
+                    line += f" error: {job['error']}"
+                print(line)
         return 0
-    except (ValidationError, PromotionError, RecipeError, OSError, ValueError) as err:
+    except (ValidationError, PromotionError, RecipeError, JobError,
+            OSError, ValueError) as err:
         parser.error(str(err))
     finally:
         lib.close()
