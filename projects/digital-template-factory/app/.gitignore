@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+release/
+*.tsbuildinfo
+
+# Local runtime state — never commit
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+userData/
+
+# Logs / crash dumps
+*.log
+crash-reports/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
