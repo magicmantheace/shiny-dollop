@@ -95,6 +95,26 @@ Choose a directory, view ranked file/folder sizes and verified duplicate groups,
 - Full suite after the fix: 91/91 tests pass (11 files, +1 new);
   `npm run typecheck` and `npm run lint` green.
 
+## Codex fix cycle 4 (2026-11-04, Linux VM, Node 24)
+
+- The scan walk no longer trusts the `Dirent` type snapshot from
+  `readdir` when following paths. A directory replaced by a symlink or
+  junction after `readdir` still reported as a directory, and the walk's
+  `stat` followed the replacement — the (dev, ino)/realpath guards only
+  reject previously visited targets, so an unvisited outside directory
+  was traversed and its files recorded under the scan root, with the
+  link itself never counted. The walk now rechecks every entry with a
+  fresh `lstat` before following it (a swapped-in link is recorded as a
+  skipped symlink), and revalidates each queued directory with `lstat`
+  before reading it (a directory swapped while queued is skipped the
+  same way; the scan root is exempt as the validated anchor). Two
+  regression tests reproduce both swap timings via the `beforeEntry`
+  hook and were verified failing pre-fix (exactly those 2 of 18 engine
+  tests); the outside file is absent from the scan and `symlinks` is 1.
+- Full suite after the fix: 93/93 tests pass (11 files, +2 new);
+  `npm run typecheck`, `npm run lint`, `npm run build` and
+  `npm run smoke` (SMOKE_OK) green.
+
 ## Pending (platform)
 
 - Real Electron window launch + live end-to-end scan on Windows (unverified here).
