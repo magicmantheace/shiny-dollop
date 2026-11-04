@@ -59,3 +59,14 @@ All three findings from the cycle-3 re-review verified against the code before f
 - **Expose campaign import without an active campaign (P2, `App.tsx`):** the Campaign data section (including whole-campaign import) sat inside the `campaign &&` conditional, so a fresh installation had to create a dummy campaign before restoring a backup. The section now renders unconditionally; only the campaign-scoped actions (export, worldbuilding/dungeon imports into the active campaign) remain conditional.
 
 - **Verification:** `npm test` — **55/55 pass** (52 before; +3 regression tests: redirect never followed / target receives nothing, transactional import rollback on a colliding later insert, campaign import visible and usable with no active campaign); `npm run typecheck`, `npm run lint`, `npm run build` clean.
+
+## Codex-review fixes, cycle 5 (2026-11-04, PR #21)
+
+Ground truth: the latest Codex review (id 5641531410, on head `542c1c0e4`) carried exactly two findings. The other 11 inline comments belong to earlier rounds on superseded commits and had already been answered by the cycle 1–4 fix commits; the summary block's unresolved flag tracks those historical threads.
+
+Both current-head findings were verified against the code and reproduced with regression tests before fixing:
+
+- **Return structured IPC failures instead of throwing plain objects (P2, `electron/main/ipc.ts` / `electron/preload/preload.ts`):** handlers previously threw the plain `{ code, message }` AidmError across Electron IPC, where the invoke dispatcher serializes a thrown plain object as `[object Object]`, losing the actionable error. Handlers now resolve an `AidmIpcResult` envelope — `{ ok: true, value }` or `{ ok: false, error }` — and the preload unwraps it, returning successful values and rejecting with the preserved AidmError. Malformed IPC responses produce an `INPUT_INVALID` AidmError rather than leaking an unshaped value.
+- **Guard direct encounter updates against campaign switches (P2, `src/components/App.tsx`):** encounter start and advance-turn responses previously called `setEncounter` directly, bypassing `refreshAll`'s campaign/generation guard, so a response for campaign A could be installed after switching to campaign B. Both paths now apply the result through `applyEncounterIfSelected`, which compares the returned encounter's `campaignId` with the currently selected campaign and discards stale results.
+
+- **Verification:** `npm test` — **59/59 pass** (55 before; +2 preload-envelope tests and +2 stale-encounter renderer tests, with the 2 existing IPC tests updated to envelope expectations). Negative check: with the source fixes stashed, exactly those 6 regression tests fail and the other 14 tests in the targeted files pass. `npm run typecheck`, `npm run lint`, and `npm run build` are clean; `npm run smoke` prints `SMOKE_OK`.
