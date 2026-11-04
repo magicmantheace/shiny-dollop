@@ -22,6 +22,22 @@ const RESULT_PATH := "res://data/scene_result.json"
 @export var speak_min_hold_ms: int = 800
 @export var speak_max_hold_ms: int = 15000
 
+## Gaze (F4.1, docs/SCENE_PROTOCOL.md): during a speak/emote/move event's
+## look_at window the actor's head bone turns toward the target. The clamps
+## are hard limits on yaw/pitch relative to the actor's facing.
+const GAZE_MAX_YAW_DEG := 60.0
+const GAZE_MAX_PITCH_DEG := 30.0
+const GAZE_HEAD_BONE := "Head"
+
+## Upper-body bone set for the gesture overlay layer (F4.1): the
+## studio_humanoid_v1 bones at/above the pelvis from docs/RIG_CONTRACT.md —
+## spine chain, neck, head, arms and fingers (finger chains matched by
+## prefix: index_/middle_/pinky_/ring_/thumb_). Pelvis, legs and the model
+## root stay exclusively on the base layer, so a gesture can never move
+## the legs or the actor root.
+const UPPER_BODY_BONES := ["spine_01", "spine_02", "spine_03", "neck_01", "Head", "clavicle_l", "clavicle_r", "upperarm_l", "upperarm_r", "lowerarm_l", "lowerarm_r", "hand_l", "hand_r"]
+const UPPER_BODY_PREFIXES := ["index_", "middle_", "pinky_", "ring_", "thumb_"]
+
 var actors: Dictionary = {}
 var events: Array = []
 var schedule: Array = []
@@ -77,7 +93,7 @@ func _ready() -> void:
         if typeof(actor) != TYPE_DICTIONARY:
             _reject_load(source, "Actor entry is not an object; scene rejected", enveloped, scene_doc)
             return
-        actors[actor.get("id", "")] = {"color": actor.get("color", "#dddddd"), "node": null, "recipe_id": String(actor.get("recipe_id", "")), "anim": null}
+        actors[actor.get("id", "")] = {"color": actor.get("color", "#dddddd"), "node": null, "recipe_id": String(actor.get("recipe_id", "")), "anim": null, "anim_overlay": null, "skeleton": null, "head_bone": -1, "gaze": {}}
     for i in raw_events.size():
         var e: Variant = raw_events[i]
         if typeof(e) != TYPE_DICTIONARY:
@@ -194,6 +210,12 @@ func _speak_hold_ms(e: Dictionary) -> int:
     var derived := int(ceil(float(line.length()) * 1000.0 / speak_chars_per_second))
     return clampi(derived, speak_min_hold_ms, speak_max_hold_ms)
 
+func _event_duration_ms(e: Dictionary) -> int:
+    var d: Variant = _as_int(e.get("duration_ms", 1000))
+    if d == null:
+        return 1000
+    return int(d)
+
 func _dispatch_priority(op: String) -> int:
     # Dispatch order at equal effective times (F3.3, docs/SCENE_PROTOCOL.md):
     # camera first, then spawn, then the rest in scene index order. Mirrors
@@ -226,6 +248,8 @@ func _build_schedule() -> void:
         e["_interrupts"] = -1
         e["_window_start_ms"] = -1
         e["_window_end_ms"] = -1
+        e["_gaze_start_ms"] = -1
+        e["_gaze_end_ms"] = -1
         if op != "camera":
             var id := String(e.get("actor_id", ""))
             var flag: Variant = e.get("interrupt", false)
@@ -257,6 +281,42 @@ func _build_schedule() -> void:
         if eff != at:
             print("Delayed ", op, " for ", String(e.get("actor_id", "")), ": at_ms ", at, " -> ", eff, " (speak hold)")
         schedule.append(e)
+    # Gaze windows (F4.1): the gaze finalization in compute_schedule
+    # (studio/timing.py) mirrored — a speak's gaze window is its occupancy
+    # window after any truncation, a move's is its duration window, and an
+    # emote's runs from its effective time until the same actor's next
+    # event dispatches (or the end of the schedule). Gaze never changes
+    # any scheduling value computed above.
+    var scene_end := 0
+    for e in events:
+        var end := int(e["_effective_ms"])
+        if int(e["_window_end_ms"]) >= 0:
+            end = maxi(end, int(e["_window_end_ms"]))
+        if String(e.get("op", "")) == "move":
+            end = maxi(end, int(e["_effective_ms"]) + _event_duration_ms(e))
+        scene_end = maxi(scene_end, end)
+    var pending_emote: Dictionary = {}
+    for e in events:
+        var op := String(e.get("op", ""))
+        var id := String(e.get("actor_id", ""))
+        if pending_emote.has(id):
+            var pending: Dictionary = pending_emote[id]
+            pending["_gaze_end_ms"] = int(e["_effective_ms"])
+            pending_emote.erase(id)
+        if typeof(e.get("look_at")) != TYPE_DICTIONARY:
+            continue
+        if op == "speak":
+            e["_gaze_start_ms"] = int(e["_window_start_ms"])
+            e["_gaze_end_ms"] = int(e["_window_end_ms"])
+        elif op == "move":
+            e["_gaze_start_ms"] = int(e["_effective_ms"])
+            e["_gaze_end_ms"] = int(e["_effective_ms"]) + _event_duration_ms(e)
+        elif op == "emote":
+            e["_gaze_start_ms"] = int(e["_effective_ms"])
+            pending_emote[id] = e
+    for pid in pending_emote:
+        var pending: Dictionary = pending_emote[pid]
+        pending["_gaze_end_ms"] = scene_end
     schedule.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
         var ea := int(a["_effective_ms"])
         var eb := int(b["_effective_ms"])
@@ -274,6 +334,154 @@ func _process(delta: float) -> void:
     while next_event < schedule.size() and float(schedule[next_event].get("_effective_ms", 0)) <= clock_ms:
         _dispatch(schedule[next_event])
         next_event += 1
+    _advance_animation(delta)
+    _update_gaze(delta)
+
+func _advance_animation(delta: float) -> void:
+    # Layered playback (F4.1): both players run in manual callback mode,
+    # so the layer composition order is fixed here every frame — base
+    # (full body) first, then the upper-body overlay — and _update_gaze
+    # reads the resulting pose. Manual mode is what makes that order
+    # deterministic; with automatic callbacks the two players' processing
+    # order relative to this script would be engine-scheduled.
+    for id in actors:
+        var state: Dictionary = actors[id]
+        var base: AnimationPlayer = state.get("anim") as AnimationPlayer
+        if base != null:
+            base.advance(delta)
+        var overlay: AnimationPlayer = state.get("anim_overlay") as AnimationPlayer
+        if overlay != null:
+            overlay.advance(delta)
+
+func _begin_gaze(id: String, state: Dictionary, e: Dictionary) -> void:
+    # Gaze engagement (F4.1): an event with look_at opens its gaze window
+    # at dispatch — dispatch time is the window start for speak, emote and
+    # move alike. Actors without a skeleton (capsule fallback) log the
+    # skip once per window and carry on; gaze is presentation only.
+    var node: Node3D = state.get("node") as Node3D
+    if node == null:
+        return
+    var look: Dictionary = e["look_at"]
+    var start := int(e.get("_gaze_start_ms", -1))
+    var end := int(e.get("_gaze_end_ms", -1))
+    if end <= start:
+        return
+    var desc := ""
+    var target_actor := ""
+    var target_point := Vector3.ZERO
+    if look.has("actor_id"):
+        target_actor = String(look.get("actor_id", ""))
+        desc = target_actor
+    elif look.has("position"):
+        var p: Variant = _parse_vec3(look.get("position"))
+        if p == null:
+            return
+        target_point = p
+        desc = "position " + str(target_point)
+    else:
+        return
+    var skeleton: Skeleton3D = state.get("skeleton") as Skeleton3D
+    if skeleton == null or int(state.get("head_bone", -1)) < 0:
+        print("Gaze skipped: ", id, " -> ", desc, " (no skeleton)")
+        return
+    if target_actor != "":
+        var target_state: Dictionary = actors.get(target_actor, {})
+        if (target_state.get("node") as Node3D) == null:
+            print("Gaze skipped: ", id, " -> ", desc, " (target not spawned)")
+            return
+    state["gaze"] = {
+        "target_actor": target_actor,
+        "target_point": target_point,
+        "end_ms": end,
+        "yaw": 0.0,
+        "pitch": 0.0,
+    }
+    var angles := _gaze_angles(state, state["gaze"])
+    print("Gaze: ", id, " -> ", desc, " (yaw ", snappedf(rad_to_deg(float(angles["yaw"])), 0.1), ", pitch ", snappedf(rad_to_deg(float(angles["pitch"])), 0.1), ")")
+
+func _gaze_angles(state: Dictionary, gaze: Dictionary) -> Dictionary:
+    # Clamped yaw/pitch (radians) aiming the actor's head at the gaze
+    # target, in the actor's facing frame (forward is -Z). Recomputed
+    # from current positions on every call — targets may move.
+    var skeleton: Skeleton3D = state.get("skeleton") as Skeleton3D
+    var head_bone := int(state.get("head_bone", -1))
+    var node: Node3D = state.get("node") as Node3D
+    var head_pos := skeleton.global_transform * skeleton.get_bone_global_pose(head_bone).origin
+    var target_pos := Vector3.ZERO
+    var target_actor := String(gaze.get("target_actor", ""))
+    if target_actor != "":
+        var target_state: Dictionary = actors.get(target_actor, {})
+        var target_node: Node3D = target_state.get("node") as Node3D
+        var target_skeleton: Skeleton3D = target_state.get("skeleton") as Skeleton3D
+        var target_head := int(target_state.get("head_bone", -1))
+        if target_skeleton != null and target_head >= 0:
+            target_pos = target_skeleton.global_transform * target_skeleton.get_bone_global_pose(target_head).origin
+        elif target_node != null:
+            target_pos = target_node.global_position + Vector3(0.0, 1.5, 0.0)
+    else:
+        target_pos = gaze.get("target_point", Vector3.ZERO)
+    var dir := target_pos - head_pos
+    if dir.length() < 0.0001:
+        return {"yaw": 0.0, "pitch": 0.0}
+    var local := node.global_transform.basis.inverse() * dir.normalized()
+    var yaw := clampf(atan2(-local.x, -local.z), -deg_to_rad(GAZE_MAX_YAW_DEG), deg_to_rad(GAZE_MAX_YAW_DEG))
+    var pitch := clampf(asin(clampf(local.y, -1.0, 1.0)), -deg_to_rad(GAZE_MAX_PITCH_DEG), deg_to_rad(GAZE_MAX_PITCH_DEG))
+    return {"yaw": yaw, "pitch": pitch}
+
+func _update_gaze(delta: float) -> void:
+    # Per-frame gaze (F4.1): while the window is open, ease the head
+    # toward the clamped aim (recomputed each frame — moving targets are
+    # tracked); once the window closes, ease back to the animated pose.
+    # The pose read here is animation-only: the base layer always carries
+    # a looping full-body clip (idle/walk), which re-applies the Head
+    # track on every advance, and the overlay advances before this runs.
+    for id in actors:
+        var state: Dictionary = actors[id]
+        var gaze: Dictionary = state.get("gaze", {})
+        if gaze.is_empty():
+            continue
+        var skeleton: Skeleton3D = state.get("skeleton") as Skeleton3D
+        if skeleton == null:
+            continue
+        var goal_yaw := 0.0
+        var goal_pitch := 0.0
+        var open: bool = clock_ms < float(int(gaze.get("end_ms", 0)))
+        if open:
+            var angles := _gaze_angles(state, gaze)
+            goal_yaw = float(angles["yaw"])
+            goal_pitch = float(angles["pitch"])
+        var blend := 1.0 - exp(-10.0 * delta)
+        var yaw := lerpf(float(gaze.get("yaw", 0.0)), goal_yaw, blend)
+        var pitch := lerpf(float(gaze.get("pitch", 0.0)), goal_pitch, blend)
+        gaze["yaw"] = yaw
+        gaze["pitch"] = pitch
+        if not open and absf(yaw) < 0.001 and absf(pitch) < 0.001:
+            state["gaze"] = {}
+            continue
+        state["gaze"] = gaze
+        _apply_gaze(state, yaw, pitch)
+
+func _apply_gaze(state: Dictionary, yaw: float, pitch: float) -> void:
+    # Compose the gaze rotation onto the head bone's animated pose: the
+    # yaw/pitch pair (actor facing frame) becomes a world-space spin
+    # about the head, converted back into the bone's pose rotation.
+    var skeleton: Skeleton3D = state.get("skeleton") as Skeleton3D
+    var head_bone := int(state.get("head_bone", -1))
+    var node: Node3D = state.get("node") as Node3D
+    if skeleton == null or head_bone < 0 or node == null:
+        return
+    var skel_q := skeleton.global_transform.basis.get_rotation_quaternion()
+    var head_global := skeleton.get_bone_global_pose(head_bone).basis.get_rotation_quaternion()
+    var parent_global := Quaternion.IDENTITY
+    var parent := skeleton.get_bone_parent(head_bone)
+    if parent >= 0:
+        parent_global = skeleton.get_bone_global_pose(parent).basis.get_rotation_quaternion()
+    var frame_q := node.global_transform.basis.get_rotation_quaternion()
+    var gaze_q := Quaternion(Vector3.UP, yaw) * Quaternion(Vector3.RIGHT, pitch)
+    var world_spin := frame_q * gaze_q * frame_q.inverse()
+    var desired := skel_q.inverse() * (world_spin * (skel_q * head_global))
+    var rest_q := skeleton.get_bone_rest(head_bone).basis.get_rotation_quaternion()
+    skeleton.set_bone_pose_rotation(head_bone, rest_q.inverse() * (parent_global.inverse() * desired))
 
 func _dispatch(e: Dictionary) -> void:
     var op := String(e.get("op", ""))
@@ -323,11 +531,13 @@ func _dispatch(e: Dictionary) -> void:
             var d: Variant = _as_int(e["duration_ms"])
             explicit = d != null and int(d) >= 100 and int(d) <= 60000
         print("Speak hold for ", id, ": ", occupied_ms, " ms (", "explicit" if explicit else "derived", ")")
-        if state["anim"] != null:
-            _play_tag(id, "speak")
+        if state["anim"] != null or state["anim_overlay"] != null:
+            _play_overlay_tag(id, "speak")
             get_tree().create_timer(maxf(0.05, float(occupied_ms) / 1000.0)).timeout.connect(_end_speak.bind(id))
     elif op == "emote":
         print(id, " emotion: ", e.get("emotion", "neutral"), " intensity: ", e.get("intensity", 0.0))
+    if op in ["speak", "emote", "move"] and typeof(e.get("look_at")) == TYPE_DICTIONARY:
+        _begin_gaze(id, state, e)
 
 func _load_manifest() -> void:
     var path := "res://data/asset_manifest.json"
@@ -420,6 +630,7 @@ func _make_visual(id: String, state: Dictionary) -> Node:
                 var model := _load_gltf(body_path)
                 if model != null:
                     var player := AnimationPlayer.new()
+                    player.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
                     model.add_child(player)
                     var lib := AnimationLibrary.new()
                     player.add_animation_library("", lib)
@@ -440,6 +651,33 @@ func _make_visual(id: String, state: Dictionary) -> Node:
                                 lib.add_animation(clip_name, anim)
                         anim_scene.free()
                     state["anim"] = player
+                    # F4.1 layering: a second player carries upper-body-only
+                    # copies of the same clips (the gesture channel — speak
+                    # today, emotes when they gain clip dispatch). It is
+                    # advanced after the base player every frame (see
+                    # _advance_animation), so its tracks win on upper-body
+                    # bones while the base keeps the pelvis, legs and root.
+                    var overlay := AnimationPlayer.new()
+                    overlay.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+                    model.add_child(overlay)
+                    var overlay_lib := AnimationLibrary.new()
+                    overlay.add_animation_library("", overlay_lib)
+                    var overlay_clips := 0
+                    for clip_name in lib.get_animation_list():
+                        var filtered := _upper_body_clip(lib.get_animation(clip_name))
+                        if filtered.get_track_count() > 0:
+                            overlay_lib.add_animation(clip_name, filtered)
+                            overlay_clips += 1
+                    if overlay_clips > 0:
+                        state["anim_overlay"] = overlay
+                        print("Layered animation for ", id, ": base player + upper-body overlay (", overlay_clips, " clips)")
+                    else:
+                        overlay.free()
+                    var found := model.find_children("*", "Skeleton3D", true, false)
+                    if not found.is_empty():
+                        var skeleton: Skeleton3D = found[0] as Skeleton3D
+                        state["skeleton"] = skeleton
+                        state["head_bone"] = skeleton.find_bone(GAZE_HEAD_BONE)
                     print("Loaded character model for ", id, ": ", body_path)
                     return model
                 print("Capsule fallback for ", id, ": model failed to load at ", body_path)
@@ -454,9 +692,56 @@ func _make_visual(id: String, state: Dictionary) -> Node:
     mesh.position.y = 0.85
     return mesh
 
+func _is_upper_body_bone(bone: String) -> bool:
+    if bone in UPPER_BODY_BONES:
+        return true
+    for prefix in UPPER_BODY_PREFIXES:
+        if bone.begins_with(prefix):
+            return true
+    return false
+
+func _upper_body_clip(anim: Animation) -> Animation:
+    # Upper-body-only copy of a full-body clip for the overlay layer:
+    # tracks targeting an upper-body bone (docs/RIG_CONTRACT.md set) are
+    # kept verbatim; root/lower-body tracks are dropped, so a gesture can
+    # never move the pelvis, legs or actor root.
+    var out := Animation.new()
+    out.length = anim.length
+    out.loop_mode = anim.loop_mode
+    for i in anim.get_track_count():
+        var path := anim.track_get_path(i)
+        if path.get_subname_count() == 0:
+            continue
+        if not _is_upper_body_bone(String(path.get_subname(0))):
+            continue
+        var nt := out.add_track(anim.track_get_type(i))
+        out.track_set_path(nt, path)
+        out.track_set_interpolation_type(nt, anim.track_get_interpolation_type(i))
+        for k in anim.track_get_key_count(i):
+            out.track_insert_key(nt, anim.track_get_key_time(i, k), anim.track_get_key_value(i, k), anim.track_get_key_transition(i, k))
+    return out
+
 func _play_tag(id: String, tag: String) -> void:
     var state: Dictionary = actors.get(id, {})
-    var player: AnimationPlayer = state.get("anim")
+    _play_tag_on(state.get("anim") as AnimationPlayer, id, tag)
+
+func _play_overlay_tag(id: String, tag: String) -> void:
+    # Gesture channel (F4.1): gestures play on the upper-body overlay so
+    # the base layer keeps its clip (idle, or a walk already in flight).
+    # Without an overlay — no upper-body tracks in the actor's clips —
+    # this is exactly the pre-F4.1 single-player behavior.
+    var state: Dictionary = actors.get(id, {})
+    var overlay: AnimationPlayer = state.get("anim_overlay") as AnimationPlayer
+    if overlay == null:
+        _play_tag(id, tag)
+        return
+    _play_tag_on(overlay, id, tag)
+    var base: AnimationPlayer = state.get("anim") as AnimationPlayer
+    if base != null and base.current_animation != "":
+        var entry: Dictionary = (manifest.get("clips", {}) as Dictionary).get(tag, {})
+        print("Layered: ", id, " base ", base.current_animation, " + overlay ", String(entry.get("clip", "")))
+
+func _play_tag_on(player: AnimationPlayer, id: String, tag: String) -> void:
     if player == null:
         return
     var clips: Dictionary = manifest.get("clips", {})
@@ -470,10 +755,17 @@ func _play_tag(id: String, tag: String) -> void:
 
 func _end_speak(id: String) -> void:
     var state: Dictionary = actors.get(id, {})
+    var entry: Dictionary = (manifest.get("clips", {}) as Dictionary).get("speak", {})
+    var overlay: AnimationPlayer = state.get("anim_overlay") as AnimationPlayer
+    if overlay != null:
+        # Layered path: the gesture ends by stopping the overlay; the
+        # base layer's clip (idle/walk) was never interrupted.
+        if overlay.current_animation == String(entry.get("clip", "")):
+            overlay.stop()
+        return
     var player: AnimationPlayer = state.get("anim")
     if player == null:
         return
-    var entry: Dictionary = (manifest.get("clips", {}) as Dictionary).get("speak", {})
     if player.current_animation == String(entry.get("clip", "")):
         _play_tag(id, "idle")
 

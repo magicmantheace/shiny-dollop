@@ -36,6 +36,18 @@ def vec3(value: object, name: str) -> None:
     for n in value:
         need(type(n) in (int, float) and -1000 <= n <= 1000, f"{name}: out of bounds")
 
+def look_at(value: object, name: str, actor_ids: set) -> None:
+    """Gaze intent (F4.1): exactly one of actor_id / position, nothing else."""
+    need(isinstance(value, dict), f"{name}: look_at must be object")
+    keys = set(value)
+    need(keys <= {"actor_id", "position"}, f"{name}: unknown look_at keys")
+    need(len(keys) == 1, f"{name}: look_at needs exactly one of actor_id/position")
+    if "actor_id" in value:
+        identifier(value.get("actor_id"), f"{name}.look_at.actor_id")
+        need(value["actor_id"] in actor_ids, f"{name}: look_at unknown actor")
+    else:
+        vec3(value.get("position"), f"{name}.look_at.position")
+
 def validate_scene(scene: dict) -> dict:
     need(isinstance(scene, dict), "scene must be object")
     need(scene.get("schema_version") == VERSION, "unsupported scene version")
@@ -68,6 +80,8 @@ def validate_scene(scene: dict) -> dict:
         last_time = t
         op = e.get("op")
         need(isinstance(op, str) and op in OPS, prefix + ": unknown operation")
+        if "look_at" in e and op not in ("speak", "emote", "move"):
+            need(False, prefix + ": look_at not allowed on " + op)
         if op == "camera":
             need(isinstance(e.get("shot"), str) and e.get("shot") in SHOTS, prefix + ": invalid shot")
             continue
@@ -83,6 +97,8 @@ def validate_scene(scene: dict) -> dict:
             vec3(e.get("target"), prefix + ".target")
             d = e.get("duration_ms")
             need(type(d) is int and 100 <= d <= 60_000, prefix + ": invalid duration")
+            if "look_at" in e:
+                look_at(e.get("look_at"), prefix, actor_ids)
         elif op == "speak":
             line = e.get("line")
             need(isinstance(line, str) and 1 <= len(line) <= 500, prefix + ": invalid line")
@@ -91,10 +107,14 @@ def validate_scene(scene: dict) -> dict:
                 need(type(d) is int and 100 <= d <= 60_000, prefix + ": invalid duration")
             if "interrupt" in e:
                 need(type(e.get("interrupt")) is bool, prefix + ": invalid interrupt")
+            if "look_at" in e:
+                look_at(e.get("look_at"), prefix, actor_ids)
         elif op == "emote":
             need(isinstance(e.get("emotion"), str) and e.get("emotion") in EMOTIONS, prefix + ": unsupported emotion")
             q = e.get("intensity")
             need(type(q) in (int, float) and 0 <= q <= 1, prefix + ": invalid intensity")
+            if "look_at" in e:
+                look_at(e.get("look_at"), prefix, actor_ids)
     need(bool(spawned), "scene never spawns an actor")
     return scene
 

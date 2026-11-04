@@ -123,6 +123,13 @@ def compute_schedule(events: list, timing: TimingConfig = DEFAULT_TIMING) -> lis
       cut this event's window) and ``interrupts`` (index of the event this
       one truncated, else None). Non-speak records carry hold 0 and None
       windows.
+    - ``look_at``: the event's gaze intent (F4.1) passed through unchanged
+      (None when absent), with ``gaze_window_start_ms`` /
+      ``gaze_window_end_ms`` giving the window the gaze applies to: the
+      occupancy window for speak (after any truncation), the duration
+      window for move, and for emote the span from its effective time to
+      the same actor's next event (or the end of the schedule). Gaze
+      never changes any scheduling value. Both are None without look_at.
 
     Semantics (docs/SCENE_PROTOCOL.md, ADR-009 + F3.3 dialogue runtime):
     camera is never gated; spawn is never gated; any other event for an
@@ -152,6 +159,9 @@ def compute_schedule(events: list, timing: TimingConfig = DEFAULT_TIMING) -> lis
             "window_end_ms": None,
             "interrupted": False,
             "interrupts": None,
+            "look_at": e.get("look_at"),
+            "gaze_window_start_ms": None,
+            "gaze_window_end_ms": None,
         }
         if op != "camera":
             actor_id = e.get("actor_id")
@@ -177,5 +187,39 @@ def compute_schedule(events: list, timing: TimingConfig = DEFAULT_TIMING) -> lis
                 hold_until[actor_id] = start + hold
                 open_speak[actor_id] = record
         records.append(record)
+    # Gaze windows (F4.1, docs/SCENE_PROTOCOL.md): gaze follows the event's
+    # scheduled window and never changes it. Computed after the main pass
+    # so a speak's window already reflects any interrupt truncation.
+    scene_end = 0
+    for record in records:
+        end = record["effective_ms"]
+        if record["window_end_ms"] is not None:
+            end = max(end, record["window_end_ms"])
+        if record["op"] == "move":
+            event = events[record["index"]]
+            end = max(end, record["effective_ms"] + int(event.get("duration_ms", 0)))
+        scene_end = max(scene_end, end)
+    pending_emote: dict = {}  # actor_id -> emote record awaiting its gaze end
+    for record in records:
+        actor_id = record["actor_id"]
+        if actor_id in pending_emote:
+            pending_emote[actor_id]["gaze_window_end_ms"] = record["effective_ms"]
+            del pending_emote[actor_id]
+        if record["look_at"] is None:
+            continue
+        event = events[record["index"]]
+        if record["op"] == "speak":
+            record["gaze_window_start_ms"] = record["window_start_ms"]
+            record["gaze_window_end_ms"] = record["window_end_ms"]
+        elif record["op"] == "move":
+            record["gaze_window_start_ms"] = record["effective_ms"]
+            record["gaze_window_end_ms"] = (
+                record["effective_ms"] + int(event.get("duration_ms", 0))
+            )
+        elif record["op"] == "emote":
+            record["gaze_window_start_ms"] = record["effective_ms"]
+            pending_emote[actor_id] = record
+    for record in pending_emote.values():
+        record["gaze_window_end_ms"] = scene_end
     records.sort(key=lambda r: (r["effective_ms"], r["priority"], r["index"]))
     return records
