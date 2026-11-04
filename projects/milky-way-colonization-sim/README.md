@@ -14,7 +14,7 @@ ruling is Adam's (2026-11-04) — lives in [`docs/DESIGN.md`](docs/DESIGN.md).
 | Slice | State |
 |---|---|
 | **S0 — Data pipeline proof** | **Complete 2026-11-04.** 113,393-star table built from live catalogs; cargo tests 22/22; Godot `--verify` all-pass (see `docs/TEST_PLAN.md`). The ~1M-star AT-HYG option was measured (52 MB table, 739 ms load). |
-| **S1 — Sim core (headless)** | **Complete 2026-11-04** (awaiting Nyx firsthand verification). Deterministic Rust core in `sim/`: one civilization surveys → claims → colonizes from Sol under fuel-range rules, monthly economy settlement, canonical save/load. Sim tests 19/19; a scripted 25-year campaign reaches 99 surveyed / 13 colonized systems; 100 game-years tick in ~0.8 s on this VM. Offline progression is **Adam's decision, pending** (see `docs/MUSE_HANDOFF.md`). |
+| **S1 — Sim core (headless)** | **Complete 2026-11-04** (awaiting Nyx firsthand verification). Deterministic Rust core in `sim/`: one civilization surveys → claims → colonizes from Sol under fuel-range rules, monthly economy settlement, canonical save/load. Sim tests 19/19; a scripted 25-year campaign reaches 99 surveyed / 13 colonized systems; 100 game-years tick in ~0.8 s on this VM. Offline progression is **ruled by Adam (2026-11-04): full catch-up** — the galaxy lives while the game is closed; S2 implements it in save/load (see `docs/MUSE_HANDOFF.md`). |
 | S2 — Playable colonizer | Not started |
 | S3–S5 — AI races, trade/diplomacy, war/victory | Not started |
 

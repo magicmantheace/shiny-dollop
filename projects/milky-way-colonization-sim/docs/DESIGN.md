@@ -310,13 +310,17 @@ manage systems, and you pause exactly when a decision needs you.
   a UI control only; the sim is a pure function of elapsed ticks, so
   saves and replays are exact. Campaigns are played by moving up and
   down this ladder — 1× is the ambient, living-galaxy speed.
-- **Offline progression — flagged consequence, not yet ruled.** A 1×
-  of one-day-per-day makes "does the galaxy advance while the game is
-  closed?" a real design question (the drabbit-pet answer was yes, by
-  construction). Options — full catch-up on load, capped catch-up, or
-  frozen while closed — differ in what AI civs may do unwatched
-  (expand? fight wars to completion?). To be settled during S1 design;
-  nothing in S0 depends on it.
+- **Offline progression — RULED by Adam 2026-11-04: full catch-up.**
+  The galaxy lives while the game is closed. On load, a save advances
+  by the **full** real elapsed time since it was saved — one game day
+  per real day at the 1× baseline — with **no cap**, however long the
+  absence. History happens unwatched: fleets arrive, colonies settle
+  their months, and (from S3 on) AI civs expand and fight without the
+  player present. Capped catch-up and frozen-while-closed were the
+  alternatives considered and not chosen. No S1 code embodies this
+  yet — the core is step-driven; the policy lands in S2 when save/load
+  is wired into the frontend, which must also give the player a way
+  to review what happened during the catch-up.
 - **What a daily tick simulates** (only for *active* systems — colonized,
   owned, or contested; uncolonized systems cost nothing):
   - fleet movement along routes (position = departure + speed × days),

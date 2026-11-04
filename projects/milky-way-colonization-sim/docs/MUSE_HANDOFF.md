@@ -152,44 +152,40 @@ Performance: the same harness at `--years 100` completes in
 - The sim depends on the pipeline crate by path; the binary star
   format contract (`pipeline/src/table.rs`) is unchanged in S1.
 
-## Offline progression — ADAM'S DECISION, PENDING
+## Offline progression — RULED BY ADAM 2026-11-04: FULL CATCH-UP
 
-Adam parked this in §2/§11: at 1× (one real day = one game day),
-does the galaxy advance while the game is closed? **No code in S1
-embodies a policy** — the core is step-driven and only advances
-when a driver calls `advance()`. The core's determinism makes any
-of the options implementable later without a redesign:
+Adam's ruling, in his words: **"Full catch-up — the galaxy lives
+while I'm away."** On load, a save advances by the full real
+elapsed time since it was saved (one game day per real day at the
+1× baseline), with **no cap**. Capped catch-up (the builder's
+recorded recommendation, ~30 days) and frozen-while-closed were
+considered and not chosen.
 
-1. **Full catch-up on load** — on opening a save, advance by the
-   real elapsed days (at 1×) since it was saved. The galaxy is
-   truly persistent; wars and famines can resolve unwatched (AI
-   behaviour in S3+ would need care). *Builder's recommendation
-   if the "living galaxy" feel is the priority.*
-2. **Capped catch-up** — advance at most N days (e.g. 30) on load,
-   regardless of absence length. Keeps the world breathing without
-   returning to a transformed galaxy after a month away.
-3. **Frozen while closed** — time passes only while playing; the
-   speed ladder is the only accelerator. Simplest, most
-   conventional; the 1× ambient speed becomes a flavour setting
-   rather than a persistence promise.
+**No code in S1 embodies this yet** — the core is step-driven and
+only advances when a driver calls `advance()`; its determinism
+makes the policy implementable without a redesign. Implementation
+belongs to S2, when save/load is wired into the frontend:
 
-Recommendation recorded for Adam: **option 2 (capped catch-up,
-cap ~30 days)** as the default with the cap visible in settings —
-it honours the 1× ruling's living-galaxy intent while bounding
-how much history can happen unwatched; option 1 can be an
-opt-in "hardcore persistence" toggle later. This is a
-recommendation only; the decision is Adam's and is needed before
-S2 wires save/load into the frontend.
+- Saves need a trustworthy saved-at timestamp; on load, the S2
+  driver advances the core by the elapsed whole days before handing
+  control to the player.
+- The player must be able to review what happened during the
+  catch-up (event history/summary) — unwatched months or years of
+  arrivals, settlements, and (S3+) AI expansion and wars cannot
+  land silently.
+- Long absences mean long catch-up runs; the measured tick rate
+  (100 game-years ≈ 0.78 s on this VM, release build) makes even
+  multi-year absences cheap to simulate.
 
 ## Unverified / owner-PC gates
 
 - FPS and rendering feel on Adam's RTX 3060 (no FPS claims made).
 - Interactive picking/orbit with a real mouse; Windows export.
-- S2 design depends on the offline-progression decision above.
+- Offline progression is settled (full catch-up, above); S2 implements it when wiring save/load into the frontend. S2 itself still needs Adam's go-ahead.
 
 ## Next slice
 
 **S2 — Playable colonizer**, only on Adam's go-ahead: Godot
 frontend over this core (map UI, system panel, colonization loop
-from Sol, save/load in the frontend). Settle offline progression
-first (above).
+from Sol, save/load in the frontend). Save/load implements the
+full-catch-up offline-progression ruling (above).
