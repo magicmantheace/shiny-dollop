@@ -1,3 +1,97 @@
+# Abstention higher corroboration recovery: raised support bar on the abstention release gate — 2026-11-04 (FAILED)
+
+Optional `developmental_ai/abstention_higher_corroboration_recovery.py`
+(identical to the graded abstention-release candidate in acting
+model, extended signal, archive, concordance definition, joint
+recovery test, recovery model, abstention trigger, the full
+three-leg authority condition, the minority branch in full, the
+reference-purity gate >= 0.70 on BOTH recovery branches, and leg P
+of the abstention release gate; the SINGLE changed element is the
+release gate's leg-S support threshold: acting_opposed_count >= 4,
+at least TWO supporting opposed events, in place of >= 3) was
+evaluated under the protocol frozen BEFORE implementation at
+`benchmarks/abstention_higher_corroboration_recovery_protocol.json` on
+NEW cohorts 412003/412021/412039 and 413001/413017/413041, both
+now INSPECTED — never re-tune against them. **Graded Failed under
+the protocol's own definitions (criteria 3 and 4 FAIL on the
+additional cohort — either triggers the Failed clause); NOT a
+Regression (pooled onset harm 149/175 well below recent8 265/269,
+control successes equal to recent8 on both cohorts, k=32
+successes 68/93 against the recent8 − 4 lines of 68/89, suite +
+transfer pass).** Per-criterion, development / additional,
+PRIMARY criterion 6 first, then co-graded guards 5, 1, 4: C6
+stationary selectivity PASS/PASS — but a NO-TRIGGER pass
+(abstentions 0/240 both, successes 124 = 124 and 116 = 116, harm
+116 = 116 and 124 = 124; candidate downstream-identical to
+recent8 on both control arms and its branch differs from both the
+records-only abstention-release-rule and reference-purity-rule
+derivations at 0/15 graded control states per cohort — no
+stationary trigger was taken or gate-blocked under any variant,
+so the raised bar's stationary benefit is UNTESTED, not
+demonstrated), C5 release FAIL/PASS (abstentions 0/144 both,
+abstained branch 0/9 both; dev successes 68 vs recent8 72 PASS
+but non-recent8 branch in 2/9 k=32 states — return-A
+retained_archive seed 412003 at purity 0.72 scoring per-seed 9/7
+vs recent8 13/3, the entire −4 k=32 deficit, and B2
+minority_archive seed 412003 at purity 0.737 scoring 9/7 =
+recent8; candidate identical to both baseline methods at k=32 on
+both cohorts; add 93 = 93, 0/9), C1 B2 protection PASS/PASS
+((a) minority TAKEN 6/6 dev and 5/6 add pooled B2 onset,
+fractions 0.262–0.299 / 0.260–0.320, purity armed at every B2
+onset state; (b) minority TAKEN 0/6 B1 and 0/6 return-A both;
+(c) B2 harm 42 vs guard 86 ceiling 51.6, 52 vs guard 61 ceiling
+55.8; (d) B2 successes 54 vs guard+16=26, 44 vs 19), C4 return-A
+harm PASS/FAIL (dev 44 vs guard 71 ceiling 51.6 PASS; add 35 vs
+guard 32 FAIL by 3 on the (a) comparison, ceiling 52.8 PASS —
+candidate identical to the abstention-release and
+reference-purity baseline methods at return-A onset on both
+cohorts, recovery TAKEN 5/6 both: shared with the >= 3 gate, not
+produced by the raise, charged unchanged), C2 return-A successes
+PASS/PASS (52 vs frozen_A 62 floors 24.8 and guard+16=25; 61 vs
+72 / 16 — cumulative 62/66 at 34/30 harm and frozen_A 62/72 at
+34/24 in full: BOTH simple retention baselines beat the
+candidate on BOTH axes at return-A on BOTH cohorts, for the
+fourth consecutive graded cohort pair), C3 pooled onset harm
+PASS/FAIL (dev 149 vs guard 202, 6/6 cells <= recent8; add 175
+vs guard 151 FAIL by 24, 6/6 cells — decomposition vs the guard:
+B1 +30 (88 vs 58), return-A +3, B2 −9; B1 alone exceeds the
+whole failure margin), C7 full accounting PASS/PASS (full
+decision records incl. the complete abstention-gate record with
+support threshold 4, replay identity true at every checkpoint in
+both cohorts — 72/72 entries per cohort, learner acquisition 0).
+**The raised bar changed exactly ONE graded outcome across both
+cohorts against the >= 3 gate — one development B1 onset
+disarming (B1 k=4 seed 412039, acting_opposed_count 3,
+supporting 1, purity 0.868, +16 pooled onset harm, absorbed on
+development) — and nothing on additional, where it is identical
+to the >= 3 baseline method on every aggregate. What failed is
+the gated family's thinned onset profile, concentrated at B1,
+the one stage where neither recovery branch can protect and
+abstention is the only defense: B1 pooled onset harm across gate
+generations (purity / release / candidate) is 31/47/63 dev and
+58/88/88 add, and on additional the candidate's B1 harm equals
+recent8's 88 exactly.** Full unit suite (1116) and historical
+transfer benchmark passed in the evaluation and grading stages;
+no CI claimed for the evaluation or grading commits
+(UNVERIFIED). See
+`docs/ABSTENTION_HIGHER_CORROBORATION_RECOVERY.md`. Keep the
+learner optional and unpromoted, default controller unchanged,
+no merge, no AthenZ/Synveil integration, D1–D10/V2A/V2B
+unchanged. Next limitation selected: P1 first-switch (B1) onset
+non-protection in the gated family — at B1 regular recovery is
+archive-blocked and the minority branch was unarmed at every B1
+onset state on both cohorts (fractions 0.124–0.192), so the
+release gates have thinned B1's only protective response to
+32/96 abstained episode-checkpoints dev and 0/96 add; whether a
+protective response at B1 onset that does not price B1 triggers
+with a stationary-evidence corroboration bar can restore B1
+pooled onset harm <= guard (and < recent8) without giving back
+stationary selectivity or k=32 release, on NEW cohorts under a
+NEW protocol. Recorded but not selected: the C5 development
+failure is the carried recovery branches' k=32 records, not a
+gate effect; cumulative / frozen_A dominance at return-A on
+both axes is now total on four consecutive cohort pairs.
+
 # Abstention release gated recovery: release gate on the abstention branch — 2026-11-03 (PARTIALLY DEMONSTRATED)
 
 Optional `developmental_ai/abstention_release_gated_recovery.py`

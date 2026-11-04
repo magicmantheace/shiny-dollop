@@ -1122,6 +1122,51 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 4 — Abstention higher corroboration recovery: raised support bar on the abstention release gate (FAILED)
+
+Optional `AbstentionHigherCorroborationRecoveryMemory` is identical
+to the graded abstention-release candidate in acting model,
+extended signal, retained archive, archive concordance, joint
+recovery test, recovery model, abstention trigger, the full
+three-leg authority condition, the minority branch in full, the
+reference-purity gate on both recovery branches and leg P of the
+abstention release gate; the SINGLE changed element is the
+release gate's leg-S support threshold (acting_opposed_count
+≥ 4, at least two supporting opposed events, in place of ≥ 3) —
+under a protocol frozen before implementation (new cohorts
+412003-family / 413001-family, now INSPECTED). **Graded Failed
+under the protocol's own definitions (criteria 3 and 4 FAIL on
+the additional cohort — either triggers the Failed clause); NOT
+a Regression** (pooled onset harm 149/175 well below recent8's
+265/269; control successes equal to recent8 on both cohorts;
+k=32 successes 68/93 against the recent8 − 4 lines of 68/89).
+PRIMARY criterion 6 PASSes on both cohorts — but as a no-trigger
+PASS: the candidate is downstream-identical to recent8 on both
+control arms and no stationary abstention trigger was taken or
+gate-blocked under any gate variant, so the raised bar's
+stationary benefit is untested, not demonstrated. Criterion 5
+FAILs on development (non-recent8 branch in 2/9 k=32 states —
+the carried recovery branches, identical to both baseline
+methods there; abstained branch 0/9 on both cohorts, as graded)
+and PASSes on additional (0/9). Criteria 1, 2 and 7 PASS on both
+cohorts (minority TAKEN 6/6 and 5/6 at B2; B2 harm 42/52 vs the
+guard's 86/61; return-A successes 52/61). The raised bar changed
+exactly ONE graded outcome across both cohorts against the
+≥ 3 gate — one development B1 onset disarming (seed 412039,
+acting_opposed_count 3, +16 harm, absorbed there) — and nothing
+on additional, where the candidate is identical to the ≥ 3
+baseline method on every aggregate and its failures are the gate
+family's thinned onset profile: pooled onset harm 175 vs the
+guard's 151, with the B1 cell alone +30 above the guard (88 =
+recent8 exactly — no B1 protection at all on that cohort).
+Plain cumulative and frozen_A again dominate the candidate at
+return-A on both axes on both cohorts (62/66 and 62/72 successes
+at 34/30 and 34/24 harm vs the candidate's 52/61 at 44/35).
+Learner acquisition actions zero; external TRAIN actor harm
+published in full in the report. Optional only, no promotion,
+no merge.
+[Full graded report](docs/ABSTENTION_HIGHER_CORROBORATION_RECOVERY.md).
+
 ### November 3 — Abstention release gated recovery: release gate on the abstention branch (PARTIALLY DEMONSTRATED)
 
 Optional `AbstentionReleaseGatedRecoveryMemory` is identical to the
