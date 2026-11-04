@@ -21,6 +21,12 @@ test-results/
 *.log
 *.sqlite
 *.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+*.sqlite3-wal
+*.sqlite3-shm
+*.sqlite3-journal
 *.db
 *.db-*
 *.db-journal
@@ -43,6 +49,6 @@ test-results/
 Thumbs.db
 .local/
 user-data/
-backups/
-exports/
-artifacts/
+/backups/
+/exports/
+/artifacts/
