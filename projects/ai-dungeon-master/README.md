@@ -1,6 +1,6 @@
 # AI Dungeon Master
 
-**Status:** PLANNED — project definition only; no working application is implemented by this intake commit.
+**Status:** MVP FUNCTIONAL — implemented and verified on Linux; Windows 11 behavior is implemented but not verified on target OS (see `docs/IMPLEMENTATION_STATUS.md`).
 
 **Priority:** 16 of 17 in the approved intake queue.
 **Category:** Tabletop RPG desktop
@@ -10,31 +10,44 @@
 
 Support offline-capable tabletop campaigns with auditable rules, dice, memory, NPCs and optional local AI narration.
 
-## First usable release (MVP)
+**Foundational rule:** the deterministic house-rules engine is authoritative. Narration is optional flavor attached to log entries and can never decide or change a rules outcome. The ruleset is original (four attributes, 2d6 checks, HP) — no published rulebook content is used.
 
-Create a campaign and characters, roll dice, run initiative/combat with logged state, save, and resume.
+## MVP (implemented)
 
-## Full intended capabilities
+Create a campaign and characters, roll dice, run initiative/combat with logged state, save, and resume — plus sessions and notes, NPC/location memory with search, campaign export/import, worldbuilding-backup and dungeon-manifest imports, and mock/local narration.
 
-- Campaign and session records
-- Character sheets and stats
-- Transparent dice engine
-- Initiative and encounter state
-- NPC/location memory
-- Inventory and session notes
-- Optional local AI speech/narration
-- Versioned ruleset packs and import
+## Install and launch
 
-## Proposed implementation direction
+Prerequisites: Node.js 22+ and npm.
 
-Deterministic campaign-state engine + local UI; optional local-model narration adapter. Muse must confirm feasibility before committing to framework choices.
+```bash
+cd projects/ai-dungeon-master/app
+npm install
+npm run build
+npx electron .          # launch the app
+```
 
-## Dependencies and boundaries
+Development: `npm run dev` (Vite renderer) with `npm run build:main` and `npx electron .` for the shell.
 
-Can import approved character/world exports from Worldbuilding Manager and dungeon manifests from Procedural Dungeon Designer.
+Verification:
 
-No unlicensed proprietary rulebooks; AI flavor is never the authoritative rules engine.
+```bash
+npm test                # 40 tests (backend + renderer)
+npm run typecheck
+npm run lint
+npm run smoke           # full acceptance workflow in the packaged main (needs xvfb on Linux)
+```
 
-## Muse start point
+## Data and formats
 
-Read the repository-root `AGENTS.md`, then [this project's instructions](AGENTS.md) and [development handoff](docs/MUSE_HANDOFF.md). Implement the smallest working end-to-end milestone; document genuine test results. See [specification](docs/PRODUCT_SPEC.md), [test plan](docs/TEST_PLAN.md), and [status](docs/IMPLEMENTATION_STATUS.md).
+- Local SQLite database (`aidm.sqlite` in the OS user-data folder). No account, no cloud, no network calls except an optionally configured **loopback-only** narration endpoint.
+- Campaign backup: `{ "format": "ai-dungeon-master/campaign", "formatVersion": "1.0.0", ... }` — byte-deterministic JSON; import reproduces the campaign.
+- Imports accepted: `worldbuilding-manager.project` v1 backups (→ memory entries) and `procedural-dungeon-designer/map` v1 manifests (→ location memory entry). Unknown major versions are rejected with named errors.
+
+## Dice auditability
+
+Each campaign has a dice seed; the PRNG stream state is stored on the campaign and recorded with every roll (dice, modifier, total, state before/after). Any roll in the session log can be replayed exactly from its recorded state — see `app/shared/dice.ts`.
+
+## Project docs
+
+[Project instructions](AGENTS.md) · [development handoff](docs/MUSE_HANDOFF.md) · [specification](docs/PRODUCT_SPEC.md) · [test plan](docs/TEST_PLAN.md) · [implementation status](docs/IMPLEMENTATION_STATUS.md)
