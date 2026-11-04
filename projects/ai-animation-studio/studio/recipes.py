@@ -12,8 +12,15 @@ approved; otherwise candidate/retired parts assemble fine and are reported
 by `unapproved_parts`. The assembled recipe keeps the existing wire shape —
 `schemas/character.schema.json` forbids additional properties, so no
 computed field is stored on it; approval state is reported, not persisted.
+
+F2 slice 3 adds the saved-recipe editor: `edit_character` applies part,
+outfit or color changes to a recipe already in the library and re-runs the
+full assembly checks before saving, so a stored recipe can never be edited
+into a state `assemble_character` would have refused.
 """
 from __future__ import annotations
+
+import copy
 
 from .schema import ValidationError, validate_character
 
@@ -78,6 +85,49 @@ def assemble_character(library, spec: dict, *,
     for slot, part_id in _slots(spec):
         _check_part(library, spec, slot, part_id, require_approved)
     return spec
+
+
+# Recipe fields the editor may change: the three fixed part slots, the
+# outfit list and the colors map. Identity fields (character_id, rig_id,
+# schema_version, status) are not editable through this path.
+EDITABLE_FIELDS = ("body_base", "head", "hair", "outfit", "colors")
+
+
+def require_character(library, character_id: str) -> dict:
+    """Return the stored recipe for character_id or raise RecipeError."""
+    recipe = library.get_character(character_id)
+    if recipe is None:
+        raise RecipeError(f"no such character '{character_id}' in the library")
+    return recipe
+
+
+def edit_character(library, character_id: str, changes: dict, *,
+                   require_approved: bool = False) -> dict:
+    """Apply `changes` to a saved recipe, re-validate, and save the result.
+
+    `changes` maps editable fields (see EDITABLE_FIELDS) to new values:
+    a part id for body_base/head/hair, a list of part ids for outfit, a
+    dict for colors. The edited recipe must pass the same checks as a
+    fresh assembly (`assemble_character`, including require_approved when
+    requested). On any failure RecipeError names the reason and the
+    stored recipe is left untouched — the library is written only after
+    validation succeeds. Returns the saved recipe.
+    """
+    stored = require_character(library, character_id)
+    unknown = sorted(set(changes) - set(EDITABLE_FIELDS))
+    if unknown:
+        raise RecipeError(
+            f"recipe edit for '{character_id}': unsupported fields "
+            f"{unknown}; editable fields are {list(EDITABLE_FIELDS)}")
+    if not changes:
+        raise RecipeError(f"recipe edit for '{character_id}': no changes given")
+    edited = copy.deepcopy(stored)
+    for field, value in changes.items():
+        edited[field] = copy.deepcopy(value)
+    recipe = assemble_character(library, edited,
+                                require_approved=require_approved)
+    library.put_character(recipe)
+    return recipe
 
 
 def unapproved_parts(library, spec: dict) -> list[str]:
