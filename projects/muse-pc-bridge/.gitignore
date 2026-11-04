@@ -1,0 +1,8 @@
+# Secrets and local state — NEVER commit these.
+config.json
+logs/
+bridge-files/
+
+# Python
+__pycache__/
+*.pyc
