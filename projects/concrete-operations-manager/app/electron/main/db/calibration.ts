@@ -60,12 +60,31 @@ export const calibrationEnvelopeSchema = z.object({
 
 export type CalibrationEnvelope = z.infer<typeof calibrationEnvelopeSchema>;
 
+/**
+ * The format major version this app implements. The contract
+ * (docs/CALIBRATION_EXCHANGE.md, versioning policy) requires readers to
+ * reject unknown major versions — a major bump is a breaking change —
+ * while accepting any minor/patch within the implemented major
+ * (minor = additive optional fields, patch = clarifications).
+ */
+export const SUPPORTED_CALIBRATION_MAJOR = 1;
+
 export function parseCalibrationEnvelope(payload: unknown): CalibrationEnvelope {
   const parsed = calibrationEnvelopeSchema.safeParse(payload);
   if (!parsed.success) {
     throw new OpsError(
       OpsErrorCodes.VALIDATION,
       `Calibration payload failed envelope validation: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`,
+    );
+  }
+  // The schema regex proves the version string's SYNTAX only; the
+  // supported MAJOR must be checked too, or a breaking "2.0.0" payload
+  // would import and report success.
+  const major = Number(parsed.data.formatVersion.split('.')[0]);
+  if (major !== SUPPORTED_CALIBRATION_MAJOR) {
+    throw new OpsError(
+      OpsErrorCodes.VALIDATION,
+      `Unsupported calibration formatVersion "${parsed.data.formatVersion}": this app implements major version ${SUPPORTED_CALIBRATION_MAJOR} (see docs/CALIBRATION_EXCHANGE.md); unknown major versions must be rejected.`,
     );
   }
   // Cross-check: every calibration/mix component must reference a declared material.

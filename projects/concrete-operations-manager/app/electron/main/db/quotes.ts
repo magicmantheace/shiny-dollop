@@ -237,6 +237,18 @@ export function issueQuote(db: DatabaseSync, id: number): Quote {
   if (quote.status !== 'draft') {
     throw new OpsError(OpsErrorCodes.INVALID_STATE, `Quote #${id} is ${quote.status}; only drafts can be issued.`);
   }
+  // A mileage-priced quote without a distance has NO delivery line at
+  // all (computeTotals skips it), and the null distance is frozen in
+  // the params snapshot that createInvoice prices from — issuing would
+  // silently undercharge. Drafts may omit the distance, but issuing
+  // requires complete pricing: set the job's distance and refresh the
+  // draft (create/update recomputes the snapshot) before issuing.
+  if (quote.params.deliveryMode === 'mileage' && quote.params.distanceTenthsKm === null) {
+    throw new OpsError(
+      OpsErrorCodes.INVALID_STATE,
+      `Quote #${id} is mileage-priced but has no distance, so it carries no delivery charge. Set the job's distance and update the draft before issuing.`,
+    );
+  }
   const now = new Date().toISOString();
   db.prepare(`UPDATE quotes SET status = 'superseded' WHERE job_id = ? AND status = 'issued'`).run(quote.jobId);
   db.prepare(`UPDATE quotes SET status = 'issued', issued_at = ? WHERE id = ?`).run(now, id);

@@ -101,6 +101,20 @@ describe('calibration exchange envelope', () => {
     expect(JSON.parse(profile.payloadJson)).toEqual(withExtras);
   });
 
+  it('rejects an unsupported major version but accepts minor/patch within major 1', () => {
+    db = makeTestDb();
+    // Syntactically valid semver, breaking major: the contract requires
+    // readers to reject unknown majors, not just check the string shape.
+    expect(() => parseCalibrationEnvelope({ ...VALID_ENVELOPE, formatVersion: '2.0.0' })).toThrow(/major version/);
+    expect(() => parseCalibrationEnvelope({ ...VALID_ENVELOPE, formatVersion: '0.9.9' })).toThrow(/major version/);
+    expect(() => importCalibrationProfile(db, { ...VALID_ENVELOPE, formatVersion: '2.0.0' })).toThrow(OpsError);
+    expect(listCalibrationProfiles(db)).toHaveLength(0);
+
+    // Compatible minor/patch versions of the implemented major are fine.
+    expect(parseCalibrationEnvelope({ ...VALID_ENVELOPE, formatVersion: '1.2.3' }).formatVersion).toBe('1.2.3');
+    expect(parseCalibrationEnvelope({ ...VALID_ENVELOPE, formatVersion: '1.0.1' }).formatVersion).toBe('1.0.1');
+  });
+
   it('rejects non-object and non-JSON payloads at import', () => {
     db = makeTestDb();
     expect(() => importCalibrationProfile(db, null)).toThrow(OpsError);

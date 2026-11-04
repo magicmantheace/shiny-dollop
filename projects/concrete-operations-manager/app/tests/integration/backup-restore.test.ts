@@ -61,6 +61,55 @@ describe('backup and restore', () => {
     }
   });
 
+  it('rejects a candidate whose schema is intact but whose data pages are damaged', () => {
+    const { db, dbPath, dir } = makeFileDb();
+    try {
+      addTestCustomer(db, 'Corruption Test Customer');
+      db.close();
+
+      // Zero the customers table's root page. sqlite_master still lists
+      // every table and schema_migrations still reports version 1, so
+      // name/version checks alone would accept this file — but the
+      // customer data is gone and querying it fails. Only the integrity
+      // check catches this before the live DB is replaced.
+      const probe = new DatabaseSync(dbPath, { readOnly: true });
+      const { rootpage } = probe.prepare("SELECT rootpage FROM sqlite_master WHERE name = 'customers'").get() as {
+        rootpage: number;
+      };
+      probe.close();
+      expect(rootpage).toBeGreaterThan(1);
+
+      const buf = fs.readFileSync(dbPath);
+      const rawPageSize = buf.readUInt16BE(16);
+      const pageSize = rawPageSize === 1 ? 65536 : rawPageSize;
+      buf.fill(0, (rootpage - 1) * pageSize, rootpage * pageSize);
+      fs.writeFileSync(dbPath, buf);
+
+      // Sanity: the schema metadata really does survive the damage.
+      const schemaProbe = new DatabaseSync(dbPath, { readOnly: true });
+      const names = (
+        schemaProbe.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
+      ).map((t) => t.name);
+      schemaProbe.close();
+      expect(names).toContain('customers');
+
+      let caught: unknown;
+      try {
+        validateRestoreCandidate(dbPath);
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(OpsError);
+      expect((caught as OpsError).code).toBe('RESTORE_INVALID');
+      expect((caught as OpsError).message).toMatch(/integrity check/);
+
+      // And restore refuses to replace the live database with it.
+      expect(() => restoreDatabase(dbPath, dbPath, path.join(dir, 'rollbacks'))).toThrow(/integrity check/);
+    } finally {
+      cleanupDir(dir);
+    }
+  });
+
   it('rejects a SQLite file that is not a ConcreteOps database', () => {
     const { db, dir } = makeFileDb();
     try {

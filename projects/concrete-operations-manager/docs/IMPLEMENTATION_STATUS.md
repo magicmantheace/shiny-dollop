@@ -124,6 +124,47 @@ code and fixed with regression tests:
 Verification: **69/69 tests pass** (`npx vitest run`, 14 files; was 67),
 `npm run typecheck` and `npm run lint` clean.
 
+## Codex review fix cycle 4 (2026-11-04)
+
+Three findings from the re-review of `72f9f8c` (two P1, one P2), all
+verified against the code and fixed with regression tests:
+
+- **Restore accepted schema-intact but data-damaged backups (P1).**
+  `validateRestoreCandidate` (`electron/main/backup.ts`) checked table
+  names and the `schema_migrations` version only — a backup with a
+  zeroed `customers` root page passes both, replaces the healthy live
+  database, and then fails with "database disk image is malformed" on
+  first use. Validation now runs `PRAGMA integrity_check` on the
+  candidate and rejects it (`RESTORE_INVALID`) unless the check comes
+  back clean; severe damage that makes the check itself throw is
+  reported as a failed integrity check too. Regression test in
+  `tests/integration/backup-restore.test.ts` zeroes the real root page
+  of `customers` and asserts rejection while the schema still reads.
+- **Unsupported calibration major versions imported successfully (P1).**
+  The envelope schema proved the `formatVersion` string's syntax only,
+  so a breaking `2.0.0` payload imported and reported success, contrary
+  to `docs/CALIBRATION_EXCHANGE.md` ("readers must reject unknown major
+  versions"). `parseCalibrationEnvelope` now also requires the major to
+  equal `SUPPORTED_CALIBRATION_MAJOR` (1); minor/patch versions within
+  major 1 still import. Regression tests in
+  `tests/integration/calibration.test.ts`; the doc's enforced
+  validation rules now state the major check.
+- **Mileage-priced quotes could be issued with no distance (P2).**
+  A blank job distance silently dropped the delivery line
+  (`computeTotals` skips it) and froze `distanceTenthsKm: null` into
+  the params snapshot `createInvoice` prices from, so fixing the job
+  afterwards could not repair the undercharge. `issueQuote` now
+  rejects a mileage-mode draft whose snapshot has no distance; the
+  recovery path is to set the job distance and refresh the draft
+  (create/update recomputes the snapshot). Regression test in
+  `tests/integration/workflow.test.ts` covers the rejection and the
+  recovery (20.0 km @ $3.50/km prices a $70.00 delivery line).
+
+Verification: **72/72 tests pass** (`npx vitest run`, 14 files; was 69),
+`npm run typecheck` and `npm run lint` clean, `npm run build` clean,
+`npm run smoke` passed (SMOKE_OK). Negative check: reverting the three
+source fixes makes exactly the three new tests fail.
+
 ## Next action
 
 Owner review of the PR; Windows-side validation (installer, portable zip,

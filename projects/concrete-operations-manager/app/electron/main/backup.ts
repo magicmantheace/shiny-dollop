@@ -2,8 +2,9 @@
  * Backup (export whole DB to a file) and restore (validated replace).
  *
  * Backup: checkpoint WAL, then copy the database file.
- * Restore: validate the candidate (real SQLite file, expected tables,
- * schema_migrations at a compatible version), keep a rollback copy of the
+ * Restore: validate the candidate (real SQLite file that passes
+ * PRAGMA integrity_check, expected tables, schema_migrations at a
+ * compatible version), keep a rollback copy of the
  * current DB, then replace it. The caller must reopen the database after
  * a successful restore.
  */
@@ -66,6 +67,31 @@ export function validateRestoreCandidate(candidatePath: string): { version: numb
   let probe: DB | null = null;
   try {
     probe = new DB(candidatePath, { readOnly: true });
+    // Schema metadata can survive damage that makes the data unusable:
+    // a backup whose customers root page is zeroed still lists every
+    // table and reports its migration version, yet querying customers
+    // fails with "database disk image is malformed". A page-level
+    // integrity check is the only pre-restore probe that establishes
+    // the candidate is actually usable, so require a clean result.
+    let integrity: { integrity_check: string }[];
+    try {
+      integrity = probe.prepare('PRAGMA integrity_check').all() as { integrity_check: string }[];
+    } catch (err) {
+      // Severe damage can make the check itself fail (SQLITE_CORRUPT)
+      // instead of returning problem rows — that is still a failed
+      // integrity check, not a generic "not a database".
+      throw new OpsError(
+        OpsErrorCodes.RESTORE_INVALID,
+        `Restore candidate failed its integrity check: ${err instanceof Error ? err.message : String(err)}.`,
+      );
+    }
+    const problems = integrity.map((r) => r.integrity_check).filter((m) => m !== 'ok');
+    if (problems.length > 0) {
+      throw new OpsError(
+        OpsErrorCodes.RESTORE_INVALID,
+        `Restore candidate failed its integrity check: ${problems.slice(0, 3).join('; ')}${problems.length > 3 ? ` (and ${problems.length - 3} more)` : ''}.`,
+      );
+    }
     const tables = (
       probe.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
     ).map((t) => t.name);

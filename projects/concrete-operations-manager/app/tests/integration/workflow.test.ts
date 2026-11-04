@@ -8,6 +8,8 @@ import { makeTestDb, addTestCustomer, addTestJob, addTestPour } from '../helpers
 import type { DatabaseSync } from 'node:sqlite';
 import { createQuote, getQuote, issueQuote, reviseQuote, updateDraft } from '../../electron/main/db/quotes';
 import { createInvoice, markInvoicePaid, voidInvoice } from '../../electron/main/db/invoices';
+import { addCustomer } from '../../electron/main/db/customers';
+import { updateJob } from '../../electron/main/db/jobs';
 import { setDeliveredLiters } from '../../electron/main/db/pours';
 import { listAudit } from '../../electron/main/db/audit';
 import { OpsError } from '../../electron/main/errors';
@@ -133,6 +135,37 @@ describe('MVP workflow', () => {
     });
     expect(reset.params.concreteRateCentsPerM3).toBe(18000);
     expect(reset.params.smallLoadChargeCents).toBe(15000);
+  });
+
+  it('refuses to issue a mileage-priced quote with no distance, then issues once priced', () => {
+    db = makeTestDb();
+    const customer = addCustomer(db, {
+      name: 'Mileage Test Customer',
+      deliveryFeeMode: 'mileage',
+      deliveryPerKmCents: 350,
+    });
+    const job = addTestJob(db, customer.id); // no distance recorded
+    addTestPour(db, job.id, 2500);
+
+    const draft = createQuote(db, job.id, null);
+    expect(draft.params.deliveryMode).toBe('mileage');
+    expect(draft.params.distanceTenthsKm).toBeNull();
+    // The draft silently carries no delivery line at all.
+    expect(draft.lines.some((l) => l.kind === 'delivery')).toBe(false);
+
+    // Issuing would freeze the null distance into the snapshot the
+    // invoice prices from, silently undercharging — so it is rejected.
+    expect(() => issueQuote(db, draft.id)).toThrow(/no distance/);
+    expect(getQuote(db, draft.id)?.status).toBe('draft');
+
+    // Recovery path: set the job distance (20.0 km) and refresh the
+    // draft; issuing then succeeds with the mileage fee priced in.
+    updateJob(db, { id: job.id, distanceTenthsKm: 200 });
+    const refreshed = updateDraft(db, draft.id, { notes: 'distance added' });
+    expect(refreshed.params.distanceTenthsKm).toBe(200);
+    const delivery = refreshed.lines.find((l) => l.kind === 'delivery');
+    expect(delivery?.amountCents).toBe(7000); // 20.0 km @ $3.50/km
+    expect(issueQuote(db, draft.id).status).toBe('issued');
   });
 
   it('issued quotes reject edits and double-issue', () => {

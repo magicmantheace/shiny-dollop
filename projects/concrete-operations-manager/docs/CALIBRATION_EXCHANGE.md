@@ -40,7 +40,7 @@ mix ID is shown, and any consumer of this format must do the same.
 
 ## Validation rules (enforced by Concrete Operations Manager on import)
 
-1. `formatVersion` matches `^\d+\.\d+\.\d+$`.
+1. `formatVersion` matches `^\d+\.\d+\.\d+$`, and its major version is one the reader implements (currently `1`); unknown major versions are rejected (see Versioning policy).
 2. `units` enums are exact; unknown unit strings are rejected.
 3. `materials` is non-empty; `materialId`s are unique.
 4. All `calibrations[].materialId` and `mixes[].components[].materialId` reference declared materials.
