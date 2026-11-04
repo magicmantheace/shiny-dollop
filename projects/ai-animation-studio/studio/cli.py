@@ -19,6 +19,9 @@ from .recipes import (RecipeError, assemble_character, edit_character,
 from .reports import clip_keys_from_manifest, missing_action_report
 from .reviews import DECISIONS, ReviewError, list_candidates, record_review
 from .schema import validate_scene, validate_asset, validate_character, validate_catalog, ValidationError
+from .shows import (ShowError, apply_continuity, capture_scene_memory,
+                    export_show_package, record_scene_memory, validate_show,
+                    verify_show_package)
 from .timing import resolve_timing
 from .voice import (ExternalVoiceEngine, StubVoiceEngine, VoiceCache,
                     VoiceError, subprocess_runner)
@@ -79,7 +82,7 @@ def enrich_manifest(manifest: dict, lib: Library, asset_root: Path | None,
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="AI Animation Studio foundation")
-    parser.add_argument("command", choices=["validate", "init-db", "seed", "register", "promote", "assemble", "show-character", "edit-character", "export-character", "list-assets", "demo", "sockets", "plan", "speak", "enqueue", "work", "jobs", "report-missing", "candidates", "review"])
+    parser.add_argument("command", choices=["validate", "init-db", "seed", "register", "promote", "assemble", "show-character", "edit-character", "export-character", "list-assets", "demo", "sockets", "plan", "speak", "enqueue", "work", "jobs", "report-missing", "candidates", "review", "continuity", "export-show", "verify-show"])
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--catalog", default="quaternius_f1_catalog.json",
                         help="catalog fixture in examples/ (register/promote commands)")
@@ -176,6 +179,12 @@ def main(argv: list[str] | None = None) -> int:
                              "never changes the asset's status)")
     parser.add_argument("--note", default=None,
                         help="review: optional note recorded on the review")
+    parser.add_argument("--show", type=Path, default=None,
+                        help="continuity / export-show: show manifest JSON "
+                             "file (a bare name resolves under examples/)")
+    parser.add_argument("--scene-index", type=int, default=None,
+                        help="continuity: 0-based index of the scene to "
+                             "apply the previous scene's memory to")
     args = parser.parse_args(argv)
     asset_root = args.asset_root or DEFAULT_ASSET_ROOT
     if args.command == "validate":
@@ -299,6 +308,91 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  events[{record['event_index']}] {record['op']} "
                   f"(actor {record['actor_id']}) needs clip "
                   f"'{record['needed']}': {record['reason']}")
+        return 0
+    if args.command == "continuity":
+        if args.show is None:
+            parser.error("continuity requires --show <show manifest JSON file>")
+        if args.scene_index is None:
+            parser.error("continuity requires --scene-index "
+                         "<0-based index into the show's scenes>")
+        show_path = args.show
+        if not show_path.exists():
+            show_path = EXAMPLES / args.show
+        try:
+            show = validate_show(
+                json.loads(show_path.read_text(encoding="utf-8")))
+        except (ValidationError, OSError, ValueError) as err:
+            parser.error(str(err))
+        entries = show["scenes"]
+        if not 0 <= args.scene_index < len(entries):
+            parser.error(f"--scene-index {args.scene_index} out of range for "
+                         f"show {show['show_id']} ({len(entries)} scene(s), "
+                         "0-based)")
+        # Capture the memory chain in play order, recording each memory
+        # into the library DB when one exists at --db (the demo export's
+        # convention; a missing DB is reported, never silently created).
+        lib = None
+        try:
+            memories = []
+            if args.db.exists():
+                lib = Library(args.db)
+                lib.init()
+            for entry in entries:
+                memory = capture_scene_memory(entry["scene"])
+                memories.append(memory)
+                if lib is not None:
+                    record_scene_memory(lib, show["show_id"], memory)
+                print(f"Memory {memory['scene_id']}: makespan "
+                      f"{memory['makespan_ms']} ms, "
+                      f"{len(memory['actors'])} actor(s), "
+                      f"{len(memory['props'])} prop(s)")
+            target = entries[args.scene_index]
+            if args.scene_index == 0:
+                print(f"Scene {target['scene_id']} is the show's first "
+                      "scene; no prior memory to apply")
+            else:
+                _applied, notes = apply_continuity(
+                    target["scene"], memories[args.scene_index - 1])
+                print(f"Continuity into {target['scene_id']} (from "
+                      f"{memories[args.scene_index - 1]['scene_id']}):")
+                for note in notes:
+                    print(f"  {note}")
+            if lib is None:
+                print(f"No library DB at {args.db}; memories were not recorded")
+        except (ValidationError, ShowError, ValueError) as err:
+            parser.error(str(err))
+        finally:
+            if lib is not None:
+                lib.close()
+        return 0
+    if args.command == "export-show":
+        if args.show is None:
+            parser.error("export-show requires --show <show manifest JSON file>")
+        if args.out is None:
+            parser.error("export-show requires --out <package directory>")
+        show_path = args.show
+        if not show_path.exists():
+            show_path = EXAMPLES / args.show
+        try:
+            show = validate_show(
+                json.loads(show_path.read_text(encoding="utf-8")))
+            package = export_show_package(show, args.out)
+        except (ValidationError, OSError, ValueError) as err:
+            parser.error(str(err))
+        print(f"Exported show {package['show_id']} to {args.out}: "
+              f"{len(package['exported_files'])} file(s) hashed, "
+              f"ipc_version {package['ipc_version']}")
+        return 0
+    if args.command == "verify-show":
+        if args.out is None:
+            parser.error("verify-show requires --out <package directory>")
+        try:
+            summary = verify_show_package(args.out)
+        except (ShowError, OSError, ValueError) as err:
+            parser.error(str(err))
+        print(f"Package OK: show {summary['show_id']}, "
+              f"{summary['scene_count']} scene(s), "
+              f"{summary['files_checked']} file hash(es) verified")
         return 0
     lib = Library(args.db)
     try:

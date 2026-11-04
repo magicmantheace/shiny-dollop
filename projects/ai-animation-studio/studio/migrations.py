@@ -72,6 +72,24 @@ MIGRATIONS: list[tuple[int, str, object]] = [
         "CREATE INDEX IF NOT EXISTS idx_reviews_asset "
         "ON reviews(asset_id, review_id);",
     ),
+    (
+        5,
+        "world_state_scene_memory",
+        "CREATE TABLE IF NOT EXISTS world_state (\n"
+        "  key TEXT PRIMARY KEY,\n"
+        "  value_json TEXT NOT NULL,\n"
+        "  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP\n"
+        ");\n"
+        "CREATE TABLE IF NOT EXISTS scene_memory (\n"
+        "  memory_id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
+        "  show_id TEXT NOT NULL,\n"
+        "  scene_id TEXT NOT NULL,\n"
+        "  memory_json TEXT NOT NULL,\n"
+        "  recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP\n"
+        ");\n"
+        "CREATE INDEX IF NOT EXISTS idx_scene_memory_show "
+        "ON scene_memory(show_id, memory_id);",
+    ),
 ]
 
 LATEST_VERSION = MIGRATIONS[-1][0]

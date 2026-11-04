@@ -219,7 +219,7 @@ class ReviewTestCase(unittest.TestCase):
 
 class MigrationFourTests(ReviewTestCase):
     def test_fresh_db_has_reviews_table(self):
-        self.assertEqual(applied_versions(self.lib.db), [1, 2, 3, 4])
+        self.assertEqual(applied_versions(self.lib.db), [1, 2, 3, 4, 5])
         cols = {r[1] for r in self.lib.db.execute("PRAGMA table_info(reviews)")}
         self.assertEqual(cols, {"review_id", "asset_id", "reviewer",
                                 "decision", "note", "created_at"})
@@ -249,7 +249,7 @@ class MigrationFourTests(ReviewTestCase):
         lib = Library(path)
         self.addCleanup(lib.close)
         lib.init()
-        self.assertEqual(applied_versions(lib.db), [1, 2, 3, 4])
+        self.assertEqual(applied_versions(lib.db), [1, 2, 3, 4, 5])
         asset = lib.get_asset("kept_asset")
         self.assertEqual(asset["source"], "unit test")
         self.assertEqual(asset["license"], "CC0-1.0")
