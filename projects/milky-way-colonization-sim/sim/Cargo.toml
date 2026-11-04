@@ -1,0 +1,16 @@
+[package]
+name = "mwcs-sim"
+version = "0.1.0"
+edition = "2021"
+description = "Milky Way Colonization Simulator — deterministic headless simulation core (S1)"
+license = "CC-BY-SA-4.0"
+
+[dependencies]
+mwcs-pipeline = { path = "../pipeline" }
+
+[[bin]]
+name = "sim-cli"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
