@@ -7,6 +7,11 @@ from __future__ import annotations
 
 import re
 
+try:
+    from .timing import resolve_timing
+except ImportError:  # standalone module use (studio/ on sys.path)
+    from timing import resolve_timing  # type: ignore[no-redef]
+
 VERSION = "1.0.0"
 OPS = frozenset({"spawn", "move", "speak", "emote", "camera"})
 EMOTIONS = frozenset({"neutral", "happy", "sad", "angry", "nervous", "surprised", "tired", "scared"})
@@ -32,6 +37,11 @@ def vec3(value: object, name: str) -> None:
 def validate_scene(scene: dict) -> dict:
     need(isinstance(scene, dict), "scene must be object")
     need(scene.get("schema_version") == VERSION, "unsupported scene version")
+    if "timing" in scene:
+        try:
+            resolve_timing(scene.get("timing"))
+        except ValueError as exc:
+            raise ValidationError(str(exc)) from exc
     identifier(scene.get("scene_id"), "scene_id")
     identifier(scene.get("environment_id"), "environment_id")
     actors = scene.get("actors")
@@ -74,6 +84,9 @@ def validate_scene(scene: dict) -> dict:
         elif op == "speak":
             line = e.get("line")
             need(isinstance(line, str) and 1 <= len(line) <= 500, prefix + ": invalid line")
+            if "duration_ms" in e:
+                d = e.get("duration_ms")
+                need(type(d) is int and 100 <= d <= 60_000, prefix + ": invalid duration")
         elif op == "emote":
             need(isinstance(e.get("emotion"), str) and e.get("emotion") in EMOTIONS, prefix + ": unsupported emotion")
             q = e.get("intensity")

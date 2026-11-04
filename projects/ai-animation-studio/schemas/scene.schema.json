@@ -21,6 +21,28 @@
     "environment_id": {
       "$ref": "#/$defs/id"
     },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional speak-timing overrides (ADR-009). Defaults: rate 15 chars/sec, clamps 800..15000 ms. The min <= max cross-check is enforced by studio/schema.py.",
+      "properties": {
+        "speak_chars_per_second": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+        },
+        "speak_min_hold_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60000
+        },
+        "speak_max_hold_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60000
+        }
+      }
+    },
     "actors": {
       "type": "array",
       "minItems": 1,

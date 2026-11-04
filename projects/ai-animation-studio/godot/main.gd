@@ -6,8 +6,16 @@ extends Node3D
 const SCHEMA_VERSION := "1.0.0"
 const VALID_OPS := ["spawn", "move", "speak", "emote", "camera"]
 
+## Speak timing (ADR-009): changeable variables, not constants. A scene may
+## override them with a top-level "timing" object; the defaults mirror
+## studio/timing.py (parity guarded by tests/test_timing.py).
+@export var speak_chars_per_second: float = 15.0
+@export var speak_min_hold_ms: int = 800
+@export var speak_max_hold_ms: int = 15000
+
 var actors: Dictionary = {}
 var events: Array = []
+var schedule: Array = []
 var next_event: int = 0
 var clock_ms: float = 0.0
 
@@ -66,12 +74,101 @@ func _ready() -> void:
             push_error("events[" + str(i) + "]: move target is not an array of exactly 3 numbers; event skipped")
             continue
         events.append(e)
+    _apply_timing(parsed)
+    _build_schedule()
     print("AI Animation Studio preview: ", parsed.get("scene_id", "<unnamed>"))
+
+func _apply_timing(scene: Dictionary) -> void:
+    # Scene-level "timing" object overrides the exported settings above.
+    # Out-of-range values are named and ignored (fail-soft per key), the
+    # Python validator remains the fail-closed gate for authored scenes.
+    var source := "preview settings"
+    var raw: Variant = scene.get("timing")
+    if typeof(raw) == TYPE_DICTIONARY:
+        source = "scene"
+        var t: Dictionary = raw
+        if t.has("speak_chars_per_second"):
+            var r: Variant = t["speak_chars_per_second"]
+            if (typeof(r) == TYPE_INT or typeof(r) == TYPE_FLOAT) and float(r) > 0.0 and float(r) <= 100.0:
+                speak_chars_per_second = float(r)
+            else:
+                push_warning("timing.speak_chars_per_second invalid; keeping " + str(speak_chars_per_second))
+        if t.has("speak_min_hold_ms"):
+            var v: Variant = _as_int(t["speak_min_hold_ms"])
+            if v != null and int(v) >= 0 and int(v) <= 60000:
+                speak_min_hold_ms = int(v)
+            else:
+                push_warning("timing.speak_min_hold_ms invalid; keeping " + str(speak_min_hold_ms))
+        if t.has("speak_max_hold_ms"):
+            var w: Variant = _as_int(t["speak_max_hold_ms"])
+            if w != null and int(w) >= 0 and int(w) <= 60000:
+                speak_max_hold_ms = int(w)
+            else:
+                push_warning("timing.speak_max_hold_ms invalid; keeping " + str(speak_max_hold_ms))
+        if speak_min_hold_ms > speak_max_hold_ms:
+            push_warning("timing clamps inverted (min > max); swapping")
+            var tmp := speak_min_hold_ms
+            speak_min_hold_ms = speak_max_hold_ms
+            speak_max_hold_ms = tmp
+    print("Timing: rate ", speak_chars_per_second, " chars/s, speak hold clamp ", speak_min_hold_ms, "..", speak_max_hold_ms, " ms (source: ", source, ")")
+
+func _as_int(v: Variant) -> Variant:
+    # JSON numbers arrive as floats; accept integral values of either type.
+    if typeof(v) == TYPE_INT:
+        return int(v)
+    if typeof(v) == TYPE_FLOAT and float(v) == floor(float(v)):
+        return int(v)
+    return null
+
+func _speak_hold_ms(e: Dictionary) -> int:
+    # Mirrors studio/timing.py speak_hold_ms: explicit duration wins,
+    # otherwise derive from the line at the configured rate and clamp.
+    if e.has("duration_ms"):
+        var d: Variant = _as_int(e["duration_ms"])
+        if d != null and int(d) >= 100 and int(d) <= 60000:
+            return int(d)
+        push_warning("speak duration_ms invalid; deriving hold from line")
+    var line := String(e.get("line", ""))
+    var derived := int(ceil(float(line.length()) * 1000.0 / speak_chars_per_second))
+    return clampi(derived, speak_min_hold_ms, speak_max_hold_ms)
+
+func _build_schedule() -> void:
+    # Precompute effective dispatch times (ADR-009): a speak hold gates only
+    # later events for the SAME actor; camera is never gated; spawn starts a
+    # fresh actor and is never gated. Dispatch order is (effective, index).
+    var hold_until: Dictionary = {}
+    schedule.clear()
+    for i in events.size():
+        var e: Dictionary = events[i]
+        var at := int(e.get("at_ms", 0))
+        var op := String(e.get("op", ""))
+        var eff := at
+        var hold := 0
+        if op != "camera":
+            var id := String(e.get("actor_id", ""))
+            if op != "spawn" and hold_until.has(id):
+                eff = maxi(at, int(hold_until[id]))
+            if op == "speak":
+                hold = _speak_hold_ms(e)
+                hold_until[id] = eff + hold
+        e["_index"] = i
+        e["_effective_ms"] = eff
+        e["_hold_ms"] = hold
+        if eff != at:
+            print("Delayed ", op, " for ", String(e.get("actor_id", "")), ": at_ms ", at, " -> ", eff, " (speak hold)")
+        schedule.append(e)
+    schedule.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+        var ea := int(a["_effective_ms"])
+        var eb := int(b["_effective_ms"])
+        if ea != eb:
+            return ea < eb
+        return int(a["_index"]) < int(b["_index"])
+    )
 
 func _process(delta: float) -> void:
     clock_ms += delta * 1000.0
-    while next_event < events.size() and float(events[next_event].get("at_ms", 0)) <= clock_ms:
-        _dispatch(events[next_event])
+    while next_event < schedule.size() and float(schedule[next_event].get("_effective_ms", 0)) <= clock_ms:
+        _dispatch(schedule[next_event])
         next_event += 1
 
 func _dispatch(e: Dictionary) -> void:
@@ -107,11 +204,15 @@ func _dispatch(e: Dictionary) -> void:
             tween.tween_callback(_play_tag.bind(id, "idle"))
     elif op == "speak":
         print(id, ": ", e.get("line", ""))
+        var hold_ms := int(e.get("_hold_ms", 0))
+        var explicit := false
+        if e.has("duration_ms"):
+            var d: Variant = _as_int(e["duration_ms"])
+            explicit = d != null and int(d) >= 100 and int(d) <= 60000
+        print("Speak hold for ", id, ": ", hold_ms, " ms (", "explicit" if explicit else "derived", ")")
         if state["anim"] != null:
             _play_tag(id, "speak")
-            var entry: Dictionary = (manifest.get("clips", {}) as Dictionary).get("speak", {})
-            var hold_s: float = float(entry.get("duration_s", 2.0))
-            get_tree().create_timer(hold_s).timeout.connect(_end_speak.bind(id))
+            get_tree().create_timer(maxf(0.05, float(hold_ms) / 1000.0)).timeout.connect(_end_speak.bind(id))
     elif op == "emote":
         print(id, " emotion: ", e.get("emotion", "neutral"), " intensity: ", e.get("intensity", 0.0))
 
