@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
- * Development runner: builds main+preload with tsc (watch), starts the
- * renderer dev server (Vite), and launches Electron against it.
+ * Development runner: builds main with tsc (watch), bundles the preload
+ * with Vite (watch — a sandboxed preload must be one self-contained
+ * script; see vite.preload.config.ts), starts the renderer dev server
+ * (Vite), and launches Electron against it.
  *
  * electron/main.ts only loads a development renderer when FS_DEV_SERVER is
  * set, so Electron is launched with FS_DEV_SERVER pointing at the Vite
@@ -15,7 +17,7 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { electronCommand, tscWatchCommand, viteCommand } from './dev-commands.mjs';
+import { electronCommand, tscWatchCommand, viteCommand, vitePreloadWatchCommand } from './dev-commands.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.join(root, '..');
@@ -56,9 +58,10 @@ function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-// 1. TypeScript watchers for main + preload.
+// 1. Main: TypeScript watcher. Preload: Vite watch bundle (single file —
+// the sandboxed preload cannot require the tsc output's relative modules).
 runSpec(tscWatchCommand(appDir, 'tsconfig.main.json'));
-runSpec(tscWatchCommand(appDir, 'tsconfig.preload.json'));
+runSpec(vitePreloadWatchCommand(appDir));
 
 // 2. Renderer dev server (Vite). Started before Electron so the URL passed
 // via FS_DEV_SERVER is already serving when the window loads.

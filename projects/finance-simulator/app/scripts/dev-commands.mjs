@@ -31,6 +31,21 @@ export function tscWatchCommand(appDir, tsconfig, execPath = process.execPath) {
   );
 }
 
+/**
+ * Vite watch build for the preload bundle. The preload must be a single
+ * self-contained script (sandboxed preloads cannot require relative
+ * modules — see vite.preload.config.ts), so dev rebuilds it with the
+ * same bundling config as `npm run build:preload`, not with tsc.
+ */
+export function vitePreloadWatchCommand(appDir, execPath = process.execPath) {
+  return nodeEntry(
+    appDir,
+    ['vite', 'bin', 'vite.js'],
+    ['build', '--config', 'vite.preload.config.ts', '--watch'],
+    execPath,
+  );
+}
+
 /** Vite renderer dev server on the given (strict) port. */
 export function viteCommand(appDir, port, execPath = process.execPath) {
   return nodeEntry(

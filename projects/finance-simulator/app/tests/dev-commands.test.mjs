@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { electronCommand, tscWatchCommand, viteCommand } from '../scripts/dev-commands.mjs';
+import { electronCommand, tscWatchCommand, viteCommand, vitePreloadWatchCommand } from '../scripts/dev-commands.mjs';
 
 // Regression (Codex PR #8, cycle 2): scripts/dev.mjs spawned `npx` and the
 // `electron.cmd` shim with no shell. On Windows those are .cmd shims, which
@@ -24,6 +24,16 @@ describe('dev launch commands (no Windows command shims)', () => {
     expect(spec.command).toBe(execPath);
     expect(spec.args[0]).toBe(path.join(appDir, 'node_modules', 'vite', 'bin', 'vite.js'));
     expect(spec.args.slice(1)).toEqual(['--port', '5177', '--strictPort']);
+  });
+
+  it('rebuilds the preload as a Vite bundle in watch mode, not tsc output', () => {
+    // The sandboxed preload must stay a single self-contained script in
+    // dev too (see vite.preload.config.ts); tsc watch output would
+    // restore the relative require the sandbox cannot load.
+    const spec = vitePreloadWatchCommand(appDir, execPath);
+    expect(spec.command).toBe(execPath);
+    expect(spec.args[0]).toBe(path.join(appDir, 'node_modules', 'vite', 'bin', 'vite.js'));
+    expect(spec.args.slice(1)).toEqual(['build', '--config', 'vite.preload.config.ts', '--watch']);
   });
 
   it('launches Electron through cli.js with Node, not the electron.cmd shim', () => {
