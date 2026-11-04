@@ -69,3 +69,16 @@ skeleton facts, clip inventory, per-piece pack hashes) are recorded in
 FPS check) are recorded as pending and are never auto-passed, so an
 asset can be `approved` for local playback while those reviews remain
 honestly outstanding.
+
+## ADR-009: Speak/camera timing semantics adopted with a tunable rate (2026-11-03)
+
+**Accepted (provisional, owner sign-off 2026-11-03).** The speak/camera
+timing semantics in `docs/SCENE_PROTOCOL.md` are adopted: an explicit
+`duration_ms` wins; otherwise the speak hold derives from the line at
+15 characters/second, clamped to 800–15000 ms; blocking is per-actor
+only; camera cuts are instantaneous at `at_ms`; move and emote are
+unchanged. Owner condition: the derivation rate and the clamp bounds
+are changeable configuration variables with those values as defaults —
+not hardcoded constants — so the rate can be increased later without
+revisiting this decision. Validator/renderer implementation is a
+separate step and has not been done yet.
