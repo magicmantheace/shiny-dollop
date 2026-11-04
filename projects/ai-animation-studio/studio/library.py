@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
+from .migrations import migrate
 from .schema import validate_asset, validate_character, validate_scene
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,8 +23,9 @@ class Library:
         self.db.close()
 
     def init(self) -> None:
-        self.db.executescript(DDL.read_text(encoding="utf-8"))
-        self.db.commit()
+        # Applies any pending schema migrations (see studio/migrations.py);
+        # a pre-migration v1 database is recognized and upgraded in place.
+        migrate(self.db)
 
     def put_asset(self, asset: dict) -> None:
         validate_asset(asset)
