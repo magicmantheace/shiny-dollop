@@ -98,6 +98,10 @@ def main(argv: list[str] | None = None) -> int:
             if args.db.exists():
                 lib = Library(args.db)
                 try:
+                    # The demo export reads through get_asset, so the opened
+                    # DB must be migrated first (idempotent; a pre-migration
+                    # v1 database is upgraded in place, rows preserved).
+                    lib.init()
                     enriched = enrich_manifest(base, lib, asset_root)
                 finally:
                     lib.close()
