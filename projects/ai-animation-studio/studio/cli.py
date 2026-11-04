@@ -6,6 +6,8 @@ import json
 import shutil
 from pathlib import Path
 from . import gltf
+from .director import (AdapterError, HttpAdapter, PlannerError, StubAdapter,
+                       plan_scene)
 from .ipc import write_ipc
 from .library import Library, ROOT, DEFAULT_DB
 from .promotion import DEFAULT_ASSET_ROOT, PromotionError, promote_asset, promote_character
@@ -58,7 +60,7 @@ def enrich_manifest(manifest: dict, lib: Library, asset_root: Path | None) -> di
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="AI Animation Studio foundation")
-    parser.add_argument("command", choices=["validate", "init-db", "seed", "register", "promote", "assemble", "show-character", "edit-character", "export-character", "list-assets", "demo", "sockets"])
+    parser.add_argument("command", choices=["validate", "init-db", "seed", "register", "promote", "assemble", "show-character", "edit-character", "export-character", "list-assets", "demo", "sockets", "plan"])
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--catalog", default="quaternius_f1_catalog.json",
                         help="catalog fixture in examples/ (register/promote commands)")
@@ -87,9 +89,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--colors", default=None,
                         help="edit-character: new colors as a JSON object, "
                              "e.g. '{\"hair\": \"#663e32\"}'")
+    parser.add_argument("--context", type=Path, default=None,
+                        help="plan: director context JSON file (cast + lines)")
+    parser.add_argument("--adapter", choices=["stub", "http"], default="stub",
+                        help="plan: scene proposer adapter (default stub)")
+    parser.add_argument("--model", default=None,
+                        help="plan (http adapter): local model name "
+                             f"(default {HttpAdapter.DEFAULT_MODEL})")
+    parser.add_argument("--endpoint", default=None,
+                        help="plan (http adapter): local model endpoint, loopback only "
+                             f"(default {HttpAdapter.DEFAULT_ENDPOINT})")
     parser.add_argument("--out", type=Path, default=None,
                         help="output file (demo: scene runtime JSON, default godot/data/scene_runtime.json; "
-                             "export-character: recipe spec file, required)")
+                             "export-character: recipe spec file, required; "
+                             "plan: enveloped scene JSON, required)")
     args = parser.parse_args(argv)
     asset_root = args.asset_root or DEFAULT_ASSET_ROOT
     if args.command == "validate":
@@ -136,6 +149,33 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Saved asset manifest to {target} (no library DB at {args.db}; "
                       "no approval state attached, preview will fall back to capsules)")
         print("Open godot/project.godot in Godot 4 and run the main scene to preview.")
+        return 0
+    if args.command == "plan":
+        if args.context is None:
+            parser.error("plan requires --context <director context JSON file>")
+        if args.out is None:
+            parser.error("plan requires --out <enveloped scene JSON file>")
+        try:
+            context = json.loads(args.context.read_text(encoding="utf-8"))
+            if not isinstance(context, dict):
+                parser.error("plan context must be a JSON object")
+            if args.adapter == "http":
+                adapter = HttpAdapter(
+                    endpoint=args.endpoint or HttpAdapter.DEFAULT_ENDPOINT,
+                    model=args.model or HttpAdapter.DEFAULT_MODEL)
+            else:
+                adapter = StubAdapter()
+            result = plan_scene(adapter, context)
+        except (AdapterError, PlannerError, OSError, ValueError) as err:
+            parser.error(str(err))
+        envelope = write_ipc(args.out, result.scene)
+        summary = (f"Planned scene {result.scene['scene_id']} via {result.adapter} "
+                   f"(attempts {result.attempts}, "
+                   f"{'fallback' if result.fallback else 'no fallback'}) "
+                   f"-> {args.out} (IPC envelope, ipc_version {envelope['ipc_version']})")
+        if result.rejections:
+            summary += f"; rejections: {' | '.join(result.rejections)}"
+        print(summary)
         return 0
     lib = Library(args.db)
     try:
