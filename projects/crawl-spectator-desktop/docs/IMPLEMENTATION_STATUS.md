@@ -4,7 +4,7 @@
 - **Priority:** 17/17
 - **Source/code implemented:** Yes — Electron app under `app/` (Electron 45 + React 19 + TypeScript strict + Vite, `node:sqlite` preferences, zod-validated IPC and Feed payloads)
 - **Build validated:** Yes — `npm run build` green (renderer + main), Linux VM
-- **Automated tests executed:** Yes — 59/59 pass (50 backend + 9 renderer; Codex-review fix cycle 3, 2026-10-24), typecheck + lint clean, build green, plus smoke `SMOKE_OK` (previous cycle)
+- **Automated tests executed:** Yes — 63/63 pass (52 backend + 11 renderer; Codex-review fix cycle 5, 2026-11-04), typecheck + lint clean, build green, smoke `SMOKE_OK`
 - **End-to-end MVP verified:** In DEMO/fixture terms, yes (see below). Against a real owner-run Underreach Feed API: **implemented but not verified** (no live server exists in this environment)
 - **Owner review:** Pending (PR to be opened by the parent agent after independent verification)
 
@@ -128,3 +128,11 @@ Both findings from the cycle-3 re-review verified against the code before fixing
 - **Avoid counting evicted events again on overlapping polls (P2, `feedStore.ts`):** evicted event ids were deleted from `seen`, so re-polling the cursor tick (600 events at one tick against a 500 capacity) re-accepted and re-counted the same 100 evicted events on every poll. The store now remembers evictions via a bounded FIFO tombstone set plus an eviction watermark (the greatest evicted (tick, id); evictions are always a sorted prefix), and replayed evicted events are ignored instead of being accepted and counted again. `clear()` resets both.
 
 - **Verification:** `npm test` — **61/61 pass** (59 before; +2 regression tests: endless oversized body rejected with `FEED_RESPONSE_TOO_LARGE` while streaming instead of timing out, and evicted events not recounted across three replayed polls of the same 600-event tick); `npm run typecheck`, `npm run lint`, `npm run build` clean.
+
+## Codex-review fixes, cycle 5 (2026-11-04, PR #22)
+
+The cycle-4 re-review (on head `db0066523`) carried exactly one finding; verified against the code (and reproduced with a failing test) before fixing:
+
+- **Refresh the selected profile and history during live updates (P2, `src/components/App.tsx`):** `getProfile`/`getHistory` were called only by `selectDescender`, while `refreshData` — run on every connected-status update — refreshed only the directory, parties, feed, and highlights. The open Profile panel therefore froze at selection-time values (health, stratum, objective, history) even as the directory and Live Ledger showed newer state, until the user reselected the same Descender. `refreshData` now also refetches the currently selected Descender's profile and history (tracked via a `selectedIdRef` mirror), applying the response only after revalidating the connection generation, the selection token, the still-current selection id, and the response's own `descender_id` — the same guards `selectDescender` uses. A failed background profile fetch keeps the last shown profile and retries on the next refresh instead of blocking the directory update. The renderer fake gained mutable profile/history stores and a status-push helper to simulate the world moving on after selection.
+
+- **Verification:** `npm test` — **63/63 pass** (61 before; +2 renderer tests: the selected profile and history follow a subsequent connected-status refresh, and a refresh profile response that resolves after the selection changed is dropped). Negative check: with only the `App.tsx` fix stashed, exactly the refresh regression test fails and the other 10 renderer tests pass (the guard test passes both ways — pre-fix code performs no refresh fetch at all — and pins the new path's guard). `npm run typecheck`, `npm run lint`, `npm run build` clean; smoke `SMOKE_OK`.
