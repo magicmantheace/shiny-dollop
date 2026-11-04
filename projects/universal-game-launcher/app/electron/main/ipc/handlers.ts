@@ -233,7 +233,13 @@ async function runStoreScan(
     epicRecordScan(deps.db, 'epic', 'ok', gamesFound, result.warnings.length > 0 ? note : null);
     return { scannedAt: result.scannedAt, gamesFound };
   } finally {
-    activeScans.delete(source);
+    // Remove only OUR controller. After a cancellation, this scan may
+    // finish late; if a replacement scan has since registered under the
+    // same source, deleting unconditionally would unregister the
+    // replacement — leaving it uncancellable and unblocking overlaps.
+    if (activeScans.get(source) === controller) {
+      activeScans.delete(source);
+    }
   }
 }
 
@@ -401,7 +407,12 @@ export function createHandlers(): HandlerDef[] {
           controller.cancel();
           cancelledAny = true;
         }
-        activeScans.clear();
+        // Deliberately do NOT clear the map: the scanners observe their
+        // token asynchronously and only finish (removing their own
+        // entry) at their next cancellation point. Clearing here would
+        // let a replacement scan start while the cancelled one is still
+        // winding down — and the old scan's cleanup would then delete
+        // the replacement's entry, making it uncancellable.
         return Promise.resolve({ cancelled: cancelledAny });
       },
     },

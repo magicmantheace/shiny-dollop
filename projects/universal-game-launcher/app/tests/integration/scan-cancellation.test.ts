@@ -183,6 +183,38 @@ describe('IPC-level scan behavior', () => {
     await third;
   });
 
+  it('a cancelled scan stays registered until it finishes; the next scan is cancellable too', async () => {
+    openContext(manyManifestTree(300));
+    const first = ctx!.call(IpcChannels.sourcesScan, { source: 'steam' });
+    await sleep(40);
+    const cancel = await ctx!.call(IpcChannels.sourcesCancelScan, {});
+    expect((cancel.data as { cancelled: boolean }).cancelled).toBe(true);
+
+    // The cancelled scan only observes its token at its next yield
+    // point, so it is still winding down: a replacement must NOT start
+    // yet. (Previously the registry was cleared at cancel time, the
+    // replacement started immediately, and the old scan's finally then
+    // deleted the replacement's entry — leaving it uncancellable.)
+    const tooSoon = await ctx!.call(IpcChannels.sourcesScan, { source: 'steam' });
+    expect(tooSoon.ok).toBe(false);
+    if (!tooSoon.ok) {
+      expect(tooSoon.error.code).toBe('SCAN_IN_PROGRESS');
+    }
+    const firstResult = await first;
+    expect(firstResult.ok).toBe(true);
+
+    // Once the old scan has fully finished, a new scan starts — and
+    // cancelling IT works, proving its registry entry survived.
+    const second = ctx!.call(IpcChannels.sourcesScan, { source: 'steam' });
+    await sleep(40);
+    const cancel2 = await ctx!.call(IpcChannels.sourcesCancelScan, {});
+    expect(cancel2.ok).toBe(true);
+    expect((cancel2.data as { cancelled: boolean }).cancelled).toBe(true);
+    const secondResult = await second;
+    expect(secondResult.ok).toBe(true);
+    expect((secondResult.data as { gamesFound: number }).gamesFound).toBe(0);
+  });
+
   it('a completed scan still merges results idempotently after the refactor', async () => {
     const os = manyManifestTree(4);
     os.delayMs = 0;
