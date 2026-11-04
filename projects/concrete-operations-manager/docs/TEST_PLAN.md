@@ -29,3 +29,26 @@ Run this workflow against a real application build using disposable data; record
 For each run, capture: commit SHA, command, execution environment, passed/failed/skipped counts, observed UI/CLI behavior, defect links, and next action. Keep logs free of credentials and personal data.
 
 No release or owner-acceptance claim before end-to-end demonstration.
+
+## Execution record — 2026-10-23 (MVP)
+
+**Environment:** Linux VM (x86_64), Node v24.22.1, Electron 45. Branch
+`concrete-operations-manager/mvp` @ `9bbc6af` (foundation `104c0bd`).
+
+| Command | Result |
+|---|---|
+| `npm run typecheck` (renderer, main, preload) | clean |
+| `npx eslint .` | clean |
+| `npx vitest run` | **57/57 pass**, 11 files, 0 failed |
+| `npm run build` | production bundle built |
+| `npm run smoke` | PASS — real Electron window opened (SMOKE_OK, xvfb) |
+| acceptance walkthrough vs compiled `dist/` (`/tmp/com-accept-walkthrough.cjs`) | **17/17 checks pass** |
+
+Coverage of the plan: price/tax incl. rounding & exemptions ✅; small-load
+threshold & alternate customer rates ✅; quote revisions never rewrite issued
+invoices ✅; inventory receipt/consumption consistency ✅; export/import recovery
+with synthetic customers ✅; malformed/missing/oversized input rejection ✅;
+persistence & restart ✅; schema versioning ✅; deterministic calculations ✅.
+
+Platform gaps (marked implemented but unverified): NSIS installer build,
+portable zip on Windows, real Windows file dialogs/hardware, install/uninstall.
