@@ -136,6 +136,34 @@ describe('launch integration (stubbed spawn)', () => {
     rmSync(path.dirname(exe), { recursive: true, force: true });
   });
 
+  it('live session duration comes from the monotonic clock, not the wall clock', async () => {
+    // The wall clock barely advances during this test (~ms), while the
+    // injected monotonic clock advances 90 s. A wall-clock implementation
+    // would record ~0 ms; the recorded duration must be the monotonic one
+    // so system-clock jumps during play cannot inflate or erase playtime.
+    let mono = 1_000_000;
+    ctx = createTestContext({ monotonicNow: () => mono });
+    const exe = makeExe();
+    const game = await addGame(exe);
+    const launched = (await ctx.call('games.launch', { id: game.id })) as {
+      ok: boolean;
+      data: { sessionId: string };
+    };
+    expect(launched.ok).toBe(true);
+    mono += 90_000;
+    ctx.stub.closeLast(0);
+    const sessions = (await ctx.call('sessions.list', { gameId: game.id })) as {
+      ok: boolean;
+      data: Session[];
+    };
+    expect(sessions.data).toHaveLength(1);
+    expect(sessions.data[0]!.state).toBe('completed');
+    expect(sessions.data[0]!.durationMs).toBe(90_000);
+    const games = (await ctx.call('library.list', {})) as { ok: boolean; data: Game[] };
+    expect(games.data[0]!.totalPlayMs).toBe(90_000);
+    rmSync(path.dirname(exe), { recursive: true, force: true });
+  });
+
   it('tracking disabled: launches without recording a session', async () => {
     ctx = createTestContext();
     const exe = makeExe();

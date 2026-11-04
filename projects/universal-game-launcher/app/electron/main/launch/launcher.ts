@@ -44,6 +44,14 @@ interface RunningEntry {
   child: ChildProcess;
   sessionId: string | null;
   gameId: string;
+  /**
+   * Monotonic timestamp (performance.now scale) taken when the process
+   * was spawned. Live-session durations are measured against this, never
+   * against wall-clock timestamps: a system clock jump during play must
+   * not inflate or collapse recorded playtime. Reset when the session is
+   * re-keyed (history cleared) so the fresh row measures from that moment.
+   */
+  monoStartedAt: number;
 }
 
 export interface LauncherDeps {
@@ -54,6 +62,8 @@ export interface LauncherDeps {
   openExternalImpl?: OpenExternalFn;
   /** Override for tests. Defaults to the real Battle.net OS layer. */
   battleNetOs?: BattleNetOs;
+  /** Override for tests. Defaults to performance.now. */
+  monotonicNow?: () => number;
   /** Called after a successful spawn (e.g. to minimize the window). */
   onLaunched?: (gameId: string) => void;
 }
@@ -86,6 +96,7 @@ export class GameLauncher {
   private readonly spawnImpl: SpawnFn;
   private readonly openExternalImpl: OpenExternalFn | undefined;
   private readonly battleNetOs: BattleNetOs;
+  private readonly monotonicNow: () => number;
   private readonly onLaunched: ((gameId: string) => void) | undefined;
   private readonly running = new Map<string, RunningEntry>();
   private checkpointTimer: NodeJS.Timeout | null = null;
@@ -95,7 +106,13 @@ export class GameLauncher {
     this.spawnImpl = deps.spawnImpl ?? spawn;
     this.openExternalImpl = deps.openExternalImpl;
     this.battleNetOs = deps.battleNetOs ?? new RealBattleNetOs();
+    this.monotonicNow = deps.monotonicNow ?? (() => performance.now());
     this.onLaunched = deps.onLaunched;
+  }
+
+  /** Elapsed milliseconds on the monotonic clock since the entry spawned. */
+  private elapsedMs(entry: RunningEntry): number {
+    return Math.max(0, Math.round(this.monotonicNow() - entry.monoStartedAt));
   }
 
   /** Number of currently tracked child processes (useful for tests/diagnostics). */
@@ -151,6 +168,7 @@ export class GameLauncher {
       : null;
 
     let child: ChildProcess;
+    const monoStartedAt = this.monotonicNow();
     try {
       child = this.spawnImpl(exePath, args, {
         cwd,
@@ -171,7 +189,7 @@ export class GameLauncher {
       );
     }
 
-    const entry: RunningEntry = { child, sessionId, gameId };
+    const entry: RunningEntry = { child, sessionId, gameId, monoStartedAt };
     const finalize = (state: 'completed' | 'interrupted', notes: string | null = null) => {
       if (!this.running.has(gameId)) return; // already finalized
       this.running.delete(gameId);
@@ -180,7 +198,13 @@ export class GameLauncher {
       const sid = entry.sessionId;
       if (sid) {
         const endedAt = new Date().toISOString();
-        const session = finalizeSession(this.db, sid, { state, notes });
+        // Duration comes from the monotonic clock, not the wall-clock
+        // span: UTC timestamps are kept for display only.
+        const session = finalizeSession(this.db, sid, {
+          state,
+          notes,
+          durationMs: this.elapsedMs(entry),
+        });
         recordPlaytime(this.db, gameId, endedAt, session.durationMs ?? 0);
       }
     };
@@ -396,6 +420,8 @@ export class GameLauncher {
     for (const entry of this.running.values()) {
       if (!entry.sessionId) continue; // tracking disabled; nothing recorded
       entry.sessionId = createSession(this.db, entry.gameId, 'observed').id;
+      // The fresh session measures from the clear moment, on both clocks.
+      entry.monoStartedAt = this.monotonicNow();
     }
   }
 

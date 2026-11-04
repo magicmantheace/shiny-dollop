@@ -77,6 +77,8 @@ export function createTestContext(overrides?: {
   epicOs?: EpicOs;
   battleNetOs?: BattleNetOs;
   openExternalImpl?: OpenExternalFn;
+  /** Controllable monotonic clock for the launcher (finding: durations). */
+  monotonicNow?: () => number;
 }): TestContext {
   const db = openDatabase(':memory:');
   const stub = makeSpawnStub();
@@ -85,6 +87,7 @@ export function createTestContext(overrides?: {
     spawnImpl: stub.spawnImpl,
     openExternalImpl: overrides?.openExternalImpl,
     battleNetOs: overrides?.battleNetOs,
+    monotonicNow: overrides?.monotonicNow,
   });
   const handlers = createHandlers();
   const deps: HandlerDeps = {
