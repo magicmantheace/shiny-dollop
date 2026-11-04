@@ -37,6 +37,15 @@ The single finding from the third Codex review of PR #4 was verified real and fi
 
 New regression tests (4, `tests/unit/long-path.test.ts`): long UNC → `\\?\UNC\` form (cross-checked against `path.win32.toNamespacedPath()`); long drive-letter → `\\?\` form; short UNC/drive paths unprefixed; already-namespaced long paths untouched. Full suite: **88/88 pass** (62 backend + 26 UI; baseline 84), typecheck and lint clean (2026-10-24, Linux VM).
 
+## Codex-review fixes, cycle 4 (2026-11-04, on `game-save-manager/initial-development`)
+
+Both findings from the fourth Codex review of PR #4 (head `d0a4870a8`) were verified real against the code and fixed by Nyx directly (the @codex cloud route is unavailable):
+
+1. **Filesystem aliases defeated the backup-overlap guard:** containment was compared on `path.resolve()` spellings, so a save folder registered through a symlink to a directory containing the backup storage passed the guard while physically overlapping it — each new backup would swallow every previous one (1, 3, 7, 15, … files). Containment now compares canonical paths: `canonicalizeForCompare` resolves the deepest existing ancestor through `realpath` and appends any not-yet-existing tail (unresolvable paths fall back to the resolved textual form); win32 comparisons strip a `\\?\` prefix realpath may add and case-fold, as before.
+2. **Restore silently dropped the destroyed legacy `manifest.json` entry:** for a legacy backup whose user-owned `manifest.json` was overwritten by old in-tree metadata, restore skipped the entry in both the copy loop and the post-restore verification, returning `mismatches: []` — a fully-verified reading for an unrecoverable file, while `verifyBackup` correctly reported it missing. The copy protection is unchanged (metadata bytes are never restored), but the verification loop now reports the entry in `mismatches` with the same `missing` report `verifyBackup` gives.
+
+Tests: 3 new symlink-overlap regression tests (aliased save folder, aliased backup root, missing tail under a symlinked ancestor) and the existing legacy-manifest test now asserts the restore mismatch report. Negative check: with the engine fix reverted, exactly those 4 tests fail. Full suite: **91/91 pass** (14 files; baseline 88), typecheck and lint clean (2026-11-04, Linux VM). Awaiting Nyx verification before push; merge stays gated on a clean Codex re-review.
+
 ## First milestone
 
 Register a manual save folder, produce a dated, checksum-verified snapshot, list backups, and restore one with a safety copy and explicit confirmation. **Done.**
