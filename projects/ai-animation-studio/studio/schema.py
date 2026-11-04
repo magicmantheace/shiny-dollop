@@ -89,6 +89,8 @@ def validate_scene(scene: dict) -> dict:
             if "duration_ms" in e:
                 d = e.get("duration_ms")
                 need(type(d) is int and 100 <= d <= 60_000, prefix + ": invalid duration")
+            if "interrupt" in e:
+                need(type(e.get("interrupt")) is bool, prefix + ": invalid interrupt")
         elif op == "emote":
             need(isinstance(e.get("emotion"), str) and e.get("emotion") in EMOTIONS, prefix + ": unsupported emotion")
             q = e.get("intensity")

@@ -122,6 +122,10 @@
             "minimum": 100,
             "maximum": 60000
           },
+          "interrupt": {
+            "type": "boolean",
+            "description": "Speak only (F3.3 dialogue runtime): when true, the speak starts at its at_ms even inside the actor's current speak hold and truncates that hold there. Absent means false."
+          },
           "line": {
             "type": "string",
             "minLength": 1,

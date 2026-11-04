@@ -194,11 +194,27 @@ func _speak_hold_ms(e: Dictionary) -> int:
     var derived := int(ceil(float(line.length()) * 1000.0 / speak_chars_per_second))
     return clampi(derived, speak_min_hold_ms, speak_max_hold_ms)
 
+func _dispatch_priority(op: String) -> int:
+    # Dispatch order at equal effective times (F3.3, docs/SCENE_PROTOCOL.md):
+    # camera first, then spawn, then the rest in scene index order. Mirrors
+    # DISPATCH_PRIORITY in studio/timing.py.
+    if op == "camera":
+        return 0
+    if op == "spawn":
+        return 1
+    return 2
+
 func _build_schedule() -> void:
-    # Precompute effective dispatch times (ADR-009): a speak hold gates only
-    # later events for the SAME actor; camera is never gated; spawn starts a
-    # fresh actor and is never gated. Dispatch order is (effective, index).
+    # Precompute effective dispatch times (ADR-009 + F3.3 dialogue runtime):
+    # a speak hold gates only later events for the SAME actor; camera is
+    # never gated; spawn starts a fresh actor and is never gated. A speak
+    # with "interrupt": true is never gated either — it starts at its at_ms
+    # and truncates the actor's current hold window when that window
+    # contains the start. This mirrors compute_schedule in studio/timing.py,
+    # the single source of truth for the window computation. Dispatch order
+    # is (effective, priority, index) — see _dispatch_priority.
     var hold_until: Dictionary = {}
+    var open_speak: Dictionary = {}
     schedule.clear()
     for i in events.size():
         var e: Dictionary = events[i]
@@ -206,16 +222,38 @@ func _build_schedule() -> void:
         var op := String(e.get("op", ""))
         var eff := at
         var hold := 0
+        e["_interrupted"] = false
+        e["_interrupts"] = -1
+        e["_window_start_ms"] = -1
+        e["_window_end_ms"] = -1
         if op != "camera":
             var id := String(e.get("actor_id", ""))
-            if op != "spawn" and hold_until.has(id):
-                eff = maxi(at, int(hold_until[id]))
+            var flag: Variant = e.get("interrupt", false)
+            var interrupting: bool = op == "speak" and typeof(flag) == TYPE_BOOL and bool(flag)
+            if op != "spawn":
+                if interrupting:
+                    if open_speak.has(id):
+                        var current: Dictionary = open_speak[id]
+                        var w_start := int(current["_window_start_ms"])
+                        var w_end := int(current["_window_end_ms"])
+                        if w_start <= at and at < w_end:
+                            current["_window_end_ms"] = at
+                            current["_interrupted"] = true
+                            e["_interrupts"] = int(current["_index"])
+                            print("Speak interrupted for ", id, " at ", at, " ms")
+                            print("Truncated speak hold for ", id, ": window ", w_start, "..", w_end, " -> ", w_start, "..", at, " ms")
+                elif hold_until.has(id):
+                    eff = maxi(at, int(hold_until[id]))
             if op == "speak":
                 hold = _speak_hold_ms(e)
                 hold_until[id] = eff + hold
+                e["_window_start_ms"] = eff
+                e["_window_end_ms"] = eff + hold
+                open_speak[id] = e
         e["_index"] = i
         e["_effective_ms"] = eff
         e["_hold_ms"] = hold
+        e["_priority"] = _dispatch_priority(op)
         if eff != at:
             print("Delayed ", op, " for ", String(e.get("actor_id", "")), ": at_ms ", at, " -> ", eff, " (speak hold)")
         schedule.append(e)
@@ -224,6 +262,10 @@ func _build_schedule() -> void:
         var eb := int(b["_effective_ms"])
         if ea != eb:
             return ea < eb
+        var pa := int(a["_priority"])
+        var pb := int(b["_priority"])
+        if pa != pb:
+            return pa < pb
         return int(a["_index"]) < int(b["_index"])
     )
 
@@ -240,7 +282,10 @@ func _dispatch(e: Dictionary) -> void:
         return
     var id := String(e.get("actor_id", ""))
     if not actors.has(id):
-        push_warning("Unknown actor: " + id)
+        # Queue safety (F3.3): unreachable after load validation; skip the
+        # event with a named error and keep the queue moving — no crash,
+        # no stall. This is a thin dispatch guard, not a second validator.
+        push_error("Dispatch skipped: event " + str(int(e.get("_index", -1))) + " references unknown actor '" + id + "' (op " + op + ")")
         return
     var state: Dictionary = actors[id]
     if op == "spawn":
@@ -256,7 +301,7 @@ func _dispatch(e: Dictionary) -> void:
         if state["anim"] != null:
             _play_tag(id, "idle")
     elif state["node"] == null:
-        push_warning("Actor not spawned: " + id)
+        push_error("Dispatch skipped: actor '" + id + "' has no spawned node (event " + str(int(e.get("_index", -1))) + ", op " + op + ")")
     elif op == "move":
         var duration: float = max(0.1, float(e.get("duration_ms", 1000)) / 1000.0)
         var tween := create_tween()
@@ -267,14 +312,20 @@ func _dispatch(e: Dictionary) -> void:
     elif op == "speak":
         print(id, ": ", e.get("line", ""))
         var hold_ms := int(e.get("_hold_ms", 0))
+        var occupied_ms := hold_ms
+        var w_end := int(e.get("_window_end_ms", -1))
+        if w_end >= 0:
+            # The actor occupies the window, not the authored hold: an
+            # interrupted speak hands the floor over at the truncation.
+            occupied_ms = w_end - int(e.get("_effective_ms", 0))
         var explicit := false
         if e.has("duration_ms"):
             var d: Variant = _as_int(e["duration_ms"])
             explicit = d != null and int(d) >= 100 and int(d) <= 60000
-        print("Speak hold for ", id, ": ", hold_ms, " ms (", "explicit" if explicit else "derived", ")")
+        print("Speak hold for ", id, ": ", occupied_ms, " ms (", "explicit" if explicit else "derived", ")")
         if state["anim"] != null:
             _play_tag(id, "speak")
-            get_tree().create_timer(maxf(0.05, float(hold_ms) / 1000.0)).timeout.connect(_end_speak.bind(id))
+            get_tree().create_timer(maxf(0.05, float(occupied_ms) / 1000.0)).timeout.connect(_end_speak.bind(id))
     elif op == "emote":
         print(id, " emotion: ", e.get("emotion", "neutral"), " intensity: ", e.get("intensity", 0.0))
 
