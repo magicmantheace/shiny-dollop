@@ -1,0 +1,19 @@
+# Catalog downloads / raw inputs (regenerable; never commit)
+pipeline/cache/
+
+# Built game tables (regenerable pipeline outputs)
+data/*.bin
+data/extended/
+
+# Rust
+pipeline/target/
+**/target/
+
+# Godot
+viewer/.godot/
+viewer/exports/
+*.import
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
