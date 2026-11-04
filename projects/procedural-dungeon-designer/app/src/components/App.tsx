@@ -245,6 +245,9 @@ export function App() {
       });
       applySaved(saved);
       setError(null);
+      // The Saved dungeons summary shows budget usage; refresh it so
+      // the row does not keep displaying the pre-edit budget.
+      await refreshSavedList();
     } catch (err) {
       reportError(err);
     }
@@ -256,6 +259,7 @@ export function App() {
       const saved = await api().placementsRemove(savedId, placementId);
       applySaved(saved);
       setError(null);
+      await refreshSavedList();
     } catch (err) {
       reportError(err);
     }

@@ -7,6 +7,7 @@ import {
   MAX_PLACEMENTS_PER_ROOM,
   addPlacement,
   movePlacement,
+  nextPlacementId,
   removePlacement,
 } from '../../shared/placements.js';
 import { getTheme } from '../../shared/themes.js';
@@ -314,5 +315,74 @@ describe('placements (per-room placement limit)', () => {
     const imported = await service.importJson(exported);
     expect(imported.map).toEqual(stored.map);
     db.close();
+  });
+});
+
+describe('placements (placement id generation)', () => {
+  // Regression: nextPlacementId converted imported suffixes to Number,
+  // so an existing id at/above 2^53 (e.g. p9007199254740992 from an
+  // imported map — a legal id, only uniqueness is schema-checked)
+  // rounded back onto itself when incremented and the generated id
+  // duplicated the existing one; the duplicate was then persisted
+  // without revalidation and broke save/import and remove semantics.
+  function mapWithPlacementIds(ids: string[]): DungeonMap {
+    const row = '#'.repeat(12);
+    const map: DungeonMap = {
+      params: {
+        seed: 'ids',
+        gridWidth: 12,
+        gridHeight: 12,
+        roomCount: 3,
+        theme: 'sunken-crypt',
+        difficulty: 1,
+      },
+      gridWidth: 12,
+      gridHeight: 12,
+      tiles: Array.from({ length: 12 }, () => row),
+      rooms: [
+        {
+          id: 'room-1',
+          name: 'Id Vault',
+          x: 1,
+          y: 1,
+          w: 3,
+          h: 3,
+          cx: 2,
+          cy: 2,
+          isEntrance: true,
+          placements: ids.map((id) => ({
+            id,
+            kind: 'treasure' as const,
+            key: 'sunken-offering-bowl',
+            name: 'Sunken Offering Bowl',
+            cost: 2,
+          })),
+        },
+      ],
+      budgetLimit: 1_000_000,
+      budgetUsed: 0,
+    };
+    map.budgetUsed = computeBudgetUsed(map);
+    return map;
+  }
+
+  it('next id after p9007199254740992 is exact, not rounded back onto it', () => {
+    const map = mapWithPlacementIds(['p9007199254740992']);
+    expect(nextPlacementId(map)).toBe('p9007199254740993');
+  });
+
+  it('suffixes beyond double precision increment exactly', () => {
+    const map = mapWithPlacementIds(['p123456789012345678901234567890']);
+    expect(nextPlacementId(map)).toBe('p123456789012345678901234567891');
+  });
+
+  it('adding to a map holding p9007199254740992 generates a unique id', () => {
+    const map = mapWithPlacementIds(['p9007199254740992']);
+    const added = addPlacement(map, 'room-1', 'treasure', 'sunken-offering-bowl');
+    const ids = added.rooms.flatMap((r) => r.placements.map((p) => p.id));
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
+    expect(ids).toContain('p9007199254740992');
+    expect(ids).toContain('p9007199254740993');
   });
 });

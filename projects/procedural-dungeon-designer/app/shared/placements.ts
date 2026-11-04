@@ -112,16 +112,24 @@ export function findPlacement(
   );
 }
 
-/** Next deterministic placement id: max existing numeric suffix + 1. */
+/** Next deterministic placement id: max existing numeric suffix + 1.
+ *  Suffixes are compared as BigInt, never Number: an imported or saved
+ *  id may legally carry a suffix at or beyond 2^53 (the schema checks
+ *  only that ids are unique, not their size), where Number arithmetic
+ *  rounds — 9007199254740992 + 1 === 9007199254740992 — and would
+ *  regenerate an id that already exists in the map. */
 export function nextPlacementId(map: DungeonMap): string {
-  let max = 0;
+  let max = 0n;
   for (const room of map.rooms) {
     for (const p of room.placements) {
-      const m = /^p(\d+)$/.exec(p.id);
-      if (m) max = Math.max(max, Number(m[1]));
+      const suffixText = /^p(\d+)$/.exec(p.id)?.[1];
+      if (suffixText !== undefined) {
+        const suffix = BigInt(suffixText);
+        if (suffix > max) max = suffix;
+      }
     }
   }
-  return `p${max + 1}`;
+  return `p${max + 1n}`;
 }
 
 export function addPlacement(

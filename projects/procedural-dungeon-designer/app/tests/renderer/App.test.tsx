@@ -42,6 +42,13 @@ function budgetUsedFromMeter(): number {
   return Number(match[1]);
 }
 
+function budgetUsedFromSavedList(): number {
+  const text = screen.getByTestId('saved-dungeons').textContent ?? '';
+  const match = /budget: (\d+) \/ (\d+)/.exec(text);
+  if (!match) throw new Error(`Saved budget text not found in: ${text}`);
+  return Number(match[1]);
+}
+
 describe('App', () => {
   it('renders the generator form and loads themes', async () => {
     installFakePdd();
@@ -147,6 +154,49 @@ describe('App', () => {
     });
     await waitFor(() => {
       expect(budgetUsedFromMeter()).toBe(usedBefore);
+    });
+  });
+
+  it('saved list summary refreshes after placement add and remove', async () => {
+    installFakePdd();
+    const user = userEvent.setup();
+    render(<App />);
+    await awaitThemesLoaded();
+    await generateSmallDungeon(user);
+
+    await user.click(screen.getByRole('button', { name: 'Save dungeon' }));
+    const editor = screen.getByTestId('placement-editor');
+    expect(
+      await within(editor).findByText(/Editing saved dungeon/),
+    ).toBeInTheDocument();
+
+    const usedBefore = budgetUsedFromSavedList();
+    expect(usedBefore).toBe(budgetUsedFromMeter());
+
+    await user.selectOptions(
+      within(editor).getByLabelText('Placement kind'),
+      'treasure',
+    );
+    await user.selectOptions(
+      within(editor).getByLabelText('Placement entry'),
+      'sunken-offering-bowl',
+    );
+    await user.click(
+      within(editor).getByRole('button', { name: 'Add placement' }),
+    );
+    // The Saved dungeons row must show the new budget, not the stale one.
+    await waitFor(() => {
+      expect(budgetUsedFromSavedList()).toBe(usedBefore + 2);
+    });
+
+    const inspector = screen.getByTestId('inspector');
+    await user.click(
+      within(inspector).getByRole('button', {
+        name: 'Remove Sunken Offering Bowl',
+      }),
+    );
+    await waitFor(() => {
+      expect(budgetUsedFromSavedList()).toBe(usedBefore);
     });
   });
 
