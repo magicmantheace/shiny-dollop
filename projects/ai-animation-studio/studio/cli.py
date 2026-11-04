@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import shutil
 from pathlib import Path
 from . import gltf
@@ -14,6 +15,9 @@ from .promotion import DEFAULT_ASSET_ROOT, PromotionError, promote_asset, promot
 from .recipes import (RecipeError, assemble_character, edit_character,
                       require_character, unapproved_parts)
 from .schema import validate_scene, validate_asset, validate_character, validate_catalog, ValidationError
+from .timing import resolve_timing
+from .voice import (ExternalVoiceEngine, StubVoiceEngine, VoiceCache,
+                    VoiceError, subprocess_runner)
 
 EXAMPLES = ROOT / "examples"
 
@@ -60,7 +64,7 @@ def enrich_manifest(manifest: dict, lib: Library, asset_root: Path | None) -> di
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="AI Animation Studio foundation")
-    parser.add_argument("command", choices=["validate", "init-db", "seed", "register", "promote", "assemble", "show-character", "edit-character", "export-character", "list-assets", "demo", "sockets", "plan"])
+    parser.add_argument("command", choices=["validate", "init-db", "seed", "register", "promote", "assemble", "show-character", "edit-character", "export-character", "list-assets", "demo", "sockets", "plan", "speak"])
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--catalog", default="quaternius_f1_catalog.json",
                         help="catalog fixture in examples/ (register/promote commands)")
@@ -103,6 +107,28 @@ def main(argv: list[str] | None = None) -> int:
                         help="output file (demo: scene runtime JSON, default godot/data/scene_runtime.json; "
                              "export-character: recipe spec file, required; "
                              "plan: enveloped scene JSON, required)")
+    parser.add_argument("--line", default=None,
+                        help="speak: line of dialogue to synthesize")
+    parser.add_argument("--voice", default="narrator",
+                        help="speak: voice name passed to the engine and the "
+                             "cache key (default narrator)")
+    parser.add_argument("--engine", choices=["stub", "external"], default="stub",
+                        help="speak: voice engine (default stub — deterministic "
+                             "offline silence at the ADR-009 speak hold; external "
+                             "runs a local CLI engine, never the network)")
+    parser.add_argument("--voice-cmd", default=None,
+                        help="speak (external engine): command template; {voice} "
+                             "is substituted, the line is fed on stdin and the "
+                             "WAV is read from stdout "
+                             "(default: the espeak-ng shape; no engine ships "
+                             "with the studio)")
+    parser.add_argument("--voice-cache", type=Path, default=None,
+                        help="speak: voice clip cache directory (default: "
+                             "AI_ANIMATION_VOICE_CACHE or a system-temp cache; "
+                             "always outside git)")
+    parser.add_argument("--rate", type=float, default=None,
+                        help="speak: speak rate in chars/sec — the ADR-009 "
+                             "timing variable (default 15)")
     args = parser.parse_args(argv)
     asset_root = args.asset_root or DEFAULT_ASSET_ROOT
     if args.command == "validate":
@@ -176,6 +202,32 @@ def main(argv: list[str] | None = None) -> int:
         if result.rejections:
             summary += f"; rejections: {' | '.join(result.rejections)}"
         print(summary)
+        return 0
+    if args.command == "speak":
+        if args.line is None:
+            parser.error("speak requires --line <dialogue line>")
+        try:
+            timing = resolve_timing(
+                {"speak_chars_per_second": args.rate}
+                if args.rate is not None else None)
+            if args.engine == "external":
+                template = (shlex.split(args.voice_cmd)
+                            if args.voice_cmd else None)
+                engine = ExternalVoiceEngine(subprocess_runner,
+                                             argv_template=template)
+            else:
+                engine = StubVoiceEngine()
+            record = VoiceCache(args.voice_cache).get_or_synthesize(
+                args.line, args.voice, engine=engine, timing=timing)
+        except (VoiceError, ValueError) as err:
+            parser.error(str(err))
+        origin = "cache" if record.from_cache else "synthesized"
+        print(f"Voice clip key {record.key} ({origin})")
+        print(f"  engine {record.engine}, voice {record.voice}, "
+              f"duration {record.duration_ms} ms, {record.wav_len} bytes, "
+              f"sha256 {record.wav_sha256}")
+        print(f"  phonemes: {len(record.phonemes)} word segments "
+              f"(ESTIMATED alignment) -> {record.wav_path}")
         return 0
     lib = Library(args.db)
     try:
