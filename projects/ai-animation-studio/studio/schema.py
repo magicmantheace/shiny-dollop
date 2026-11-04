@@ -16,6 +16,8 @@ VERSION = "1.0.0"
 OPS = frozenset({"spawn", "move", "speak", "emote", "camera"})
 EMOTIONS = frozenset({"neutral", "happy", "sad", "angry", "nervous", "surprised", "tired", "scared"})
 SHOTS = frozenset({"wide", "two_shot", "close_left", "close_right"})
+# Asset license identifiers (F2.1); mirrored in schemas/asset.schema.json.
+LICENSES = frozenset({"CC0-1.0", "MIT", "proprietary", "unknown"})
 ID = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 
@@ -107,6 +109,11 @@ def validate_asset(asset: dict) -> dict:
     need(isinstance(tags, list) and len(tags) <= 32 and all(isinstance(t, str) and ID.fullmatch(t) for t in tags), "invalid tags")
     rig = asset.get("rig_id")
     need(rig is None or (isinstance(rig, str) and ID.fullmatch(rig)), "invalid rig")
+    if "source" in asset:
+        source = asset.get("source")
+        need(isinstance(source, str) and 1 <= len(source) <= 256, "invalid source")
+    if "license" in asset:
+        need(isinstance(asset.get("license"), str) and asset.get("license") in LICENSES, "invalid license")
     need(isinstance(asset.get("metadata"), dict), "invalid metadata")
     return asset
 

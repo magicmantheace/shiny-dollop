@@ -30,12 +30,15 @@ class Library:
     def put_asset(self, asset: dict) -> None:
         validate_asset(asset)
         self.db.execute(
-            "INSERT INTO assets(asset_id, kind, uri, rig_id, status, tags_json, metadata_json) "
-            "VALUES(?,?,?,?,?,?,?) ON CONFLICT(asset_id) DO UPDATE SET "
+            "INSERT INTO assets(asset_id, kind, uri, rig_id, status, tags_json, metadata_json, "
+            "source, license) "
+            "VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(asset_id) DO UPDATE SET "
             "kind=excluded.kind,uri=excluded.uri,rig_id=excluded.rig_id,status=excluded.status,"
-            "tags_json=excluded.tags_json,metadata_json=excluded.metadata_json",
+            "tags_json=excluded.tags_json,metadata_json=excluded.metadata_json,"
+            "source=excluded.source,license=excluded.license",
             (asset["asset_id"], asset["kind"], asset["uri"], asset.get("rig_id"), asset["status"],
-             json.dumps(asset["tags"]), json.dumps(asset["metadata"])),
+             json.dumps(asset["tags"]), json.dumps(asset["metadata"]),
+             asset.get("source"), asset.get("license")),
         )
         self.db.commit()
 
@@ -67,7 +70,7 @@ class Library:
 
     def get_asset(self, asset_id: str) -> dict | None:
         row = self.db.execute(
-            "SELECT asset_id,kind,uri,rig_id,status,tags_json,metadata_json "
+            "SELECT asset_id,kind,uri,rig_id,status,tags_json,metadata_json,source,license "
             "FROM assets WHERE asset_id=?", (asset_id,)).fetchone()
         if row is None:
             return None

@@ -8,6 +8,8 @@
       "uri": "assets/characters/Superhero_Male_FullBody.gltf",
       "rig_id": "studio_humanoid_v1",
       "status": "candidate",
+      "source": "Quaternius Universal Base Characters [Standard]",
+      "license": "CC0-1.0",
       "tags": [
         "character",
         "male",
@@ -33,6 +35,8 @@
       "uri": "assets/characters/Superhero_Female_FullBody.gltf",
       "rig_id": "studio_humanoid_v1",
       "status": "candidate",
+      "source": "Quaternius Universal Base Characters [Standard]",
+      "license": "CC0-1.0",
       "tags": [
         "character",
         "female",
@@ -57,6 +61,8 @@
       "uri": "assets/hair/Hair_SimpleParted.gltf",
       "rig_id": "studio_humanoid_v1",
       "status": "candidate",
+      "source": "Quaternius Universal Base Characters [Standard]",
+      "license": "CC0-1.0",
       "tags": [
         "hair",
         "head_bone_rigged"
@@ -78,6 +84,8 @@
       "uri": "assets/hair/Hair_Long.gltf",
       "rig_id": "studio_humanoid_v1",
       "status": "candidate",
+      "source": "Quaternius Universal Base Characters [Standard]",
+      "license": "CC0-1.0",
       "tags": [
         "hair",
         "head_bone_rigged"
@@ -99,6 +107,8 @@
       "uri": "assets/animations/UAL1_Standard.glb",
       "rig_id": "studio_humanoid_v1",
       "status": "candidate",
+      "source": "Quaternius UAL1 [Standard]",
+      "license": "CC0-1.0",
       "tags": [
         "animation",
         "humanoid",
@@ -167,6 +177,8 @@
       "uri": "assets/animations/UAL1_Standard_RM.glb",
       "rig_id": "studio_humanoid_v1",
       "status": "candidate",
+      "source": "Quaternius UAL1 [Standard]",
+      "license": "CC0-1.0",
       "tags": [
         "animation",
         "humanoid",
@@ -235,6 +247,8 @@
       "uri": "assets/animations/UAL2_Standard.glb",
       "rig_id": "studio_humanoid_v1",
       "status": "candidate",
+      "source": "Quaternius UAL2 [Standard]",
+      "license": "CC0-1.0",
       "tags": [
         "animation",
         "humanoid",
@@ -303,6 +317,8 @@
       "uri": "assets/animations/UAL2_Standard_RM.glb",
       "rig_id": "studio_humanoid_v1",
       "status": "candidate",
+      "source": "Quaternius UAL2 [Standard]",
+      "license": "CC0-1.0",
       "tags": [
         "animation",
         "humanoid",
@@ -371,6 +387,8 @@
       "uri": "assets/environment/kenney_furniture/",
       "rig_id": null,
       "status": "candidate",
+      "source": "Kenney Furniture Kit",
+      "license": "CC0-1.0",
       "tags": [
         "room",
         "furniture",

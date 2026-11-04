@@ -46,6 +46,19 @@
         "retired"
       ]
     },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "license": {
+      "enum": [
+        "CC0-1.0",
+        "MIT",
+        "proprietary",
+        "unknown"
+      ]
+    },
     "tags": {
       "type": "array",
       "maxItems": 32,
