@@ -12,6 +12,7 @@ import type {
   ActionKind,
   ActionOutcome,
   ChangedEvent,
+  CompanionState,
   DrabbitApi,
   IpcResult,
   PetSummary,
@@ -26,6 +27,9 @@ const CH = {
   openPanel: 'pet:openPanel',
   changed: 'pet:changed',
   roamState: 'pet:roamState',
+  companionGetState: 'companion:getState',
+  companionSetEnabled: 'companion:setEnabled',
+  companionRegenerateToken: 'companion:regenerateToken',
 } as const;
 
 async function invoke<T>(channel: string, payload?: unknown): Promise<T> {
@@ -60,6 +64,10 @@ const api: DrabbitApi = {
       ipcRenderer.removeListener(CH.roamState, listener);
     };
   },
+  getCompanionState: () => invoke<CompanionState>(CH.companionGetState),
+  setCompanionEnabled: (enabled: boolean) =>
+    invoke<CompanionState>(CH.companionSetEnabled, { enabled }),
+  regenerateCompanionToken: () => invoke<CompanionState>(CH.companionRegenerateToken),
 };
 
 contextBridge.exposeInMainWorld('drabbit', api);

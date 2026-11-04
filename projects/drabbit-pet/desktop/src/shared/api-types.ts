@@ -75,6 +75,35 @@ export type IpcResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: { code: string; message: string } };
 
+/** Live counters from the companion server (main-process memory only). */
+export interface CompanionServerStats {
+  /** ms epoch when the server started listening. */
+  startedAt: number;
+  /** All /v1/* requests seen, authenticated or not. */
+  requestCount: number;
+  authFailures: number;
+  /** Remote address of the most recent /v1/* request, if any. */
+  lastClient: string | null;
+}
+
+export type CompanionStatus = 'off' | 'on' | 'error';
+
+/** Everything the care panel's Companion section renders. */
+export interface CompanionState {
+  /** The persisted master switch in companion.json. */
+  enabled: boolean;
+  status: CompanionStatus;
+  host: string;
+  port: number;
+  /** `http://<host>:<port>` while running; null otherwise. */
+  url: string | null;
+  /** Bind/start failure detail while status is 'error'. */
+  error: string | null;
+  /** The pairing token ('' until first generated). The panel masks it. */
+  token: string;
+  stats: CompanionServerStats | null;
+}
+
 /** The typed API the preload exposes as `window.drabbit`. */
 export interface DrabbitApi {
   getSummary(): Promise<PetSummary>;
@@ -86,4 +115,8 @@ export interface DrabbitApi {
   onChanged(cb: (e: ChangedEvent) => void): () => void;
   /** Subscribe to roaming (hop) state flips. Returns an unsubscribe fn. */
   onRoamState(cb: (s: RoamState) => void): () => void;
+  // Companion server (P3)
+  getCompanionState(): Promise<CompanionState>;
+  setCompanionEnabled(enabled: boolean): Promise<CompanionState>;
+  regenerateCompanionToken(): Promise<CompanionState>;
 }

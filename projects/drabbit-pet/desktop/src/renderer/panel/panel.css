@@ -145,6 +145,90 @@ body {
   margin: 4px 0 0;
 }
 
+.companion {
+  background: #2c2440;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.companion h2 {
+  font-size: 15px;
+  margin: 0;
+}
+.companion-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+}
+.companion-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #8f81b5;
+  flex: none;
+}
+.companion-dot.on {
+  background: #6fce62;
+}
+.companion-dot.error {
+  background: #e05252;
+}
+.companion-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.companion-token {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.companion-token-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.companion-token-label {
+  color: #bdb0d9;
+  flex: none;
+}
+.companion-token-value {
+  background: #171221;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.companion-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.companion-buttons button {
+  background: #4a3672;
+  color: #f2ecff;
+  border: 1px solid #6a529c;
+  border-radius: 8px;
+  padding: 6px 11px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.companion-buttons button:hover:not(:disabled) {
+  background: #59418a;
+}
+.companion-buttons button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .feed h2 {
   font-size: 15px;
   margin: 0 0 6px;

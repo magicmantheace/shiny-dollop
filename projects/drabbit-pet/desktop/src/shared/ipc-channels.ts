@@ -13,3 +13,13 @@ export const PetChannels = {
   /** main → renderer push: { hopping } when roaming state flips */
   roamState: 'pet:roamState',
 } as const;
+
+/** Companion server channels (P3). */
+export const CompanionChannels = {
+  /** invoke → IpcResult<CompanionState> */
+  getState: 'companion:getState',
+  /** invoke { enabled } → IpcResult<CompanionState> */
+  setEnabled: 'companion:setEnabled',
+  /** invoke → IpcResult<CompanionState> */
+  regenerateToken: 'companion:regenerateToken',
+} as const;

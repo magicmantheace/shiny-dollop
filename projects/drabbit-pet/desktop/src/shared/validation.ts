@@ -36,3 +36,14 @@ export function parseActionPayload(payload: unknown): ValidationResult<{ kind: A
   }
   return { ok: true, value: { kind: payload.kind } };
 }
+
+/** Validate a `companion:setEnabled` payload: `{ enabled: boolean }`. */
+export function parseSetEnabledPayload(payload: unknown): ValidationResult<{ enabled: boolean }> {
+  if (!isRecord(payload) || typeof payload.enabled !== 'boolean') {
+    return {
+      ok: false,
+      error: { code: 'bad_payload', message: 'Payload must be an object with a boolean "enabled".' },
+    };
+  }
+  return { ok: true, value: { enabled: payload.enabled } };
+}

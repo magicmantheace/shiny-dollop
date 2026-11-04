@@ -18,6 +18,9 @@ import { SaveStore } from './save-store.js';
 import { TickService } from './tick-service.js';
 import { RoamPlanner, type RoamBounds } from './roaming.js';
 import { registerPetIpc } from './ipc.js';
+import { registerCompanionIpc } from './companion-ipc.js';
+import { CompanionConfigStore } from './server/companion-config.js';
+import { CompanionService } from './server/companion-service.js';
 
 const isDev = !!process.env.DRABBIT_DEV_SERVER;
 const isSmoke = !!process.env.DRABBIT_SMOKE;
@@ -35,6 +38,7 @@ let petWindow: BrowserWindow | null = null;
 let panelWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let service: PetService | null = null;
+let companion: CompanionService | null = null;
 let tickService: TickService | null = null;
 let roamTimer: ReturnType<typeof setInterval> | null = null;
 let roamingPaused = false;
@@ -247,6 +251,19 @@ function startApp(): void {
     openPanel: () => togglePanel(),
   });
 
+  // Companion server (P3): a second front door to the same pet. It
+  // runs only if the persisted switch in companion.json is on —
+  // default off, so a fresh install (and the smoke profile) never
+  // opens a port.
+  companion = new CompanionService({
+    store: new CompanionConfigStore(app.getPath('userData'), { log }),
+    service,
+    clock: systemClock,
+    log,
+  });
+  registerCompanionIpc({ companion });
+  void companion.init();
+
   createPetWindow();
   createPanelWindow();
   createTray();
@@ -291,6 +308,7 @@ if (!gotLock) {
     isQuitting = true;
     tickService?.stop();
     if (roamTimer) clearInterval(roamTimer);
+    void companion?.shutdown();
     service?.shutdown();
   });
 }
