@@ -23,6 +23,7 @@ python -m studio sockets
 - `tests/test_f1_catalog.py`: F1 catalog/manifest consistency (clip inventories, URI cross-references), per-asset version + hash presence, stage-piece validity, register idempotency, and demo export attaching library approval state.
 - `tests/test_promotion.py`: promotion gates on synthetic GLB fixtures — success records gates + pending human gates; hash mismatch, missing file, and clip-inventory mismatch are refused; character promotion requires an approved body asset.
 - `tests/test_timing.py`: speak-hold derivation (millisecond precision), min/max clamps, explicit-duration override and bounds, rate/clamps as variables, `timing` config resolution and rejection, scene validation of the `timing` object and speak `duration_ms`, and default parity across `studio/timing.py`, `schemas/scene.schema.json` and the exported settings in `godot/main.gd`.
+- `tests/test_migrations.py`: migration framework (fresh DB migrates to latest, v1-shaped DB built from `database/schema.sql` upgrades with rows intact, init twice is a no-op, newer-than-code DB raises) and source/license records (validator bounds, JSON Schema license-enum parity, library round-trip with/without the fields, invalid license rejected by validator and library, F1 catalog fixture coverage).
 
 ## F1 completion evidence (2026-11-03, Linux VM — not owner hardware)
 
