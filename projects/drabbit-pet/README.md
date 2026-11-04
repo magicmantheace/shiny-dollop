@@ -1,8 +1,8 @@
 # Drabbit Pet
 
 **Status:** IN DEVELOPMENT — P0 (foundation + design), P1 (pet-brain
-core), and P2 (Electron desktop pet) built on a review branch; the
-companion server (P3) and Android app (P4) are still planned. See
+core), P2 (Electron desktop pet), and P3 (companion server) built on
+a review branch; the Android app (P4) is still planned. See
 [the handoff](docs/MUSE_HANDOFF.md) for the honest
 verified/unverified split.
 

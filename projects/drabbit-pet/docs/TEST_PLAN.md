@@ -36,13 +36,22 @@ surface; the GUI itself is not faked in tests.
 | Build + smoke | `npm run build` clean (core tsc, main/preload tsc strict, Vite production build of both windows). `npm run smoke`: the real Electron binary launches under Xvfb, creates a fresh save in a throwaway userData, and loads both windows (`SMOKE_OK`). |
 | **Owner-PC only** | Transparent window behaviour, perching/roaming feel on a real desktop, tray, always-on-top over real windows, multi-monitor, high-DPI — never claimed from VM runs. |
 
-## P3 — companion server (planned)
+## P3 — companion server (`desktop/tests/companion-*.test.ts`)
 
-- Headless integration tests (server + core, no Electron): missing /
-  wrong token → 401; status shape matches DESIGN; a remote feed
-  action mutates the one shared pet state; events endpoint honours
-  `since`.
-- **Owner-side only:** real LAN/Tailscale reachability from the phone.
+Automated: vitest suites driving the **real HTTP server** on
+ephemeral ports against a temp-dir PetService — no Electron, no
+mocked transport. Run with `npm --prefix desktop test` (21 tests).
+
+| Area | Coverage |
+| --- | --- |
+| Config store | Missing file → defaults (disabled, nothing written); save/load round-trip with no `.tmp` left; corrupt JSON and invalid shape → renamed-aside recovery with bytes preserved; injected in-memory fs works; token generator is long, url-safe, unique. |
+| Auth | No token and wrong token → 401 `unauthorized`; stats count requests + auth failures and record last client + start time. Token comparison is constant-time. |
+| Status | 200 with `{ ok, serverNow, pet }`; pet key set matches PetSummary exactly; values match the service's state. |
+| Remote actions | A remote feed-meal mutates the one shared state (the IPC door sees the same pet) and its response equals the IPC dispatcher's outcome on a twin pet (summary deep-equal, same event kinds); wrong-stage medicine → 409 `not_sick`, byte-identical error to IPC; `new-egg` → 403 `desktop_only` even when the pet is dead, and starts nothing. |
+| Events cursor | Bootstrap (no `since`) returns no events + the current cursor; after an action, `since=<cursor>` returns exactly the new events and a larger cursor; polling at the cursor returns empty; `since=0` returns the whole retained log incl. `hatched`; malformed `since` → 400 `bad_query`. |
+| Protocol edges | Unknown routes inside and outside `/v1` → 404 `not_found`; non-JSON body → 400 `bad_json`; unknown kind → 400 `bad_payload`; body over 64 KB → 413 `too_large`; stop frees the port for a new server. |
+| Service lifecycle | Starts disabled with no token; first enable mints the token and serves the real pet; regeneration makes the old token 401 immediately while the new one works; disable stops the server and frees the port; a port conflict lands in a panel-visible `error` state (EADDRINUSE) with the switch left on, and a retry after freeing the port succeeds. |
+| **Owner-side only** | Real LAN/Tailscale reachability from a phone; Windows Firewall behaviour on first enable. Never claimed from VM runs. |
 
 ## P4 — Android app (planned)
 

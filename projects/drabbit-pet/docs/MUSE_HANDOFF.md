@@ -8,7 +8,7 @@ two apps — an Electron desktop pet that owns the pet and its save, and
 a Kotlin Android companion that connects to it. Both are driven by one
 framework-free TypeScript pet brain in `core/`. Full design:
 [PET_DESIGN.md](PET_DESIGN.md) (simulation spec) and
-[DESIGN.md](DESIGN.md) (architecture + companion protocol draft).
+[DESIGN.md](DESIGN.md) (architecture + companion protocol as built).
 
 ## Current state (2026-11-04)
 
@@ -25,8 +25,9 @@ forms (radiant/content/scruffy), messes, sickness, death + lineage,
 canonical JSON persistence with schema versioning and a migration
 stub, append-only capped event log, headless demo.
 
-**P2 — desktop pet (`desktop/`): DONE on this branch** (pending Nyx
-verification, then the owner's first visual check on Windows).
+**P2 — desktop pet (`desktop/`): DONE on this branch** (verified by
+Nyx firsthand per the queue log; the owner's first visual check on
+Windows is still open).
 Electron 45 + React 19 + TS strict + Vite, consuming `drabbit-core`
 via a `file:` dependency — **the core is unchanged**; no core edits
 were needed. Main process owns the one pet state: save in Electron
@@ -49,8 +50,37 @@ flavour, idle/hop/sleep/eat/play/sick/egg/ghost animation states) —
 **v1 placeholder art**, structured for later sprite replacement.
 Packaging (electron-builder) is future work, out of P2 scope.
 
-**P3–P4: NOT STARTED.** Companion server and Android app are
-placeholders plus the protocol draft in DESIGN.md.
+**P3 — companion server (`desktop/src/main/server/`): DONE on this
+branch** (pending Nyx verification). Node stdlib `http` only, no new
+dependencies, core unchanged. The server is a second front door to
+the same pet: it is constructed over the PetService with the **one
+shared action dispatcher** (`action-dispatch.ts`, now used by IPC
+too — the P2 IPC handler was refactored onto it), so remote and
+panel actions have identical validation and error codes. Settings
+live in `userData/companion.json` (own store, SaveStore pattern;
+defaults `enabled: false`, `0.0.0.0:8931`, token `''`). The token
+(32 random bytes, base64url) is minted lazily on first enable and
+compared in constant time; regenerating restarts the server so the
+old token dies immediately. Config changes apply via stop+start
+under a CompanionService; a bind failure lands in a panel-visible
+`error` state, never a crash. The pet now tracks an event **cursor**
+(a produced-event count maintained by PetService) that backs
+`GET /v1/events?since=`; two deliberate divergences from the P0
+protocol draft — the `{ kind }` action payload (shared with IPC
+instead of core action names + variant) and the count cursor
+(instead of timestamp filtering) — are recorded with reasons in
+DESIGN.md, as is the one behaviour the draft implied but didn't
+spell out: `new-egg` is recognized and refused remotely with
+**403 `desktop_only`**. The care panel gained a Companion section
+(status/address, enable toggle, masked token with Show/Copy/
+Regenerate, live request/auth-failure stats) over three new typed
+IPC channels (`companion:getState` / `setEnabled` /
+`regenerateToken`). Default-disabled means the smoke profile never
+opens a port.
+
+**P4: NOT STARTED.** Android app is a placeholder; the protocol it
+will consume is now implemented and documented as-built in
+DESIGN.md.
 
 ## Verified (this Linux VM, Node v24.22.1, 2026-11-04)
 
@@ -84,6 +114,17 @@ placeholders plus the protocol draft in DESIGN.md.
   45 binary launched headlessly under Xvfb against a throwaway
   userData, created and persisted a fresh save (canonical JSON with
   the egg's `created` event), and loaded both production windows.
+- P3 (same VM, after the companion build): `npm --prefix desktop run
+  typecheck` → clean; `npm --prefix desktop test` → **50 tests, 50
+  passed** (the 29 above + 21 companion: config store incl.
+  corrupt-recovery and injected-fs, real-HTTP auth/status/action
+  parity with IPC, `desktop_only` refusal, events-cursor polling
+  semantics, protocol edges 400/404/413, token regeneration
+  invalidating the old token, stop-frees-port, bind-failure error
+  state); `npm --prefix core test` → still **46/46** (core
+  untouched); `npm --prefix desktop run build` → clean;
+  `npm --prefix desktop run smoke` → **SMOKE_OK** (companion
+  disabled by default in the smoke profile).
 
 ## NOT verified (no evidence exists yet)
 
@@ -93,8 +134,10 @@ placeholders plus the protocol draft in DESIGN.md.
   creation on Linux — not the Windows desktop experience. That is
   the owner's first-visual-check checkpoint.
 - Anything Android: no app, no SDK check, no device run (P4).
-- The companion protocol is a **draft on paper only** — no server has
-  run (P3).
+- The companion server **from a real phone**: pairing, LAN and
+  Tailscale reachability, and Windows Firewall behaviour on first
+  enable are owner-device evidence; the VM tests prove the protocol
+  over loopback only.
 - Sprite assets: the pet is inline SVG (v1 placeholder art);
   `assets/` holds only the generated app/tray icon.
 
@@ -110,8 +153,10 @@ placeholders plus the protocol draft in DESIGN.md.
 
 ## Next step
 
-P3 — the companion server inside the desktop app (protocol drafted
-in DESIGN.md). Owner-side checkpoint, still open: first visual check
-of the P2 pet on the owner's Windows PC (look, roaming feel,
-transparency) — do it whenever convenient; it doesn't block P3's
+P4 — the Android companion app (Kotlin + Compose) against the
+as-built protocol in DESIGN.md, polling with the event cursor
+(bootstrap, then `since = <last cursor>`). Owner-side checkpoints,
+still open: first visual check of the P2 pet on the owner's Windows
+PC (look, roaming feel, transparency), and a first real pairing of
+the companion server from the owner's phone — neither blocks P4's
 headless work.
