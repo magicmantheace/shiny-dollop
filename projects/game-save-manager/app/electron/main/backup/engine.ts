@@ -240,15 +240,57 @@ function uniqueBackupDir(backupsRoot: string, gameId: number, createdAt: string)
   return dir;
 }
 
-/** Case-folded resolved path for comparisons (win32 paths are case-insensitive). */
-function normalizeForCompare(p: string): string {
-  const resolved = path.resolve(p);
-  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+/**
+ * Final spelling cleanup for an already-resolved/canonical path: on win32,
+ * realpath may return the `\\?\` namespaced form — strip it so both sides of
+ * a comparison use the same spelling — then case-fold (win32 paths are
+ * case-insensitive).
+ */
+function normalizeResolvedForCompare(resolved: string): string {
+  if (process.platform !== 'win32') return resolved;
+  const stripped = resolved.startsWith('\\\\?\\UNC\\')
+    ? `\\\\${resolved.slice('\\\\?\\UNC\\'.length)}`
+    : resolved.startsWith('\\\\?\\')
+      ? resolved.slice('\\\\?\\'.length)
+      : resolved;
+  return stripped.toLowerCase();
+}
+
+/**
+ * Canonical form of a path for containment comparisons.
+ *
+ * A plain `path.resolve()` is NOT enough: it leaves symlinks/aliases in
+ * place, so a registered save folder reached through a symlink can look
+ * textually disjoint from the backup storage while physically containing
+ * it — the overlap guard then accepts roots whose backups swallow every
+ * previous backup. Resolve the deepest existing ancestor through
+ * `realpath` and append any not-yet-existing tail unchanged; when a path
+ * cannot be canonicalized at all (unreadable ancestor, symlink loop),
+ * fall back to the resolved textual form rather than failing the check.
+ */
+export function canonicalizeForCompare(p: string): string {
+  let current = path.resolve(p);
+  const tail: string[] = [];
+  for (;;) {
+    try {
+      const real = fs.realpathSync(withLongPathPrefix(current));
+      const joined = tail.length > 0 ? path.join(real, ...tail) : real;
+      return normalizeResolvedForCompare(joined);
+    } catch (err) {
+      if (errnoCode(err) !== 'ENOENT') {
+        return normalizeResolvedForCompare(path.resolve(p));
+      }
+      const parent = path.dirname(current);
+      if (parent === current) return normalizeResolvedForCompare(path.resolve(p));
+      tail.unshift(path.basename(current));
+      current = parent;
+    }
+  }
 }
 
 /** True when `child` equals `parent` or lives anywhere underneath it. */
 export function isPathWithin(parent: string, child: string): boolean {
-  const rel = path.relative(normalizeForCompare(parent), normalizeForCompare(child));
+  const rel = path.relative(canonicalizeForCompare(parent), canonicalizeForCompare(child));
   return rel === '' || (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel));
 }
 
@@ -721,8 +763,14 @@ export async function restoreBackup(
   const mismatches: CorruptFile[] = [];
   for (const f of detail.files) {
     // Same legacy carve-out as the copy loop: the in-tree manifest.json is
-    // old metadata, not user data — it was deliberately not restored.
-    if (legacyInTreeManifest && f.relPath === 'manifest.json') continue;
+    // old metadata, not user data — it was deliberately not restored. But
+    // the entry itself is UNRECOVERABLE (the old metadata write destroyed
+    // the user's bytes), so report it exactly as verifyBackup does rather
+    // than silently treating the restore as fully verified.
+    if (legacyInTreeManifest && f.relPath === 'manifest.json') {
+      mismatches.push({ relPath: f.relPath, issue: 'missing', expected: f.sha256 });
+      continue;
+    }
     const dest = path.join(game.savePath, ...f.relPath.split('/'));
     try {
       const stat = await fs.promises.stat(withLongPathPrefix(dest));

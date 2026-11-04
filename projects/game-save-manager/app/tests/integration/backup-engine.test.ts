@@ -465,9 +465,14 @@ describe('manifest.json collision (regression)', () => {
     );
 
     // …and restore recovers slot1.sav without writing metadata bytes over the
-    // user's current manifest.json.
+    // user's current manifest.json. The destroyed entry is NOT silently
+    // treated as handled: restore reports it in mismatches (same 'missing'
+    // report verifyBackup gives), so the result cannot read as fully
+    // verified while a listed file is unrecoverable.
     const restored = await restoreBackup(deps, backup.id, { confirmed: true });
-    expect(restored.mismatches).toEqual([]);
+    expect(restored.mismatches).toEqual([
+      expect.objectContaining({ relPath: 'manifest.json', issue: 'missing' }),
+    ]);
     expect(restored.restoredFiles).toBe(1);
     expect(readFile(f.saveDir, 'slot1.sav')).toBe('legacy save v1');
     expect(readFile(f.saveDir, 'manifest.json')).toBe('{"player":"adam","slot":7}');
@@ -702,6 +707,87 @@ describe('backup destination overlap (regression)', () => {
     );
     expect(countBackups(f.db, game.id)).toBe(0);
     expect(fs.existsSync(path.join(f.backupsRoot, String(game.id)))).toBe(false);
+  });
+
+  it('rejects a save folder reached through a symlink that hides the backup destination', async () => {
+    const f = makeFixture();
+    // Physical layout: <dir>/real contains the backup storage. The game is
+    // registered through a symlink alias, so textually the save folder and
+    // the backup storage look disjoint — the guard must compare canonical
+    // (realpath) locations, not spellings, or every backup would swallow
+    // all previous ones (1, 3, 7, 15, … files).
+    const realDir = path.join(f.dir, 'real');
+    const realBackupsRoot = path.join(realDir, 'backups');
+    fs.mkdirSync(realBackupsRoot, { recursive: true });
+    writeFile(realDir, 'slot1.sav', 'save data v1');
+    const aliasDir = path.join(f.dir, 'alias');
+    try {
+      fs.symlinkSync(realDir, aliasDir, 'dir');
+    } catch {
+      return; // Windows without symlink privilege — same guard as other symlink tests.
+    }
+    const game = addGame(f.db, { name: 'Alias Game', savePath: aliasDir, source: 'manual' });
+
+    const err = await createBackup({ db: f.db, backupsRoot: realBackupsRoot }, game.id).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(BackupError);
+    expect((err as BackupError).code).toBe(
+      BackupErrorCodes.BACKUP_DESTINATION_OVERLAPS_SAVE_DIR,
+    );
+    expect(countBackups(f.db, game.id)).toBe(0);
+  });
+
+  it('rejects a backup destination reached through a symlink into the save folder', async () => {
+    const f = setup();
+    const game = addTestGame(f);
+    // The backup storage physically lives at <saveDir>/backups, but is
+    // spelled through an alias of the fixture root, so the textual paths
+    // look unrelated. Canonical comparison must still see the containment.
+    const aliasRoot = path.join(f.dir, 'alias-root');
+    try {
+      fs.symlinkSync(f.dir, aliasRoot, 'dir');
+    } catch {
+      return; // Windows without symlink privilege.
+    }
+    const aliasedBackupsRoot = path.join(aliasRoot, 'saves', 'backups');
+
+    const err = await createBackup({ db: f.db, backupsRoot: aliasedBackupsRoot }, game.id).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(BackupError);
+    expect((err as BackupError).code).toBe(
+      BackupErrorCodes.BACKUP_DESTINATION_OVERLAPS_SAVE_DIR,
+    );
+    expect(countBackups(f.db, game.id)).toBe(0);
+  });
+
+  it('rejects overlap when the save tail does not exist yet under a symlinked ancestor', async () => {
+    const f = makeFixture();
+    // Neither <real>/saves nor the backup root below it exists yet; the
+    // registered save path reaches <real>/saves through a symlink. The
+    // guard must canonicalize the existing ancestor and append the missing
+    // tail before comparing.
+    const realDir = path.join(f.dir, 'real');
+    fs.mkdirSync(realDir, { recursive: true });
+    const aliasDir = path.join(f.dir, 'alias');
+    try {
+      fs.symlinkSync(realDir, aliasDir, 'dir');
+    } catch {
+      return; // Windows without symlink privilege.
+    }
+    const futureSavePath = path.join(aliasDir, 'saves');
+    const futureBackupsRoot = path.join(realDir, 'saves', 'backups');
+    const game = addGame(f.db, { name: 'Future Game', savePath: futureSavePath, source: 'manual' });
+
+    const err = await createBackup({ db: f.db, backupsRoot: futureBackupsRoot }, game.id).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(BackupError);
+    expect((err as BackupError).code).toBe(
+      BackupErrorCodes.BACKUP_DESTINATION_OVERLAPS_SAVE_DIR,
+    );
+    expect(countBackups(f.db, game.id)).toBe(0);
   });
 });
 
