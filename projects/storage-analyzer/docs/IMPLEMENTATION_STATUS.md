@@ -132,3 +132,10 @@ Choose a directory, view ranked file/folder sizes and verified duplicate groups,
 - Full gates independently re-verified by coordinator on the final pushed tree: 77/77 tests, typecheck, lint, build, smoke (`SMOKE_OK`).
 - Commit(s) on `storage-analyzer/mvp`; PR left unmerged for owner review.
 - Do not infer end-to-end success from the green renderer suite alone.
+
+## Sandboxed-preload fix (2026-11-04, branch `storage-analyzer/sandboxed-preload-fix`)
+
+- **Defect:** `electron/main/index.ts` runs the preload with `sandbox: true`; a sandboxed preload may only require `electron`/builtins. The plain-tsc `build:preload` preserved `preload/index.ts`'s `require("../../shared/ipc-channels")`, so the preload threw "module not found" before `contextBridge.exposeInMainWorld` ran — `window.storageAnalyzer` never existed in a real window and the UI booted dead. Same defect proven live on `projects/universal-game-launcher` during the 2026-11-04 Windows validation; this app was flagged by the follow-up source sweep.
+- **Fix:** the preload is now bundled with Vite (`app/vite.preload.config.ts`, mirroring finance-simulator; `build:preload` → `vite build --config vite.preload.config.ts`), `electron` external, emitted at `dist/electron/preload/index.js` — the path main already loads. Sandbox setting, main and preload sources unchanged.
+- **Verified (Linux VM, 2026-11-04):** `npm ci` clean; `npm test` 93/93 (11 files); `npm run build` clean (typecheck + main + bundled preload + renderer); the emitted `dist/electron/preload/index.js` audited — its only `require` is `"electron"` (shared channel constants inlined).
+- **Unverified:** real Windows window launch of the packaged app — belongs with the batch's owner-PC pass.
