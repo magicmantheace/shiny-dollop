@@ -54,11 +54,22 @@ export class PetService {
   private envelope: SaveEnvelope;
   /** How the save was obtained at startup (for logs / recovery notes). */
   readonly loadOutcome: LoadOutcome | 'injected';
+  /**
+   * Total events produced in the current pet-line's log since this
+   * process started counting (anchored at the loaded log's length at
+   * startup). This is the companion protocol's event cursor: the
+   * event at log index `i` has sequence `eventTotal - log.length + i`.
+   * Every mutation flows through tick()/doAction() below, and the
+   * core reports exactly the events each call produced, so the count
+   * is exact. It is per-process by design — see getEventsSince.
+   */
+  private eventTotal: number;
 
   constructor(private readonly deps: PetServiceDeps) {
     if (deps.initialEnvelope) {
       this.envelope = deps.initialEnvelope;
       this.loadOutcome = 'injected';
+      this.eventTotal = this.envelope.pet.events.length;
       return;
     }
     const now = deps.clock.now();
@@ -67,6 +78,7 @@ export class PetService {
     );
     this.envelope = result.envelope;
     this.loadOutcome = result.outcome;
+    this.eventTotal = this.envelope.pet.events.length;
     if (result.outcome !== 'loaded') {
       // Persist the fresh egg immediately so a crash before the first
       // tick doesn't lose the pet's birth time.
@@ -84,6 +96,38 @@ export class PetService {
   }
 
   /**
+   * Events after a companion-protocol cursor, plus the current cursor.
+   *
+   * The cursor is a count, not an index: it is the total number of
+   * events produced in this pet-line's log (see `eventTotal` above).
+   * `since` means "I have seen `since` events" — the response is the
+   * retained events with sequence >= `since`, in order, and `cursor`
+   * is the new total to poll with next time. Passing the returned
+   * cursor back yields only events produced in between. `since = 0`
+   * returns the whole retained window (the core caps the log at 500,
+   * so events older than the window are gone; if `since` predates
+   * the window the whole window is returned). A `since` at or beyond
+   * the current total — e.g. a stale cursor from before a desktop
+   * restart, which renumbers from the loaded log — returns no events
+   * and the current cursor, so pollers resync instead of erroring.
+   */
+  /** The current event cursor (see getEventsSince). */
+  getEventCursor(): number {
+    return this.eventTotal;
+  }
+
+  getEventsSince(since: number): { events: PetEvent[]; cursor: number } {
+    const log = this.envelope.pet.events;
+    const cursor = this.eventTotal;
+    if (!Number.isFinite(since) || since >= cursor) {
+      return { events: [], cursor };
+    }
+    const windowStart = cursor - log.length;
+    const fromIndex = Math.max(0, Math.floor(since) - windowStart);
+    return { events: log.slice(fromIndex), cursor };
+  }
+
+  /**
    * Advance the pet to clock-now and persist if anything changed.
    * Change detection is by canonical serialization: a tick that
    * doesn't cross a 1-minute sim step changes nothing and writes
@@ -97,6 +141,7 @@ export class PetService {
     const before = serialize(this.envelope);
     const { state, events } = advance(this.envelope.pet, this.deps.clock.now());
     this.envelope = { ...this.envelope, pet: state };
+    this.eventTotal += events.length;
     const changed = serialize(this.envelope) !== before;
     if (changed) {
       this.deps.store.save(this.envelope);
@@ -145,6 +190,7 @@ export class PetService {
       this.envelope = { ...this.envelope, pet: result.state };
       events = result.events;
     }
+    this.eventTotal += events.length;
 
     this.deps.store.save(this.envelope);
     const summary = this.getSummary();

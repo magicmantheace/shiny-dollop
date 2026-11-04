@@ -1,8 +1,8 @@
 import { ipcMain } from 'electron';
-import { PetError } from 'drabbit-core';
 import { PetChannels } from '../shared/ipc-channels.js';
 import { parseActionPayload } from '../shared/validation.js';
 import type { IpcResult } from '../shared/api-types.js';
+import { dispatchAction } from './action-dispatch.js';
 import type { PetService } from './pet-service.js';
 
 /**
@@ -33,12 +33,7 @@ export function registerPetIpc(deps: IpcDeps): void {
   ipcMain.handle(PetChannels.action, (_event, payload: unknown) => {
     const parsed = parseActionPayload(payload);
     if (!parsed.ok) return fail(parsed.error.code, parsed.error.message);
-    try {
-      return ok(deps.service.doAction(parsed.value.kind));
-    } catch (err) {
-      if (err instanceof PetError) return fail(err.code, err.message);
-      return fail('internal', err instanceof Error ? err.message : String(err));
-    }
+    return dispatchAction(deps.service, parsed.value.kind);
   });
 
   ipcMain.handle(PetChannels.openPanel, () => {
