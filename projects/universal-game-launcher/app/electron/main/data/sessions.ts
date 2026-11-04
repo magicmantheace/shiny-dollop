@@ -2,6 +2,7 @@
 import type { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 import type { Session, SessionState, TrackingMethod } from '../../../shared/types';
+import { recordPlaytime } from './games';
 
 interface SessionRow {
   id: string;
@@ -66,6 +67,14 @@ export interface FinalizeInput {
   endedAtIso?: string;
   state: SessionState;
   notes?: string | null;
+  /**
+   * Elapsed time measured by the caller with a monotonic clock. For an
+   * actively observed process this is authoritative: wall-clock timestamps
+   * can jump (manual correction, time sync) and would inflate or collapse
+   * the recorded playtime. When omitted, the duration is derived from the
+   * stored UTC timestamps (display / conservative crash-recovery path).
+   */
+  durationMs?: number;
 }
 
 export function finalizeSession(db: DatabaseSync, sessionId: string, input: FinalizeInput): Session {
@@ -74,7 +83,10 @@ export function finalizeSession(db: DatabaseSync, sessionId: string, input: Fina
     | undefined;
   if (!row) throw new Error(`Session ${sessionId} not found.`);
   const endedAt = input.endedAtIso ?? new Date().toISOString();
-  const durationMs = computeDurationMs(row.started_at, endedAt);
+  const durationMs =
+    input.durationMs !== undefined
+      ? Math.max(0, Math.round(input.durationMs))
+      : computeDurationMs(row.started_at, endedAt);
   db.prepare(
     `UPDATE sessions SET ended_at = ?, duration_ms = ?, state = ?, notes = COALESCE(?, notes) WHERE id = ?`,
   ).run(endedAt, durationMs, input.state, input.notes ?? null, sessionId);
@@ -90,18 +102,34 @@ export function finalizeSession(db: DatabaseSync, sessionId: string, input: Fina
  * Crash/restart recovery. Sessions left 'running' are finalized as
  * 'interrupted' at their last checkpoint — never at "now", so no phantom
  * playtime is invented between the last observation and the restart.
+ * Each recovered session also updates its game's aggregates
+ * (total_play_ms / last_played_at) in the same transaction, exactly as a
+ * normal process-exit finalize does — otherwise recovered playtime would
+ * show in Recent but never in the game's totals or playtime sorting.
  * Returns the number of sessions recovered.
  */
 export function recoverInterruptedSessions(db: DatabaseSync): number {
   const running = db.prepare(`SELECT * FROM sessions WHERE state = 'running'`).all() as unknown as SessionRow[];
-  for (const row of running) {
-    const end = row.last_checkpoint_at ?? row.started_at;
-    const durationMs = computeDurationMs(row.started_at, end);
-    db.prepare(
-      `UPDATE sessions SET ended_at = ?, duration_ms = ?, state = 'interrupted',
-       notes = COALESCE(notes, 'App closed or crashed during this session; ended conservatively at last checkpoint.')
-       WHERE id = ?`,
-    ).run(end, durationMs, row.id);
+  db.exec('BEGIN');
+  try {
+    for (const row of running) {
+      const end = row.last_checkpoint_at ?? row.started_at;
+      const durationMs = computeDurationMs(row.started_at, end);
+      db.prepare(
+        `UPDATE sessions SET ended_at = ?, duration_ms = ?, state = 'interrupted',
+         notes = COALESCE(notes, 'App closed or crashed during this session; ended conservatively at last checkpoint.')
+         WHERE id = ?`,
+      ).run(end, durationMs, row.id);
+      recordPlaytime(db, row.game_id, end, durationMs);
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    try {
+      db.exec('ROLLBACK');
+    } catch {
+      // ROLLBACK itself failed; surface the original error.
+    }
+    throw err;
   }
   return running.length;
 }
