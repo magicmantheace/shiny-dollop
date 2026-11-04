@@ -53,14 +53,23 @@ mocked transport. Run with `npm --prefix desktop test` (21 tests).
 | Service lifecycle | Starts disabled with no token; first enable mints the token and serves the real pet; regeneration makes the old token 401 immediately while the new one works; disable stops the server and frees the port; a port conflict lands in a panel-visible `error` state (EADDRINUSE) with the switch left on, and a retry after freeing the port succeeds. |
 | **Owner-side only** | Real LAN/Tailscale reachability from a phone; Windows Firewall behaviour on first enable. Never claimed from VM runs. |
 
-## P4 — Android app (planned)
+## P4 — Android app (`android/app/src/test/`)
 
-- Unit tests for client/state logic (status parsing, error states,
-  action request building).
-- APK build only if an Android SDK exists on the build machine;
-  otherwise recorded as owner-PC / Android Studio verification.
-- **Owner-device only:** pairing against the real desktop server,
-  UI behaviour on a physical phone.
+JVM unit tests (JUnit 4), run with `./gradlew :app:testDebugUnitTest`
+in Android Studio. The build VM has **no JDK/Android SDK**, so in
+this environment the suite ships as sources (status below) and the
+wire contract is covered by the fixture evidence instead.
+
+| Area | Coverage |
+| --- | --- |
+| Client parsing (fixtures) | Status parsing for baby / egg-ready / dead summaries captured from the real P3 server (exact field values, null adultForm/deathCause handling); hatch + feed-meal action outcomes (summary + events); request shape asserted (URL, `Authorization: Bearer`, `{kind}` body in the panel vocabulary). |
+| Error mapping | 401 → BadToken, 403 → DesktopOnly, 409 → StateError (server code + message verbatim), 404/500 → ServerError, transport IOException → Unreachable, non-JSON or pet-less 200 → MalformedResponse. Error fixtures are the server's real error bodies. |
+| Events cursor | Bootstrap (no `since` sent) → empty + cursor; delta returns only the new event and advances the cursor; caught-up returns empty with the same cursor; `since=0` returns the whole retained window. |
+| CareRules matrix | Awake baby: core actions enabled, wake/medicine disabled with the core's reasons; asleep: wake + clean enabled (core allows clean asleep), feed/play disabled; sick: medicine enabled, even asleep; energy below the core's play floor (10) disables play; egg: only hatch, gated on readyToHatch; dead: everything disabled; NEW_EGG never offered in any state. |
+| Settings | `ConnectionSettings.normalize` (scheme/whitespace stripping, port fallback to 8931, range checks), completeness, baseUrl building. (SettingsStore's SharedPreferences read/write is Android-runtime only.) |
+| Formatting | Age strings at minute/hour/day boundaries; stage labels. |
+| **Ran on this VM** | The **fixtures themselves**: 13 raw responses captured over real HTTP from the compiled P3 server (Node, temp-dir PetService, dummy token), plus an independent strict shape validation (exact key sets/types, cursor semantics, error codes) — all passing. The Kotlin suite has **not** been executed (no JDK); first run is owner-side in Android Studio. |
+| **Owner-device only** | Gradle build + the test run above, install on the Pixel 9a, pairing against the real desktop server, UI behaviour on a physical phone. |
 
 ## Honesty rule
 

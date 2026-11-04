@@ -61,12 +61,18 @@ never a crash. Bind address is configurable (localhost / LAN /
 Tailscale — the owner's network, the owner's choice); the token is
 the gate.
 
-### `android/` — Kotlin client (P4, planned)
+### `android/` — Kotlin client (P4, implemented)
 
 Kotlin + Jetpack Compose. A thin client: connection setup (address +
-token), a status screen (sprite, needs, stage, mood), and care buttons
-that POST actions to the companion server. It holds **no** simulation
-and **no** pet state of its own beyond what's on screen.
+token), a status screen (Canvas-drawn drabbit, needs, stage, mood),
+and care buttons that POST actions to the companion server. It holds
+**no** simulation and **no** pet state of its own beyond what's on
+screen. It polls status + cursor-delta events every 15 s while in
+the foreground, keeps last-known state under an offline banner when
+the PC is unreachable, and implements the protocol below exactly
+(its unit-test fixtures are raw responses captured from the real P3
+server). Built in Android Studio on the owner's PC — see
+`android/README.md`.
 
 ### `assets/` — art (P2, planned)
 

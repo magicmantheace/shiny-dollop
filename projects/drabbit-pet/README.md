@@ -1,9 +1,12 @@
 # Drabbit Pet
 
-**Status:** IN DEVELOPMENT — P0 (foundation + design), P1 (pet-brain
-core), P2 (Electron desktop pet), and P3 (companion server) built on
-a review branch; the Android app (P4) is still planned. See
-[the handoff](docs/MUSE_HANDOFF.md) for the honest
+**Status:** v1 SCOPE COMPLETE on a review branch — P0 (foundation +
+design), P1 (pet-brain core), P2 (Electron desktop pet), P3
+(companion server), and P4 (Android companion app) are all built.
+The Android app is source-complete but was written on a VM with no
+JDK/Android SDK: its first compile is the owner's Android Studio
+build, and the desktop pet's first visual check on Windows is still
+open. See [the handoff](docs/MUSE_HANDOFF.md) for the honest
 verified/unverified split.
 
 A Tamagotchi-style virtual pet whose creature is the **renfaire
@@ -49,6 +52,10 @@ npm --prefix desktop test   # desktop headless suites
 npm --prefix desktop run build   # build the Electron app into desktop/dist
 npm --prefix desktop run smoke   # headless launch smoke (Xvfb on Linux)
 ```
+
+The Android app builds in Android Studio on the owner's PC (no SDK
+on the build VM) — see [android/README.md](android/README.md) for the
+pairing walkthrough, build steps, and what was verified without one.
 
 ## Start point for agents
 

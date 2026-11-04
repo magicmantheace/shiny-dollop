@@ -78,9 +78,33 @@ IPC channels (`companion:getState` / `setEnabled` /
 `regenerateToken`). Default-disabled means the smoke profile never
 opens a port.
 
-**P4: NOT STARTED.** Android app is a placeholder; the protocol it
-will consume is now implemented and documented as-built in
-DESIGN.md.
+**P4 — Android companion (`android/`): BUILT as complete sources on
+this branch** (pending Nyx verification; the app itself has never
+been compiled — see the verification split below). Kotlin + Jetpack
+Compose, single `:app` module (`ca.wilkins.drabbit`, minSdk 26,
+SDK 35), zero third-party runtime dependencies beyond
+AndroidX/Compose BOM (networking is `HttpURLConnection`, JSON is
+`org.json`). Layers: `net/` (transport interface + production impl,
+`DrabbitClient` with the protocol's full error mapping — 401
+BadToken, 403 DesktopOnly, 409 StateError carrying the core's code +
+message, other HTTP ServerError, IOException Unreachable, bad body
+MalformedResponse), `model/` (wire model matching
+`desktop/src/shared/api-types.ts` field-for-field, org.json parsing,
+`CareRules` mirroring the core's action guards including
+clean-while-asleep and play's energy floor), `data/`
+(ConnectionSettings normalization + SharedPreferences store), `ui/`
+(PetViewModel — connect, 15 s foreground polling with the count
+cursor, actions, offline last-known-state; Connect + Pet screens;
+the drabbit drawn with Compose Canvas in the desktop's fur palette).
+`new-egg` is never offered (desktop-only by design). Cleartext HTTP
+is explicitly enabled in the manifest — the companion is a
+token-gated LAN/Tailscale service, documented in android/README.md.
+The Gradle wrapper ships as `gradle-wrapper.properties` only: the
+wrapper JAR/scripts could not be generated here (no JDK/Gradle);
+Android Studio creates it on first open.
+
+**The v1 slice queue (P0–P4) is now complete.** What remains is
+owner-side verification, listed below.
 
 ## Verified (this Linux VM, Node v24.22.1, 2026-11-04)
 
@@ -126,6 +150,22 @@ DESIGN.md.
   `npm --prefix desktop run smoke` → **SMOKE_OK** (companion
   disabled by default in the smoke profile).
 
+- P4 wire contract (same VM, 2026-11-04): with **no JDK/Android SDK
+  on this VM** (`java`/`sdkmanager`/`adb`/`kotlinc`/`gradle` all
+  absent — checked first, per the queue rules), the Gradle build
+  could not run. Instead the compiled P3 server (`desktop/dist`) was
+  booted headlessly in Node over a temp-dir PetService with a dummy
+  token and driven over real HTTP: **13 raw responses captured
+  verbatim** as the Android unit tests' fixtures (egg-ready + baby +
+  dead status, hatch + feed-meal actions, events bootstrap/delta/
+  caught-up/full-window, 401/403/409/404 error bodies). An
+  independent strict shape check (Python) passed on all 13: exact
+  PetSummary key set (16 fields, matching `summary.ts`), needs key
+  set, `{t, kind, detail}` events, count-cursor semantics
+  (bootstrap 4 → delta 5 → caught-up empty, `since=0` = 5 events),
+  and the four error codes. The Kotlin sources passed a
+  delimiter-balance smoke check only.
+
 ## NOT verified (no evidence exists yet)
 
 - The desktop pet **on Windows**: transparency, always-on-top over
@@ -133,12 +173,19 @@ DESIGN.md.
   high-DPI. The Xvfb smoke proves launch + window load + save
   creation on Linux — not the Windows desktop experience. That is
   the owner's first-visual-check checkpoint.
-- Anything Android: no app, no SDK check, no device run (P4).
+- The Android app **compiled or run, anywhere**: no JDK/Android SDK
+  exists on this VM, so there is no Gradle build, no green unit-test
+  run, and no device run yet. The JVM tests (client parsing + error
+  mapping over the captured fixtures, events cursor, CareRules
+  matrix, settings normalization, age formatting) ship as sources;
+  their first execution is `./gradlew :app:testDebugUnitTest` in the
+  owner's Android Studio. Any compile fallout is P4 follow-up.
 - The companion server **from a real phone**: pairing, LAN and
   Tailscale reachability, and Windows Firewall behaviour on first
   enable are owner-device evidence; the VM tests prove the protocol
   over loopback only.
-- Sprite assets: the pet is inline SVG (v1 placeholder art);
+- Sprite assets: the pet is inline SVG on desktop and Canvas shapes
+  on Android (v1 placeholder art in both);
   `assets/` holds only the generated app/tray icon.
 
 ## Working rules for the next agent
@@ -153,10 +200,13 @@ DESIGN.md.
 
 ## Next step
 
-P4 — the Android companion app (Kotlin + Compose) against the
-as-built protocol in DESIGN.md, polling with the event cursor
-(bootstrap, then `since = <last cursor>`). Owner-side checkpoints,
-still open: first visual check of the P2 pet on the owner's Windows
-PC (look, roaming feel, transparency), and a first real pairing of
-the companion server from the owner's phone — neither blocks P4's
-headless work.
+The v1 queue is complete; everything left is owner-side
+verification, in any order: (1) first visual check of the P2 pet on
+the owner's Windows PC (look, roaming feel, transparency);
+(2) open `android/` in Android Studio — accept the wrapper creation,
+run `./gradlew :app:testDebugUnitTest`, fix any compile fallout as
+P4 follow-up; (3) install on the Pixel 9a and do the first real
+pairing against the desktop companion over LAN or Tailscale.
+Future-work candidates already recorded: electron-builder packaging
+(P2), PNG sprite art replacing the v1 placeholder art, title-bar
+perching.
