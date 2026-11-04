@@ -92,6 +92,17 @@ rule, so save and import both reject duplicates that rooms.find /
 findRoom would otherwise resolve to the first room (mis-targeting
 inspection and placement moves). 62/62 tests, typecheck and lint green.
 
+Codex-review fix cycle 5 (2026-11-04): placement id generation no
+longer converts imported suffixes to Number — nextPlacementId compares
+suffixes as BigInt, so an existing id at or beyond 2^53 (e.g.
+p9007199254740992, a legal imported id) increments exactly to
+p9007199254740993 instead of rounding back onto itself and persisting
+a duplicate id that save/import validation and remove semantics would
+then trip over; and the renderer's add/remove placement handlers now
+refresh the Saved dungeons list, so its per-dungeon budget summary no
+longer shows the pre-edit budget until an unrelated save/import/delete
+or restart. 66/66 tests, typecheck, lint, build and smoke green.
+
 Codex-review fix cycle 2 (2026-10-24): IPC failures now travel as a
 structured { ok, value | error } envelope returned from the handlers and
 unwrapped in the preload, so named errors (e.g. BUDGET_EXCEEDED) survive
