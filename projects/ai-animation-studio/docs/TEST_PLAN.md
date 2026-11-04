@@ -22,6 +22,7 @@ python -m studio sockets
 - `tests/test_conformance.py`: JSON Schema <-> hand validator agreement (ops, emotions, shots, version) plus accept/reject fixture scenes.
 - `tests/test_f1_catalog.py`: F1 catalog/manifest consistency (clip inventories, URI cross-references), per-asset version + hash presence, stage-piece validity, register idempotency, and demo export attaching library approval state.
 - `tests/test_promotion.py`: promotion gates on synthetic GLB fixtures — success records gates + pending human gates; hash mismatch, missing file, and clip-inventory mismatch are refused; character promotion requires an approved body asset.
+- `tests/test_timing.py`: speak-hold derivation (millisecond precision), min/max clamps, explicit-duration override and bounds, rate/clamps as variables, `timing` config resolution and rejection, scene validation of the `timing` object and speak `duration_ms`, and default parity across `studio/timing.py`, `schemas/scene.schema.json` and the exported settings in `godot/main.gd`.
 
 ## F1 completion evidence (2026-11-03, Linux VM — not owner hardware)
 
@@ -30,6 +31,12 @@ python -m studio sockets
 - Tamper probes on the exported manifest (status flip, pin hash corruption, version bump, pin+record hash replacement): each produced its named rejection line + capsule fallback for the affected actor only.
 - Empty-store run: furniture skipped, capsule fallback, full dialogue sequence, zero errors. Fresh-clone run: byte-identical output to the F0 baseline.
 - Full suite: 32 tests, OK. No FPS or visual-correctness evidence exists yet; both remain owner-hardware items.
+
+## Speak timing evidence (2026-11-03, Linux VM — not owner hardware)
+
+- Full suite: 49 tests, OK (32 prior + 17 timing).
+- Godot 4.7.2 headless probe scenes (validated by `studio/schema.py`, run via the runtime-scene slot, logs asserted on the preview's printed logical times): per-actor delay — same-actor emote at 1000 ms inside a 3000 ms derived hold dispatched at 3100 ms while another actor's emote and a camera cut at 1000 ms fired on time; explicit duration — a 5000 ms explicit hold delayed a same-actor emote 2000 -> 5100 ms; clamps — a 2-char line held the 800 ms minimum (delay 5500 -> 6000 ms) and a 500-char line held the 15000 ms maximum (delay 10000 -> 21100 ms); scene variables — `timing` rate 30 halved a 45-char hold to 1500 ms (delay -> 1600 ms), scene min clamp 2000 raised a short line's hold to 2000 ms (delay -> 2100 ms).
+- Baseline demo and F1 approved-path runs under the new scheduler: no delays, derived holds 2934 ms (traveler) and 2000 ms (innkeeper), furniture/models/clips unchanged, zero errors. One defect found and fixed during the probes: Godot's JSON parser returns numbers as floats, so integral-value acceptance is shared by the explicit-duration and clamp-override checks.
 
 ## Godot manual acceptance
 

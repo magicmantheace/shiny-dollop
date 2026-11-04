@@ -82,3 +82,10 @@ are changeable configuration variables with those values as defaults —
 not hardcoded constants — so the rate can be increased later without
 revisiting this decision. Validator/renderer implementation is a
 separate step and has not been done yet.
+**Implemented 2026-11-03.** `studio/timing.py` owns the derivation;
+`studio/schema.py` and `schemas/scene.schema.json` validate the optional
+scene `timing` object and speak `duration_ms` (wire bounds 100–60000 ms);
+`godot/main.gd` schedules per-actor holds with the rate and clamps as
+exported settings, overridable per scene. Suite 49/49 and headless probe
+scenes (delay, explicit duration, both clamps, both scene overrides)
+verified the computed times; see `docs/TEST_PLAN.md`.
