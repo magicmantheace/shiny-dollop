@@ -65,7 +65,7 @@ class JobTestCase(unittest.TestCase):
 
 class MigrationTests(JobTestCase):
     def test_fresh_db_has_jobs_table(self):
-        self.assertEqual(applied_versions(self.lib.db), [1, 2, 3])
+        self.assertEqual(applied_versions(self.lib.db), [1, 2, 3, 4])
         cols = {r[1] for r in self.lib.db.execute("PRAGMA table_info(jobs)")}
         self.assertEqual(cols, {
             "job_id", "kind", "payload_json", "state", "worker_id",
@@ -85,7 +85,7 @@ class MigrationTests(JobTestCase):
         lib = Library(path)
         self.addCleanup(lib.close)
         lib.init()
-        self.assertEqual(applied_versions(lib.db), [1, 2, 3])
+        self.assertEqual(applied_versions(lib.db), [1, 2, 3, 4])
         self.assertIsNotNone(lib.get_asset("legacy_prop"))
         job_id = enqueue(lib, "validate_scene", {"scene": preview_scene()})
         self.assertEqual(get_job(lib, job_id)["state"], "queued")

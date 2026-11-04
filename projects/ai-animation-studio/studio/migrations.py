@@ -57,6 +57,21 @@ MIGRATIONS: list[tuple[int, str, object]] = [
         ");\n"
         "CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state, job_id);",
     ),
+    (
+        4,
+        "asset_reviews",
+        "CREATE TABLE IF NOT EXISTS reviews (\n"
+        "  review_id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
+        "  asset_id TEXT NOT NULL,\n"
+        "  reviewer TEXT NOT NULL,\n"
+        "  decision TEXT NOT NULL\n"
+        "    CHECK(decision IN ('approve','reject','needs_info')),\n"
+        "  note TEXT,\n"
+        "  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP\n"
+        ");\n"
+        "CREATE INDEX IF NOT EXISTS idx_reviews_asset "
+        "ON reviews(asset_id, review_id);",
+    ),
 ]
 
 LATEST_VERSION = MIGRATIONS[-1][0]

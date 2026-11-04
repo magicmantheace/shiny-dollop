@@ -16,6 +16,8 @@ from .library import Library, ROOT, DEFAULT_DB
 from .promotion import DEFAULT_ASSET_ROOT, PromotionError, promote_asset, promote_character
 from .recipes import (RecipeError, assemble_character, edit_character,
                       require_character, unapproved_parts)
+from .reports import clip_keys_from_manifest, missing_action_report
+from .reviews import DECISIONS, ReviewError, list_candidates, record_review
 from .schema import validate_scene, validate_asset, validate_character, validate_catalog, ValidationError
 from .timing import resolve_timing
 from .voice import (ExternalVoiceEngine, StubVoiceEngine, VoiceCache,
@@ -77,12 +79,14 @@ def enrich_manifest(manifest: dict, lib: Library, asset_root: Path | None,
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="AI Animation Studio foundation")
-    parser.add_argument("command", choices=["validate", "init-db", "seed", "register", "promote", "assemble", "show-character", "edit-character", "export-character", "list-assets", "demo", "sockets", "plan", "speak", "enqueue", "work", "jobs"])
+    parser.add_argument("command", choices=["validate", "init-db", "seed", "register", "promote", "assemble", "show-character", "edit-character", "export-character", "list-assets", "demo", "sockets", "plan", "speak", "enqueue", "work", "jobs", "report-missing", "candidates", "review"])
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--catalog", default="quaternius_f1_catalog.json",
                         help="catalog fixture in examples/ (register/promote commands)")
     parser.add_argument("--scene", default="scene_demo.json",
-                        help="scene fixture in examples/ (demo command)")
+                        help="scene fixture in examples/ (demo command); "
+                             "report-missing: a scene JSON file "
+                             "(a bare name resolves under examples/)")
     parser.add_argument("--asset-root", type=Path, default=None,
                         help="local asset store root (promote/demo/sockets); "
                              "defaults to AI_ANIMATION_ASSET_ROOT or the VM store")
@@ -159,6 +163,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--state", choices=["queued", "running", "done", "failed"],
                         default=None,
                         help="jobs: list only jobs in this state")
+    parser.add_argument("--manifest", type=Path, default=None,
+                        help="report-missing: asset manifest JSON file whose "
+                             "clips table is the provided clip map "
+                             "(a bare name resolves under examples/)")
+    parser.add_argument("--asset", default=None,
+                        help="review: asset id to record a review for")
+    parser.add_argument("--reviewer", default=None,
+                        help="review: reviewer name recorded on the review")
+    parser.add_argument("--decision", choices=list(DECISIONS), default=None,
+                        help="review: decision to record (advisory only; "
+                             "never changes the asset's status)")
+    parser.add_argument("--note", default=None,
+                        help="review: optional note recorded on the review")
     args = parser.parse_args(argv)
     asset_root = args.asset_root or DEFAULT_ASSET_ROOT
     if args.command == "validate":
@@ -259,6 +276,29 @@ def main(argv: list[str] | None = None) -> int:
               f"sha256 {record.wav_sha256}")
         print(f"  phonemes: {len(record.phonemes)} word segments "
               f"(ESTIMATED alignment) -> {record.wav_path}")
+        return 0
+    if args.command == "report-missing":
+        if args.manifest is None:
+            parser.error("report-missing requires --manifest <manifest JSON file>")
+        scene_path = Path(args.scene)
+        if not scene_path.exists():
+            scene_path = EXAMPLES / args.scene
+        manifest_path = args.manifest
+        if not manifest_path.exists():
+            manifest_path = EXAMPLES / args.manifest
+        try:
+            scene = validate_scene(
+                json.loads(scene_path.read_text(encoding="utf-8")))
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            records = missing_action_report(
+                scene, clip_keys_from_manifest(manifest))
+        except (ValidationError, OSError, ValueError) as err:
+            parser.error(str(err))
+        print(f"Scene {scene['scene_id']}: {len(records)} missing action(s)")
+        for record in records:
+            print(f"  events[{record['event_index']}] {record['op']} "
+                  f"(actor {record['actor_id']}) needs clip "
+                  f"'{record['needed']}': {record['reason']}")
         return 0
     lib = Library(args.db)
     try:
@@ -384,9 +424,28 @@ def main(argv: list[str] | None = None) -> int:
                 if job["error"]:
                     line += f" error: {job['error']}"
                 print(line)
+        elif args.command == "candidates":
+            for entry in list_candidates(lib):
+                print(f"{entry['asset_id']} [candidate] {entry['uri']} "
+                      f"source={entry['source'] or '-'} "
+                      f"license={entry['license'] or '-'} "
+                      f"review={entry['review']}")
+        elif args.command == "review":
+            if args.asset is None:
+                parser.error("review requires --asset <asset id>")
+            if args.reviewer is None:
+                parser.error("review requires --reviewer <name>")
+            if args.decision is None:
+                parser.error("review requires --decision <decision>")
+            record = record_review(lib, args.asset, args.reviewer,
+                                   args.decision, note=args.note)
+            print(f"Recorded review {record['review_id']} for "
+                  f"{record['asset_id']}: {record['decision']} by "
+                  f"{record['reviewer']} (advisory only; asset status "
+                  f"unchanged)")
         return 0
     except (ValidationError, PromotionError, RecipeError, JobError,
-            OSError, ValueError) as err:
+            ReviewError, OSError, ValueError) as err:
         parser.error(str(err))
     finally:
         lib.close()

@@ -34,6 +34,7 @@ from pathlib import Path
 
 from .ipc import write_ipc
 from .library import Library
+from .reports import clip_keys_from_manifest, missing_action_report
 from .schema import ValidationError, validate_scene
 from .timing import compute_schedule, resolve_timing
 
@@ -279,9 +280,49 @@ def _handle_export_scene(lib: Library, payload: object) -> dict:
             "scene_id": scene["scene_id"]}
 
 
+def _handle_report_missing_actions(lib: Library, payload: object) -> dict:
+    """Missing-action report for a scene (F5.2, studio/reports.py).
+
+    Payload: {"scene": <scene document>, "clip_keys": [<key>, ...]}
+    or {"scene": ..., "manifest": <manifest document>} (the keys are
+    then the manifest's `clips` table keys). Following the
+    validate_scene preview convention, an invalid scene is a
+    completed report carrying {"valid": false, "error": ...}; a
+    payload that provides neither clip keys nor a manifest is a job
+    failure. The result is {"missing_count": n, "missing": [...]}.
+    """
+    payload = _require_payload(payload, "report_missing_actions")
+    scene = payload["scene"]
+    if "clip_keys" in payload:
+        clip_keys = payload["clip_keys"]
+        if (not isinstance(clip_keys, list)
+                or not all(isinstance(k, str) for k in clip_keys)):
+            raise JobError(
+                "report_missing_actions payload 'clip_keys' must be a "
+                "list of clip key strings")
+    elif "manifest" in payload:
+        try:
+            clip_keys = clip_keys_from_manifest(payload["manifest"])
+        except ValueError as exc:
+            raise JobError(
+                f"report_missing_actions payload 'manifest' is "
+                f"unusable: {exc}") from exc
+    else:
+        raise JobError(
+            "report_missing_actions payload requires 'clip_keys' or "
+            "'manifest'")
+    try:
+        validate_scene(scene)
+    except ValidationError as exc:
+        return {"valid": False, "error": str(exc)}
+    missing = missing_action_report(scene, clip_keys)
+    return {"missing_count": len(missing), "missing": missing}
+
+
 HANDLERS = {
     "validate_scene": _handle_validate_scene,
     "export_scene": _handle_export_scene,
+    "report_missing_actions": _handle_report_missing_actions,
 }
 
 
