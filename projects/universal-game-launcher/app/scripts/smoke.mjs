@@ -2,7 +2,7 @@
 /**
  * Headless smoke test: production-builds the app, then opens the real
  * Electron window under xvfb (Linux) and expects the SMOKE_OK marker.
- * GUI/Windows-only behaviors are NOT verified here — only that the packaged
+ * GUI/Windows-only behaviors are NOT verified here - only that the packaged
  * production bundle boots to a real native window.
  */
 import { spawnSync, spawn } from 'node:child_process';
@@ -13,22 +13,28 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.join(root, '..');
 
 function sh(cmd, args) {
-  const r = spawnSync(cmd, args, { cwd: appDir, stdio: 'inherit', shell: false });
+  // Windows: npm is a .cmd shim and cannot be spawned directly without a
+  // shell (Node >= 20.12 refuses .cmd/.bat spawns with shell:false).
+  const r = spawnSync(cmd, args, {
+    cwd: appDir,
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+  });
   if (r.status !== 0) {
     console.error(`[smoke] FAILED: ${cmd} ${args.join(' ')}`);
     process.exit(1);
   }
 }
 
-console.log('[smoke] building production bundle…');
+console.log('[smoke] building production bundle.');
 sh('npm', ['run', 'build', '--silent']);
 
-const electronBin = path.join(
-  appDir,
-  'node_modules',
-  '.bin',
-  process.platform === 'win32' ? 'electron.cmd' : 'electron',
-);
+// Windows: spawn the real electron.exe, not the .bin/electron.cmd shim
+// (same .cmd spawn restriction as npm above).
+const electronBin =
+  process.platform === 'win32'
+    ? path.join(appDir, 'node_modules', 'electron', 'dist', 'electron.exe')
+    : path.join(appDir, 'node_modules', '.bin', 'electron');
 const entry = path.join(appDir, 'dist', 'electron', 'main', 'index.js');
 
 const useXvfb = process.platform === 'linux';
@@ -37,7 +43,7 @@ const args = useXvfb
   ? ['-a', electronBin, '--no-sandbox', entry]
   : ['--no-sandbox', entry];
 
-console.log('[smoke] launching Electron (UGL_SMOKE=1)…');
+console.log('[smoke] launching Electron (UGL_SMOKE=1).');
 const child = spawn(cmd, args, {
   cwd: appDir,
   env: { ...process.env, UGL_SMOKE: '1' },
