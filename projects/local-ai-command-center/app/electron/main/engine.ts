@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { LACC_ERROR_CODES, isLaccError, laccError, type LaccError } from '../../shared/errors.js';
@@ -8,7 +8,7 @@ import { createAdapter, type RuntimeAdapter } from './adapter.js';
 import { createDiff } from './diff.js';
 import { NodeOsLayer, snapshotResources, type OsLayer } from './resources.js';
 import { appendAudit, appendTaskLog, getConfig as storeGetConfig, getProposal as storeGetProposal, getTask as storeGetTask, insertProposal, insertTask, listAudit as storeListAudit, listProposals as storeListProposals, listTaskLogs, listTasks as storeListTasks, saveConfig as storeSaveConfig, updateProposalStatus, updateTask, nowIso } from './store.js';
-import { readExistingFile, resolveInWorkspace } from './workspace.js';
+import { readExistingFile, resolveInWorkspace, writeFileReplacing } from './workspace.js';
 
 export interface TaskEngineOptions {
   adapterFactory?: (config: EndpointConfig) => RuntimeAdapter;
@@ -217,7 +217,10 @@ export class TaskEngine {
       // Final freshness check immediately before the write, so an edit
       // landing during mkdir cannot slip between the check and the apply.
       this.assertProposalBaseUnchanged(still, task);
-      await writeFile(full, proposal.proposedContent, 'utf8');
+      // Replace, never write in place: an in-place write would follow the
+      // destination's inode, so a workspace file hard-linked to a file
+      // outside the workspace would modify that external file too.
+      await writeFileReplacing(full, proposal.proposedContent);
       const updated = updateProposalStatus(this.db, id, 'approved')!;
       appendAudit(this.db, 'user', 'proposal.approved', `proposal=${id} path=${proposal.relativePath}`);
       appendAudit(this.db, 'system', 'proposal.applied', `proposal=${id} path=${proposal.relativePath}`);

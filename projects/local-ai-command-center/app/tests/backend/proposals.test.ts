@@ -125,6 +125,34 @@ describe('proposals', () => {
     expect(readFileSync(join(ws, 'stable.txt'), 'utf8')).toBe('proposed replacement\n');
     db.close();
   });
+  it('hard-link containment: approving a proposal for a hard-linked file never modifies the file outside the workspace', async () => {
+    const { engine, db, config, ws } = makeFixture();
+    engine.saveConfig(config);
+    const { linkSync, mkdtempSync, statSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    // A file outside the workspace, and a workspace file hard-linked to it
+    // (same inode). A hard link is not a symlink: canonical path checks see
+    // an ordinary in-workspace file, so an in-place write would truncate
+    // the shared inode and change the external file too.
+    const outside = mkdtempSync(join(tmpdir(), 'lacc-outside-'));
+    const externalPath = join(outside, 'external.txt');
+    writeFileSync(externalPath, 'external original\n');
+    const linkedPath = join(ws, 'linked.txt');
+    linkSync(externalPath, linkedPath);
+    expect(statSync(linkedPath).ino).toBe(statSync(externalPath).ino);
+    // The proposal diff is created against the linked file's current content.
+    engine.submit({ prompt: proposePrompt('linked.txt', 'proposed replacement\n') });
+    await engine.whenIdle();
+    const p = engine.listProposals()[0]!;
+    const approved = await engine.approve(p.id);
+    expect(approved.status).toBe('approved');
+    // The approved content landed at the workspace path...
+    expect(readFileSync(linkedPath, 'utf8')).toBe('proposed replacement\n');
+    // ...but the external file is untouched and no longer shares an inode.
+    expect(readFileSync(externalPath, 'utf8')).toBe('external original\n');
+    expect(statSync(linkedPath).ino).not.toBe(statSync(externalPath).ino);
+    db.close();
+  });
   it('escape path creates no proposal, task completes, audit records', async () => {
     const { engine, db, config } = makeFixture();
     engine.saveConfig(config);

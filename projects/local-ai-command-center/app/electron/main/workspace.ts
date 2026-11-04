@@ -1,5 +1,7 @@
 import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
-import { isAbsolute, join, resolve, sep } from 'node:path';
+import { randomBytes } from 'node:crypto';
+import { chmod, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { LACC_ERROR_CODES, laccError } from '../../shared/errors.js';
 
 function isInside(root: string, candidate: string): boolean {
@@ -59,6 +61,50 @@ export function resolveInWorkspace(root: string, relativePath: string): string {
     }
   }
   return resolved;
+}
+
+/**
+ * Write `content` to `fullPath` by REPLACING the directory entry, never by
+ * writing in place: the content goes to an exclusively created temporary
+ * file in the same directory and is then renamed over the destination.
+ *
+ * An in-place write (fs.writeFile's truncate-and-rewrite) follows the
+ * destination's inode, so a destination that is hard-linked to a file
+ * outside the workspace would silently modify that external file too —
+ * hard links have no target for the canonical containment walk above to
+ * reject (lstat sees an ordinary file and realpath returns the workspace
+ * path itself). Renaming instead gives the destination a fresh inode:
+ * every other link keeps the old inode and its old content. The same
+ * argument covers a destination symlink, which rename replaces rather
+ * than writes through.
+ */
+export async function writeFileReplacing(fullPath: string, content: string): Promise<void> {
+  const dir = dirname(fullPath);
+  let tmp: string | null = null;
+  for (let attempt = 0; attempt < 10 && tmp === null; attempt++) {
+    const candidate = join(dir, `.lacc-write-${process.pid}-${randomBytes(8).toString('hex')}.tmp`);
+    try {
+      // 'wx': fail rather than clobber if the name is somehow taken.
+      await writeFile(candidate, content, { encoding: 'utf8', flag: 'wx' });
+      tmp = candidate;
+    } catch (err) {
+      if (err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === 'EEXIST') continue;
+      throw err;
+    }
+  }
+  if (tmp === null) throw new Error(`Could not create a temporary file in ${dir} to replace ${fullPath}.`);
+  try {
+    // Preserve the replaced file's permission bits (an in-place write
+    // would have kept them); a brand-new file keeps the default mode.
+    try {
+      const existing = await stat(fullPath);
+      if (existing.isFile()) await chmod(tmp, existing.mode);
+    } catch { /* destination does not exist yet — nothing to preserve */ }
+    await rename(tmp, fullPath);
+  } catch (err) {
+    await rm(tmp, { force: true }).catch(() => undefined);
+    throw err;
+  }
 }
 
 export function readExistingFile(root: string, relativePath: string): string | null {
