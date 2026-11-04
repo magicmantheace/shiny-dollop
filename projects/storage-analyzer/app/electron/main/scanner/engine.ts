@@ -6,7 +6,10 @@
  * - Cancellable via AbortController; cancellation is checked per entry.
  * - NEVER follows symlinks/junctions: they are recorded as skipped entries.
  *   Visited (dev, ino) pairs plus resolved realpaths break hardlink/bind-mount
- *   directory loops.
+ *   directory loops. Entry types are rechecked with a fresh lstat before any
+ *   path is followed (a Dirent is a readdir snapshot — an entry swapped for a
+ *   link after readdir still reports its old type), and queued directories
+ *   are revalidated the same way before they are read.
  * - Permission-denied (and other per-entry) errors are recorded in
  *   scan_errors; the walk keeps going and never throws for them.
  * - Read-only by construction: only readdir / lstat-style stat /
@@ -345,6 +348,29 @@ async function walkDirectory(
   while (stack.length > 0) {
     checkAborted();
     const dir = stack.pop() as string;
+    // A queued directory may have been replaced by a symlink/junction
+    // after it was queued: readdir would follow the replacement and pull
+    // an outside tree into the scan under this path. Revalidate with a
+    // fresh lstat before reading. The root is exempt — it is the scan
+    // anchor and was stat/realpath validated just above.
+    if (dir !== root) {
+      let lst: Stats;
+      try {
+        lst = await fsp.lstat(dir);
+      } catch (err) {
+        recordError(dir, errnoCode(err));
+        continue;
+      }
+      if (lst.isSymbolicLink()) {
+        recordFile(db, options.scanId, dir, lst.size, true);
+        counters.symlinks += 1;
+        continue;
+      }
+      if (!lst.isDirectory()) {
+        recordError(dir, 'NOT_A_DIRECTORY');
+        continue;
+      }
+    }
     let entries: Dirent[];
     try {
       entries = await fsp.readdir(dir, { withFileTypes: true });
@@ -377,6 +403,27 @@ async function walkDirectory(
           // best effort; a vanished link still counts as skipped
         }
         recordFile(db, options.scanId, full, linkSize, true);
+        counters.symlinks += 1;
+        continue;
+      }
+
+      // The Dirent above is a snapshot taken by readdir: an entry REPLACED
+      // by a symlink/junction after readdir still reports its old type,
+      // and the stat() calls below follow links — the identity/realpath
+      // guards only reject previously visited targets, so a swapped-in
+      // link to an unvisited outside directory would be traversed as if
+      // it were under the root. Recheck the live type with a fresh lstat
+      // before following any path. A vanished entry (lstat throws) falls
+      // through: the branches below record the error from their own stat,
+      // exactly as before.
+      let fresh: Stats | null = null;
+      try {
+        fresh = await fsp.lstat(full);
+      } catch {
+        fresh = null;
+      }
+      if (fresh?.isSymbolicLink()) {
+        recordFile(db, options.scanId, full, fresh.size, true);
         counters.symlinks += 1;
         continue;
       }

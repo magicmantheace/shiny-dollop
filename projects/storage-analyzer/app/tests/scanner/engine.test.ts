@@ -174,6 +174,102 @@ describe('symlink handling', () => {
     expect(skipped.c).toBe(3);
     db.close();
   });
+
+  it('does not follow a directory replaced by an outside symlink after readdir', async () => {
+    const root = track(makeFixtureDir());
+    const outside = track(makeFixtureDir());
+    writeFixture(path.join(outside, 'outside.txt'), 'outside the scan root');
+    const sub = path.join(root, 'sub');
+    writeFixture(path.join(sub, 'inner.txt'), 'inside before the swap');
+    writeFixture(path.join(root, 'keep.txt'), 'stays');
+
+    if (!trySymlink(outside, path.join(root, 'probe-link'))) return; // privilege skip
+    fs.rmSync(path.join(root, 'probe-link'), { force: true });
+
+    // readdir(root) snapshots sub's Dirent as a directory; the hook then
+    // swaps sub for a symlink to the outside tree before the engine
+    // processes the stale entry. The engine must recheck the live type.
+    const { db, scanId } = scanRoot(root);
+    const job = startScanJob(db, {
+      scanId,
+      rootPath: root,
+      exclusions: [],
+      emitProgress: () => {},
+      hooks: {
+        beforeEntry: (p: string) => {
+          if (p === sub) {
+            fs.rmSync(sub, { recursive: true, force: true });
+            fs.symlinkSync(outside, sub);
+          }
+        },
+      },
+    });
+    const result = await job.promise;
+
+    expect(result.state).toBe('complete');
+    // Only keep.txt is a real file under the root; the swap is one skipped link.
+    expect(result.files).toBe(1);
+    expect(result.symlinks).toBe(1);
+    const paths = db
+      .prepare('SELECT path FROM files WHERE scan_id = ?')
+      .all(scanId) as { path: string }[];
+    expect(paths.some((r) => r.path.includes('outside.txt'))).toBe(false);
+    expect(paths.some((r) => r.path.includes('inner.txt'))).toBe(false);
+    const skipped = db
+      .prepare('SELECT COUNT(*) AS c FROM files WHERE scan_id = ? AND is_symlink = 1')
+      .get(scanId) as { c: number };
+    expect(skipped.c).toBe(1);
+    db.close();
+  });
+
+  it('does not read a queued directory replaced by an outside symlink before its turn', async () => {
+    const root = track(makeFixtureDir());
+    const outside = track(makeFixtureDir());
+    writeFixture(path.join(outside, 'outside.txt'), 'outside the scan root');
+    const aDir = path.join(root, 'a');
+    const victim = path.join(aDir, 'victim');
+    writeFixture(path.join(victim, 'inner.txt'), 'inside before the swap');
+    const trigger = path.join(aDir, 'trigger.txt');
+    writeFixture(trigger, 'sibling file');
+    writeFixture(path.join(root, 'keep.txt'), 'stays');
+
+    if (!trySymlink(outside, path.join(root, 'probe-link'))) return; // privilege skip
+    fs.rmSync(path.join(root, 'probe-link'), { force: true });
+
+    // Whichever order a's entries are processed in, the swap lands after
+    // victim's Dirent was snapshotted by readdir(a): if victim is queued
+    // first, the queued-directory revalidation must catch the swap; if
+    // victim is processed after the swap, the fresh entry-type recheck
+    // must. Either way the outside tree stays out of the scan.
+    let swapped = false;
+    const { db, scanId } = scanRoot(root);
+    const job = startScanJob(db, {
+      scanId,
+      rootPath: root,
+      exclusions: [],
+      emitProgress: () => {},
+      hooks: {
+        beforeEntry: (p: string) => {
+          if (p === trigger && !swapped) {
+            swapped = true;
+            fs.rmSync(victim, { recursive: true, force: true });
+            fs.symlinkSync(outside, victim);
+          }
+        },
+      },
+    });
+    const result = await job.promise;
+    expect(swapped).toBe(true);
+
+    expect(result.state).toBe('complete');
+    expect(result.files).toBe(2); // trigger.txt + keep.txt only
+    expect(result.symlinks).toBe(1);
+    const paths = db
+      .prepare('SELECT path FROM files WHERE scan_id = ?')
+      .all(scanId) as { path: string }[];
+    expect(paths.some((r) => r.path.includes('outside.txt'))).toBe(false);
+    db.close();
+  });
 });
 
 describe('permission errors', () => {
