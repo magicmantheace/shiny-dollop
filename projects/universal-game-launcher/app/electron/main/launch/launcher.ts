@@ -449,6 +449,37 @@ export class GameLauncher {
   }
 
   /**
+   * React to the user turning playtime tracking OFF while games are
+   * running. The privacy toggle must take effect immediately, not at the
+   * game's next exit: each live session is finalized at this moment
+   * (with the playtime accrued while tracking was on), the entry is
+   * detached from its session so process exit records nothing further,
+   * and the checkpoint timer is suspended once no tracked sessions
+   * remain. The games themselves are never touched. Turning tracking
+   * back on does not resume these sessions; it applies to new launches.
+   */
+  onTrackingDisabled(): void {
+    for (const entry of this.running.values()) {
+      const sid = entry.sessionId;
+      if (!sid) continue;
+      entry.sessionId = null;
+      const endedAt = new Date().toISOString();
+      const session = finalizeSession(this.db, sid, {
+        state: 'interrupted',
+        notes:
+          'Tracking was turned off while this game was running; the session was ended at that moment and nothing further is recorded.',
+        durationMs: this.elapsedMs(entry),
+      });
+      recordPlaytime(this.db, entry.gameId, endedAt, session.durationMs ?? 0);
+    }
+    const anyTracked = [...this.running.values()].some((entry) => entry.sessionId !== null);
+    if (!anyTracked && this.checkpointTimer) {
+      clearInterval(this.checkpointTimer);
+      this.checkpointTimer = null;
+    }
+  }
+
+  /**
    * Finalize any in-memory running sessions conservatively (at last
    * checkpoint, never "now"). Called on app shutdown; also safe to call when
    * idle. Child processes themselves are left alone — we never kill games.

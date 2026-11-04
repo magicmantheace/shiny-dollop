@@ -164,6 +164,56 @@ describe('launch integration (stubbed spawn)', () => {
     rmSync(path.dirname(exe), { recursive: true, force: true });
   });
 
+  it('disabling tracking mid-game finalizes the live session and records nothing further', async () => {
+    ctx = createTestContext();
+    const exe = makeExe();
+    const game = await addGame(exe);
+    const launched = (await ctx.call('games.launch', { id: game.id })) as {
+      ok: boolean;
+      data: { sessionId: string };
+    };
+    expect(launched.ok).toBe(true);
+
+    // The user turns tracking off while the game is still running.
+    const upd = await ctx.call('settings.update', { trackingEnabled: false });
+    expect(upd.ok).toBe(true);
+
+    // The live session is finalized at that moment — not left running
+    // until the process exits.
+    const sessions = (await ctx.call('sessions.list', { gameId: game.id })) as {
+      ok: boolean;
+      data: Session[];
+    };
+    expect(sessions.data).toHaveLength(1);
+    expect(sessions.data[0]!.state).toBe('interrupted');
+    expect(sessions.data[0]!.endedAt).not.toBeNull();
+    expect(sessions.data[0]!.notes).toContain('Tracking was turned off');
+    const totalsAtDisable = (
+      (await ctx.call('library.list', {})) as { ok: boolean; data: Game[] }
+    ).data[0]!.totalPlayMs;
+
+    // The game is still tracked as running (a second launch is a no-op),
+    // but its eventual exit records nothing more.
+    expect(ctx.launcher.runningCount()).toBe(1);
+    const again = (await ctx.call('games.launch', { id: game.id })) as {
+      ok: boolean;
+      data: { alreadyRunning: boolean };
+    };
+    expect(again.data.alreadyRunning).toBe(true);
+    ctx.stub.closeLast(0);
+    expect(ctx.launcher.runningCount()).toBe(0);
+    const after = (await ctx.call('sessions.list', { gameId: game.id })) as {
+      ok: boolean;
+      data: Session[];
+    };
+    expect(after.data).toHaveLength(1);
+    const totalsAfterExit = (
+      (await ctx.call('library.list', {})) as { ok: boolean; data: Game[] }
+    ).data[0]!.totalPlayMs;
+    expect(totalsAfterExit).toBe(totalsAtDisable);
+    rmSync(path.dirname(exe), { recursive: true, force: true });
+  });
+
   it('tracking disabled: launches without recording a session', async () => {
     ctx = createTestContext();
     const exe = makeExe();

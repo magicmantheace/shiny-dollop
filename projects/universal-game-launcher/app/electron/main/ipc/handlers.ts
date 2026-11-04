@@ -308,7 +308,19 @@ export function createHandlers(): HandlerDef[] {
     {
       channel: IpcChannels.settingsUpdate,
       schema: schemas.settingsUpdateSchema,
-      run: (payload, deps) => Promise.resolve(updateSettings(deps.db, (payload ?? {}) as Partial<Settings>)),
+      run: (payload, deps) => {
+        const patch = (payload ?? {}) as Partial<Settings>;
+        const wasTracking = getSettings(deps.db).trackingEnabled;
+        const updated = updateSettings(deps.db, patch);
+        if (wasTracking && !updated.trackingEnabled) {
+          // The privacy toggle must bite immediately: without this, a
+          // game already running keeps its session, its checkpoint
+          // timer keeps writing, and its full duration is recorded at
+          // exit as if tracking had stayed on.
+          deps.launcher.onTrackingDisabled();
+        }
+        return Promise.resolve(updated);
+      },
     },
     {
       channel: IpcChannels.filesChooseExecutable,
