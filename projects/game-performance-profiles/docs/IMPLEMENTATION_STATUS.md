@@ -5,7 +5,7 @@
 - **Branch:** `game-performance-profiles/mvp` (base: origin/main @ d4441fd)
 - **Source/code implemented:** `projects/game-performance-profiles/app/` — Electron 45 + TypeScript strict + Vite, `node:sqlite`, zod IPC, typed preload, React 19 renderer
 - **Build validated:** Yes (Linux) — `npm run build` produces dist/main + dist/renderer
-- **Automated tests executed:** Yes — 100/100 backend vitest tests pass (MockOsLayer, synthetic fixtures) + 87/87 renderer UI tests pass (`app/tests-ui/`, mocked `window.gpp`, jsdom)
+- **Automated tests executed:** Yes — 117/117 backend vitest tests pass (MockOsLayer, synthetic fixtures) + 87/87 renderer UI tests pass (`app/tests-ui/`, mocked `window.gpp`, jsdom)
 
 ## Codex fix cycle 1 — 2026-10-24
 
@@ -28,6 +28,11 @@
 - IPC handlers are now registered before the renderer starts loading: startup sequencing moved into `electron/main/startup.ts` (`startAppWindow` registers handlers first, then creates/loads the window; the progress emit forwards to the window once it exists). Previously `createWindow()` was awaited first, so the renderer's initial IPC requests on mount could reject with "No handler registered" and strand the app on its load-error screen.
 - Windows process-priority restoration now preserves process identity across calls: resolution also captures creation-time ticks (`StartTime.ToUniversalTime().Ticks`), `apply()` resolves once and retains the mutated instance's identity (pid + creation ticks) and its pre-change priority in a `PriorityRecoveryLog`, and `restore()` re-targets exactly that identity — the set script itself re-verifies the ticks, closing the exit/pid-reuse race. If the original instance has exited (or its pid was reused), restore is a successful no-op that touches NO surviving same-name instance; without retained identity (journal entries from before this session) restore proceeds only for an unambiguous single instance and otherwise refuses, leaving the journal entry in place. Known limitation: retained identity is session-scoped, so a multi-instance restore after an app restart refuses rather than guessing (previously it silently modified the wrong instance).
 - Regression tests added for both (new helpers/sequencing fail pre-fix by construction; the restore-plan tests encode the exact activate → instance exits → rollback scenario): backend 103 → 115 tests, UI unchanged at 87/87, typecheck (backend + renderer) + lint + build clean. Windows-only execution still NOT verified (needs Adam's Windows box).
+
+## Codex fix cycle 4 — 2026-11-04
+
+- Snapshot collection failures are no longer persisted as measurements: `WindowsOsLayer.takeSnapshot()` used to swallow a failed or unparseable performance-counter command and return `{ cpuPercent: -1, memoryMb: -1 }` sentinels, which the engine stored verbatim and `SnapshotsView` displayed and compared as ordinary data (a failed reading against a valid 12.5% / 8192 MB baseline reported phantom "improvements"). The Windows layer now throws an actionable `OsLayerError('os-error', …)` (with the underlying failure as `cause`) when the counter command fails or its output is not usable measurements, and `engine/snapshots.ts` additionally validates every observation — non-finite or negative values are rejected with an error and **nothing is written to the DB** — so no OS layer can persist a sentinel again. The IPC layer already surfaces thrown errors to the renderer as `{ error }`, so the user sees the collection failure instead of a fake snapshot.
+- Regression tests added (verified failing pre-fix via the negative check — exactly those 2 fail with the source fixes reverted): backend 115 → 117 tests, UI unchanged at 87/87, typecheck (backend + renderer) + lint + build + smoke clean. Windows-only execution still NOT verified (needs Adam's Windows box) — the win32 counter path itself remains exercised only by construction; the engine-level rejection is platform-independent and fully tested.
 
 ## First milestone
 
