@@ -30,6 +30,20 @@ async function addCharacter(user: User, name: string, kind: 'pc' | 'npc'): Promi
   expect(await within(characters).findByText(new RegExp(name))).toBeInTheDocument();
 }
 
+async function addSecondCampaign(user: User): Promise<void> {
+  const campaigns = region('Campaigns');
+  await user.type(within(campaigns).getByLabelText('Name'), 'Second Campaign');
+  await user.click(within(campaigns).getByRole('button', { name: 'Create campaign' }));
+  expect(await within(campaigns).findByText(/Second Campaign/)).toBeInTheDocument();
+}
+
+async function selectCampaign(user: User, campaignId: string): Promise<void> {
+  await user.selectOptions(
+    within(region('Campaigns')).getByLabelText('Active campaign'),
+    campaignId,
+  );
+}
+
 describe('App', () => {
   it('renders the header and campaign creation form', async () => {
     installFakeAidm();
@@ -257,6 +271,96 @@ describe('App', () => {
     expect(importedRolls.length).toBeGreaterThan(0);
     expect(importedRolls.every((e) => e.sessionId === null)).toBe(true);
     expect(importedRolls.every((e) => e.sessionId !== sessionAId)).toBe(true);
+  });
+
+  it('does not install an encounter started in campaign A after switching to B', async () => {
+    const fake = installFakeAidm();
+    const user = userEvent.setup();
+    render(<App />);
+    await createCampaign(user);
+    await addCharacter(user, 'Wren', 'pc');
+    await addSecondCampaign(user);
+    await addCharacter(user, 'Berta', 'npc');
+    const campaignA = [...fake.campaigns.values()].find((c) => c.name === 'The Mire Campaign');
+    const campaignB = [...fake.campaigns.values()].find((c) => c.name === 'Second Campaign');
+    if (!campaignA || !campaignB) throw new Error('campaigns missing');
+
+    await selectCampaign(user, campaignA.id);
+    expect(await within(region('Characters')).findByText(/Wren/)).toBeInTheDocument();
+    let resolveStart: (() => void) | undefined;
+    const originalStart = fake.encountersStart.bind(fake);
+    fake.encountersStart = async (campaignId, req) => {
+      const created = await originalStart(campaignId, req);
+      await new Promise<void>((resolve) => {
+        resolveStart = resolve;
+      });
+      return created;
+    };
+
+    const encounter = region('Encounter');
+    await user.type(within(encounter).getByLabelText('Encounter name'), 'Ambush A');
+    await user.click(within(encounter).getByLabelText('Wren'));
+    await user.click(within(encounter).getByRole('button', { name: 'Start encounter' }));
+    expect(resolveStart).toBeDefined();
+
+    await selectCampaign(user, campaignB.id);
+    expect(await within(region('Characters')).findByText(/Berta/)).toBeInTheDocument();
+    await act(async () => {
+      resolveStart?.();
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 30);
+      });
+    });
+
+    expect(within(region('Encounter')).getByRole('button', { name: 'Start encounter' })).toBeInTheDocument();
+    expect(within(region('Encounter')).queryByText(/Ambush A/)).not.toBeInTheDocument();
+    expect(within(region('Encounter')).queryByText(/round 1/)).not.toBeInTheDocument();
+  });
+
+  it('does not install an encounter advanced in campaign A after switching to B', async () => {
+    const fake = installFakeAidm();
+    const user = userEvent.setup();
+    render(<App />);
+    await createCampaign(user);
+    await addCharacter(user, 'Wren', 'pc');
+    await addSecondCampaign(user);
+    await addCharacter(user, 'Berta', 'npc');
+    const campaignA = [...fake.campaigns.values()].find((c) => c.name === 'The Mire Campaign');
+    const campaignB = [...fake.campaigns.values()].find((c) => c.name === 'Second Campaign');
+    if (!campaignA || !campaignB) throw new Error('campaigns missing');
+
+    await selectCampaign(user, campaignA.id);
+    expect(await within(region('Characters')).findByText(/Wren/)).toBeInTheDocument();
+    const encounter = region('Encounter');
+    await user.type(within(encounter).getByLabelText('Encounter name'), 'Ambush A');
+    await user.click(within(encounter).getByLabelText('Wren'));
+    await user.click(within(encounter).getByRole('button', { name: 'Start encounter' }));
+    expect(await within(encounter).findByText(/Ambush A/)).toBeInTheDocument();
+
+    let resolveAdvance: (() => void) | undefined;
+    const originalAdvance = fake.encountersAdvanceTurn.bind(fake);
+    fake.encountersAdvanceTurn = async (encounterId) => {
+      const updated = await originalAdvance(encounterId);
+      await new Promise<void>((resolve) => {
+        resolveAdvance = resolve;
+      });
+      return updated;
+    };
+    await user.click(within(encounter).getByRole('button', { name: 'Advance turn' }));
+    expect(resolveAdvance).toBeDefined();
+
+    await selectCampaign(user, campaignB.id);
+    expect(await within(region('Characters')).findByText(/Berta/)).toBeInTheDocument();
+    await act(async () => {
+      resolveAdvance?.();
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 30);
+      });
+    });
+
+    expect(within(region('Encounter')).getByRole('button', { name: 'Start encounter' })).toBeInTheDocument();
+    expect(within(region('Encounter')).queryByText(/Ambush A/)).not.toBeInTheDocument();
+    expect(within(region('Encounter')).queryByText(/round 1/)).not.toBeInTheDocument();
   });
 
   it('discards a stale refresh when narration for campaign A finishes after switching to B', async () => {

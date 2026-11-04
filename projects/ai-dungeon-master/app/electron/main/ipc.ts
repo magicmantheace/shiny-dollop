@@ -1,6 +1,8 @@
 // IPC boundary: zod-parse the raw args array for every method, delegate
-// to CampaignService, and convert every failure to a plain { code,
-// message } AidmError so nothing exotic crosses the bridge.
+// to CampaignService, and return a structured { ok, value | error }
+// envelope. Failures must not be thrown across Electron IPC: a thrown
+// plain { code, message } object is serialized as `[object Object]`, so
+// the renderer would lose the actionable AidmError.
 import { ZodError } from 'zod';
 import {
   AIDM_ERROR_CODES,
@@ -8,6 +10,7 @@ import {
   aidmError,
   type AidmError,
   type AidmErrorCode,
+  type AidmIpcResult,
 } from '../../shared/errors.js';
 import { AIDM_CHANNELS, type AidmMethodName } from './channels.js';
 import * as s from './schemas.js';
@@ -30,6 +33,7 @@ export interface IpcMainLike {
 }
 
 type Handler = (...args: unknown[]) => Promise<unknown>;
+export type IpcHandler = (...args: unknown[]) => Promise<AidmIpcResult<unknown>>;
 
 function toPlain(err: unknown, fallback: AidmErrorCode): AidmError {
   if (isAidmError(err)) return { code: err.code, message: err.message };
@@ -79,7 +83,7 @@ const FALLBACKS: Record<AidmMethodName, AidmErrorCode> = {
   importDungeonManifest: AIDM_ERROR_CODES.IMPORT_INVALID,
 };
 
-export function createHandlers(service: CampaignService): Record<string, Handler> {
+export function createHandlers(service: CampaignService): Record<string, IpcHandler> {
   const byMethod: Record<AidmMethodName, Handler> = {
     campaignsList: async () => service.campaignsList(),
     campaignsCreate: async (...a) => service.campaignsCreate(s.campaignsCreateSchema.parse(a)[0] as CampaignInput),
@@ -167,7 +171,7 @@ export function createHandlers(service: CampaignService): Record<string, Handler
     },
   };
 
-  const table: Record<string, Handler> = {};
+  const table: Record<string, IpcHandler> = {};
   for (const [method, channel] of Object.entries(AIDM_CHANNELS) as Array<
     [AidmMethodName, string]
   >) {
@@ -175,9 +179,9 @@ export function createHandlers(service: CampaignService): Record<string, Handler
     const fallback = FALLBACKS[method];
     table[channel] = async (...args: unknown[]) => {
       try {
-        return await handler(...args);
+        return { ok: true, value: await handler(...args) };
       } catch (err) {
-        throw toPlain(err, fallback);
+        return { ok: false, error: toPlain(err, fallback) };
       }
     };
   }

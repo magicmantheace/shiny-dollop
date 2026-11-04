@@ -157,6 +157,15 @@ export function App() {
     }
   }, [campaignId, reportError]);
 
+  // Direct encounter setters are not covered by refreshAll's generation
+  // guard. An encounter response belongs to exactly one campaign; only
+  // install it while that campaign is still selected.
+  const applyEncounterIfSelected = useCallback((next: Encounter): boolean => {
+    if (selectedCampaignIdRef.current !== next.campaignId) return false;
+    setEncounter(next);
+    return true;
+  }, []);
+
   useEffect(() => {
     void refreshCampaigns();
     void (async () => {
@@ -624,7 +633,8 @@ export function App() {
                     <button
                       onClick={() =>
                         void run(async () => {
-                          setEncounter(await api().encountersAdvanceTurn(encounter.id));
+                          const updated = await api().encountersAdvanceTurn(encounter.id);
+                          applyEncounterIfSelected(updated);
                         })
                       }
                     >
@@ -670,7 +680,7 @@ export function App() {
                             .map((c) => c.id),
                           sessionId: sessionId || null,
                         });
-                        setEncounter(created);
+                        if (!applyEncounterIfSelected(created)) return;
                         setEncounterName('');
                         await refreshAll();
                       })

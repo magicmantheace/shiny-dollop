@@ -5,35 +5,42 @@ import { CampaignService } from '../../electron/main/service.js';
 import { makeFixture } from './helpers.js';
 
 describe('IPC boundary validation', () => {
-  it('rejects oversized and malformed args before they reach the service', async () => {
+  it('returns structured failures for oversized and malformed args before they reach the service', async () => {
     const fx = makeFixture();
     const handlers = createHandlers(new CampaignService(fx.db));
     const create = handlers['aidm:campaigns-create'];
     if (!create) throw new Error('handler missing');
-    await expect(create({ name: '' })).rejects.toMatchObject({
-      code: AIDM_ERROR_CODES.INPUT_INVALID,
+    await expect(create({ name: '' })).resolves.toMatchObject({
+      ok: false,
+      error: { code: AIDM_ERROR_CODES.INPUT_INVALID, message: expect.any(String) },
     });
-    await expect(create({ name: 'x'.repeat(201) })).rejects.toMatchObject({
-      code: AIDM_ERROR_CODES.INPUT_INVALID,
+    await expect(create({ name: 'x'.repeat(201) })).resolves.toMatchObject({
+      ok: false,
+      error: { code: AIDM_ERROR_CODES.INPUT_INVALID, message: expect.any(String) },
     });
-    await expect(create({ name: 'Ok', hacker: true })).rejects.toMatchObject({
-      code: AIDM_ERROR_CODES.INPUT_INVALID,
+    await expect(create({ name: 'Ok', hacker: true })).resolves.toMatchObject({
+      ok: false,
+      error: { code: AIDM_ERROR_CODES.INPUT_INVALID, message: expect.any(String) },
     });
-    const ok = (await create({ name: 'Via IPC' })) as { name: string };
-    expect(ok.name).toBe('Via IPC');
+    await expect(create({ name: 'Via IPC' })).resolves.toMatchObject({
+      ok: true,
+      value: { name: 'Via IPC' },
+    });
   });
 
-  it('maps service named errors through unchanged', async () => {
+  it('returns service named errors unchanged in the structured failure envelope', async () => {
     const fx = makeFixture();
     const handlers = createHandlers(new CampaignService(fx.db));
     const roll = handlers['aidm:dice-roll'];
     if (!roll) throw new Error('handler missing');
-    await expect(roll('missing-campaign', { notation: '2d6' })).rejects.toMatchObject({
-      code: 'CAMPAIGN_NOT_FOUND',
+    await expect(roll('missing-campaign', { notation: '2d6' })).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'CAMPAIGN_NOT_FOUND', message: expect.any(String) },
     });
     const campaign = await fx.service.campaignsCreate({ name: 'X', seed: 'x' });
-    await expect(roll(campaign.id, { notation: 'bogus' })).rejects.toMatchObject({
-      code: 'DICE_NOTATION_INVALID',
+    await expect(roll(campaign.id, { notation: 'bogus' })).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'DICE_NOTATION_INVALID', message: expect.any(String) },
     });
   });
 

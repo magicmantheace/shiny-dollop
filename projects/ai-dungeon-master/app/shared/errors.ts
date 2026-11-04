@@ -25,6 +25,16 @@ export interface AidmError {
   message: string;
 }
 
+/**
+ * Structured result returned by every Electron IPC handler. Failures are
+ * resolved as data rather than thrown across the IPC bridge, where Electron
+ * would serialize a thrown plain object as `[object Object]` and lose the
+ * actionable code/message. The preload unwraps this envelope for callers.
+ */
+export type AidmIpcResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; error: AidmError };
+
 export function aidmError(code: AidmErrorCode, message: string): AidmError {
   return { code, message };
 }
