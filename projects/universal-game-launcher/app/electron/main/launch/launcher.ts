@@ -217,6 +217,29 @@ export class GameLauncher {
     });
 
     this.running.set(gameId, entry);
+
+    // Confirm the OS actually started the process before reporting
+    // success. Failures discovered after spawn returns (a file removed
+    // after validation, EACCES, ENOEXEC) surface as an asynchronous
+    // 'error' event; without this wait, launch() would return success,
+    // the IPC handler would minimize the window, and the UI would never
+    // learn the launch failed. Mirrors the Battle.net client path.
+    try {
+      await new Promise<void>((resolve, reject) => {
+        child.once('spawn', () => resolve());
+        child.once('error', (err: Error) => reject(err));
+      });
+    } catch (err) {
+      // The 'error' listener above was registered first, so it has
+      // already finalized the session; this call is an idempotent
+      // safeguard (guarded by the running map) if that ever changes.
+      finalize('interrupted', `Process failed to start: ${(err as Error).message}`);
+      throw new ValidationError(
+        'SPAWN_FAILED',
+        describeSpawnFailure(`"${game.title}"`, err as Error),
+      );
+    }
+
     this.ensureCheckpointTimer();
     this.onLaunched?.(gameId);
     return { sessionId, alreadyRunning: false };
