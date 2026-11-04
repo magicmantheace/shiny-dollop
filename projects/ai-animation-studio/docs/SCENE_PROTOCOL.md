@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | spawn | actor_id, position [x,y,z] | Creates actor once |
 | move | actor_id, target [x,y,z], duration_ms | Time-bounded translation; future pathfinding |
-| speak | actor_id, line | Currently logs line; future TTS/lip sync |
+| speak | actor_id, line | Logs line; optional `duration_ms` (ADR-009 hold) and `interrupt` (F3.3, below); future TTS/lip sync |
 | emote | actor_id, emotion, intensity | Currently logs; future facial rig |
 | camera | shot | Currently logs; future shot controller |
 
@@ -25,7 +25,7 @@
 - Coordinates bounded to ±1000; move duration 100–60000 ms; line maximum 500 characters.
 - Unsupported schema versions or unknown opcodes fail closed.
 - Runtime must also resolve referenced recipe/environment/rig/prop IDs to **approved** assets before production execution. Preview deliberately uses procedural stand-ins, not approved files.
-- Event ordering on tied timestamps is stable in JSON array order.
+- Event ordering on tied timestamps follows the dispatch priority rule (camera, then spawn, then JSON array order) — see the F3.3 dialogue runtime section below.
 - Future: shot targets, animation IDs, state preconditions, cancellation, playback clocks, causality/acks, voice cues and bounded live IPC.
 
 ## Director-to-engine IPC (F2.4, implemented 2026-11-03)
@@ -50,3 +50,11 @@ The v1 rules above define *when* events fire (`at_ms`) but not how long a `speak
 - **Camera cuts are instantaneous.** A `camera` event takes effect exactly at its `at_ms`, has no duration, is never blocked by a speak hold and blocks nothing. On tied timestamps the existing stable array-order rule decides application order. Fades/dolly moves are out of scope for v1 and would arrive as new ops, not as a duration on `camera`.
 - **Move and emote unchanged.** `move` already carries a validated `duration_ms` (100–60000 ms); it remains fire-at-`at_ms` — its motion runs concurrently and a later same-actor event applies on schedule (interrupting/retargeting the motion), exactly as the preview behaves today. `emote` is an instantaneous state change at its `at_ms` with no hold. Speak is the only op this proposal gives a hold.
 - **Demo check.** Under this model the demo scene stays consistent: the traveler's 44-character line at 3800 ms derives a 2934 ms hold ending at 6734 ms; the innkeeper's reply at 6600 ms is a different actor, so per-actor blocking does not delay it, and no same-actor event falls inside any hold. (Verified in the preview's headless run, 2026-11-03: no `Delayed` lines; holds logged 2934 ms and 2000 ms.)
+
+## Dialogue runtime: interrupts, dispatch priority, queue safety (F3.3, implemented 2026-11-03)
+
+Extends ADR-009 without changing it: non-interrupt behavior is exactly as ADR-009 specifies. The schedule computation has a single source of truth — `compute_schedule` in `studio/timing.py` — which the Godot preview mirrors; the whole schedule (including every truncation) is precomputed at load, with no runtime timers deciding order.
+
+- **Speak interrupt.** A `speak` event may carry `"interrupt": true` (boolean; absent means false; enforced by `studio/schema.py` and `schemas/scene.schema.json`). An interrupting speak is never delayed by a hold — it starts exactly at its `at_ms`. When the actor's current speak window contains that start (`window_start <= at_ms < window_end`), the current window is **truncated** at `at_ms`: the interrupted line keeps the floor up to the cut and no further, and the interrupting speak's own hold is computed normally (explicit `duration_ms` first, else derived, per ADR-009). An interrupt at or after the window's end is a no-op, an interrupt never touches another actor's window, and interrupts chain — each interrupting speak truncates the window left by the previous one. Later same-actor events are gated by the window *as truncated*. The preview logs a truncation distinctly — `Speak interrupted for <actor> at <ms>` plus the revised window (`Truncated speak hold for <actor>: window <start>..<old end> -> <start>..<at_ms> ms`) — and an interrupted speak occupies (and animates) only its truncated window.
+- **Dispatch priority on tied effective times.** When several events share an effective start time, dispatch order is: `camera` first, then `spawn`, then all remaining ops in scene (JSON array) order. This supersedes the tie-ordering sentences in the semantic rules and ADR-009 above: a camera cut authored at the same instant as a line is applied before the line, and a spawn always precedes same-instant commands for any actor. Camera events remain instantaneous, unblocked and blocking nothing (ADR-009).
+- **Queue safety.** Dispatch is per-event best-effort: an event referencing an actor with no spawned node — impossible in a scene that passed load validation — is skipped with a named error (`Dispatch skipped: ...`) and the queue continues; there is no crash and no stall. This is a thin runtime guard, not a second validator; validation remains the fail-closed gate.
