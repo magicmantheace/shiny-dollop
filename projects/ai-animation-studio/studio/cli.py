@@ -6,6 +6,7 @@ import json
 import shutil
 from pathlib import Path
 from . import gltf
+from .ipc import write_ipc
 from .library import Library, ROOT, DEFAULT_DB
 from .promotion import DEFAULT_ASSET_ROOT, PromotionError, promote_asset, promote_character
 from .recipes import (RecipeError, assemble_character, edit_character,
@@ -111,9 +112,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "demo":
         scene = validate_scene(load(args.scene))
         out_path = args.out or (ROOT / "godot" / "data" / "scene_runtime.json")
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(json.dumps(scene, indent=2) + "\n", encoding="utf-8")
-        print(f"Saved {len(scene['events'])} validated events to {out_path}")
+        envelope = write_ipc(out_path, scene)
+        print(f"Saved {len(scene['events'])} validated events to {out_path} "
+              f"(IPC envelope, ipc_version {envelope['ipc_version']})")
         manifest = EXAMPLES / "asset_manifest.json"
         if manifest.exists():
             target = out_path.parent / "asset_manifest.json"

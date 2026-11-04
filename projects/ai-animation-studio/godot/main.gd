@@ -6,6 +6,15 @@ extends Node3D
 const SCHEMA_VERSION := "1.0.0"
 const VALID_OPS := ["spawn", "move", "speak", "emote", "camera"]
 
+## Director-to-engine IPC (F2.4, studio/ipc.py): the runtime slot may carry
+## a versioned envelope {ipc_version, kind: "scene", payload} instead of a
+## bare scene. IPC_VERSION mirrors IPC_VERSION in studio/ipc.py (parity
+## guarded by tests/test_ipc.py). Enveloped loads are acknowledged with a
+## result document at RESULT_PATH; bare scenes keep the pre-IPC behavior
+## exactly (no result file).
+const IPC_VERSION := "1.0.0"
+const RESULT_PATH := "res://data/scene_result.json"
+
 ## Speak timing (ADR-009): changeable variables, not constants. A scene may
 ## override them with a top-level "timing" object; the defaults mirror
 ## studio/timing.py (parity guarded by tests/test_timing.py).
@@ -42,20 +51,31 @@ func _ready() -> void:
     if typeof(parsed) != TYPE_DICTIONARY:
         push_error("Invalid scene JSON: " + source)
         return
+    # IPC envelope (F2.4): a document carrying ipc_version/kind is treated
+    # as an envelope and unwrapped; anything else is a legacy bare scene.
+    var enveloped: bool = parsed.has("ipc_version") or parsed.has("kind")
+    var scene_doc: Dictionary = parsed
+    if enveloped:
+        var problem := _ipc_envelope_problem(parsed)
+        if problem != "":
+            push_error("IPC envelope rejected (" + problem + "): " + source)
+            _write_result(_envelope_scene_id(parsed), false, problem)
+            return
+        scene_doc = parsed["payload"]
     # Cheap re-validation at load: parsed JSON is not trusted input.
     # This mirrors the fail-closed wire subset of studio/schema.py that the
     # preview executes; full semantic validation stays on the Python side.
-    if String(parsed.get("schema_version", "")) != SCHEMA_VERSION:
-        push_error("Unsupported schema_version (expected " + SCHEMA_VERSION + "): " + source)
+    if String(scene_doc.get("schema_version", "")) != SCHEMA_VERSION:
+        _reject_load(source, "Unsupported schema_version (expected " + SCHEMA_VERSION + ")", enveloped, scene_doc)
         return
-    var raw_actors: Variant = parsed.get("actors")
-    var raw_events: Variant = parsed.get("events")
+    var raw_actors: Variant = scene_doc.get("actors")
+    var raw_events: Variant = scene_doc.get("events")
     if typeof(raw_actors) != TYPE_ARRAY or typeof(raw_events) != TYPE_ARRAY:
-        push_error("Scene actors/events must be arrays: " + source)
+        _reject_load(source, "Scene actors/events must be arrays", enveloped, scene_doc)
         return
     for actor in raw_actors:
         if typeof(actor) != TYPE_DICTIONARY:
-            push_error("Actor entry is not an object; scene rejected: " + source)
+            _reject_load(source, "Actor entry is not an object; scene rejected", enveloped, scene_doc)
             return
         actors[actor.get("id", "")] = {"color": actor.get("color", "#dddddd"), "node": null, "recipe_id": String(actor.get("recipe_id", "")), "anim": null}
     for i in raw_events.size():
@@ -74,9 +94,51 @@ func _ready() -> void:
             push_error("events[" + str(i) + "]: move target is not an array of exactly 3 numbers; event skipped")
             continue
         events.append(e)
-    _apply_timing(parsed)
+    _apply_timing(scene_doc)
     _build_schedule()
-    print("AI Animation Studio preview: ", parsed.get("scene_id", "<unnamed>"))
+    print("AI Animation Studio preview: ", scene_doc.get("scene_id", "<unnamed>"))
+    if enveloped:
+        _write_result(String(scene_doc.get("scene_id", "")), true,
+            "scene accepted and scheduled (" + str(events.size()) + " events)")
+
+func _ipc_envelope_problem(env: Dictionary) -> String:
+    # Returns "" when env is a well-formed scene envelope for IPC_VERSION,
+    # otherwise the named rejection reason (mirrors studio/ipc.py).
+    if String(env.get("ipc_version", "")) != IPC_VERSION:
+        return "unsupported ipc_version '" + String(env.get("ipc_version", "")) + "' (expected " + IPC_VERSION + ")"
+    if String(env.get("kind", "")) != "scene":
+        return "unknown kind '" + String(env.get("kind", "")) + "' (expected 'scene')"
+    if typeof(env.get("payload")) != TYPE_DICTIONARY:
+        return "envelope payload is not an object"
+    return ""
+
+func _envelope_scene_id(env: Dictionary) -> String:
+    var payload: Variant = env.get("payload")
+    if typeof(payload) == TYPE_DICTIONARY:
+        return String(payload.get("scene_id", ""))
+    return ""
+
+func _reject_load(source: String, reason: String, enveloped: bool, scene_doc: Dictionary) -> void:
+    push_error(reason + ": " + source)
+    if enveloped:
+        _write_result(String(scene_doc.get("scene_id", "")), false, reason)
+
+func _write_result(scene_id: String, accepted: bool, detail: String) -> void:
+    # IPC acknowledgement (F2.4): the result document the director reads
+    # back; shape mirrors studio/ipc.py result documents.
+    var doc := {
+        "ipc_version": IPC_VERSION,
+        "kind": "result",
+        "scene_id": scene_id,
+        "accepted": accepted,
+        "detail": detail,
+    }
+    var f := FileAccess.open(RESULT_PATH, FileAccess.WRITE)
+    if f == null:
+        push_warning("Could not write IPC result file: " + RESULT_PATH)
+        return
+    f.store_string(JSON.stringify(doc, "  ") + "\n")
+    f.close()
 
 func _apply_timing(scene: Dictionary) -> void:
     # Scene-level "timing" object overrides the exported settings above.

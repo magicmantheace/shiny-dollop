@@ -21,6 +21,7 @@ dist/
 godot/.godot/
 godot/data/scene_runtime.json
 godot/data/asset_manifest.json
+godot/data/scene_result.json
 *.blend1
 *.blend2
 *.glb

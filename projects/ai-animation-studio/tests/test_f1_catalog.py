@@ -10,6 +10,7 @@ import unittest
 from pathlib import Path
 
 from studio.cli import load, main
+from studio.ipc import read_ipc
 from studio.library import Library, ROOT
 from studio.schema import (
     VERSION,
@@ -148,7 +149,10 @@ class RegisterCliTests(unittest.TestCase):
             out = Path(temp) / "scene_runtime.json"
             code = main(["demo", "--scene", "scene_tavern_v2.json", "--out", str(out)])
             self.assertEqual(code, 0)
-            scene = json.loads(out.read_text(encoding="utf-8"))
+            # Since F2.4 the demo writes an IPC envelope; read the scene
+            # back through the contract (envelope shape covered in
+            # tests/test_ipc.py).
+            scene = read_ipc(out)
             self.assertEqual(scene["scene_id"], "tavern_meeting_v2")
             manifest_copy = Path(temp) / "asset_manifest.json"
             self.assertTrue(manifest_copy.exists())
