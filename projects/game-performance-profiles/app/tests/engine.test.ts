@@ -382,6 +382,25 @@ describe('takeSnapshot', () => {
     expect(db.listSnapshots()).toHaveLength(1);
     db.close();
   });
+
+  it('rejects sentinel measurements from a failed collection and persists nothing', async () => {
+    // Regression: the Windows layer used to return { cpuPercent: -1,
+    // memoryMb: -1 } when its counter command failed, and those sentinels
+    // were persisted and compared as if they were real measurements.
+    const os = new MockOsLayer({ initial: { cpuPercent: -1, memoryMb: -1 } });
+    const db = memDb();
+    await expect(takeSnapshot('failed', os, db)).rejects.toThrow(/invalid measurements/);
+    expect(db.listSnapshots()).toHaveLength(0);
+    db.close();
+  });
+
+  it('rejects non-finite measurements and persists nothing', async () => {
+    const os = new MockOsLayer({ initial: { cpuPercent: Number.NaN, memoryMb: 4096 } });
+    const db = memDb();
+    await expect(takeSnapshot('failed', os, db)).rejects.toThrow(/invalid measurements/);
+    expect(db.listSnapshots()).toHaveLength(0);
+    db.close();
+  });
 });
 
 describe('validateParams', () => {

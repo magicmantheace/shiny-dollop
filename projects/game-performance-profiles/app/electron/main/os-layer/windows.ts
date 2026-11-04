@@ -295,26 +295,37 @@ export class WindowsOsLayer implements OsLayer {
 
   async takeSnapshot(): Promise<{ cpuPercent: number; memoryMb: number }> {
     this.requireWin32();
-    // Best-effort point-in-time estimate via documented tools.
-    // typeperf counters are sampled once; failure yields a clearly-marked fallback.
+    // Point-in-time estimate via documented tools. Counters are sampled
+    // once; a collection failure (command error or unparseable output)
+    // throws an actionable error — it must never be persisted or shown
+    // as a measurement (previously this returned -1/-1 sentinels, which
+    // the engine stored and the UI compared as if they were real data).
+    let out: string;
     try {
-      const out = await run('powershell.exe', [
+      out = await run('powershell.exe', [
         '-NoProfile', '-NonInteractive', '-Command',
         "$c=(Get-Counter '\\Processor(_Total)\\% Processor Time').CounterSamples[0].CookedValue;" +
           "$m=(Get-Counter '\\Memory\\Available MBytes').CounterSamples[0].CookedValue;" +
           "$t=(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1MB;" +
           "\"$([math]::Round($c,1)) $([math]::Round($t-$m,0))\"",
       ]);
-      const parts = out.trim().split(/\s+/);
-      const cpu = Number(parts[0]);
-      const mem = Number(parts[1]);
-      if (Number.isFinite(cpu) && Number.isFinite(mem)) {
-        return { cpuPercent: cpu, memoryMb: mem };
-      }
-    } catch {
-      // fall through to fallback
+    } catch (e) {
+      throw new OsLayerError(
+        'os-error',
+        'Could not collect a resource snapshot: the Windows performance-counter command failed. No snapshot was recorded.',
+        { cause: e },
+      );
     }
-    return { cpuPercent: -1, memoryMb: -1 }; // counters unavailable; still labelled approximate
+    const parts = out.trim().split(/\s+/);
+    const cpu = Number(parts[0]);
+    const mem = Number(parts[1]);
+    if (!Number.isFinite(cpu) || !Number.isFinite(mem) || cpu < 0 || mem < 0) {
+      throw new OsLayerError(
+        'os-error',
+        `Could not collect a resource snapshot: the performance-counter output was not usable measurements ("${out.trim()}"). No snapshot was recorded.`,
+      );
+    }
+    return { cpuPercent: cpu, memoryMb: mem };
   }
 
   // -- raw helpers ----------------------------------------------------------
