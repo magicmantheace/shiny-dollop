@@ -3,7 +3,7 @@ import { getSim, type SimulationResult } from '../types';
 import { dollarsToCents, formatHorizon, formatPayoffMonth, formatUnpaidWithinHorizon, formatUSD } from '../lib/money';
 import { monthlyIncomeTotalCents } from '../lib/frequency';
 import { validateExtraPayment } from '../lib/validation';
-import { balancePolyline, chartMaxBalance, downsample } from '../lib/chart';
+import { balancePolyline, chartMaxBalance, chartMaxMonth, downsample } from '../lib/chart';
 import { styles, theme } from '../styles';
 
 interface Comparison {
@@ -43,10 +43,11 @@ function BalanceChart({ comparison }: { comparison: Comparison }) {
   const width = 640;
   const height = 220;
   const max = chartMaxBalance([comparison.avalanche.monthly, comparison.snowball.monthly]);
+  const maxMonth = chartMaxMonth([comparison.avalanche.monthly, comparison.snowball.monthly]);
   const av = downsample(comparison.avalanche.monthly, 200);
   const sn = downsample(comparison.snowball.monthly, 200);
-  const avPts = balancePolyline(av, width, height, max);
-  const snPts = balancePolyline(sn, width, height, max);
+  const avPts = balancePolyline(av, width, height, max, maxMonth);
+  const snPts = balancePolyline(sn, width, height, max, maxMonth);
   return (
     <div style={styles.card}>
       <h2 style={styles.cardTitle}>Balance over time</h2>
