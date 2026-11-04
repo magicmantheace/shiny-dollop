@@ -8,6 +8,7 @@ from pathlib import Path
 from . import gltf
 from .library import Library, ROOT, DEFAULT_DB
 from .promotion import DEFAULT_ASSET_ROOT, PromotionError, promote_asset, promote_character
+from .recipes import RecipeError, assemble_character, unapproved_parts
 from .schema import validate_scene, validate_asset, validate_character, validate_catalog, ValidationError
 
 EXAMPLES = ROOT / "examples"
@@ -55,7 +56,7 @@ def enrich_manifest(manifest: dict, lib: Library, asset_root: Path | None) -> di
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="AI Animation Studio foundation")
-    parser.add_argument("command", choices=["validate", "init-db", "seed", "register", "promote", "list-assets", "demo", "sockets"])
+    parser.add_argument("command", choices=["validate", "init-db", "seed", "register", "promote", "assemble", "list-assets", "demo", "sockets"])
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--catalog", default="quaternius_f1_catalog.json",
                         help="catalog fixture in examples/ (register/promote commands)")
@@ -66,6 +67,10 @@ def main(argv: list[str] | None = None) -> int:
                              "defaults to AI_ANIMATION_ASSET_ROOT or the VM store")
     parser.add_argument("--body", default="assets/characters/Superhero_Male_FullBody.gltf",
                         help="body glTF under the asset root (sockets command)")
+    parser.add_argument("--spec", type=Path, default=None,
+                        help="character spec JSON file (assemble command)")
+    parser.add_argument("--require-approved", action="store_true",
+                        help="assemble command: refuse recipes with unapproved parts")
     parser.add_argument("--out", type=Path, default=ROOT / "godot" / "data" / "scene_runtime.json")
     args = parser.parse_args(argv)
     asset_root = args.asset_root or DEFAULT_ASSET_ROOT
@@ -153,11 +158,26 @@ def main(argv: list[str] | None = None) -> int:
                           f"{'PASS' if gate['passed'] else 'FAIL'} — {gate['detail']}")
                 print(f"  pending human gates (NOT passed): {', '.join(result['pending'])}")
             return 0 if all_ok else 2
+        elif args.command == "assemble":
+            if args.spec is None:
+                parser.error("assemble requires --spec <character spec JSON file>")
+            spec = json.loads(args.spec.read_text(encoding="utf-8"))
+            recipe = assemble_character(lib, spec,
+                                        require_approved=args.require_approved)
+            lib.put_character(recipe)
+            print(f"Assembled character {recipe['character_id']} "
+                  f"(rig {recipe['rig_id']}) into {args.db}")
+            pending = unapproved_parts(lib, recipe)
+            if pending:
+                print(f"  unapproved parts (not playable until promoted): "
+                      f"{', '.join(pending)}")
+            else:
+                print("  all parts approved")
         elif args.command == "list-assets":
             for item in lib.list_assets():
                 print(f"{item['asset_id']} [{item['status']}] {item['uri']}")
         return 0
-    except (ValidationError, PromotionError, OSError, ValueError) as err:
+    except (ValidationError, PromotionError, RecipeError, OSError, ValueError) as err:
         parser.error(str(err))
     finally:
         lib.close()
