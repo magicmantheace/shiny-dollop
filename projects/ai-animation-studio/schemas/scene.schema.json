@@ -1,0 +1,263 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/ai-animation-studio/scene.schema.json",
+  "title": "Validated AI director scene v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scene_id",
+    "environment_id",
+    "actors",
+    "events"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "scene_id": {
+      "$ref": "#/$defs/id"
+    },
+    "environment_id": {
+      "$ref": "#/$defs/id"
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional speak-timing overrides (ADR-009). Defaults: rate 15 chars/sec, clamps 800..15000 ms. The min <= max cross-check is enforced by studio/schema.py.",
+      "properties": {
+        "speak_chars_per_second": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+        },
+        "speak_min_hold_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60000
+        },
+        "speak_max_hold_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60000
+        }
+      }
+    },
+    "props": {
+      "type": "array",
+      "maxItems": 32,
+      "description": "Optional scene prop registry (F4.2): stage objects an interact event can reference. Each prop's asset resolves through the manifest's approved-asset path at runtime (ADR-008); socket names the hand anchor the prop attaches to (docs/RIG_CONTRACT.md), default hand_r.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "asset_id",
+          "position"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "asset_id": {
+            "$ref": "#/$defs/id"
+          },
+          "position": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number",
+              "minimum": -1000,
+              "maximum": 1000
+            }
+          },
+          "socket": {
+            "enum": [
+              "hand_r",
+              "hand_l"
+            ]
+          }
+        }
+      }
+    },
+    "actors": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "recipe_id",
+          "color"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "recipe_id": {
+            "$ref": "#/$defs/id"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          }
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2000,
+      "items": {
+        "type": "object",
+        "required": [
+          "at_ms",
+          "op"
+        ],
+        "properties": {
+          "at_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3600000
+          },
+          "op": {
+            "enum": [
+              "spawn",
+              "move",
+              "speak",
+              "emote",
+              "camera",
+              "interact"
+            ]
+          },
+          "action": {
+            "enum": [
+              "pick_up",
+              "put_down",
+              "sit",
+              "drink"
+            ],
+            "description": "Composite action for op=interact (F4.2), required there and meaningless elsewhere. Per-action field rules (prop_id required for pick_up/put_down/drink and refused on sit; target required for sit, optional for put_down, refused elsewhere; holding sequence pick_up -> drink -> put_down) are enforced by studio/schema.py."
+          },
+          "prop_id": {
+            "$ref": "#/$defs/id",
+            "description": "For op=interact: the id of a prop declared in the scene's top-level props registry."
+          },
+          "actor_id": {
+            "$ref": "#/$defs/id"
+          },
+          "position": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number",
+              "minimum": -1000,
+              "maximum": 1000
+            }
+          },
+          "target": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number",
+              "minimum": -1000,
+              "maximum": 1000
+            }
+          },
+          "duration_ms": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 60000
+          },
+          "interrupt": {
+            "type": "boolean",
+            "description": "Speak only (F3.3 dialogue runtime): when true, the speak starts at its at_ms even inside the actor's current speak hold and truncates that hold there. Absent means false."
+          },
+          "look_at": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Gaze intent (F4.1) for speak/emote/move events only — refused on spawn/camera by studio/schema.py. Exactly one of actor_id (gaze at that actor) or position (gaze at a stage point). The actor gazes at the target for the event's scheduled window; absent means no gaze change.",
+            "properties": {
+              "actor_id": {
+                "$ref": "#/$defs/id"
+              },
+              "position": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": {
+                  "type": "number",
+                  "minimum": -1000,
+                  "maximum": 1000
+                }
+              }
+            },
+            "oneOf": [
+              {
+                "required": [
+                  "actor_id"
+                ],
+                "not": {
+                  "required": [
+                    "position"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "position"
+                ],
+                "not": {
+                  "required": [
+                    "actor_id"
+                  ]
+                }
+              }
+            ]
+          },
+          "line": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "emotion": {
+            "enum": [
+              "neutral",
+              "happy",
+              "sad",
+              "angry",
+              "nervous",
+              "surprised",
+              "tired",
+              "scared"
+            ]
+          },
+          "intensity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "shot": {
+            "enum": [
+              "wide",
+              "two_shot",
+              "close_left",
+              "close_right"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+    }
+  }
+}

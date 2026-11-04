@@ -1,0 +1,9 @@
+[project]
+name = "ai-animation-studio"
+version = "0.1.0"
+description = "Local-first modular 3D animation director foundation"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.setuptools]
+packages = ["studio"]

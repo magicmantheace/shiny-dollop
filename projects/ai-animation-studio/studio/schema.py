@@ -1,0 +1,233 @@
+"""Dependency-free runtime validation for the v1 scene and asset contracts.
+
+JSON Schema documents in schemas/ are the interchange contract. This module
+enforces the security/semantic subset needed before sending commands to Godot.
+"""
+from __future__ import annotations
+
+import re
+
+try:
+    from .timing import resolve_timing
+except ImportError:  # standalone module use (studio/ on sys.path)
+    from timing import resolve_timing  # type: ignore[no-redef]
+
+VERSION = "1.0.0"
+OPS = frozenset({"spawn", "move", "speak", "emote", "camera", "interact"})
+EMOTIONS = frozenset({"neutral", "happy", "sad", "angry", "nervous", "surprised", "tired", "scared"})
+SHOTS = frozenset({"wide", "two_shot", "close_left", "close_right"})
+# Composite interaction actions (F4.2); mirrored in schemas/scene.schema.json.
+INTERACT_ACTIONS = frozenset({"pick_up", "put_down", "sit", "drink"})
+# Actions that take a prop_id; sit never does, pick_up/drink never take a
+# target, put_down may (its release position).
+PROP_ACTIONS = frozenset({"pick_up", "put_down", "drink"})
+# Hand sockets a declared prop attaches to (docs/RIG_CONTRACT.md names the
+# skeleton anchors hand_r/hand_l; the bone names match).
+PROP_SOCKETS = frozenset({"hand_r", "hand_l"})
+DEFAULT_PROP_SOCKET = "hand_r"
+# Asset license identifiers (F2.1); mirrored in schemas/asset.schema.json.
+LICENSES = frozenset({"CC0-1.0", "MIT", "proprietary", "unknown"})
+ID = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
+HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+class ValidationError(ValueError):
+    pass
+
+def need(ok: bool, message: str) -> None:
+    if not ok:
+        raise ValidationError(message)
+
+def identifier(value: object, name: str) -> None:
+    need(isinstance(value, str) and bool(ID.fullmatch(value)), f"{name}: invalid id")
+
+def vec3(value: object, name: str) -> None:
+    need(isinstance(value, list) and len(value) == 3, f"{name}: expected 3-vector")
+    for n in value:
+        need(type(n) in (int, float) and -1000 <= n <= 1000, f"{name}: out of bounds")
+
+def look_at(value: object, name: str, actor_ids: set) -> None:
+    """Gaze intent (F4.1): exactly one of actor_id / position, nothing else."""
+    need(isinstance(value, dict), f"{name}: look_at must be object")
+    keys = set(value)
+    need(keys <= {"actor_id", "position"}, f"{name}: unknown look_at keys")
+    need(len(keys) == 1, f"{name}: look_at needs exactly one of actor_id/position")
+    if "actor_id" in value:
+        identifier(value.get("actor_id"), f"{name}.look_at.actor_id")
+        need(value["actor_id"] in actor_ids, f"{name}: look_at unknown actor")
+    else:
+        vec3(value.get("position"), f"{name}.look_at.position")
+
+def validate_props(props: object) -> dict:
+    """Scene prop registry (F4.2): id -> declaration. A prop is a stage
+    object an `interact` event can reference; its asset resolves through
+    the manifest's approved-asset path at runtime (ADR-008)."""
+    need(isinstance(props, list) and len(props) <= 32, "props must contain at most 32 entries")
+    registry = {}
+    for n, prop in enumerate(props):
+        prefix = f"props[{n}]"
+        need(isinstance(prop, dict), prefix + ": not object")
+        identifier(prop.get("id"), prefix + ".id")
+        identifier(prop.get("asset_id"), prefix + ".asset_id")
+        need(prop["id"] not in registry, prefix + ": duplicate prop id")
+        vec3(prop.get("position"), prefix + ".position")
+        socket = prop.get("socket", DEFAULT_PROP_SOCKET)
+        need(isinstance(socket, str) and socket in PROP_SOCKETS, prefix + ": invalid socket")
+        registry[prop["id"]] = prop
+    return registry
+
+def validate_scene(scene: dict) -> dict:
+    need(isinstance(scene, dict), "scene must be object")
+    need(scene.get("schema_version") == VERSION, "unsupported scene version")
+    if "timing" in scene:
+        try:
+            resolve_timing(scene.get("timing"))
+        except ValueError as exc:
+            raise ValidationError(str(exc)) from exc
+    identifier(scene.get("scene_id"), "scene_id")
+    identifier(scene.get("environment_id"), "environment_id")
+    prop_registry = validate_props(scene["props"]) if "props" in scene else {}
+    actors = scene.get("actors")
+    events = scene.get("events")
+    need(isinstance(actors, list) and 1 <= len(actors) <= 32, "actors must contain 1..32 entries")
+    need(isinstance(events, list) and 1 <= len(events) <= 2000, "events must contain 1..2000 entries")
+    actor_ids = set()
+    for actor in actors:
+        need(isinstance(actor, dict), "actor must be object")
+        identifier(actor.get("id"), "actor.id")
+        identifier(actor.get("recipe_id"), "actor.recipe_id")
+        need(actor["id"] not in actor_ids, "duplicate actor id")
+        need(isinstance(actor.get("color"), str) and HEX.fullmatch(actor["color"]), "invalid actor color")
+        actor_ids.add(actor["id"])
+    spawned = set()
+    held_by: dict = {}    # actor_id -> prop_id currently held (F4.2)
+    holder_of: dict = {}  # prop_id -> actor_id currently holding it
+    last_time = -1
+    for n, e in enumerate(events):
+        prefix = f"events[{n}]"
+        need(isinstance(e, dict), prefix + ": not object")
+        t = e.get("at_ms")
+        need(type(t) is int and 0 <= t <= 3_600_000 and t >= last_time, prefix + ": invalid ordering/time")
+        last_time = t
+        op = e.get("op")
+        need(isinstance(op, str) and op in OPS, prefix + ": unknown operation")
+        if "look_at" in e and op not in ("speak", "emote", "move"):
+            need(False, prefix + ": look_at not allowed on " + op)
+        if op == "camera":
+            need(isinstance(e.get("shot"), str) and e.get("shot") in SHOTS, prefix + ": invalid shot")
+            continue
+        actor_id = e.get("actor_id")
+        need(isinstance(actor_id, str) and actor_id in actor_ids, prefix + ": unknown actor")
+        if op == "spawn":
+            need(actor_id not in spawned, prefix + ": duplicate spawn")
+            vec3(e.get("position"), prefix + ".position")
+            spawned.add(actor_id)
+        else:
+            need(actor_id in spawned, prefix + ": actor not spawned")
+        if op == "move":
+            vec3(e.get("target"), prefix + ".target")
+            d = e.get("duration_ms")
+            need(type(d) is int and 100 <= d <= 60_000, prefix + ": invalid duration")
+            if "look_at" in e:
+                look_at(e.get("look_at"), prefix, actor_ids)
+        elif op == "speak":
+            line = e.get("line")
+            need(isinstance(line, str) and 1 <= len(line) <= 500, prefix + ": invalid line")
+            if "duration_ms" in e:
+                d = e.get("duration_ms")
+                need(type(d) is int and 100 <= d <= 60_000, prefix + ": invalid duration")
+            if "interrupt" in e:
+                need(type(e.get("interrupt")) is bool, prefix + ": invalid interrupt")
+            if "look_at" in e:
+                look_at(e.get("look_at"), prefix, actor_ids)
+        elif op == "emote":
+            need(isinstance(e.get("emotion"), str) and e.get("emotion") in EMOTIONS, prefix + ": unsupported emotion")
+            q = e.get("intensity")
+            need(type(q) in (int, float) and 0 <= q <= 1, prefix + ": invalid intensity")
+            if "look_at" in e:
+                look_at(e.get("look_at"), prefix, actor_ids)
+        elif op == "interact":
+            # Composite action macros (F4.2, docs/SCENE_PROTOCOL.md). The
+            # holding rules are checked in authored event order: gating
+            # delays never reorder one actor's events, so the authored
+            # pick_up -> drink -> put_down sequence is the executed one.
+            action = e.get("action")
+            need(isinstance(action, str) and action in INTERACT_ACTIONS, prefix + ": unknown action")
+            d = e.get("duration_ms")
+            need(type(d) is int and 100 <= d <= 60_000, prefix + ": invalid duration")
+            if action in PROP_ACTIONS:
+                prop_id = e.get("prop_id")
+                identifier(prop_id, prefix + ".prop_id")
+                need(prop_id in prop_registry, prefix + ": unknown prop")
+            else:
+                need("prop_id" not in e, prefix + ": prop_id not allowed on " + action)
+                prop_id = None
+            if action == "sit":
+                vec3(e.get("target"), prefix + ".target")
+            elif action == "put_down":
+                if "target" in e:
+                    vec3(e.get("target"), prefix + ".target")
+            else:
+                need("target" not in e, prefix + ": target not allowed on " + action)
+            if action == "pick_up":
+                need(holder_of.get(prop_id) is None, prefix + ": prop already held")
+                need(actor_id not in held_by, prefix + ": actor already holding a prop")
+                held_by[actor_id] = prop_id
+                holder_of[prop_id] = actor_id
+            elif action in ("drink", "put_down"):
+                need(held_by.get(actor_id) == prop_id, prefix + ": actor is not holding this prop")
+                if action == "put_down":
+                    del held_by[actor_id]
+                    del holder_of[prop_id]
+    need(bool(spawned), "scene never spawns an actor")
+    return scene
+
+def validate_asset(asset: dict) -> dict:
+    need(isinstance(asset, dict), "asset must be object")
+    need(asset.get("schema_version") == VERSION, "unsupported asset version")
+    identifier(asset.get("asset_id"), "asset_id")
+    need(isinstance(asset.get("kind"), str) and asset.get("kind") in {"body", "head", "hair", "outfit", "prop", "motion", "environment", "voice", "material"}, "invalid kind")
+    uri = asset.get("uri")
+    need(isinstance(uri, str) and len(uri) < 256 and uri.startswith("assets/"), "uri must be assets/ relative path")
+    need(".." not in uri.split("/") and "\\" not in uri and not uri.startswith("/"), "unsafe path")
+    need(isinstance(asset.get("status"), str) and asset.get("status") in {"candidate", "approved", "retired"}, "invalid asset status")
+    tags = asset.get("tags")
+    need(isinstance(tags, list) and len(tags) <= 32 and all(isinstance(t, str) and ID.fullmatch(t) for t in tags), "invalid tags")
+    rig = asset.get("rig_id")
+    need(rig is None or (isinstance(rig, str) and ID.fullmatch(rig)), "invalid rig")
+    if "source" in asset:
+        source = asset.get("source")
+        need(isinstance(source, str) and 1 <= len(source) <= 256, "invalid source")
+    if "license" in asset:
+        need(isinstance(asset.get("license"), str) and asset.get("license") in LICENSES, "invalid license")
+    need(isinstance(asset.get("metadata"), dict), "invalid metadata")
+    return asset
+
+def validate_catalog(data: dict) -> dict:
+    """A catalog is a bundle of asset + character records for bulk intake."""
+    need(isinstance(data, dict), "catalog must be object")
+    need(data.get("schema_version") == VERSION, "unsupported catalog version")
+    assets = data.get("assets")
+    characters = data.get("characters")
+    need(isinstance(assets, list) and 1 <= len(assets) <= 512, "catalog assets must contain 1..512 entries")
+    need(isinstance(characters, list) and len(characters) <= 512, "catalog characters must contain 0..512 entries")
+    seen = set()
+    for asset in assets:
+        validate_asset(asset)
+        need(asset["asset_id"] not in seen, "duplicate catalog asset id")
+        seen.add(asset["asset_id"])
+    for character in characters:
+        validate_character(character)
+    return data
+
+def validate_character(data: dict) -> dict:
+    need(isinstance(data, dict), "character must be object")
+    need(data.get("schema_version") == VERSION, "unsupported character version")
+    for key in ("character_id", "rig_id", "body_base", "head", "hair"):
+        identifier(data.get(key), key)
+    outfits = data.get("outfit")
+    need(isinstance(outfits, list) and len(outfits) <= 16, "invalid outfit")
+    for item in outfits:
+        identifier(item, "outfit[]")
+    need(isinstance(data.get("colors"), dict), "colors must be object")
+    need(isinstance(data.get("status"), str) and data.get("status") in {"candidate", "approved", "retired"}, "invalid character status")
+    return data

@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/ai-animation-studio/asset.schema.json",
+  "title": "Reusable asset v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "asset_id",
+    "kind",
+    "uri",
+    "status",
+    "tags",
+    "rig_id",
+    "metadata"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "asset_id": {
+      "$ref": "#/$defs/id"
+    },
+    "kind": {
+      "enum": [
+        "body",
+        "head",
+        "hair",
+        "outfit",
+        "prop",
+        "motion",
+        "environment",
+        "voice",
+        "material"
+      ]
+    },
+    "uri": {
+      "type": "string",
+      "pattern": "^assets/(?!.*\\\\.\\\\.)(?!.*\\\\\\\\)[A-Za-z0-9_./-]+$",
+      "maxLength": 255
+    },
+    "status": {
+      "enum": [
+        "candidate",
+        "approved",
+        "retired"
+      ]
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "license": {
+      "enum": [
+        "CC0-1.0",
+        "MIT",
+        "proprietary",
+        "unknown"
+      ]
+    },
+    "tags": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    },
+    "rig_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "metadata": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+    }
+  }
+}
