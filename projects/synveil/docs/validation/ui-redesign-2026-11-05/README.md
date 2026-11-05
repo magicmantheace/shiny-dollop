@@ -162,4 +162,68 @@ Deviations and findings:
 
 ## S3 — weston.ini presentation
 
-Pending.
+Source revisions: `5ee6c0a` (weston.ini), `c360e06` (A/B fixture
+anchor follow-up), `0ae4cfa` (QMP frame-validator follow-up).
+
+Route verification (done before the edit, against the pinned
+source): the pinned Weston 15.0.1 desktop-shell parses
+`panel-position` from the ini `[shell]` section —
+`out/native-weston/build/build/weston-15.0.1/clients/desktop-shell.c:1582`,
+`weston_config_section_get_string(s, "panel-position", &position, "top")`
+— so the **ini route shipped**; no protocol route from the session
+was needed. `weston-session` and every session-startup mechanism
+are untouched; the diff is the `[shell]` presentation keys only
+(animation=zoom, close-animation=fade, startup-animation=fade,
+focus-animation=none, background-color=0xFF0F2B5B,
+panel-color=0xFF202020, panel-position=bottom).
+
+What was exercised:
+
+- Joined image rebuilt from `5ee6c0a` (image sha256
+  `cc6a25ad2b018a67310a71038e5f5a3b1c03b3ef39c3f4462d437ffae53903a4`).
+- **Joined acceptance (QEMU, TCG): PASS** —
+  `SYNVEIL_NATIVE_JOINED_QEMU_ENROLL_LOGIN_WESTON_PASS`
+  (enroll → login → Weston desktop, window move/resize/close
+  exercise, terminal, session-end relock, cold-reboot re-login;
+  `out/native-joined/guest-validation.json`,
+  `physical_hardware_tested: false`).
+- Screenshot in this folder: `s3-qemu-desktop-panel-bottom.png` —
+  a real guest frame from the S3 image: panel at the bottom in the
+  shell color with clock and launcher, desktop-near background,
+  terminal and the reskinned first window.
+- Follow-up consistency fixes the slice required (both verified):
+  `tools/native_ab.py` anchored its per-generation background
+  substitution on the pre-S3 base value and would have raised on
+  the next A/B build — it now anchors on the `background-color=`
+  key (fixture generation colors unchanged); `tests/qmp-input.py`
+  OK after the validator change below.
+
+Deviations and findings:
+
+- **Frame-validator follow-up (`0ae4cfa`, harness tooling):** the
+  first S3 acceptance runs failed with “weston desktop proof
+  failed” while the guest's own weston log showed a clean start
+  and `SYNVEIL_WESTON_SESSION_TWO_WINDOWS_READY`. Root cause:
+  `verified_ppm_test_frame` sampled only the first 1 MiB of a
+  screendump (the top ~273 rows) and required ≥64 pixels differing
+  from the top-left one; with the panel at the bottom, the top of
+  a fully rendered desktop is uniform background, so every frame
+  read as blank. The validator now also samples the frame tail;
+  single-color and all-zero frames still fail (synthetic checks
+  recorded in the commit message). No acceptance semantics
+  changed — the frame remains supplementary evidence beside the
+  guest's serial/session markers.
+- One further first-boot failure after that fix was window
+  placement variance in the move/resize exercise under TCG (the
+  gradient window can land mostly behind the terminal; the
+  exercise needs a ≥180 px visible gradient run). The identical
+  exercise steps were reproduced passing by hand twice, and the
+  next full harness run passed; recorded here rather than
+  smoothed over.
+- The update round trip was not re-run for S3: the updates window
+  and its behaviour contract are unchanged by this slice (the
+  joined image's session config changed only in the presentation
+  keys above, and the joined acceptance — which exercises the
+  session — passes). Future A/B builds pick up the new base ini
+  through the fixed anchor in `tools/native_ab.py`.
+
