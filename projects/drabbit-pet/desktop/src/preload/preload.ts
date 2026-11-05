@@ -11,6 +11,7 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import type {
   ActionKind,
   ActionOutcome,
+  BridgeReaction,
   ChangedEvent,
   CompanionState,
   DrabbitApi,
@@ -27,6 +28,7 @@ const CH = {
   openPanel: 'pet:openPanel',
   changed: 'pet:changed',
   roamState: 'pet:roamState',
+  bridgeReaction: 'pet:bridgeReaction',
   companionGetState: 'companion:getState',
   companionSetEnabled: 'companion:setEnabled',
   companionRegenerateToken: 'companion:regenerateToken',
@@ -62,6 +64,13 @@ const api: DrabbitApi = {
     ipcRenderer.on(CH.roamState, listener);
     return () => {
       ipcRenderer.removeListener(CH.roamState, listener);
+    };
+  },
+  onBridgeReaction: (cb) => {
+    const listener = (_e: IpcRendererEvent, payload: BridgeReaction) => cb(payload);
+    ipcRenderer.on(CH.bridgeReaction, listener);
+    return () => {
+      ipcRenderer.removeListener(CH.bridgeReaction, listener);
     };
   },
   getCompanionState: () => invoke<CompanionState>(CH.companionGetState),

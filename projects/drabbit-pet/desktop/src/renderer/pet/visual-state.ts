@@ -1,5 +1,6 @@
 import type { PetEvent } from 'drabbit-core';
 import type { PetSummary } from '../../shared/api-types.js';
+import type { BridgeReactionKind } from '../../shared/bridge-reaction.js';
 
 /**
  * Maps pet state → the pet window's animation state. Pure functions,
@@ -35,6 +36,14 @@ export function transientFromEvents(events: readonly PetEvent[]): TransientAnim 
     if (e.kind === 'played') return 'playing';
   }
   return null;
+}
+
+/**
+ * Bridge reactions are mostly a bubble line, not a body animation —
+ * only a successful bridge update earns the happy bounce.
+ */
+export function bridgeTransientFor(kind: BridgeReactionKind): TransientAnim | null {
+  return kind === 'celebrate' ? 'playing' : null;
 }
 
 /** Priority: base state (egg/dead/sleep/sick) > transient > hopping > idle. */

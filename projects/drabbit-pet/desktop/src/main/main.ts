@@ -16,6 +16,7 @@ import type { ChangedEvent, RoamState } from '../shared/api-types.js';
 import { PetService, systemClock } from './pet-service.js';
 import { SaveStore } from './save-store.js';
 import { TickService } from './tick-service.js';
+import { BridgeLinkService } from './bridge-link.js';
 import { RoamPlanner, type RoamBounds } from './roaming.js';
 import { registerPetIpc } from './ipc.js';
 import { registerCompanionIpc } from './companion-ipc.js';
@@ -40,6 +41,7 @@ let tray: Tray | null = null;
 let service: PetService | null = null;
 let companion: CompanionService | null = null;
 let tickService: TickService | null = null;
+let bridgeLink: BridgeLinkService | null = null;
 let roamTimer: ReturnType<typeof setInterval> | null = null;
 let roamingPaused = false;
 let isQuitting = false;
@@ -272,6 +274,16 @@ function startApp(): void {
   tickService.start();
   startRoaming();
 
+  // Muse PC Bridge link: the pet observes the bridge avatar
+  // window's published state file and reacts in its window. Read-
+  // only, one-way; a missing file (bridge in console form) is a
+  // quiet no-op. Presentation only — the sim never sees it.
+  bridgeLink = new BridgeLinkService({
+    onReaction: (reaction) => broadcast(PetChannels.bridgeReaction, reaction),
+    petName: () => service?.getSummary().name ?? 'The drabbit',
+  });
+  bridgeLink.start();
+
   if (isSmoke) {
     // Real windows opened with the production bundle: smoke passes.
     let loaded = 0;
@@ -307,6 +319,7 @@ if (!gotLock) {
   app.on('before-quit', () => {
     isQuitting = true;
     tickService?.stop();
+    bridgeLink?.stop();
     if (roamTimer) clearInterval(roamTimer);
     void companion?.shutdown();
     service?.shutdown();

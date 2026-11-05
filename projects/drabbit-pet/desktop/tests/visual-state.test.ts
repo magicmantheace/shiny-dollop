@@ -3,6 +3,7 @@ import type { PetEvent } from 'drabbit-core';
 import type { PetSummary } from '../src/shared/api-types.js';
 import {
   baseAnimState,
+  bridgeTransientFor,
   resolveAnimState,
   transientFromEvents,
 } from '../src/renderer/pet/visual-state.js';
@@ -66,5 +67,15 @@ describe('resolveAnimState', () => {
     expect(resolveAnimState(summary(), true, 'eating')).toBe('eating');
     expect(resolveAnimState(summary(), true, null)).toBe('hopping');
     expect(resolveAnimState(summary(), false, null)).toBe('idle');
+  });
+});
+
+describe('bridgeTransientFor', () => {
+  it('only a bridge celebrate earns a body animation', () => {
+    expect(bridgeTransientFor('celebrate')).toBe('playing');
+    expect(bridgeTransientFor('working')).toBeNull();
+    expect(bridgeTransientFor('session')).toBeNull();
+    expect(bridgeTransientFor('alert')).toBeNull();
+    expect(bridgeTransientFor('idle')).toBeNull();
   });
 });

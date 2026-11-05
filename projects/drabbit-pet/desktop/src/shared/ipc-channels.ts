@@ -12,6 +12,8 @@ export const PetChannels = {
   changed: 'pet:changed',
   /** main → renderer push: { hopping } when roaming state flips */
   roamState: 'pet:roamState',
+  /** main → renderer push: BridgeReaction when the PC bridge's state changes */
+  bridgeReaction: 'pet:bridgeReaction',
 } as const;
 
 /** Companion server channels (P3). */

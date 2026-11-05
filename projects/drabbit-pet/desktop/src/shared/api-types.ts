@@ -1,6 +1,8 @@
 import type { AdultForm, FurVariant, Mood, Needs, PetEvent, Stage } from 'drabbit-core';
+import type { BridgeReaction } from './bridge-reaction.js';
 
 export type { PetEvent };
+export type { BridgeReaction };
 
 /**
  * The presentation subset of the pet state, safe to send over IPC and
@@ -115,6 +117,8 @@ export interface DrabbitApi {
   onChanged(cb: (e: ChangedEvent) => void): () => void;
   /** Subscribe to roaming (hop) state flips. Returns an unsubscribe fn. */
   onRoamState(cb: (s: RoamState) => void): () => void;
+  /** Subscribe to Muse PC Bridge reactions. Returns an unsubscribe fn. */
+  onBridgeReaction(cb: (r: BridgeReaction) => void): () => void;
   // Companion server (P3)
   getCompanionState(): Promise<CompanionState>;
   setCompanionEnabled(enabled: boolean): Promise<CompanionState>;
