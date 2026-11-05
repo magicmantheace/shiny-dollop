@@ -1725,6 +1725,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
         except PlatformUnavailable as exc:
             self._audit_request(f"unavailable: {exc}", 501, started)
             self._send_json(501, {"error": str(exc), "platform_limited": True})
+        except FileNotFoundError as exc:
+            self._audit_request(f"not found: {exc}", 404, started)
+            self._send_json(404, {"error": str(exc)})
         except ValueError as exc:
             self._audit_request(f"bad request: {exc}", 400, started)
             self._send_json(400, {"error": str(exc)})
@@ -2277,11 +2280,19 @@ class BridgeHandler(BaseHTTPRequestHandler):
             raise ValueError("sha256 must be 64 hex characters")
         # Validate the destination now so failures surface before data flows.
         self.core.resolve_in_root(root_name, rel)
+        # The client may request a chunk size (small chunks make tests
+        # and resumable transfers over slow links practical); clamp it.
+        try:
+            chunk_size = int(payload.get("chunk_bytes")
+                             or payload.get("chunk_size") or CHUNK_SIZE)
+        except (TypeError, ValueError):
+            raise ValueError("chunk_bytes must be an integer")
+        chunk_size = max(64 * 1024, min(16 * 1024 * 1024, chunk_size))
         upload = Upload(self.core, {
             "id": uuid.uuid4().hex[:12],
             "root": root_name, "path": rel, "size": size,
             "sha256": str(expected).lower() if expected else None,
-            "chunk_size": CHUNK_SIZE, "created": time.time(),
+            "chunk_size": chunk_size, "created": time.time(),
         })
         upload.save_meta()
         with self.core._uploads_lock:
@@ -2293,7 +2304,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         with self.core._uploads_lock:
             upload = self.core.uploads.get(upload_id)
         if upload is None:
-            raise ValueError(f"no such upload: {upload_id}")
+            raise FileNotFoundError(f"no such upload: {upload_id}")
         return upload
 
     def _handle_upload_chunk(self, upload_id: str, index: int):
