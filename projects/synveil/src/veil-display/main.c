@@ -163,6 +163,375 @@ static void paint(const struct surface *screen) {
               rgb(screen, 74, 157, 196));
 }
 
+/* ------------------------------------------------------------------ */
+/* Windows 11 presentation layer (ADR 0024, docs/UI_DESIGN.md).        */
+/* Rendering only: no authentication, policy, credential or session    */
+/* logic lives here. Text uses an embedded bitmap atlas generated      */
+/* from the Buildroot-pinned DejaVu faces by tools/generate_ui_font.py */
+/* (the spec's DejaVu fallback; the Selawik deviation is recorded in   */
+/* docs/validation/). Integer math only: this binary is statically     */
+/* linked without libm.                                                */
+/* ------------------------------------------------------------------ */
+#include "ui_font_data.h"
+
+#ifndef UI_MOTION
+#define UI_MOTION 1
+#endif
+
+struct ui_rgb { uint8_t r; uint8_t g; uint8_t b; };
+
+struct ui_palette {
+    struct ui_rgb ink, dim, faint, shell, surface, surface_hi, stroke;
+    struct ui_rgb accent, accent_pressed, danger, field;
+    struct ui_rgb grad_near, grad_far, on_accent, select;
+};
+
+/* UI_DESIGN.md tokens. select is the spec's selection blend: the accent
+ * at 25 percent over the surface token. */
+static const struct ui_palette UI_DARK = {
+    {255, 255, 255}, {200, 200, 200}, {138, 138, 138}, {32, 32, 32},
+    {44, 44, 44}, {56, 56, 56}, {69, 69, 69}, {76, 194, 255},
+    {56, 168, 232}, {232, 17, 35}, {44, 44, 44}, {15, 43, 91},
+    {27, 75, 143}, {32, 32, 32}, {52, 81, 96}
+};
+
+/* The pre-existing high-contrast preference keeps its light scheme; only
+ * the token roles are mapped onto it. */
+static const struct ui_palette UI_HC = {
+    {9, 22, 31}, {29, 53, 67}, {80, 96, 104}, {245, 248, 250},
+    {255, 255, 255}, {232, 238, 242}, {150, 164, 172}, {0, 95, 184},
+    {0, 80, 158}, {200, 16, 32}, {255, 255, 255}, {200, 220, 240},
+    {150, 190, 230}, {255, 255, 255}, {229, 186, 84}
+};
+
+static uint32_t ui_px(const struct surface *screen, struct ui_rgb color) {
+    return rgb(screen, color.r, color.g, color.b);
+}
+
+static void ui_fill(const struct surface *screen, unsigned x, unsigned y,
+                    unsigned width, unsigned height, struct ui_rgb color) {
+    rectangle(screen, x, y, width, height, ui_px(screen, color));
+}
+
+static void ui_unpack(const struct surface *screen, uint32_t value,
+                      unsigned out[3]) {
+    const struct fb_bitfield fields[3] = {
+        screen->variable.red, screen->variable.green, screen->variable.blue
+    };
+    for (unsigned i = 0; i < 3u; i++) {
+        unsigned length = fields[i].length;
+        unsigned max = length ? ((1u << length) - 1u) : 0u;
+        unsigned raw = length ? ((value >> fields[i].offset) & max) : 0u;
+        out[i] = max ? (raw * 255u + max / 2u) / max : 0u;
+    }
+}
+
+/* Alpha-blend one pixel: cover 0 is invisible, 255 is the solid color. */
+static void ui_blend(const struct surface *screen, unsigned x, unsigned y,
+                     struct ui_rgb color, unsigned cover) {
+    if (!cover || x >= screen->variable.xres || y >= screen->variable.yres)
+        return;
+    if (cover >= 255u) {
+        rectangle(screen, x, y, 1u, 1u, ui_px(screen, color));
+        return;
+    }
+    size_t offset = (size_t)y * screen->fixed.line_length + (size_t)x * 4u;
+    uint32_t old;
+    memcpy(&old, (const unsigned char *)screen->mapped + offset, 4u);
+    unsigned bg[3];
+    ui_unpack(screen, old, bg);
+    unsigned inv = 255u - cover;
+    struct ui_rgb mixed = {
+        (uint8_t)((color.r * cover + bg[0] * inv + 127u) / 255u),
+        (uint8_t)((color.g * cover + bg[1] * inv + 127u) / 255u),
+        (uint8_t)((color.b * cover + bg[2] * inv + 127u) / 255u)
+    };
+    uint32_t value = ui_px(screen, mixed);
+    memcpy((unsigned char *)screen->mapped + offset, &value, 4u);
+}
+
+/* Coverage of one pixel of a circle of radius r whose centre is at a
+ * pixel-corner grid point; coordinates are doubled to stay integral. */
+static unsigned ui_circle_cover(int dx2, int dy2, unsigned r) {
+    int d2 = dx2 * dx2 + dy2 * dy2;
+    int rr = (int)(2u * r);
+    int inner = (rr - 1) * (rr - 1);
+    int outer = (rr + 1) * (rr + 1);
+    if (d2 <= inner) return 255u;
+    if (d2 >= outer) return 0u;
+    return (unsigned)((outer - d2) * 255 / (outer - inner));
+}
+
+static void ui_circle(const struct surface *screen, unsigned cx, unsigned cy,
+                      unsigned r, struct ui_rgb color) {
+    if (!r) return;
+    for (unsigned y = cy > r ? cy - r : 0u; y < cy + r && y < screen->variable.yres; y++) {
+        for (unsigned x = cx > r ? cx - r : 0u; x < cx + r && x < screen->variable.xres; x++) {
+            int dx2 = (int)(2u * x + 1u) - (int)(2u * cx);
+            int dy2 = (int)(2u * y + 1u) - (int)(2u * cy);
+            unsigned cover = ui_circle_cover(dx2, dy2, r);
+            if (cover) ui_blend(screen, x, y, color, cover);
+        }
+    }
+}
+
+static void ui_ring(const struct surface *screen, unsigned cx, unsigned cy,
+                    unsigned r, unsigned width, struct ui_rgb color,
+                    struct ui_rgb inside) {
+    ui_circle(screen, cx, cy, r, color);
+    if (r > width) ui_circle(screen, cx, cy, r - width, inside);
+}
+
+/* Filled rounded rectangle with antialiased corners. */
+static void ui_rrect(const struct surface *screen, unsigned x, unsigned y,
+                     unsigned width, unsigned height, unsigned radius,
+                     struct ui_rgb color) {
+    if (!width || !height) return;
+    if (radius * 2u > width) radius = width / 2u;
+    if (radius * 2u > height) radius = height / 2u;
+    if (!radius) {
+        ui_fill(screen, x, y, width, height, color);
+        return;
+    }
+    ui_fill(screen, x, y + radius, width, height - 2u * radius, color);
+    ui_fill(screen, x + radius, y, width - 2u * radius, radius, color);
+    ui_fill(screen, x + radius, y + height - radius,
+            width - 2u * radius, radius, color);
+    for (unsigned q = 0; q < 4u; q++) {
+        unsigned left = (q & 1u) ? x + width - radius : x;
+        unsigned top = (q & 2u) ? y + height - radius : y;
+        unsigned ccx = (q & 1u) ? x + width - radius : x + radius;
+        unsigned ccy = (q & 2u) ? y + height - radius : y + radius;
+        for (unsigned py = top; py < top + radius; py++) {
+            for (unsigned px = left; px < left + radius; px++) {
+                int dx2 = (int)(2u * px + 1u) - (int)(2u * ccx);
+                int dy2 = (int)(2u * py + 1u) - (int)(2u * ccy);
+                unsigned cover = ui_circle_cover(dx2, dy2, radius);
+                if (cover) ui_blend(screen, px, py, color, cover);
+            }
+        }
+    }
+}
+
+/* Rounded rectangle with a 1 px outline in stroke and a filled interior. */
+static void ui_rrect_outline(const struct surface *screen, unsigned x,
+                             unsigned y, unsigned width, unsigned height,
+                             unsigned radius, struct ui_rgb stroke,
+                             struct ui_rgb fill) {
+    ui_rrect(screen, x, y, width, height, radius, stroke);
+    if (width > 2u && height > 2u)
+        ui_rrect(screen, x + 1u, y + 1u, width - 2u, height - 2u,
+                 radius ? radius - 1u : 0u, fill);
+}
+
+static void ui_gradient(const struct surface *screen, struct ui_rgb top,
+                        struct ui_rgb bottom) {
+    unsigned w = screen->variable.xres;
+    unsigned h = screen->variable.yres;
+    for (unsigned y = 0; y < h; y++) {
+        unsigned span = h > 1u ? h - 1u : 1u;
+        struct ui_rgb row = {
+            (uint8_t)((top.r * (span - y) + bottom.r * y) / span),
+            (uint8_t)((top.g * (span - y) + bottom.g * y) / span),
+            (uint8_t)((top.b * (span - y) + bottom.b * y) / span)
+        };
+        rectangle(screen, 0u, y, w, 1u, ui_px(screen, row));
+    }
+}
+
+static const struct ui_font *ui_font_for(unsigned size, int bold) {
+    for (unsigned i = 0; i < sizeof(ui_fonts) / sizeof(ui_fonts[0]); i++) {
+        if (ui_fonts[i].size == size && ui_fonts[i].bold == (bold ? 1 : 0))
+            return &ui_fonts[i];
+    }
+    return &ui_fonts[0];
+}
+
+/* PackBits-decode one glyph into out (width*height coverage bytes). */
+static unsigned ui_glyph_decode(const struct ui_font *font,
+                                const struct ui_glyph *glyph,
+                                unsigned char *out) {
+    const unsigned char *p = font->data + glyph->data_offset;
+    unsigned total = (unsigned)glyph->width * glyph->height;
+    unsigned produced = 0;
+    while (produced < total) {
+        unsigned char tag = *p++;
+        if (tag >= 128) {
+            unsigned run = 257u - tag;
+            unsigned char value = *p++;
+            while (run-- && produced < total) out[produced++] = value;
+        } else {
+            unsigned count = (unsigned)tag + 1u;
+            while (count-- && produced < total) out[produced++] = *p++;
+        }
+    }
+    return produced;
+}
+
+static const struct ui_glyph *ui_glyph(const struct ui_font *font,
+                                       unsigned char c) {
+    if (c < 32 || c > 126) c = '?';
+    return &font->glyphs[c - 32];
+}
+
+static unsigned ui_text_width(unsigned size, int bold, const char *text) {
+    const struct ui_font *font = ui_font_for(size, bold);
+    unsigned width = 0;
+    for (const unsigned char *p = (const unsigned char *)text; *p; p++)
+        width += ui_glyph(font, *p)->advance;
+    return width;
+}
+
+static void ui_text(const struct surface *screen, unsigned x,
+                    unsigned baseline, unsigned size, int bold,
+                    struct ui_rgb color, const char *text) {
+    const struct ui_font *font = ui_font_for(size, bold);
+    static unsigned char bitmap[64 * 64];
+    unsigned pen = x;
+    for (const unsigned char *p = (const unsigned char *)text; *p; p++) {
+        const struct ui_glyph *glyph = ui_glyph(font, *p);
+        if (glyph->width && glyph->height) {
+            ui_glyph_decode(font, glyph, bitmap);
+            int gx = (int)pen + glyph->left;
+            int gy = (int)baseline - glyph->top;
+            for (unsigned row = 0; row < glyph->height; row++) {
+                for (unsigned col = 0; col < glyph->width; col++) {
+                    unsigned cover = bitmap[row * glyph->width + col];
+                    if (!cover) continue;
+                    int sx = gx + (int)col;
+                    int sy = gy + (int)row;
+                    if (sx < 0 || sy < 0) continue;
+                    ui_blend(screen, (unsigned)sx, (unsigned)sy, color, cover);
+                }
+            }
+        }
+        pen += glyph->advance;
+    }
+}
+
+/* Draw text, stopping before the first glyph that would cross max_x. */
+static void ui_text_clipped(const struct surface *screen, unsigned x,
+                            unsigned baseline, unsigned size, int bold,
+                            struct ui_rgb color, const char *text,
+                            unsigned max_x) {
+    char buffer[256];
+    size_t length = 0;
+    unsigned pen = x;
+    const struct ui_font *font = ui_font_for(size, bold);
+    for (const unsigned char *p = (const unsigned char *)text;
+         *p && length + 1u < sizeof(buffer); p++) {
+        unsigned advance = ui_glyph(font, *p)->advance;
+        if (pen + advance > max_x) break;
+        buffer[length++] = (char)*p;
+        pen += advance;
+    }
+    buffer[length] = '\0';
+    ui_text(screen, x, baseline, size, bold, color, buffer);
+}
+
+static void ui_text_centered(const struct surface *screen, unsigned center_x,
+                             unsigned baseline, unsigned size, int bold,
+                             struct ui_rgb color, const char *text) {
+    unsigned width = ui_text_width(size, bold, text);
+    unsigned x = center_x > width / 2u ? center_x - width / 2u : 0u;
+    ui_text(screen, x, baseline, size, bold, color, text);
+}
+
+static unsigned long long ui_now_ms(void) {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (unsigned long long)now.tv_sec * 1000ull +
+           (unsigned long long)now.tv_nsec / 1000000ull;
+}
+
+/* Cubic ease-out over permille 0..1000, returned as permille. */
+static unsigned ui_ease_out(unsigned permille) {
+    if (permille > 1000u) permille = 1000u;
+    unsigned inv = 1000u - permille;
+    unsigned long long cube =
+        (unsigned long long)inv * inv * inv;
+    return (unsigned)(1000ull - cube / 1000000ull);
+}
+
+/* Dashboard geometry (UI_DESIGN.md: left nav rail, card content). */
+static unsigned ui_rail_w(unsigned w) {
+    unsigned rail = w / 6u;
+    if (rail < 180u) rail = 180u;
+    if (rail > 300u) rail = 300u;
+    if (rail > w) rail = w;
+    return rail;
+}
+
+static unsigned ui_content_x(unsigned w) { return ui_rail_w(w) + 36u; }
+
+static unsigned ui_content_w(unsigned w) {
+    unsigned x = ui_content_x(w);
+    return w > x + 24u ? w - x - 24u : 0u;
+}
+
+#define UI_RAIL_TOP 108u
+#define UI_RAIL_ITEM_H 40u
+#define UI_RAIL_ITEM_GAP 6u
+#define UI_PAGE_TOP 120u
+#define UI_FILES_TOP 150u
+#define UI_FILES_ROW_H 32u
+
+static const char *const UI_PAGES[6] = {
+    "STATUS", "STORAGE", "NETWORK", "TERMINAL", "SETTINGS", "FILES"
+};
+
+static unsigned ui_files_first(unsigned selected) {
+    return selected > 6u ? selected - 6u : 0u;
+}
+
+static unsigned ui_files_rows(unsigned height) {
+    if (height <= UI_FILES_TOP + 96u) return 1u;
+    unsigned rows = (height - UI_FILES_TOP - 64u) / UI_FILES_ROW_H;
+    if (rows > 8u) rows = 8u;
+    return rows ? rows : 1u;
+}
+
+/* Simple geometric rail glyphs, one per page, drawn in a 16x16 box. */
+static void ui_icon(const struct surface *screen, unsigned kind,
+                    unsigned x, unsigned y, struct ui_rgb color,
+                    struct ui_rgb behind) {
+    switch (kind) {
+        case 0: /* STATUS: gauge ring and needle */
+            ui_ring(screen, x + 8u, y + 8u, 7u, 2u, color, behind);
+            ui_circle(screen, x + 8u, y + 8u, 2u, color);
+            for (unsigned i = 0; i < 4u; i++)
+                ui_fill(screen, x + 9u + i, y + 6u - (i > 1u ? 1u : 0u),
+                        1u, 1u, color);
+            break;
+        case 1: /* STORAGE: disk outline and hub */
+            ui_rrect_outline(screen, x, y + 3u, 16u, 11u, 2u, color, behind);
+            ui_circle(screen, x + 12u, y + 8u, 2u, color);
+            break;
+        case 2: /* NETWORK: globe ring and equator */
+            ui_ring(screen, x + 8u, y + 8u, 7u, 2u, color, behind);
+            ui_fill(screen, x + 2u, y + 7u, 12u, 2u, color);
+            break;
+        case 3: /* TERMINAL: prompt chevron and cursor bar */
+            ui_rrect_outline(screen, x, y + 1u, 16u, 14u, 2u, color, behind);
+            ui_fill(screen, x + 3u, y + 5u, 2u, 2u, color);
+            ui_fill(screen, x + 4u, y + 7u, 2u, 2u, color);
+            ui_fill(screen, x + 3u, y + 9u, 2u, 2u, color);
+            ui_fill(screen, x + 7u, y + 11u, 5u, 2u, color);
+            break;
+        case 4: /* SETTINGS: gear ring and spokes */
+            ui_ring(screen, x + 8u, y + 8u, 5u, 2u, color, behind);
+            ui_fill(screen, x + 7u, y, 2u, 3u, color);
+            ui_fill(screen, x + 7u, y + 13u, 2u, 3u, color);
+            ui_fill(screen, x, y + 7u, 3u, 2u, color);
+            ui_fill(screen, x + 13u, y + 7u, 3u, 2u, color);
+            break;
+        default: /* FILES: folder body and tab */
+            ui_fill(screen, x, y + 2u, 7u, 3u, color);
+            ui_rrect_outline(screen, x, y + 4u, 16u, 10u, 2u, color, behind);
+            break;
+    }
+}
+
 // Deliberately tiny read-only framebuffer launcher prototype. Terminal and
 // privileged system actions are not exposed through this UI.
 struct menu_state {
@@ -205,6 +574,205 @@ static void menu_key(struct menu_state *state, unsigned code) {
     }
 }
 
+static void render_menu(const struct surface *screen,
+                        const struct menu_state *state);
+static void render_private_files(const struct surface *screen,
+                                 const struct synveil_file_browser *files,
+                                 const struct menu_state *state);
+
+/* Sliding page transitions (UI_DESIGN.md motion: 280 ms ease-out).
+ * The outgoing frame is snapshotted and the incoming page is rendered
+ * once into an offscreen surface; each step then only composites. Input
+ * is never blocked: the loops keep polling, and if the target page
+ * changes mid-transition the transition restarts from the frame that is
+ * actually on screen. Full-screen cost rule: a transition whose slowest
+ * frame exceeds 140 ms degrades the NEXT transition one level (full
+ * slide, then half slide with crossfade, then crossfade only) and the
+ * level that shipped is reported on stdout as SYNVEIL_UI_MOTION_LEVEL.
+ * Frame skipping is inherent: progress is a function of elapsed time. */
+#define UI_SLIDE_MS 280ull
+#define UI_FRAME_SLOW_MS 140ull
+
+static struct {
+    int active;
+    int to_page;
+    int backward;
+    unsigned long long start_ms;
+    unsigned long long slowest_frame_ms;
+    unsigned level;
+    struct surface frame;
+    unsigned char *old_frame;
+    unsigned char *new_frame;
+    size_t bytes;
+} ui_anim = {.level = 1u};
+
+static int ui_shown_page = -2; /* -2: nothing painted yet */
+
+static int ui_anim_active(void) { return ui_anim.active; }
+
+static int ui_anim_begin(const struct surface *screen,
+                         const struct menu_state *state,
+                         const struct synveil_file_browser *files) {
+    size_t bytes = (size_t)screen->fixed.line_length *
+                   screen->variable.yres;
+    if (bytes != ui_anim.bytes) {
+        free(ui_anim.old_frame);
+        free(ui_anim.new_frame);
+        ui_anim.old_frame = malloc(bytes);
+        ui_anim.new_frame = malloc(bytes);
+        ui_anim.bytes = bytes;
+        if (!ui_anim.old_frame || !ui_anim.new_frame) {
+            free(ui_anim.old_frame);
+            free(ui_anim.new_frame);
+            ui_anim.old_frame = ui_anim.new_frame = NULL;
+            ui_anim.bytes = 0;
+            return 0;
+        }
+    }
+    memcpy(ui_anim.old_frame, screen->mapped, bytes);
+    ui_anim.frame = *screen;
+    ui_anim.frame.mapped = ui_anim.new_frame;
+    ui_anim.frame.length = bytes;
+    render_menu(&ui_anim.frame, state);
+    if (files) render_private_files(&ui_anim.frame, files, state);
+    ui_anim.to_page = state->page;
+    ui_anim.backward = state->page == -1;
+    ui_anim.start_ms = ui_now_ms();
+    ui_anim.slowest_frame_ms = 0;
+    ui_anim.active = 1;
+    return 1;
+}
+
+static void ui_anim_blend_pixel(const struct surface *screen,
+                                unsigned char *dst, const unsigned char *oldpx,
+                                const unsigned char *newpx, unsigned alpha) {
+    if (screen->variable.red.length == 8u &&
+        screen->variable.green.length == 8u &&
+        screen->variable.blue.length == 8u) {
+        const unsigned offsets[3] = {
+            screen->variable.red.offset / 8u,
+            screen->variable.green.offset / 8u,
+            screen->variable.blue.offset / 8u
+        };
+        unsigned char blended[4];
+        memcpy(blended, newpx, 4u);
+        for (unsigned i = 0; i < 3u; i++) {
+            unsigned o = oldpx[offsets[i]];
+            unsigned n = newpx[offsets[i]];
+            blended[offsets[i]] = (unsigned char)(
+                (o * (255u - alpha) + n * alpha + 127u) / 255u);
+        }
+        memcpy(dst, blended, 4u);
+        return;
+    }
+    /* Non-8-bit-channel formats take a hard cut halfway through. */
+    memcpy(dst, alpha >= 128u ? newpx : oldpx, 4u);
+}
+
+static void ui_anim_frame(const struct surface *screen) {
+    unsigned long long frame_start = ui_now_ms();
+    unsigned long long elapsed = frame_start - ui_anim.start_ms;
+    unsigned permille = elapsed >= UI_SLIDE_MS ? 1000u :
+        (unsigned)(elapsed * 1000ull / UI_SLIDE_MS);
+    unsigned eased = ui_ease_out(permille);
+    unsigned w = screen->variable.xres;
+    unsigned h = screen->variable.yres;
+    size_t stride = screen->fixed.line_length;
+    if (!UI_MOTION) permille = 1000u;
+    if (ui_anim.level >= 3u || !UI_MOTION) {
+        unsigned alpha = eased * 255u / 1000u;
+        for (unsigned y = 0; y < h; y++) {
+            unsigned char *dst = screen->mapped + (size_t)y * stride;
+            const unsigned char *op = ui_anim.old_frame + (size_t)y * stride;
+            const unsigned char *np = ui_anim.new_frame + (size_t)y * stride;
+            for (unsigned x = 0; x < w; x++) {
+                ui_anim_blend_pixel(screen, dst + (size_t)x * 4u,
+                                    op + (size_t)x * 4u,
+                                    np + (size_t)x * 4u, alpha);
+            }
+        }
+    } else {
+        unsigned distance = ui_anim.level == 1u ? w : w / 2u;
+        unsigned dx = eased * distance / 1000u;
+        if (dx > w) dx = w;
+        for (unsigned y = 0; y < h; y++) {
+            unsigned char *dst = screen->mapped + (size_t)y * stride;
+            const unsigned char *op = ui_anim.old_frame + (size_t)y * stride;
+            const unsigned char *np = ui_anim.new_frame + (size_t)y * stride;
+            if (!ui_anim.backward) {
+                if (w > dx) memcpy(dst, op + (size_t)dx * 4u,
+                                   (size_t)(w - dx) * 4u);
+                if (dx) memcpy(dst + (size_t)(w - dx) * 4u, np,
+                               (size_t)dx * 4u);
+            } else {
+                if (dx) memcpy(dst, np + (size_t)(w - dx) * 4u,
+                               (size_t)dx * 4u);
+                if (w > dx) memcpy(dst + (size_t)dx * 4u, op,
+                                   (size_t)(w - dx) * 4u);
+            }
+        }
+        if (ui_anim.level == 2u) {
+            unsigned alpha = eased * 255u / 1000u;
+            for (unsigned y = 0; y < h; y++) {
+                unsigned char *dst = screen->mapped + (size_t)y * stride;
+                const unsigned char *np = ui_anim.new_frame + (size_t)y * stride;
+                for (unsigned x = 0; x < w; x++) {
+                    unsigned char current[4];
+                    memcpy(current, dst + (size_t)x * 4u, 4u);
+                    ui_anim_blend_pixel(screen, dst + (size_t)x * 4u,
+                                        current, np + (size_t)x * 4u, alpha);
+                }
+            }
+        }
+    }
+    unsigned long long frame_ms = ui_now_ms() - frame_start;
+    if (frame_ms > ui_anim.slowest_frame_ms)
+        ui_anim.slowest_frame_ms = frame_ms;
+    if (permille >= 1000u) {
+        memcpy(screen->mapped, ui_anim.new_frame, ui_anim.bytes);
+        ui_anim.active = 0;
+        printf("\nSYNVEIL_UI_MOTION_LEVEL %u\n", ui_anim.level);
+        fflush(stdout);
+        if (ui_anim.slowest_frame_ms > UI_FRAME_SLOW_MS &&
+            ui_anim.level < 3u)
+            ui_anim.level++;
+    }
+}
+
+/* Paint the dashboard, animating page changes. files may be NULL in the
+ * unauthenticated launcher, which has no Files page. */
+static void dash_paint(const struct surface *screen,
+                       const struct menu_state *state,
+                       const struct synveil_file_browser *files) {
+    if (!UI_MOTION) {
+        render_menu(screen, state);
+        if (files) render_private_files(screen, files, state);
+        ui_shown_page = state->page;
+        return;
+    }
+    if (ui_anim.active) {
+        if (ui_anim.to_page != state->page) {
+            /* Target changed mid-flight: fall through and restart the
+             * transition from whatever is currently displayed. */
+            ui_anim.active = 0;
+            ui_shown_page = -2;
+        } else {
+            ui_anim_frame(screen);
+            if (!ui_anim.active) ui_shown_page = state->page;
+            return;
+        }
+    }
+    if (ui_shown_page != -2 && ui_shown_page != state->page &&
+        ui_anim_begin(screen, state, files)) {
+        ui_anim_frame(screen);
+        if (!ui_anim.active) ui_shown_page = state->page;
+        return;
+    }
+    render_menu(screen, state);
+    if (files) render_private_files(screen, files, state);
+    ui_shown_page = state->page;
+}
+
 static int mounted_state(void) {
     FILE *mounts = fopen("/proc/mounts", "r");
     if (!mounts) return 0;
@@ -220,14 +788,17 @@ static int mounted_state(void) {
     return found;
 }
 
+/* Detail rows for the Status/Storage/Network cards. Row baselines are
+ * y + 30*n. All strings are the pre-existing readouts, unchanged. */
 static void show_runtime_details(const struct surface *screen, int page,
-                                 unsigned y, uint32_t color) {
+                                 unsigned x, unsigned y,
+                                 const struct ui_palette *pal) {
     char line[96];
     if (page == 0) {
         long cpus = sysconf(_SC_NPROCESSORS_ONLN);
         if (cpus > 0) {
             snprintf(line, sizeof(line), "CPU %ld THREADS", cpus);
-            heading(screen, line, 32u, y, 2u, color);
+            ui_text(screen, x, y, 14, 0, pal->dim, line);
         }
         FILE *memory = fopen("/proc/meminfo", "r");
         if (memory != NULL) {
@@ -240,7 +811,7 @@ static void show_runtime_details(const struct surface *screen, int page,
             fclose(memory);
             if (available > 0) {
                 snprintf(line, sizeof(line), "RAM %llu MB AVAILABLE", available / 1024u);
-                heading(screen, line, 32u, y + 34u, 2u, color);
+                ui_text(screen, x, y + 30u, 14, 0, pal->dim, line);
             }
         }
         FILE *uptime = fopen("/proc/uptime", "r");
@@ -250,7 +821,7 @@ static void show_runtime_details(const struct surface *screen, int page,
                 seconds >= 0.0 && seconds < 1.0e12) {
                 snprintf(line, sizeof(line), "UPTIME %llu MIN",
                          (unsigned long long)(seconds / 60.0));
-                heading(screen, line, 32u, y + 68u, 2u, color);
+                ui_text(screen, x, y + 60u, 14, 0, pal->dim, line);
             }
             fclose(uptime);
         }
@@ -271,7 +842,7 @@ static void show_runtime_details(const struct surface *screen, int page,
                 snprintf(line, sizeof(line), "%s STALL UNAVAILABLE",
                          pressure_labels[i]);
             }
-            heading(screen, line, 32u, y + 102u + 34u * i, 2u, color);
+            ui_text(screen, x, y + 90u + 30u * i, 14, 0, pal->dim, line);
         }
     } else if (page == 1 && mounted_state()) {
         struct statvfs filesystem;
@@ -279,71 +850,105 @@ static void show_runtime_details(const struct surface *screen, int page,
             unsigned long long free_mb =
                 (unsigned long long)filesystem.f_bavail * filesystem.f_frsize / 1048576ull;
             snprintf(line, sizeof(line), "FREE %llu MB", free_mb);
-            heading(screen, line, 32u, y, 2u, color);
+            ui_text(screen, x, y, 14, 0, pal->dim, line);
         }
     } else if (page == 2) {
         struct synveil_network_diag network;
         synveil_network_snapshot_auto("/proc/net/route",
                                       "/etc/resolv.conf", &network);
-        heading(screen, !network.present ? "NETWORK UNAVAILABLE" :
-                network.link_up ? "LINK READY" : "LINK DOWN",
-                32u, y, 2u, color);
+        ui_text(screen, x, y, 14, 0, pal->dim,
+                !network.present ? "NETWORK UNAVAILABLE" :
+                network.link_up ? "LINK READY" : "LINK DOWN");
         snprintf(line, sizeof(line), "IF %s",
                  network.interface[0] ? network.interface : "NOT DETECTED");
-        heading(screen, line, 32u, y + 34u, 2u, color);
+        ui_text(screen, x, y + 30u, 14, 0, pal->dim, line);
         snprintf(line, sizeof(line), "IP %s",
                  network.address[0] ? network.address : "NOT ASSIGNED");
-        heading(screen, line, 32u, y + 68u, 2u, color);
+        ui_text(screen, x, y + 60u, 14, 0, pal->dim, line);
         snprintf(line, sizeof(line), "GW %s",
                  network.gateway[0] ? network.gateway : "NOT ASSIGNED");
-        heading(screen, line, 32u, y + 102u, 2u, color);
+        ui_text(screen, x, y + 90u, 14, 0, pal->dim, line);
         snprintf(line, sizeof(line), "DNS %s",
                  network.dns[0] ? network.dns : "NOT ASSIGNED");
-        heading(screen, line, 32u, y + 136u, 2u, color);
+        ui_text(screen, x, y + 120u, 14, 0, pal->dim, line);
     }
 }
 
+/* The dashboard: left navigation rail plus card content, per
+ * UI_DESIGN.md. Every string below is a pre-existing label or readout;
+ * the redesign changes geometry, type and color only. */
 static void render_menu(const struct surface *screen, const struct menu_state *state) {
     unsigned w = screen->variable.xres;
     unsigned h = screen->variable.yres;
-    uint32_t background = state->high_contrast ?
-        rgb(screen, 245, 248, 250) : rgb(screen, 12, 21, 34);
-    uint32_t title = state->high_contrast ?
-        rgb(screen, 9, 22, 31) : rgb(screen, 219, 237, 244);
-    uint32_t muted = state->high_contrast ?
-        rgb(screen, 29, 53, 67) : rgb(screen, 134, 171, 190);
-    uint32_t highlight = state->high_contrast ?
-        rgb(screen, 232, 171, 28) : rgb(screen, 62, 148, 187);
-    rectangle(screen, 0, 0, w, h, background);
-    rectangle(screen, 0, 0, w, h / 11u, rgb(screen, 21, 51, 78));
-    heading(screen, "SYNVEIL", 24u, 18u, 3u, title);
+    const struct ui_palette *pal = state->high_contrast ? &UI_HC : &UI_DARK;
+    unsigned rail = ui_rail_w(w);
+    unsigned cx = ui_content_x(w);
+    unsigned content_w = ui_content_w(w);
+    unsigned count = state->authenticated ? 6u : 5u;
+    int current = state->page >= 0 ? state->page : (int)state->selected;
+
+    ui_fill(screen, 0, 0, w, h, pal->shell);
+    /* Rail: brand mark, then one item per page. */
+    ui_rrect(screen, 20u, 24u, 24u, 24u, 6u, pal->accent);
+    ui_text(screen, 56u, 43u, 20, 1, pal->ink, "SYNVEIL");
+    for (unsigned i = 0; i < count; i++) {
+        unsigned y = UI_RAIL_TOP + i * (UI_RAIL_ITEM_H + UI_RAIL_ITEM_GAP);
+        int active = (int)i == current;
+        if (active)
+            ui_rrect(screen, 8u, y, rail - 16u, UI_RAIL_ITEM_H, 6u,
+                     pal->surface_hi);
+        if (active)
+            ui_fill(screen, 8u, y + 10u, 3u, UI_RAIL_ITEM_H - 20u, pal->accent);
+        ui_icon(screen, i, 24u, y + 12u, active ? pal->ink : pal->dim,
+                active ? pal->surface_hi : pal->shell);
+        ui_text(screen, 52u, y + 25u, 14, active,
+                active ? pal->ink : pal->dim, UI_PAGES[i]);
+    }
+    ui_fill(screen, rail, 0, 1u, h, pal->stroke);
+
     if (state->page >= 0) {
-        const char *pages[] = {"STATUS", "STORAGE", "NETWORK", "TERMINAL", "SETTINGS", "FILES"};
-        heading(screen, pages[state->page], 32u, h / 5u, 3u, title);
+        /* Back affordance: chevron plus the existing BACK label. */
+        for (unsigned i = 0; i < 7u; i++) {
+            ui_fill(screen, cx + (i < 4u ? i : 6u - i), 30u + i, 2u, 2u,
+                    pal->dim);
+            ui_fill(screen, cx + (i < 4u ? i : 6u - i), 44u - i, 2u, 2u,
+                    pal->dim);
+        }
+        ui_text(screen, cx + 16u, 44u, 14, 0, pal->dim, "BACK");
+        ui_text(screen, cx, 92u, 20, 1, pal->ink, UI_PAGES[state->page]);
         if (state->page == 5 && state->authenticated) {
-            heading(screen, "PRIVATE HOME", 32u, h / 3u, 2u, muted);
-            heading(screen, "ARROWS SELECT ENTER DIR BACKSPACE UP",
-                    32u, h * 4u / 5u, 2u, muted);
-            heading(screen, "BACK", w > 125u ? w - 105u : 0u, 18u, 2u, title);
+            ui_text(screen, cx, 128u, 14, 0, pal->dim, "PRIVATE HOME");
+            ui_text(screen, cx, h - 24u, 12, 0, pal->faint,
+                    "ARROWS SELECT ENTER DIR BACKSPACE UP");
             return;
         }
         if (state->page == 4) {
-            heading(screen, state->high_contrast ? "BRIGHT COLORS" : "DARK COLORS",
-                    32u, h / 3u, 2u, muted);
-            heading(screen, "LEFT RIGHT TO CHANGE", 32u, h / 3u + 35u, 2u, muted);
-            heading(screen, state->cursor_scale ? "LARGE POINTER" : "SMALL POINTER",
-                    32u, h / 2u + 10u, 2u, muted);
-            heading(screen, "UP DOWN TO CHANGE", 32u, h / 2u + 45u, 2u, muted);
-            heading(screen, "BACK", w > 125u ? w - 105u : 0u, 18u, 2u, title);
+            ui_rrect_outline(screen, cx, UI_PAGE_TOP, content_w, 76u, 8u,
+                             pal->stroke, pal->surface);
+            ui_text(screen, cx + 20u, UI_PAGE_TOP + 34u, 14, 1, pal->ink,
+                    state->high_contrast ? "BRIGHT COLORS" : "DARK COLORS");
+            ui_text(screen, cx + 20u, UI_PAGE_TOP + 58u, 12, 0, pal->faint,
+                    "LEFT RIGHT TO CHANGE");
+            ui_rrect_outline(screen, cx, UI_PAGE_TOP + 88u, content_w, 76u,
+                             8u, pal->stroke, pal->surface);
+            ui_text(screen, cx + 20u, UI_PAGE_TOP + 122u, 14, 1, pal->ink,
+                    state->cursor_scale ? "LARGE POINTER" : "SMALL POINTER");
+            ui_text(screen, cx + 20u, UI_PAGE_TOP + 146u, 12, 0, pal->faint,
+                    "UP DOWN TO CHANGE");
             return;
         }
         if (state->page == 3) {
-            heading(screen, state->authenticated ? "USER TERMINAL" : "NON ROOT DEMO",
-                    32u, h / 3u, 2u, muted);
-            rectangle(screen, 32u, h / 2u - 10u, 250u, 50u, highlight);
-            heading(screen, "OPEN TERMINAL", 40u, h / 2u + 5u, 2u, title);
-            heading(screen, "ENTER TO OPEN", 32u, h * 3u / 5u, 2u, muted);
-            heading(screen, "BACK", w > 125u ? w - 105u : 0u, 18u, 2u, title);
+            ui_rrect_outline(screen, cx, UI_PAGE_TOP, content_w, 170u, 8u,
+                             pal->stroke, pal->surface);
+            ui_text(screen, cx + 20u, UI_PAGE_TOP + 38u, 14, 0, pal->dim,
+                    state->authenticated ? "USER TERMINAL" : "NON ROOT DEMO");
+            ui_rrect(screen, cx + 20u, UI_PAGE_TOP + 58u, 300u, 48u, 4u,
+                     pal->accent);
+            ui_text_centered(screen, cx + 20u + 150u, UI_PAGE_TOP + 90u,
+                             14, 1, pal->on_accent, "OPEN TERMINAL");
+            ui_text(screen, cx + 20u, UI_PAGE_TOP + 142u, 12, 0, pal->faint,
+                    "ENTER TO OPEN");
+            ui_text(screen, cx, h - 24u, 12, 0, pal->faint, "ESC TO GO BACK");
             return;
         }
         const char *label = "";
@@ -355,27 +960,49 @@ static void render_menu(const struct surface *screen, const struct menu_state *s
         } else {
             label = "NETWORK DETAILS";
         }
-        heading(screen, label, 32u, h / 3u, 2u, muted);
-        show_runtime_details(screen, state->page, h / 3u + 44u, muted);
-        heading(screen, "BACK", w > 125u ? w - 105u : 0u, 18u, 2u, title);
-        heading(screen, "ESC TO GO BACK", 32u, h * 4u / 5u, 2u, title);
+        ui_rrect_outline(screen, cx, UI_PAGE_TOP, content_w, 252u, 8u,
+                         pal->stroke, pal->surface);
+        ui_text(screen, cx + 20u, UI_PAGE_TOP + 38u, 14, 1, pal->ink, label);
+        show_runtime_details(screen, state->page, cx + 20u,
+                             UI_PAGE_TOP + 76u, pal);
+        ui_text(screen, cx, h - 24u, 12, 0, pal->faint, "ESC TO GO BACK");
         return;
     }
-    heading(screen, state->authenticated ? "USER DESKTOP" : "SYSTEM LAUNCHER",
-            32u, h / 5u, 3u, title);
-    const char *pages[] = {"STATUS", "STORAGE", "NETWORK", "TERMINAL", "SETTINGS", "FILES"};
-    unsigned count = state->authenticated ? 6u : 5u;
-    for (unsigned i = 0; i < count; ++i) {
-        unsigned x = 32u + i * ((w > 140u ? w - 64u : w) / count);
-        unsigned tile = w > 140u ? (w - 72u) / count : 20u;
-        rectangle(screen, x, h / 3u, tile, h / 5u,
-                  i == state->selected ? highlight : rgb(screen, 34, 61, 78));
-        unsigned scale = tile >= 120u ? 2u : 1u;
-        heading(screen, pages[i], x + 6u, h / 3u + 18u, scale, title);
+
+    /* Launcher home: title plus one summary card per page. */
+    ui_text(screen, cx, 92u, 20, 1, pal->ink,
+            state->authenticated ? "USER DESKTOP" : "SYSTEM LAUNCHER");
+    for (unsigned i = 0; i < count; i++) {
+        unsigned y = UI_PAGE_TOP + i * 54u;
+        int active = (int)i == current;
+        ui_rrect_outline(screen, cx, y, content_w, 46u, 8u, pal->stroke,
+                         active ? pal->surface_hi : pal->surface);
+        ui_icon(screen, i, cx + 16u, y + 15u, active ? pal->ink : pal->dim,
+                active ? pal->surface_hi : pal->surface);
+        ui_text(screen, cx + 44u, y + 29u, 14, 1, pal->ink, UI_PAGES[i]);
+        const char *summary = "";
+        if (i == 0u) {
+            summary = synveil_core_health("/run/synveil/veil-core.sock") ?
+                "CORE READY" : "CORE UNAVAILABLE";
+        } else if (i == 1u) {
+            summary = mounted_state() ? "STATE DISK MOUNTED" :
+                                        "STATE DISK MISSING";
+        } else if (i == 2u) {
+            summary = "NETWORK DETAILS";
+        } else if (i == 3u) {
+            summary = state->authenticated ? "USER TERMINAL" :
+                                             "NON ROOT DEMO";
+        } else if (i == 4u) {
+            summary = state->high_contrast ? "BRIGHT COLORS" : "DARK COLORS";
+        } else {
+            summary = "PRIVATE HOME";
+        }
+        unsigned name_w = ui_text_width(14, 1, UI_PAGES[i]);
+        ui_text(screen, cx + 60u + name_w, y + 29u, 12, 0, pal->dim, summary);
     }
-    heading(screen, "LEFT RIGHT ENTER", 32u, h * 4u / 5u, 2u, muted);
-    heading(screen, state->authenticated ? "ESC TO LOGOUT" : "ESC TO EXIT",
-            32u, h * 4u / 5u + 24u, 2u, muted);
+    ui_text(screen, cx, h - 48u, 12, 0, pal->faint, "LEFT RIGHT ENTER");
+    ui_text(screen, cx, h - 24u, 12, 0, pal->faint,
+            state->authenticated ? "ESC TO LOGOUT" : "ESC TO EXIT");
 }
 
 static int event_bit(const unsigned char *bits, size_t count, unsigned bit) {
@@ -498,30 +1125,43 @@ static unsigned absolute_pixel(int value, int minimum, int maximum, unsigned ext
 
 static void menu_click(struct menu_state *state, unsigned x, unsigned y,
                        unsigned width, unsigned height) {
+    unsigned cx = ui_content_x(width);
+    unsigned content_w = ui_content_w(width);
+    (void)height;
     if (state->page >= 0) {
-        if (y <= height / 11u && x >= (width > 125u ? width - 125u : 0u)) {
+        if (x >= cx && x < cx + 120u && y >= 16u && y < 56u) {
             state->page = -1;
-        } else if (state->page == 3 && x >= 32u && x < 282u &&
-                   y >= height / 2u - 10u && y < height / 2u + 40u) {
+        } else if (state->page == 3 && x >= cx + 20u && x < cx + 320u &&
+                   y >= UI_PAGE_TOP + 58u && y < UI_PAGE_TOP + 106u) {
             state->launch = 1;
-        } else if (state->page == 4 && x >= 32u && x < width / 2u) {
-            if (y >= height / 3u && y < height / 3u + 80u)
+        } else if (state->page == 4 && x >= cx && x < cx + content_w) {
+            if (y >= UI_PAGE_TOP && y < UI_PAGE_TOP + 76u)
                 state->high_contrast = !state->high_contrast;
-            if (y >= height / 2u && y < height / 2u + 90u)
+            if (y >= UI_PAGE_TOP + 88u && y < UI_PAGE_TOP + 164u)
                 state->cursor_scale = !state->cursor_scale;
         }
         return;
     }
     unsigned count = state->authenticated ? 6u : 5u;
-    unsigned tile_spacing = (width > 140u ? width - 64u : width) / count;
-    unsigned tile_width = width > 140u ? (width - 72u) / count : 20u;
-    if (y < height / 3u || y >= height / 3u + height / 5u) return;
-    for (unsigned i = 0; i < count; ++i) {
-        unsigned left = 32u + i * tile_spacing;
-        if (x >= left && x - left < tile_width) {
-            state->selected = i;
-            state->page = (int)i;
-            break;
+    unsigned rail = ui_rail_w(width);
+    if (x >= 8u && x < rail - 8u) {
+        for (unsigned i = 0; i < count; ++i) {
+            unsigned top = UI_RAIL_TOP + i * (UI_RAIL_ITEM_H + UI_RAIL_ITEM_GAP);
+            if (y >= top && y < top + UI_RAIL_ITEM_H) {
+                state->selected = i;
+                state->page = (int)i;
+                return;
+            }
+        }
+    }
+    if (x >= cx && x < cx + content_w) {
+        for (unsigned i = 0; i < count; ++i) {
+            unsigned top = UI_PAGE_TOP + i * 54u;
+            if (y >= top && y < top + 46u) {
+                state->selected = i;
+                state->page = (int)i;
+                return;
+            }
         }
     }
 }
@@ -531,12 +1171,12 @@ static void render_cursor(const struct surface *screen, const struct pointer_dev
     if (pointer->fd >= 0) {
         unsigned size = state->cursor_scale ? 16u : 9u;
         rectangle(screen, pointer->screen_x, pointer->screen_y, size, size,
-                  state->high_contrast ? rgb(screen, 25, 75, 150) :
-                                         rgb(screen, 251, 210, 102));
+                  state->high_contrast ? rgb(screen, 0, 95, 184) :
+                                         rgb(screen, 76, 194, 255));
         rectangle(screen, pointer->screen_x + 2u, pointer->screen_y + 2u,
                   state->cursor_scale ? 9u : 3u, state->cursor_scale ? 9u : 3u,
                   state->high_contrast ? rgb(screen, 245, 248, 250) :
-                                         rgb(screen, 31, 52, 73));
+                                         rgb(screen, 32, 32, 32));
     }
 }
 
@@ -579,7 +1219,7 @@ static int run_menu(const struct surface *screen) {
         }
     }
     struct pointer_device pointer = open_pointer();
-    render_menu(screen, &state);
+    dash_paint(screen, &state, NULL);
     render_cursor(screen, &pointer, &state);
     // The serial recovery shell may already have printed a prompt without
     // a newline. Begin on a new line so CI can require a standalone marker.
@@ -591,13 +1231,13 @@ static int run_menu(const struct surface *screen) {
         struct pollfd fds[2] = {{.fd = keyboard, .events = POLLIN},
                                 {.fd = pointer.fd, .events = POLLIN}};
         nfds_t count = pointer.fd >= 0 ? 2u : 1u;
-        int result = poll(fds, count, 1000);
+        int result = poll(fds, count, ui_anim_active() ? 16 : 1000);
         if (result < 0) {
             if (errno == EINTR) continue;
             break;
         }
         if ((fds[0].revents & (POLLERR | POLLHUP | POLLNVAL)) != 0) break;
-        int redraw = result == 0 && state.page >= 0;
+        int redraw = (result == 0 && state.page >= 0) || ui_anim_active();
         if ((fds[0].revents & POLLIN) != 0) {
             struct input_event event;
             if (read(keyboard, &event, sizeof(event)) == (ssize_t)sizeof(event) &&
@@ -651,7 +1291,7 @@ static int run_menu(const struct surface *screen) {
             }
         }
         if (redraw && !state.quit) {
-            render_menu(screen, &state);
+            dash_paint(screen, &state, NULL);
             render_cursor(screen, &pointer, &state);
         }
     }
@@ -759,45 +1399,39 @@ static void render_private_files(const struct surface *screen,
                                  const struct menu_state *state) {
     if (!state->authenticated || state->page != 5) return;
     unsigned h = screen->variable.yres;
-    uint32_t text = state->high_contrast ? rgb(screen, 9, 22, 31) :
-                                           rgb(screen, 219, 237, 244);
-    uint32_t muted = state->high_contrast ? rgb(screen, 29, 53, 67) :
-                                            rgb(screen, 134, 171, 190);
+    unsigned cx = ui_content_x(screen->variable.xres);
+    unsigned content_w = ui_content_w(screen->variable.xres);
+    const struct ui_palette *pal = state->high_contrast ? &UI_HC : &UI_DARK;
     if (!files->available) {
-        heading(screen, "FILES UNAVAILABLE", 32u, h / 3u + 45u, 2u, muted);
+        ui_text(screen, cx, UI_FILES_TOP + 21u, 14, 0, pal->dim,
+                "FILES UNAVAILABLE");
         return;
     }
     if (!files->count) {
-        heading(screen, "EMPTY DIRECTORY", 32u, h / 3u + 45u, 2u, muted);
+        ui_text(screen, cx, UI_FILES_TOP + 21u, 14, 0, pal->dim,
+                "EMPTY DIRECTORY");
         return;
     }
-    unsigned first = files->selected > 6u ? files->selected - 6u : 0u;
+    unsigned first = ui_files_first(files->selected);
     unsigned rows = files->count - first;
-    if (rows > 8u) rows = 8u;
+    unsigned max_rows = ui_files_rows(h);
+    if (rows > max_rows) rows = max_rows;
     for (unsigned row = 0u; row < rows; row++) {
         unsigned index = first + row;
-        unsigned y = h / 3u + 45u + row * 26u;
-        if (index == files->selected) {
-            unsigned width = screen->variable.xres > 65u ?
-                             screen->variable.xres - 56u : 0u;
-            rectangle(screen, 28u, y - 4u, width, 24u,
-                      state->high_contrast ? rgb(screen, 229, 186, 84) :
-                                             rgb(screen, 38, 86, 115));
-        }
-        heading(screen, files->entries[index].directory ? "DIR" : "FILE",
-                35u, y, 2u, muted);
-        char label[25] = {0};
-        for (unsigned j = 0; j + 1u < sizeof(label) &&
-             files->entries[index].name[j]; j++) {
-            unsigned char c = (unsigned char)files->entries[index].name[j];
-            if (c >= 'a' && c <= 'z') c = (unsigned char)(c - ('a' - 'A'));
-            label[j] = (char)(((c >= 'A' && c <= 'Z') ||
-                                (c >= '0' && c <= '9') || c == '.') ? c : ' ');
-        }
-        heading(screen, label, 125u, y, 2u, text);
+        unsigned y = UI_FILES_TOP + row * UI_FILES_ROW_H;
+        if (index == files->selected)
+            ui_rrect(screen, cx > 6u ? cx - 6u : 0u, y, content_w + 12u,
+                     UI_FILES_ROW_H, 6u, pal->select);
+        ui_text(screen, cx + 8u, y + 21u, 12, 1, pal->faint,
+                files->entries[index].directory ? "DIR" : "FILE");
+        /* File names keep their real case; bytes outside printable ASCII
+         * render as '?' inside the text layer. */
+        ui_text_clipped(screen, cx + 64u, y + 21u, 14, 0, pal->ink,
+                        files->entries[index].name, cx + content_w);
     }
     if (files->truncated)
-        heading(screen, "MORE FILES NOT SHOWN", 35u, h * 3u / 4u, 1u, muted);
+        ui_text(screen, cx, h - 48u, 12, 0, pal->faint,
+                "MORE FILES NOT SHOWN");
 }
 
 static int run_user_session(const struct surface *screen) {
@@ -824,7 +1458,7 @@ static int run_user_session(const struct surface *screen) {
     struct pointer_device pointer = session_pointer();
     struct synveil_file_browser files;
     (void)synveil_files_open(&files, "/home/synveil");
-    render_menu(screen, &state);
+    dash_paint(screen, &state, &files);
     render_cursor(screen, &pointer, &state);
     puts("\nSYNVEIL_USER_DESKTOP_READY");
     fflush(stdout);
@@ -835,9 +1469,9 @@ static int run_user_session(const struct surface *screen) {
             {.fd = pointer.fd, .events = POLLIN},
         };
         nfds_t count = pointer.fd >= 0 ? 2u : 1u;
-        int activity = poll(fds, count, -1);
+        int activity = poll(fds, count, ui_anim_active() ? 16 : -1);
         if (activity < 0 && errno == EINTR) continue;
-        if (activity <= 0 || (fds[0].revents & (POLLERR | POLLHUP | POLLNVAL))) {
+        if (activity < 0 || (fds[0].revents & (POLLERR | POLLHUP | POLLNVAL))) {
             result = 1;
             break;
         }
@@ -880,12 +1514,15 @@ static int run_user_session(const struct surface *screen) {
                     pointer.screen_y = absolute_pixel(event.value, pointer.y.minimum,
                                                       pointer.y.maximum, screen->variable.yres);
                 else if (event.type == EV_KEY && event.code == BTN_LEFT && event.value == 1) {
-                    unsigned base = screen->variable.yres / 3u + 45u;
                     if (state.page == 5 && files.available &&
-                        pointer.screen_y >= base && pointer.screen_y < base + 8u * 26u) {
-                        unsigned first = files.selected > 6u ? files.selected - 6u : 0u;
-                        synveil_files_select(&files, first +
-                            (pointer.screen_y - base) / 26u);
+                        pointer.screen_y >= UI_FILES_TOP &&
+                        pointer.screen_y < UI_FILES_TOP +
+                            ui_files_rows(screen->variable.yres) * UI_FILES_ROW_H) {
+                        unsigned first = ui_files_first(files.selected);
+                        unsigned index = first +
+                            (pointer.screen_y - UI_FILES_TOP) / UI_FILES_ROW_H;
+                        if (index < files.count)
+                            synveil_files_select(&files, index);
                     } else {
                         menu_click(&state, pointer.screen_x, pointer.screen_y,
                                    screen->variable.xres, screen->variable.yres);
@@ -917,8 +1554,7 @@ static int run_user_session(const struct surface *screen) {
             (void)preferences_save("/home/synveil", &prefs);
         }
         if (!state.quit) {
-            render_menu(screen, &state);
-            render_private_files(screen, &files, &state);
+            dash_paint(screen, &state, &files);
             render_cursor(screen, &pointer, &state);
         }
     }
@@ -1027,6 +1663,7 @@ struct auth_input {
     unsigned shift;     // bit 0 = left, bit 1 = right
     int caps_lock;      // only affects letters, not symbols
     int denied;
+    unsigned long long denied_at_ms;  // shake clock; 0 = no denial shown
     int keyboard_missing;
     // 0: normal login; 1: first password; 2: repeat password.
     unsigned enroll_stage;
@@ -1048,6 +1685,7 @@ static void auth_keyboard_disconnected(struct auth_input *state) {
     auth_clear(state);
     state->caps_lock = 0;
     state->denied = 0;
+    state->denied_at_ms = 0;
     state->keyboard_missing = 1;
 }
 
@@ -1055,6 +1693,7 @@ static void auth_keyboard_connected(struct auth_input *state) {
     auth_clear(state);
     state->caps_lock = 0;
     state->denied = 0;
+    state->denied_at_ms = 0;
     state->keyboard_missing = 0;
 }
 
@@ -1131,39 +1770,94 @@ static void auth_input_key(struct auth_input *state, unsigned code, int value) {
     }
 }
 
+/* Record a denial and start the wrong-password shake clock. The denial
+ * itself is decided by the caller exactly as before; this only stamps
+ * the presentation timing. */
+static void auth_note_denied(struct auth_input *state) {
+    state->denied = 1;
+    state->denied_at_ms = ui_now_ms();
+}
+
+#define AUTH_SHAKE_MS 200ull
+
+static int auth_shake_active(const struct auth_input *state) {
+    return state->denied && state->denied_at_ms &&
+           ui_now_ms() - state->denied_at_ms < AUTH_SHAKE_MS;
+}
+
+/* Horizontal shake offset: +-8 px decaying over 200 ms (UI_DESIGN.md). */
+static int auth_shake_dx(const struct auth_input *state) {
+    static const int offsets[4] = {8, -8, 5, -3};
+    if (!auth_shake_active(state)) return 0;
+    unsigned long long elapsed = ui_now_ms() - state->denied_at_ms;
+    return offsets[(elapsed / 50ull) & 3ull];
+}
+
+/* Centered login composition (UI_DESIGN.md): desktop gradient, avatar
+ * circle with the owner initial, owner name, one 320x36 password field.
+ * Every string is a pre-existing greeter string, unchanged. Rendering
+ * only: no credential handling lives here, and the field shows one dot
+ * per entered character, never the secret itself. */
 static void auth_render(const struct surface *screen, const struct auth_input *state) {
     unsigned w = screen->variable.xres;
     unsigned h = screen->variable.yres;
-    uint32_t background = rgb(screen, 12, 21, 34);
-    uint32_t text = rgb(screen, 219, 237, 244);
-    uint32_t muted = rgb(screen, 134, 171, 190);
-    rectangle(screen, 0u, 0u, w, h, background);
-    rectangle(screen, 0u, 0u, w, h/11u, rgb(screen, 21, 51, 78));
-    heading(screen, "SYNVEIL", 24u, 18u, 3u, text);
-    heading(screen, state->enroll_stage ? "FIRST USER SETUP" : "LOCAL LOGIN",
-            36u, h/4u, 3u, text);
-    heading(screen, state->enroll_stage == 1u ? "CREATE PASSWORD" :
-            state->enroll_stage == 2u ? "RETYPE PASSWORD" : "PASSWORD",
-            36u, h/3u, 2u, muted);
-    // Constant glyph per character, never a raw or encoded secret.
-    unsigned visible = state->length < 26u ? state->length : 26u;
-    for (unsigned i = 0; i < visible; i++) {
-        rectangle(screen, 40u + i*15u, h/2u, 8u, 8u, text);
+    const struct ui_palette *pal = &UI_DARK;
+    unsigned center_x = w / 2u;
+    int shake = auth_shake_dx(state);
+    unsigned field_x = center_x > 160u ? center_x - 160u : 0u;
+    if (shake > 0) field_x += (unsigned)shake;
+    else if (shake < 0) field_x = field_x > (unsigned)-shake ?
+        field_x - (unsigned)-shake : 0u;
+    unsigned field_y = h * 2u / 5u + 40u;
+
+    ui_gradient(screen, pal->grad_near, pal->grad_far);
+    if (state->enroll_stage) {
+        ui_text_centered(screen, center_x, h / 4u, 20, 1, pal->ink,
+                         "FIRST USER SETUP");
+        ui_text_centered(screen, center_x, h / 4u + 34u, 14, 0, pal->dim,
+                         state->enroll_stage == 1u ? "CREATE PASSWORD" :
+                                                     "RETYPE PASSWORD");
+    } else {
+        unsigned avatar_y = h / 4u + 64u;
+        ui_circle(screen, center_x, avatar_y, 64u, pal->surface_hi);
+        ui_text_centered(screen, center_x, avatar_y + 17u, 48, 0, pal->ink,
+                         "S");
+        ui_text_centered(screen, center_x, avatar_y + 64u + 56u, 32, 0,
+                         pal->ink, "Synveil");
+        ui_text_centered(screen, center_x, avatar_y + 64u + 84u, 14, 0,
+                         pal->dim, "LOCAL LOGIN");
+        field_y = avatar_y + 64u + 104u;
     }
-    if (state->caps_lock && h*3u/5u > 27u)
-        heading(screen, "CAPS LOCK ON", 36u, h*3u/5u - 27u, 2u, muted);
+    /* Password field: surface fill, stroke outline, accent focus bar. */
+    ui_rrect_outline(screen, field_x, field_y, 320u, 36u, 4u,
+                     pal->stroke, pal->field);
+    ui_fill(screen, field_x + 10u, field_y + 33u, 300u, 2u, pal->accent);
+    /* Constant glyph per character, never a raw or encoded secret. */
+    unsigned visible = state->length < 22u ? state->length : 22u;
+    for (unsigned i = 0; i < visible; i++)
+        ui_circle(screen, field_x + 18u + i * 13u, field_y + 17u, 3u,
+                  pal->ink);
+    unsigned message_y = field_y + 70u;
+    if (state->caps_lock)
+        ui_text_centered(screen, center_x, message_y, 14, 0, pal->dim,
+                         "CAPS LOCK ON");
     if (state->length >= AUTH_MAX_UI_PASSWORD)
-        heading(screen, "PASSWORD LIMIT", 36u, h*3u/5u, 2u, muted);
+        ui_text_centered(screen, center_x, message_y + 26u, 14, 0,
+                         pal->dim, "PASSWORD LIMIT");
     if (state->keyboard_missing) {
-        heading(screen, "KEYBOARD DISCONNECTED", 36u, h*3u/5u, 2u, muted);
-        heading(screen, "RECONNECT TO CONTINUE", 36u, h*3u/5u+32u, 2u, muted);
+        ui_text_centered(screen, center_x, message_y + 52u, 14, 0, pal->dim,
+                         "KEYBOARD DISCONNECTED");
+        ui_text_centered(screen, center_x, message_y + 78u, 14, 0, pal->dim,
+                         "RECONNECT TO CONTINUE");
     } else if (state->denied) {
-        heading(screen, state->enroll_stage ? "SETUP RETRY" : "LOGIN DENIED",
-                36u, h*3u/5u, 2u, muted);
+        ui_text_centered(screen, center_x, message_y + 52u, 14, 0, pal->ink,
+                         state->enroll_stage ? "SETUP RETRY" : "LOGIN DENIED");
     }
-    heading(screen, state->enroll_stage ? "ENTER TO CONTINUE" :
-            "ENTER TO LOGIN", 36u, h*4u/5u, 2u, text);
-    heading(screen, "ESC TO CLEAR", 36u, h*4u/5u+32u, 2u, muted);
+    ui_text_centered(screen, center_x, h * 4u / 5u, 12, 0, pal->faint,
+                     state->enroll_stage ? "ENTER TO CONTINUE" :
+                                           "ENTER TO LOGIN");
+    ui_text_centered(screen, center_x, h * 4u / 5u + 22u, 12, 0, pal->faint,
+                     "ESC TO CLEAR");
 }
 
 static int auth_send_all(int fd, const unsigned char *bytes, size_t len) {
@@ -1296,7 +1990,7 @@ static int run_auth_login(const struct surface *screen) {
             continue;
         }
         struct pollfd fd = {.fd = keyboard, .events = POLLIN};
-        int n = poll(&fd, 1u, 1000);
+        int n = poll(&fd, 1u, auth_shake_active(&state) ? 10 : 1000);
         if (n < 0) {
             if (errno == EINTR) continue;
             break;
@@ -1345,6 +2039,7 @@ static int run_auth_login(const struct surface *screen) {
             first_length = 0u;
             if (state.enroll_stage) state.enroll_stage = 1u;
             state.denied = 0;
+            state.denied_at_ms = 0;
         } else if (event.value == 1 &&
                    (event.code == KEY_ENTER || event.code == KEY_KPENTER)) {
             if (state.enroll_stage == 1u) {
@@ -1359,7 +2054,7 @@ static int run_auth_login(const struct surface *screen) {
                     fflush(stdout);
                 } else {
                     auth_clear(&state);
-                    state.denied = 1;
+                    auth_note_denied(&state);
                     auth_render(screen, &state);
                 }
                 continue;
@@ -1381,7 +2076,7 @@ static int run_auth_login(const struct surface *screen) {
                     puts("SYNVEIL_LOGIN_READY");
                 } else {
                     state.enroll_stage = synveil_enroll_can_start() ? 1u : 0u;
-                    state.denied = 1;
+                    auth_note_denied(&state);
                     auth_render(screen, &state);
                     puts("\nSYNVEIL_ENROLL_FAILED");
                 }
@@ -1395,9 +2090,12 @@ static int run_auth_login(const struct surface *screen) {
             // the session's switch to tty1; it is restored on relock.
             if (auth_handoff_login_vt() != 0) {
                 auth_clear(&state);
-                state.denied = 1;
+                auth_note_denied(&state);
+            } else if (auth_attempt(&state)) {
+                state.denied = 0;
+                state.denied_at_ms = 0;
             } else {
-                state.denied = !auth_attempt(&state);
+                auth_note_denied(&state);
             }
             // Authentication can return "denied" even if the seat accepted
             // the password but the response was interrupted. In that race
@@ -1477,9 +2175,9 @@ static int self_test(void) {
     menu_key(&state, KEY_ESC);
     if (!state.quit) return 1;
     struct menu_state click_state = {.selected = 0u, .page = -1, .quit = 0};
-    menu_click(&click_state, 310u, 250u, 900u, 600u);
+    menu_click(&click_state, 60u, 170u, 900u, 600u);
     if (click_state.page != 1 || click_state.selected != 1u) return 1;
-    menu_click(&click_state, 850u, 20u, 900u, 600u);
+    menu_click(&click_state, 240u, 36u, 900u, 600u);
     if (click_state.page != -1) return 1;
     struct menu_state demo = {.selected = 3u, .page = -1, .quit = 0};
     menu_key(&demo, KEY_ENTER);
@@ -1487,7 +2185,7 @@ static int self_test(void) {
     menu_key(&demo, KEY_ENTER);
     if (!demo.launch) return 1;
     demo.launch = 0;
-    menu_click(&demo, 60u, 310u, 900u, 600u);
+    menu_click(&demo, 300u, 200u, 900u, 600u);
     if (!demo.launch) return 1;
     struct menu_state settings = {.selected = 4u, .page = -1, .quit = 0};
     menu_key(&settings, KEY_ENTER);
@@ -1495,8 +2193,8 @@ static int self_test(void) {
     menu_key(&settings, KEY_RIGHT);
     menu_key(&settings, KEY_UP);
     if (!settings.high_contrast || settings.cursor_scale != 1u) return 1;
-    menu_click(&settings, 50u, 220u, 900u, 600u);
-    menu_click(&settings, 50u, 330u, 900u, 600u);
+    menu_click(&settings, 300u, 150u, 900u, 600u);
+    menu_click(&settings, 300u, 240u, 900u, 600u);
     if (settings.high_contrast || settings.cursor_scale) return 1;
     // An incomplete seat reply must not hold the login screen indefinitely.
     // The successful path accepts exactly the broker's seven-byte ACTIVE reply.
@@ -1588,6 +2286,21 @@ static int self_test(void) {
         auth.password[AUTH_MAX_UI_PASSWORD - 1u]) return 1;
     if (glyph_for('4') == NULL || glyph_for('.') == NULL ||
         glyph_for('N') == NULL || glyph_for('@') != NULL) return 1;
+    // The embedded UI atlas must decode to exactly width*height coverage
+    // bytes per glyph and fit the renderer's static bitmap buffer.
+    for (unsigned i = 0; i < sizeof(ui_fonts) / sizeof(ui_fonts[0]); i++) {
+        static unsigned char decoded[64 * 64];
+        for (unsigned c = 0; c < 95u; c++) {
+            const struct ui_glyph *glyph = &ui_fonts[i].glyphs[c];
+            if (glyph->width > 64u || glyph->height > 64u) return 1;
+            if (ui_glyph_decode(&ui_fonts[i], glyph, decoded) !=
+                (unsigned)glyph->width * glyph->height) return 1;
+        }
+    }
+    if (ui_text_width(20, 0, "SYNVEIL") == 0u ||
+        ui_text_width(14, 1, "STATUS") == 0u) return 1;
+    if (ui_ease_out(0u) != 0u || ui_ease_out(1000u) != 1000u ||
+        ui_ease_out(500u) <= 500u) return 1;
     if (absolute_pixel(-20, 0, 100, 900u) != 0u ||
         absolute_pixel(200, 0, 100, 900u) != 899u ||
         absolute_pixel(50, 0, 100, 900u) != 449u) return 1;
