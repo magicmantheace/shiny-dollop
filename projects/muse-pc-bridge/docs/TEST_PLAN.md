@@ -34,7 +34,7 @@ PC during install verification.
 
 | File | Covers |
 | --- | --- |
-| `tests/test_v1_jobs.py` (12) | job submit returns immediately with a job id; result/output/exit code; incremental byte-offset reads (head + tail reconstruct the whole, no repeats); cancel → killed; timeout → failed + timed_out + null exit code; job list; unknown job → 404; **job_finish audited with a 64-char stdout SHA-256**; detached process spawn/list/kill with log tails; PTY session echo round-trip; missing session → 400 |
+| `tests/test_v1_jobs.py` (14) | job submit returns immediately with a job id; result/output/exit code; incremental byte-offset reads (head + tail reconstruct the whole, no repeats); **first line visible via the API while the job is still running** (regression for the pipe-pump starvation below); cancel → killed; timeout → failed + timed_out + null exit code; job list; unknown job → 404; **job_finish audited with a 64-char stdout SHA-256**; detached process spawn/list/kill with log tails; PTY session echo round-trip; **pipe-pump regression: session output reaches the buffer while the shell is still alive** (pipe path forced, echo child — fails against the pre-fix pump); missing session → 400 |
 | `tests/test_v1_platform.py` (16) | PNG encoder structure (IHDR, filter-0 scanlines round-trip), BMP structure, BGRA→RGBA conversion; PNG round-trip at real capture size (1536x864, per-chunk CRC + pixel-exact decode) and the declared ctypes capture-signature table pinned with stand-in functions (regressions for the staging-found screenshot HTTP 500); the same signature pinning for the kernel32 process calls in `pid_alive` (OpenProcess/GetExitCodeProcess/CloseHandle) and for the clipboard path's user32/kernel32 calls (HGLOBAL round-trip, incl. GlobalAlloc's SIZE_T parameter); capabilities vs platform_limited in /v1/status; screenshot/input/clipboard/UIA → 501 off Windows; bad format → 400; empty input actions → 400; real-capture test is Windows-only (skipped on the VM) |
 | `tests/test_v1_lifecycle.py` (8) | update stage/apply/rollback file cycle; wrong SHA-256, version mismatch, and zip-slip bundles rejected; apply without pending → error; supervisor restarts a twice-crashing agent and reports it; a staged **unhealthy update is rolled back automatically** (file bytes restored); a healthy update stays applied |
 | `tests/test_v1_files.py` (9) | hash endpoint + ranged get; chunked upload round-trip through the client library; **resume after partial upload** (2 chunks sent, client resumes by id); hash mismatch at completion rejected with no file placed; wrong chunk size rejected; upload discard; tree/mkdir/move/delete incl. root protection; a second named root (and unknown root → 400); path escapes still confined; client `exec_run` |
@@ -93,6 +93,42 @@ PC during install verification.
   output hashes), and UIA window enumeration all verified
   working. Staging agent stopped afterwards; live v0.1 agent
   untouched and healthy. See `docs/MUSE_HANDOFF.md`.
+- 2026-11-05 morning (owner PC): **the full suite ran under
+  Windows Python for the first time** (Windows 11, Python 3.14.2,
+  checkout at tip `bc48202`): **61 tests, FAILED (failures=1,
+  errors=1, skipped=4)** in 37.7s. The 4 skips are the expected
+  platform-conditional ones (`test_{screenshot,input,clipboard,uia}_501_off_windows`
+  in `test_v1_platform.py`); the Windows-only real-capture test
+  ran and passed. Everything else passed, including jobs, files,
+  self-update rollback, and hardening. Two findings:
+  (1) **FAIL `test_session_roundtrip`** — a real product bug:
+  `Session._pump_pipe` (and `Job._pump`, same pattern) used
+  `BufferedReader.read(65536)`, which blocks until the buffer
+  fills or EOF; an interactive shell never EOFs, so session
+  output starved indefinitely (also live-reproduced over the API
+  against a staging agent: powershell and cmd sessions returned
+  empty output forever). On POSIX the session test uses the PTY
+  path, which is why the VM never saw it. Fixed: both pumps now
+  read via a shared `_read_available()` helper (`read1()`), so
+  partial output lands promptly; jobs gain the same incremental
+  visibility while running.
+  (2) **ERROR `tearDownClass (JobsTestCase)`** — test harness
+  only: `WinError 32` deleting a detached process's log file
+  during temp-dir cleanup, because the process still held it
+  open (Windows refuses to delete open files; POSIX allows it).
+  Fixed in the tests: teardown now kills any spawned detached
+  processes via the API, waits until none report alive, then
+  cleans up with a short retry. No agent behavior changed.
+- 2026-11-05 morning (fix verification, Muse's Linux VM):
+  new regression tests in `tests/test_v1_jobs.py` —
+  `PipePumpRegressionTests.test_session_pipe_output_streams_while_shell_alive`
+  (confirmed to FAIL against the pre-fix agent with the fix
+  stashed: buffer empty, same symptom as Windows) and
+  `JobsTestCase.test_job_output_visible_while_job_still_running`.
+  **Full suite on the VM after the fix: 63 tests, OK (1 skip)** —
+  the skip remains the Windows-only real-capture test.
+  **Windows re-verification is PENDING** the parent session's
+  re-run on the PC; the Windows suite is not claimed green.
 
 ## What the tests cannot prove
 

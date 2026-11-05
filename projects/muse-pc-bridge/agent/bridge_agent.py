@@ -579,6 +579,28 @@ class BridgeCore:
 
 
 # --------------------------------------------------------------------------
+# Incremental pipe reads
+# --------------------------------------------------------------------------
+
+def _read_available(stream, size: int = 65536) -> bytes:
+    """One incremental read from a pipe-backed stream.
+
+    ``BufferedReader.read(n)`` blocks until *n* bytes arrive or EOF.
+    A job's process exit (EOF) eventually flushes that wait, but an
+    interactive session's shell never EOFs — a few hundred bytes of
+    session output starved indefinitely behind a 64 KiB read (found
+    by the first Windows suite run: session round-trips returned
+    empty forever). ``read1()`` performs a single raw read and
+    returns promptly with whatever is available. Streams without
+    ``read1`` fall back to a plain ``read``.
+    """
+    read1 = getattr(stream, "read1", None)
+    if read1 is not None:
+        return read1(size)
+    return stream.read(size)
+
+
+# --------------------------------------------------------------------------
 # Async jobs (v1 §1)
 # --------------------------------------------------------------------------
 
@@ -623,7 +645,7 @@ class Job:
     def _pump(self, stream, buffer: OutputBuffer) -> None:
         try:
             while True:
-                chunk = stream.read(65536)
+                chunk = _read_available(stream)
                 if not chunk:
                     break
                 buffer.append(chunk)
@@ -979,7 +1001,7 @@ class Session:
     def _pump_pipe(self) -> None:
         try:
             while True:
-                chunk = self.proc.stdout.read(65536)  # type: ignore[union-attr]
+                chunk = _read_available(self.proc.stdout)  # type: ignore[union-attr]
                 if not chunk:
                     break
                 self.buffer.append(chunk)

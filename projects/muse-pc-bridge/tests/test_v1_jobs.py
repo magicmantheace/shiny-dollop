@@ -9,6 +9,7 @@ on the machine running the suite; Windows execution is owner-PC only
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 import threading
@@ -17,6 +18,7 @@ import unittest
 import urllib.error
 import urllib.request
 from pathlib import Path
+from unittest import mock
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_DIR / "agent"))
@@ -43,6 +45,14 @@ def two_step_cmd() -> str:
     if ON_WINDOWS:
         return "echo first & ping -n 2 127.0.0.1 >nul & echo second"
     return "echo first; sleep 1; echo second"
+
+
+def two_step_slow_cmd() -> str:
+    """Print, pause ~3s, print — wide margin for 'visible while
+    still running' polling assertions."""
+    if ON_WINDOWS:
+        return "echo first & ping -n 4 127.0.0.1 >nul & echo second"
+    return "echo first; sleep 3; echo second"
 
 
 class HttpClient:
@@ -91,11 +101,39 @@ class JobsTestCase(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        # Kill any detached processes the tests spawned BEFORE the
+        # temp dir is removed: a live process holds its stdout/stderr
+        # log files (state/processes/*.log) open, and Windows refuses
+        # to delete open files (WinError 32). POSIX unlink semantics
+        # hid this on Linux/macOS — the first Windows suite run failed
+        # tearDownClass with exactly that PermissionError.
+        _, listing = cls.http.request("GET", "/v1/processes")
+        for proc in listing.get("processes", []):
+            if proc.get("alive"):
+                cls.http.request(
+                    "POST", f"/v1/processes/{proc['process_id']}/kill")
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            _, listing = cls.http.request("GET", "/v1/processes")
+            if not any(p.get("alive")
+                       for p in listing.get("processes", [])):
+                break
+            time.sleep(0.1)
         cls.server.core.log_stop()
         cls.server.shutdown()
         cls.server.server_close()
         cls.thread.join(timeout=5)
-        cls.tmp.cleanup()
+        # Short retry: a just-killed process can release its log
+        # handles a moment after it stops reporting alive. Genuine
+        # cleanup failures still surface after the retries.
+        for attempt in range(10):
+            try:
+                cls.tmp.cleanup()
+                break
+            except PermissionError:
+                if attempt == 9:
+                    raise
+                time.sleep(0.3)
 
     def wait_job(self, job_id, timeout=15):
         deadline = time.time() + timeout
@@ -159,6 +197,34 @@ class JobsTestCase(unittest.TestCase):
         self.assertEqual(head["stdout"] + tail["stdout"], full)
         self.assertIn("first", head["stdout"])
         self.assertNotIn("first", tail["stdout"])
+
+    def test_job_output_visible_while_job_still_running(self):
+        # Regression (first Windows suite run): the job pump read with
+        # BufferedReader.read(65536), which blocks until the buffer
+        # fills or EOF — so a running job's small early output stayed
+        # invisible until the process exited, defeating incremental
+        # polling. The first line must be observable via the API while
+        # the job state is still "running".
+        status, obj = self.http.request(
+            "POST", "/v1/exec",
+            {"command": two_step_slow_cmd(), "shell": SHELL})
+        self.assertEqual(status, 202)
+        job_id = obj["job_id"]
+        saw_first_while_running = False
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            _, snap = self.http.request("GET", f"/v1/jobs/{job_id}")
+            if snap["state"] != "running":
+                break
+            if "first" in snap["stdout"]:
+                saw_first_while_running = True
+                break
+            time.sleep(0.05)
+        self.assertTrue(
+            saw_first_while_running,
+            "first line never visible while the job was still running")
+        final = self.wait_job(job_id)
+        self.assertIn("second", final["stdout"])
 
     def test_job_cancel(self):
         status, obj = self.http.request(
@@ -286,6 +352,76 @@ class JobsTestCase(unittest.TestCase):
     def test_session_missing_is_400(self):
         status, _ = self.http.request("GET", "/v1/sessions/deadbeefdead")
         self.assertEqual(status, 400)
+
+
+# A shell substitute for the pipe-pump regression: reads stdin lines
+# and answers each one immediately, then keeps running (never EOFs).
+ECHO_CHILD = (
+    "import sys\n"
+    "while True:\n"
+    "    line = sys.stdin.readline()\n"
+    "    if not line:\n"
+    "        break\n"
+    "    sys.stdout.write('reply:' + line)\n"
+    "    sys.stdout.flush()\n"
+)
+
+
+class PipePumpRegressionTests(unittest.TestCase):
+    """Regression for the pipe-pump output starvation found by the
+    first Windows suite run (61 tests: test_session_roundtrip FAIL —
+    session output empty forever, live-reproduced over the API for
+    both powershell and cmd sessions).
+
+    Session._pump_pipe read with BufferedReader.read(65536), which
+    blocks until 65536 bytes arrive or EOF; an interactive shell
+    never EOFs, so its output starved. On POSIX the suite only ever
+    exercised the PTY path, which is why the VM stayed green.
+
+    This test forces the pipe path on any platform (IS_WINDOWS
+    patched, which is also what selects the branch on real Windows)
+    around a line-echo child, and requires output in the buffer
+    WHILE the child is still alive.
+    """
+
+    def test_session_pipe_output_streams_while_shell_alive(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            cfg = dict(bridge_agent.DEFAULT_CONFIG)
+            cfg.update({
+                "host": "127.0.0.1", "port": 0, "token": TOKEN,
+                "allowed_file_root": str(root / "bridge-files"),
+                "audit_log": str(root / "logs" / "audit.jsonl"),
+                "state_dir": str(root / "state"),
+                "default_timeout_s": 10, "max_timeout_s": 30,
+            })
+            core = bridge_agent.BridgeCore(cfg)
+            argv = [sys.executable, "-u", "-c", ECHO_CHILD]
+            with mock.patch.object(bridge_agent, "IS_WINDOWS", True), \
+                    mock.patch.object(bridge_agent, "shell_argv",
+                                      return_value=argv):
+                session = bridge_agent.Session(core, "posix", str(root),
+                                               dict(os.environ))
+                try:
+                    session.send(b"hello\n")
+                    seen = ""
+                    deadline = time.time() + 5
+                    while time.time() < deadline:
+                        seen, _ = session.buffer.text()
+                        if "reply:hello" in seen:
+                            break
+                        time.sleep(0.05)
+                    self.assertIn("reply:hello", seen)
+                    self.assertIsNone(
+                        session.proc.poll(),
+                        "output must arrive while the shell is still "
+                        "alive — not flushed by its exit/EOF")
+                finally:
+                    # close() inside the patch: kill_tree consults
+                    # IS_WINDOWS, and the child shares this process's
+                    # group (start_new_session was False under the
+                    # patch), so the POSIX killpg path must not run.
+                    session.close()
 
 
 if __name__ == "__main__":

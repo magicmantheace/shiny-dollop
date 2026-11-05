@@ -339,3 +339,67 @@ suite under Windows Python, the supervised service form, and
 self-update apply on the PC — those ride on the owner's cutover
 checklist (see the overnight report in `docs/V1_PLAN.md` terms:
 staging first, then the manual first cutover, UAC step owner-only).
+
+### State update — 2026-11-05 morning: first Windows Python suite run found 2 defects; both fixed on this branch
+
+The cutover attempt ran the suite under Windows Python on the PC
+(Windows 11, Python 3.14.2, checkout pulled to tip `bc48202`; the
+running live agent is still v0.1, loaded in memory — it was not
+stopped). Result: **61 tests, FAILED (failures=1, errors=1,
+skipped=4)** in 37.7s. The 4 skips are the expected
+platform-conditional ones (`test_{screenshot,input,clipboard,uia}_501_off_windows`
+in `tests/test_v1_platform.py`); the Windows-only real-capture
+test ran and passed. Everything else passed, including jobs,
+files, the self-update rollback cycle, and hardening. The
+cutover paused at this gate — the suite must be green on Windows
+before the live agent is stopped. Two defects:
+
+**Defect 1 — product bug: pipe-pump output starvation**
+(FAIL `test_v1_jobs.JobsTestCase.test_session_roundtrip`).
+`Session._pump_pipe` did `self.proc.stdout.read(65536)`;
+`Job._pump` used the same `stream.read(65536)` pattern.
+`BufferedReader.read(n)` blocks until *n* bytes arrive or EOF.
+A job's exit eventually EOFs, but an interactive session's shell
+never does — its output (a few hundred bytes) starved
+indefinitely. Confirmed live over the API against a staging
+agent on Windows: both powershell and cmd sessions returned
+empty output forever. POSIX never saw it because sessions there
+use the PTY path (`os.read` returns what is available). **Fix:**
+both pumps now read through a shared `_read_available()` helper
+in `agent/bridge_agent.py` that uses `read1()` — a single raw
+read returning whatever is available — so partial output lands
+in the buffer promptly. The PTY pump is unchanged. Jobs gain
+the same fix: early output is now visible via the API while a
+job is still running, as the v1 incremental-output design
+intends.
+
+**Defect 2 — test harness only** (ERROR `tearDownClass
+(JobsTestCase)`): `PermissionError: [WinError 32]` deleting
+`state/processes/<id>.err.log` during temp-dir cleanup — a
+detached process the tests spawned still held its log files
+open, and Windows refuses to delete open files (POSIX allows
+it, so the VM never saw it). **Fix (tests only, no agent change
+— holding log handles for live tracked processes is by
+design):** `tearDownClass` now kills any spawned detached
+processes through the API and waits until none report alive
+before cleanup, and the cleanup itself retries briefly on
+`PermissionError`.
+
+**Regression coverage** (`tests/test_v1_jobs.py`, 12 → 14):
+`PipePumpRegressionTests.test_session_pipe_output_streams_while_shell_alive`
+forces the pipe path (IS_WINDOWS patched, echo child as the
+shell) and asserts output reaches the buffer while the child is
+still alive — **confirmed to fail against the pre-fix agent**
+(fix stashed: buffer empty, the Windows symptom) and to pass
+with the fix. `JobsTestCase.test_job_output_visible_while_job_still_running`
+asserts a job's first line is visible via the API while its
+state is still `running`.
+
+**Verification state:** full suite on Muse's Linux VM after
+the fix: **63 tests, OK (1 skip)** — the skip remains the
+Windows-only real-capture test. That is a VM result only.
+**Windows re-verification is PENDING**: the parent session will
+re-pull the PC checkout and re-run the suite under Windows
+Python before the cutover resumes. The Windows suite is NOT
+claimed green. Also still unverified: the supervised service
+form and self-update apply on the PC.
