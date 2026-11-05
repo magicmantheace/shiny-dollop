@@ -325,12 +325,16 @@ def gui_window_rect(width, height, data):
                         probe += 1
                     if probe > x:
                         w += probe - x
-                    # Height: the left edge stays title/banner/paper
-                    # until the window's bottom.
+                    # Height: a column near the right edge stays
+                    # title/banner/paper until the window's bottom.
+                    # (The left title corner now carries the app
+                    # glyph, whose accent pixels are not interior
+                    # colors; the right probe column stays clear of
+                    # the caption glyphs and the 1px frame stroke.)
                     interior = set(GUI_BANNERS.values()) | {GUI_PAPER, GUI_TITLE}
                     bottom = y
                     for row in range(y + 1, height):
-                        if any(_near(_px(data, width, start + 2, row), c)
+                        if any(_near(_px(data, width, start + w - 4, row), c)
                                for c in interior):
                             bottom = row
                         else:

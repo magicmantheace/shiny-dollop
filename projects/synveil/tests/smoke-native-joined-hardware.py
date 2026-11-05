@@ -600,7 +600,10 @@ def _gui_window_rect(width, height, data):
                         w += probe - xx
                     bottom = yy
                     for row in range(yy + 1, height):
-                        if any(_near(_px(data, width, start + 2, row), c)
+                        # Probe column near the right edge: the left
+                        # title corner carries the app glyph (accent,
+                        # not an interior color) since ADR 0024 S2.
+                        if any(_near(_px(data, width, start + w - 4, row), c)
                                for c in interior):
                             bottom = row
                         else:
