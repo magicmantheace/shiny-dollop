@@ -28,13 +28,13 @@ $StatusFile = Join-Path $StateDir "supervisor-status.json"
 
 switch ($Action) {
     'install' {
-        $action = New-ScheduledTaskAction -Execute "cmd.exe" `
+        $taskAction = New-ScheduledTaskAction -Execute "cmd.exe" `
             -Argument "/c `"$Launcher`"" -WorkingDirectory $ProjectRoot
         $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
         $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries `
             -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) `
             -RestartCount 0
-        Register-ScheduledTask -TaskName $TaskName -Action $action `
+        Register-ScheduledTask -TaskName $TaskName -Action $taskAction `
             -Trigger $trigger -Settings $settings `
             -Description "muse-pc-bridge supervised agent (visible console; closing it stops the bridge)" `
             -Force | Out-Null
