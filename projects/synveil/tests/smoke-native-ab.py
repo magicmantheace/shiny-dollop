@@ -346,16 +346,26 @@ def gui_window_rect(width, height, data):
 
 
 def gui_banner_kind(width, height, data, rect):
-    """Sample the GUI's state banner: a GUI_BANNERS key or None."""
+    """Sample the GUI's state banner: a GUI_BANNERS key or None.
+
+    The banner is a full-width color field with text over it, so
+    classify by the band row's dominant banner color: a kind needs
+    at least 200 matching pixels in the row. (A single sample point
+    is not robust since ADR 0024 S2: the 20px banner head's glyphs
+    cross the row at the window centre, and another window may
+    cover either end of the band.)
+    """
     x, y, w, _h = rect
-    # Sample near the banner's right end: since ADR 0024 S2 the
-    # banner head renders at 20px and its glyphs (incl. descenders)
-    # reach the window centre on this row, which read as no-banner.
-    rgb = _px(data, width, x + w - 20, y + 30 + 26)
-    for kind, color in GUI_BANNERS.items():
-        if _near(rgb, color, tol=6):
-            return kind
-    return None
+    row = y + 30 + 26
+    counts = {kind: 0 for kind in GUI_BANNERS}
+    for col in range(x + 8, x + w - 8):
+        rgb = _px(data, width, col, row)
+        for kind, color in GUI_BANNERS.items():
+            if _near(rgb, color, tol=6):
+                counts[kind] += 1
+                break
+    kind, count = max(counts.items(), key=lambda item: item[1])
+    return kind if count >= 200 else None
 
 
 def gui_click(boot, rect, index):
