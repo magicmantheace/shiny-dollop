@@ -65,6 +65,7 @@ and token to Muse **out-of-band** — never via git.
 | `docs/CHATGPT_INSTALL_HANDOFF.md` | delegated install (D: drive) that stops before the owner's token/final-setup steps |
 | `docs/TEST_PLAN.md` | what the tests prove — and what they cannot |
 | `docs/MUSE_HANDOFF.md` | current state, decisions, next steps |
+| `docs/V1_PLAN.md` | the v1 feature plan (recorded 2026-11-04) |
 | `REQUIREMENTS.md` | Python >= 3.11, stdlib only, Tailscale |
 
 ## Status — honest version
@@ -76,3 +77,7 @@ the .cmd launcher), the real Tailscale link, and the autostart task.
 Those are owner-PC checks built into the install doc; until they are
 done, this project is *implemented and VM-tested*, not *installed*.
 See `docs/MUSE_HANDOFF.md`.
+
+**Update (2026-11-04):** installed and live on the owner's PC — see
+the state update in `docs/MUSE_HANDOFF.md`. The v1 feature plan is
+recorded in `docs/V1_PLAN.md`.

@@ -81,5 +81,23 @@ audit log is the owner's explicit decision (2026-11-04) — see
    the result here.
 3. First real task through the bridge; review the PC-side audit log
    with the owner afterward.
-4. Possible v0.2 (see DESIGN future work): approval mode, Tailscale
-   identity checks, chunked transfers.
+4. **v1 plan recorded** in `docs/V1_PLAN.md` (2026-11-04, owner's
+   direction): async jobs, native screenshot + host input, service
+   form + self-update, chunked files with server-side hashes, a real
+   client library. It supersedes this earlier v0.2 sketch; an approval
+   mode is an explicit non-goal in the plan (owner's full-access
+   decision stands).
+
+## State update (2026-11-04, later the same day)
+
+- Installed on the owner's PC at `D:\shiny-dollop\projects\muse-pc-bridge`
+  via the delegated install handoff; that install reported the suite
+  passing 10/10 under Windows Python.
+- Tailnet link verified firsthand by Muse from the VM: an
+  unauthenticated request returns 401; authenticated status, exec,
+  and a file put/list/get round trip (SHA-256 verified) all passed.
+- The bridge then carried a full day of production work on the PC
+  (packaged-app validation, Gradle and Godot runs, a QEMU guest
+  update cycle). The friction observed that day is the evidence base
+  for `docs/V1_PLAN.md`. Connection details (IP, token) stay
+  out-of-band per the hard rules — never in this repo.
