@@ -35,7 +35,7 @@ PC during install verification.
 | File | Covers |
 | --- | --- |
 | `tests/test_v1_jobs.py` (12) | job submit returns immediately with a job id; result/output/exit code; incremental byte-offset reads (head + tail reconstruct the whole, no repeats); cancel → killed; timeout → failed + timed_out + null exit code; job list; unknown job → 404; **job_finish audited with a 64-char stdout SHA-256**; detached process spawn/list/kill with log tails; PTY session echo round-trip; missing session → 400 |
-| `tests/test_v1_platform.py` (12) | PNG encoder structure (IHDR, filter-0 scanlines round-trip), BMP structure, BGRA→RGBA conversion; capabilities vs platform_limited in /v1/status; screenshot/input/clipboard/UIA → 501 off Windows; bad format → 400; empty input actions → 400; real-capture test is Windows-only (skipped on the VM) |
+| `tests/test_v1_platform.py` (14) | PNG encoder structure (IHDR, filter-0 scanlines round-trip), BMP structure, BGRA→RGBA conversion; PNG round-trip at real capture size (1536x864, per-chunk CRC + pixel-exact decode) and the declared ctypes capture-signature table pinned with stand-in functions (regressions for the staging-found screenshot HTTP 500); capabilities vs platform_limited in /v1/status; screenshot/input/clipboard/UIA → 501 off Windows; bad format → 400; empty input actions → 400; real-capture test is Windows-only (skipped on the VM) |
 | `tests/test_v1_lifecycle.py` (8) | update stage/apply/rollback file cycle; wrong SHA-256, version mismatch, and zip-slip bundles rejected; apply without pending → error; supervisor restarts a twice-crashing agent and reports it; a staged **unhealthy update is rolled back automatically** (file bytes restored); a healthy update stays applied |
 | `tests/test_v1_files.py` (9) | hash endpoint + ranged get; chunked upload round-trip through the client library; **resume after partial upload** (2 chunks sent, client resumes by id); hash mismatch at completion rejected with no file placed; wrong chunk size rejected; upload discard; tree/mkdir/move/delete incl. root protection; a second named root (and unknown root → 400); path escapes still confined; client `exec_run` |
 | `tests/test_v1_hardening.py` (6) | audit rotation bounds the log and honors `audit_keep`; audit tail returns well-formed recent entries from the current file and clamps n; the rate-limit flow end-to-end (401 → 429 + `retry_after_s`, real token unaffected, blocked attempts still audited with `rate_limited: true`); update staging API (empty → staged; running agent untouched) |
@@ -53,10 +53,21 @@ PC during install verification.
   CLI smoke run (status / exec / put / get / jobs / hash /
   audit-tail / update-status) against a locally running v1 agent,
   all exit 0 with verified hashes.
-- **PC staging verification of v1 (port 8766 beside the live v0.1)
-  is still pending** — see `docs/MUSE_HANDOFF.md` for why and for
-  the exact staging procedure. Nothing in the v1 column above is a
+- **PC staging verification of v1 (port 8766 beside the live v0.1)**
+  has since run — see the next bullet for its screenshot findings.
+  Apart from that BMP result, nothing in the v1 column above is a
   Windows result.
+- 2026-11-04 night, later (defect fix): the first PC staging run
+  reported `GET /v1/screenshot?format=png` → HTTP 500
+  (`argument 1: OverflowError: int too long to convert`) while
+  `format=bmp` returned 200 with a real 1536x864 capture and a
+  correct SHA-256 — a live Windows result for the BMP path. Root
+  cause: undeclared ctypes `argtypes` in the GDI capture (see
+  `docs/MUSE_HANDOFF.md`). Fixed on this branch; **full suite on
+  the VM: 59 tests, OK (1 skip)**, including the new real-size PNG
+  round-trip and capture-signature regression tests. Live Windows
+  re-verification of `format=png` is still pending (the staging
+  session re-runs it on the PC).
 
 ## What the tests cannot prove
 

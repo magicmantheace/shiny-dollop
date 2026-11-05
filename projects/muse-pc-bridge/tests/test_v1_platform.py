@@ -71,6 +71,89 @@ class EncoderTests(unittest.TestCase):
         rgba = bridge_agent.bgra_to_rgba(bgra)
         self.assertEqual(rgba, bytes([30, 20, 10, 255, 60, 50, 40, 255]))
 
+    def test_png_roundtrip_real_capture_size(self):
+        # Regression: the live-PC staging failure (HTTP 500 on
+        # ?format=png) appeared only at real capture dimensions.
+        # Exercise the full BGRA->RGBA->PNG path at 1536x864 (the
+        # staged size) and decode the result end to end.
+        import binascii
+        w, h = 1536, 864
+        bgra = bytes(range(256)) * (w * h * 4 // 256)
+        rgba = bridge_agent.bgra_to_rgba(bgra)
+        png = bridge_agent.encode_png(w, h, rgba)
+        self.assertTrue(png.startswith(b"\x89PNG\r\n\x1a\n"))
+        pos = 8
+        idat = b""
+        ihdr = None
+        while pos < len(png):
+            length = struct.unpack(">I", png[pos:pos + 4])[0]
+            typ = png[pos + 4:pos + 8]
+            data = png[pos + 8:pos + 8 + length]
+            crc, = struct.unpack(">I", png[pos + 8 + length:
+                                            pos + 12 + length])
+            self.assertEqual(crc, binascii.crc32(typ + data) & 0xFFFFFFFF)
+            if typ == b"IHDR":
+                ihdr = struct.unpack(">IIBBBBB", data)
+            elif typ == b"IDAT":
+                idat += data
+            pos += 12 + length
+        self.assertIsNotNone(ihdr)
+        self.assertEqual((ihdr[0], ihdr[1], ihdr[3]), (w, h, 6))
+        stride = w * 4
+        expected = b"".join(b"\x00" + rgba[y * stride:(y + 1) * stride]
+                            for y in range(h))
+        self.assertEqual(zlib.decompress(idat), expected)
+
+
+class CaptureSignatureTests(unittest.TestCase):
+    """Regression guard for the live-PC screenshot HTTP 500
+    ("argument 1: OverflowError: int too long to convert"): the GDI
+    capture functions round-trip pointer-sized handles, so every
+    signature capture_screen relies on must be declared with
+    c_void_p handle slots. Undeclared ctypes signatures convert
+    Python ints through the 32-bit Windows C long and raise on
+    handle values above INT_MAX. The capture itself is Windows-only,
+    so this test drives the declaration routine with stand-in
+    function objects and pins the declared table."""
+
+    def test_capture_signatures_declared(self):
+        import ctypes
+        import types
+
+        def fake_dll(*names):
+            return types.SimpleNamespace(
+                **{name: types.SimpleNamespace() for name in names})
+
+        user32 = fake_dll("GetDC", "ReleaseDC", "GetSystemMetrics")
+        gdi32 = fake_dll("CreateCompatibleDC", "CreateCompatibleBitmap",
+                         "SelectObject", "BitBlt", "GetDIBits",
+                         "DeleteObject", "DeleteDC")
+        bridge_agent._declare_capture_signatures(user32, gdi32)
+        P, I, U, UL = (ctypes.c_void_p, ctypes.c_int, ctypes.c_uint,
+                       ctypes.c_ulong)
+        expected = {
+            "GetDC": ([P], P),
+            "ReleaseDC": ([P, P], I),
+            "GetSystemMetrics": ([I], I),
+            "CreateCompatibleDC": ([P], P),
+            "CreateCompatibleBitmap": ([P, I, I], P),
+            "SelectObject": ([P, P], P),
+            "BitBlt": ([P, I, I, I, I, P, I, I, UL], I),
+            "GetDIBits": ([P, P, U, U, P, P, U], I),
+            "DeleteObject": ([P], I),
+            "DeleteDC": ([P], I),
+        }
+        funcs = {}
+        for dll in (user32, gdi32):
+            for name in expected:
+                if hasattr(dll, name):
+                    funcs[name] = getattr(dll, name)
+        self.assertEqual(set(funcs), set(expected))
+        for name, (argtypes, restype) in expected.items():
+            with self.subTest(function=name):
+                self.assertEqual(funcs[name].argtypes, argtypes)
+                self.assertIs(funcs[name].restype, restype)
+
 
 class PlatformEndpointTests(unittest.TestCase):
     @classmethod

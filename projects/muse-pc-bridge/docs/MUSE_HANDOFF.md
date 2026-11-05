@@ -203,3 +203,54 @@ applied; the owner applies it after cutover:
 git tag -a v1.0.0 -m "muse-pc-bridge v1.0.0" <v1-tip-commit>
 git push origin v1.0.0
 ```
+
+## State update (2026-11-04 night, later): screenshot PNG defect — found by PC staging, fixed, VM-verified
+
+The first PC staging run of v1 (second instance on port 8766) found
+a defect the VM suite could not: `GET /v1/screenshot?format=png`
+returned HTTP 500 with `{"error": "internal error: argument 1:
+OverflowError: int too long to convert"}`, while `format=bmp` on the
+same staging agent returned 200 with a real 1536x864 capture and a
+correct SHA-256.
+
+**Root cause** (`agent/bridge_agent.py`: `capture_screen`, plus
+`_monitor_rects`): the ctypes GDI capture declared
+`restype = ctypes.c_void_p` for the handle-returning calls — so
+handles came back as full pointer-sized Python ints — but never
+declared `argtypes` for any user32/gdi32 function. With undeclared
+signatures, ctypes passes Python ints through the platform C long
+conversion, which is 32-bit on Windows; any HDC/HBITMAP handle
+value above INT_MAX then raises exactly the observed error at
+argument 1 (a handle in every capture-path call). Both formats
+share `capture_screen`, so the PNG/BMP difference in staging was
+which requests happened to draw a high handle value, not the
+encoders: the pure-Python `encode_png`/`bgra_to_rgba` path was
+verified innocent by round-tripping 1536x864 and 3840x2160
+synthetic frames on the VM (structure + per-chunk CRC +
+pixel-exact decode), and the pre-existing encoder tests only ever
+used tiny images.
+
+**Fix:** `_declare_capture_signatures()` in `bridge_agent.py`
+declares argtypes + restype for all ten user32/gdi32 functions the
+capture path calls (every handle slot `c_void_p`) and runs at the
+top of `capture_screen`; `_monitor_rects` likewise declares
+`EnumDisplayMonitors`, and its callback's LPARAM parameter is now
+`c_void_p` (was `c_double`). No other behavior change.
+
+**Regression coverage** (`tests/test_v1_platform.py`, 12 → 14):
+`test_png_roundtrip_real_capture_size` runs the full
+BGRA→RGBA→PNG path at 1536x864 and decodes it end to end;
+`test_capture_signatures_declared` pins the declared signature
+table using stand-in function objects (the capture itself remains
+Windows-only). The signature test was confirmed to error against
+the pre-fix agent code.
+
+**Verification state:** full suite on Muse's Linux VM after the
+fix: **59 tests, OK (1 skip)** — the skip remains the Windows-only
+real-capture test. That is a VM result only. **Live Windows
+re-verification of `format=png` is PENDING** the staging session's
+re-run on the PC; BMP was verified live on Windows by that session
+(200, 1536x864, SHA-256 correct). Noted for a future pass, not
+touched by this fix: the same undeclared-signature pattern exists
+in the jobs process-exit helper (`OpenProcess` /
+`GetExitCodeProcess` near the top of `bridge_agent.py`).

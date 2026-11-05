@@ -1182,15 +1182,59 @@ def _monitor_rects() -> list[tuple[int, int, int, int]]:
 
     callback_type = ctypes.WINFUNCTYPE(
         ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p,
-        ctypes.POINTER(RECT), ctypes.c_double)
+        ctypes.POINTER(RECT), ctypes.c_void_p)   # LPARAM is pointer-sized
 
     def _cb(_hmon, _hdc, rect_ptr, _data):
         r = rect_ptr.contents
         rects.append((r.left, r.top, r.right - r.left, r.bottom - r.top))
         return 1
 
+    user32.EnumDisplayMonitors.argtypes = [
+        ctypes.c_void_p, ctypes.c_void_p, callback_type, ctypes.c_void_p]
+    user32.EnumDisplayMonitors.restype = ctypes.c_int
     user32.EnumDisplayMonitors(None, None, callback_type(_cb), 0)
     return rects
+
+
+def _declare_capture_signatures(user32, gdi32) -> None:
+    """Declare argtypes/restype for every user32/gdi32 call in the
+    capture path.
+
+    This is load-bearing, not decoration. The functions below take and
+    return GDI handles (HDC/HBITMAP/HGDIOBJ), which are pointer-sized
+    in this 64-bit process. With undeclared signatures, ctypes passes
+    Python ints through the platform C long conversion — 32-bit on
+    Windows — so any handle value above INT_MAX raises
+    ``ArgumentError: argument 1: OverflowError: int too long to
+    convert`` at capture time (observed live on the owner's PC:
+    GET /v1/screenshot?format=png -> HTTP 500, while a later request
+    whose handles happened to fit succeeded). Declaring every handle
+    parameter and return as c_void_p removes that failure class.
+    """
+    import ctypes
+    P = ctypes.c_void_p
+    I = ctypes.c_int
+    U = ctypes.c_uint
+    user32.GetDC.argtypes = [P]
+    user32.GetDC.restype = P
+    user32.ReleaseDC.argtypes = [P, P]
+    user32.ReleaseDC.restype = I
+    user32.GetSystemMetrics.argtypes = [I]
+    user32.GetSystemMetrics.restype = I
+    gdi32.CreateCompatibleDC.argtypes = [P]
+    gdi32.CreateCompatibleDC.restype = P
+    gdi32.CreateCompatibleBitmap.argtypes = [P, I, I]
+    gdi32.CreateCompatibleBitmap.restype = P
+    gdi32.SelectObject.argtypes = [P, P]
+    gdi32.SelectObject.restype = P
+    gdi32.BitBlt.argtypes = [P, I, I, I, I, P, I, I, ctypes.c_ulong]
+    gdi32.BitBlt.restype = I                       # BOOL
+    gdi32.GetDIBits.argtypes = [P, P, U, U, P, P, U]
+    gdi32.GetDIBits.restype = I
+    gdi32.DeleteObject.argtypes = [P]
+    gdi32.DeleteObject.restype = I                 # BOOL
+    gdi32.DeleteDC.argtypes = [P]
+    gdi32.DeleteDC.restype = I                     # BOOL
 
 
 def capture_screen(region: tuple[int, int, int, int] | None = None,
@@ -1227,10 +1271,7 @@ def capture_screen(region: tuple[int, int, int, int] | None = None,
                     ("biClrUsed", ctypes.c_ulong),
                     ("biClrImportant", ctypes.c_ulong)]
 
-    user32.GetDC.restype = ctypes.c_void_p
-    gdi32.CreateCompatibleDC.restype = ctypes.c_void_p
-    gdi32.CreateCompatibleBitmap.restype = ctypes.c_void_p
-    gdi32.SelectObject.restype = ctypes.c_void_p
+    _declare_capture_signatures(user32, gdi32)
     screen_dc = user32.GetDC(None)
     if not screen_dc:
         raise PlatformUnavailable("GetDC failed")
