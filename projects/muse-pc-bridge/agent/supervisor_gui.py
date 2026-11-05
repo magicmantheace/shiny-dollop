@@ -168,12 +168,11 @@ class AvatarWindow:
             widget.bind("<Button-3>", self._popup_menu)
         root.protocol("WM_DELETE_WINDOW", self.stop)
 
-        root.update_idletasks()
-        w = root.winfo_reqwidth()
-        h = root.winfo_reqheight()
-        x = root.winfo_screenwidth() - w - 24
-        y = root.winfo_screenheight() - h - 48
-        root.geometry(f"+{max(x, 0)}+{max(y, 0)}")
+        # Stay hidden until the first animation is applied: the
+        # window's real size is only known once an image is in the
+        # label, and placing it before that pushes it off-screen.
+        self._placed = False
+        root.withdraw()
 
     # -- window behaviour ----------------------------------------------------
 
@@ -282,6 +281,15 @@ class AvatarWindow:
         self.avatar_label.configure(bg=bg)
         self.text_label.configure(bg=bg)
         self.close_label.configure(bg=bg)
+        if not self._placed:
+            self._placed = True
+            self.root.update_idletasks()
+            w = self.root.winfo_reqwidth()
+            h = self.root.winfo_reqheight()
+            x = self.root.winfo_screenwidth() - w - 24
+            y = self.root.winfo_screenheight() - h - 48
+            self.root.geometry(f"+{max(x, 0)}+{max(y, 0)}")
+            self.root.deiconify()
 
     def run(self) -> None:
         self.root.after(300, self._poll)
