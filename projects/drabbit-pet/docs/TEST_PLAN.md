@@ -32,9 +32,23 @@ surface; the GUI itself is not faked in tests.
 | Tick service | Fresh egg persisted once at startup; a tick that changes nothing writes nothing; crossing the incubation boundary persists and emits `egg_ready`; scheduler wiring (5 s default, start/stop, no double-schedule); a dead pet is never advanced or persisted; `onChanged` fires only on change. |
 | Roaming planner | Bounds respected under adversarial randomness (always-right / scripted-left), out-of-bounds starts clamped; never moves while asleep, panel-open, paused, an egg, or dead; hop → arrive exactly on target → sit; sit bias gives long idle sits. |
 | IPC action mapping | Payload validation accepts all nine UI kinds and rejects malformed payloads (`bad_payload`); each kind maps to the right core action with exact need deltas (snack +8, meal +35/clamp, play −7 energy…); wrong-stage/state actions raise the core's typed errors (`not_ready`, `asleep`, `not_sick`, `not_dead`, `is_egg`); clean is allowed while asleep; medicine cures an injected sick pet; new-egg starts generation 2. |
-| Visual state | state→animation mapping (egg/egg-ready/idle/sleeping/sick/dead), transient eating/playing from events, resolution priority (base > transient > hopping > idle). |
+| Visual state | state→animation mapping (egg/egg-ready/idle/sleeping/sick/dead), transient eating/playing from events, resolution priority (base > transient > hopping > idle); bridge reactions add a bubble-only transient except `celebrate`, which maps to the playing bounce. |
+| Bridge link | `desktop/tests/bridge-link.test.ts` (12): display-state parsing (junk/missing state → null, optional fields tolerated); reaction mapping (busy states + celebrate react, alert reacts even on first sighting, repeats/connecting/first-sighting calm stay quiet, busy→idle relaxes, alert→idle says "All clear"); the polling service against an injected reader + fake scheduler (reacts on change only; missing/corrupt file is a quiet no-op and recovery works; start/stop wiring); env-override path priority. |
 | Build + smoke | `npm run build` clean (core tsc, main/preload tsc strict, Vite production build of both windows). `npm run smoke`: the real Electron binary launches under Xvfb, creates a fresh save in a throwaway userData, and loads both windows (`SMOKE_OK`). |
 | **Owner-PC only** | Transparent window behaviour, perching/roaming feel on a real desktop, tray, always-on-top over real windows, multi-monitor, high-DPI — never claimed from VM runs. |
+
+**Bridge link — owner-PC verification (2026-11-05):** the desktop
+suite on the VM is **63 tests** (bridge-link 12 + visual-state 6
+included) with core unchanged at 46. On the owner's PC the built
+app was run with an isolated throwaway profile and
+`DRABBIT_BRIDGE_STATE_FILE` pointed at a staged state file: the pet
+window (PrintWindow capture) showed **no bubble** at an idle first
+sighting, **"Pip is watching Muse work"** after the file flipped
+to `working`, and **"⚠ Muse needs attention on the PC"** after a
+flip to `alert`. The owner's real pet save was not touched. Live
+pairing against the real bridge state file begins whenever the
+bridge's production form is the GUI supervisor (owner's call);
+until then the file simply doesn't exist and the link stays quiet.
 
 ## P3 — companion server (`desktop/tests/companion-*.test.ts`)
 

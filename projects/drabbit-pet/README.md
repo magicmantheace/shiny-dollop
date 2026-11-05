@@ -30,6 +30,18 @@ neglect, death, and the next generation's egg. Time is deterministic —
 the pet ages from timestamps, so a week offline catches up in one
 advance call, identically to having ticked live.
 
+**Bridge link (2026-11-05):** the desktop pet also *observes* the
+Muse PC Bridge's avatar window. The bridge's GUI supervisor
+publishes its state (idle / working / session / …) to a local
+`display-state.json`; the pet's main process polls that file and the
+pet reacts in its window — a bubble ("Pip is watching Muse work",
+"⚠ Muse needs attention on the PC") and a happy bounce when a
+bridge update lands. Strictly one-way and read-only: the pet holds
+no bridge credentials, opens no sockets, and the reactions are
+presentation only — the deterministic sim never sees them. If the
+bridge runs its console form (no state file), the pet simply never
+reacts. Path override: `DRABBIT_BRIDGE_STATE_FILE`.
+
 ## Layout
 
 | Folder | Contents | Slice |

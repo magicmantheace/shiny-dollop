@@ -198,6 +198,35 @@ owner-side verification, listed below.
   each verified before the next; keep this file's verified/unverified
   split honest after every slice.
 
+## 2026-11-05 — bridge link (post-v1, owner's request)
+
+The owner asked for his desktop pet to be able to interact with the
+new Muse PC Bridge avatar window. Shipped as a one-way link:
+
+- `desktop/src/shared/bridge-reaction.ts` — defensive parsing of
+  the bridge's `display-state.json` + the pure change→reaction
+  mapping. `desktop/src/main/bridge-link.ts` — a polling service
+  (2 s, injected reader/scheduler) that broadcasts reactions over
+  the new `pet:bridgeReaction` channel; the pet window shows a
+  bubble (6 s) and plays the bounce transient on `celebrate`.
+- The sim is untouched: no core changes, no save changes, no new
+  inputs to the pet's world — reactions are main/renderer
+  presentation, so determinism and offline catch-up are unaffected.
+  The link holds no bridge credentials and opens no sockets; the
+  bridge gains no new inputs from the pet. Path resolution:
+  `DRABBIT_BRIDGE_STATE_FILE` → `D:\shiny-dollop\...` checkout →
+  home-relative checkout.
+- Verified: VM desktop suite **63/63** (was 50; +12 bridge-link,
+  +1 visual-state), core **46/46**, full build clean. Owner-PC
+  smoke with a throwaway profile + staged state file: bubbles for
+  `working` and `alert` captured from the real pet window; idle
+  first-sighting correctly quiet. The owner's real pet/save were
+  never run or touched.
+- Not yet live in production: the bridge still runs its console
+  supervisor form, which does not publish `display-state.json`.
+  The link activates by itself the day the bridge's GUI form runs
+  (owner's separate call) — no pet-side change needed then.
+
 ## Next step
 
 The v1 queue is complete; everything left is owner-side
