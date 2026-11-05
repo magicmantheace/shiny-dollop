@@ -84,6 +84,15 @@ PC during install verification.
   against the pre-fix agent code. VM result only: live Windows
   verification of the process/clipboard paths rides on the
   staging session's re-run on the PC.
+- 2026-11-04 night, staging re-run (parent session): tip
+  `232b6d3` deployed as a staging instance on the PC (port 8766).
+  Live Windows results: `format=png` now 200 (valid PNG,
+  1536x864, real desktop frame); a job ran to done after the
+  process-signature fix; clipboard GET 200; jobs, cancel,
+  file hash, chunked upload, audit tail (`job_finish` with
+  output hashes), and UIA window enumeration all verified
+  working. Staging agent stopped afterwards; live v0.1 agent
+  untouched and healthy. See `docs/MUSE_HANDOFF.md`.
 
 ## What the tests cannot prove
 

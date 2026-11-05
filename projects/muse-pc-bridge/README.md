@@ -99,7 +99,9 @@ PC staging run found a screenshot defect (`format=png` → HTTP 500,
 undeclared ctypes signatures in the GDI capture); it is fixed on
 this branch and VM-verified, and the same signature defect class
 has since been fixed in the `pid_alive` process helper and the
-clipboard path, with live Windows re-verification still pending
-(see `docs/MUSE_HANDOFF.md`). The live
-agent on the PC is still v0.1 — v1 is *implemented and
-VM-verified*, not yet *cut over*.
+clipboard path, with live Windows staging
+verification completed the same night (see
+`docs/MUSE_HANDOFF.md`). The live
+agent on the PC is still v0.1 — v1 is *implemented,
+VM-verified, and staging-verified on the PC*, not yet
+*cut over*.

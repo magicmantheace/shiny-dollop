@@ -310,3 +310,32 @@ and rides on the parent session's staging re-run on the PC (the
 jobs-liveness and clipboard endpoints exercised against the
 staging instance), alongside the still-pending `format=png`
 re-verification.
+
+### State update — 2026-11-04 night, final: PC staging verification COMPLETE
+
+The parent session (the one holding the live bridge token) ran the
+staging procedure from this handoff against tip `232b6d3`: the v1
+agent was deployed to `D:\bridge-work\bridge-v1-stage`, port 8766,
+with its own staging config and token. Verified live on Windows
+(AthenZ971): `/v1/status` reports version 1.0.0 with the full
+capability list; job submit → poll → done with correct output, and
+job cancel → killed; `file/put` plus the server-side SHA-256
+endpoint agree with the local hash; a chunked upload (200,000 B in
+64 KiB chunks) completed with a matching final hash; the audit
+tail shows `job_finish` events carrying output hashes; UIA
+`windows` enumeration returned real window data; clipboard GET
+returned 200 on the newly declared signature path; BMP capture
+returned a real 1536x864 frame; and, after the two signature
+fixes, `format=png` returned 200 with a valid PNG — the frame
+shows the staging agent's own console banner ("muse-pc-bridge
+1.0.0 listening"). Capture-resolution note: 1536x864 is the
+DPI-scaled logical desktop size (the host display is 3840x2160 at
+250% scaling); the agent is not DPI-aware yet.
+
+The staging agent was then stopped (port 8766 closed) and the
+transfer artifacts removed; the live v0.1 agent was never touched
+and reported healthy afterwards. Still NOT verified anywhere: the
+suite under Windows Python, the supervised service form, and
+self-update apply on the PC — those ride on the owner's cutover
+checklist (see the overnight report in `docs/V1_PLAN.md` terms:
+staging first, then the manual first cutover, UAC step owner-only).
