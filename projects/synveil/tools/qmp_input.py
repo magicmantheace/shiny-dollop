@@ -108,6 +108,18 @@ def send_keys(socket_path: Path, keys: tuple[str, ...], *, timeout=5.0,
 
 
 
+def _has_content(sample: bytes) -> bool:
+    """True when >=64 pixels differ from the sample's first pixel."""
+    base = sample[:3]
+    differences = 0
+    for i in range(3, len(sample) - 2, 3):
+        if sample[i:i + 3] != base:
+            differences += 1
+            if differences >= 64:
+                return True
+    return False
+
+
 def verified_ppm_test_frame(path: Path) -> bool:
     """Reject a blank, oversized, malformed or truncated QMP P6 screenshot.
 
@@ -139,13 +151,20 @@ def verified_ppm_test_frame(path: Path) -> bool:
             # require enough changed pixels to show actual UI content.
             if len(sample) < 3 or not any(sample):
                 return False
-            base = sample[:3]
-            differences = 0
-            for i in range(3, len(sample) - 2, 3):
-                if sample[i:i + 3] != base:
-                    differences += 1
-                    if differences >= 64:
-                        return True
+            if _has_content(sample):
+                return True
+            # The first rows are not guaranteed to hold content: since
+            # ADR 0024 S3 the shell panel sits at the bottom and the
+            # top of the desktop is uniform background, which the
+            # head-only sample misread as a blank scanout. Sample the
+            # tail of the frame as well; a truly blank (single-color)
+            # frame still fails both windows.
+            tail = min(pixel_bytes, 1024 * 1024)
+            stream.seek(match.end() + pixel_bytes - tail)
+            sample = stream.read(tail)
+            if len(sample) < 3 or not any(sample):
+                return False
+            return _has_content(sample)
             return False
     except (OSError, ValueError):
         return False
