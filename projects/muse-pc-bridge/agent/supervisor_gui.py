@@ -356,6 +356,10 @@ def main(argv: list[str] | None = None) -> int:
     thread.start()
     window = AvatarWindow(supervisor, args.config, state_dir)
     window.run()
+    # The window is gone; give the supervisor thread a few seconds to
+    # record its final "stopped" state before the process exits, so
+    # the status file never claims a dead bridge is still running.
+    thread.join(timeout=6.0)
     return 0
 
 
