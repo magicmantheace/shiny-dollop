@@ -119,3 +119,58 @@ Muse stores the token in its client environment only and runs a
   request, command, and file transfer, in order.
 - **Rotate the token:** stop the agent, delete `agent\config.json`,
   redo steps 3–6.
+
+## Upgrading to v1 (from the live v0.1 install)
+
+v1 is backward-compatible with the v0 config: every new setting is
+optional (see `config.example.json` for the full shape). The first
+cutover is manual — v0.1 has no self-update endpoint to stage it
+with. Steps, in order:
+
+1. **Stop the v0 agent** — close its console window (the kill
+   switch). Access is down during the upgrade; that's expected.
+2. **Update the checkout** to the v1 tip of
+   `muse-pc-bridge/foundation`:
+   ```powershell
+   cd D:\shiny-dollop
+   git pull
+   cd projects\muse-pc-bridge
+   ```
+   Your `agent\config.json`, `agent\logs\`, and
+   `agent\bridge-files\` are git-ignored and stay untouched.
+3. **Run the suite on Windows:**
+   ```powershell
+   python -m unittest discover -s tests -v
+   ```
+   Expect all tests to pass except one Windows-only skip pattern in
+   reverse: on Windows the real-screenshot test runs and the
+   POSIX-only 501 tests skip. If anything fails, stop and show
+   Muse the output — do not cut over on a red suite.
+4. **(Optional) name extra file roots** in `agent\config.json` —
+   e.g. add `"file_roots": [{"name": "default", "path":
+   "./bridge-files"}, {"name": "work", "path": "D:\\bridge-work"}]`.
+   Skip this to keep exactly the v0 behavior.
+5. **Restart, one of two ways:**
+   - Same as v0: `scripts\start-bridge.cmd` (single agent console).
+   - Supervised (v1 service form): `scripts\start-bridge-service.cmd`
+     — a supervisor console that restarts the agent if it crashes
+     and applies staged self-updates with automatic rollback.
+     Closing the supervisor console stops everything (kill switch
+     preserved).
+6. **Verify:** from the PC, `client\bridge_client.py status` should
+   report `"version": "1.0.0"` with a capabilities list; then Muse
+   verifies from the VM over the tailnet as before.
+7. **(Optional) autostart the supervised form:**
+   ```powershell
+   scripts\bridge-service.ps1 -Action install
+   ```
+   This registers a per-user logon Scheduled Task. **It may prompt
+   for UAC — run it yourself, interactively.** `-Action status`,
+   `-Action start`, `-Action stop`, and `-Action uninstall` manage
+   it afterwards.
+
+After cutover, later updates can ride the v1 self-update: Muse
+stages a signed-by-hash bundle via `POST /v1/update/stage`, and the
+supervisor applies it at the next restart with a health check and
+automatic rollback. (Self-update only exists in the supervised
+form.)

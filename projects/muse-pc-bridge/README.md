@@ -55,13 +55,18 @@ and token to Muse **out-of-band** — never via git.
 | Path | What |
 | --- | --- |
 | `agent/bridge_agent.py` | the server (runs on the PC) |
-| `client/bridge_client.py` | Muse-side CLI (status / exec / list / get / put) |
+| `agent/supervisor.py` | v1 service form: visible-console supervisor (auto-restart, staged-update apply + health check + auto-rollback) |
+| `agent/bridge_update.py` | self-update mechanics (bundle verify, staged apply, rollback) |
+| `agent/helpers/uia.ps1` | fixed UI Automation helper driven by the agent (JSON parameters only) |
+| `client/bridge_client.py` | Muse-side library + CLI (jobs, processes, sessions, chunked files, screenshot/input/clipboard/uia) |
 | `scripts/start-bridge.cmd` | start the agent in a visible console |
+| `scripts/start-bridge-service.cmd` | start the supervised agent (v1 service form) |
+| `scripts/bridge-service.ps1` | manage the supervised form as a logon task (install/start/stop/status/uninstall) |
 | `scripts/install-autostart.ps1` | OPTIONAL logon autostart (same visible console) |
 | `config.example.json` | config shape (real `config.json` is git-ignored) |
-| `tests/test_bridge.py` | end-to-end suite: boots the real server on loopback |
+| `tests/` | end-to-end suites: boot the real server on loopback (`test_bridge.py` + `test_v1_*.py`) |
 | `docs/DESIGN.md` | architecture, wire protocol, threat model |
-| `docs/INSTALL_WINDOWS.md` | exact Windows install + verification steps |
+| `docs/INSTALL_WINDOWS.md` | exact Windows install + verification steps, plus the v1 upgrade path |
 | `docs/CHATGPT_INSTALL_HANDOFF.md` | delegated install (D: drive) that stops before the owner's token/final-setup steps |
 | `docs/TEST_PLAN.md` | what the tests prove — and what they cannot |
 | `docs/MUSE_HANDOFF.md` | current state, decisions, next steps |
@@ -81,3 +86,15 @@ See `docs/MUSE_HANDOFF.md`.
 **Update (2026-11-04):** installed and live on the owner's PC — see
 the state update in `docs/MUSE_HANDOFF.md`. The v1 feature plan is
 recorded in `docs/V1_PLAN.md`.
+
+**Update (2026-11-04 night): v1 built (agent `1.0.0`).** Async jobs,
+detached processes, interactive sessions, in-agent screenshot /
+host input / clipboard / UI Automation, chunked resumable transfers
+with server-side SHA-256, multi-root files, a supervised service
+form with self-update + automatic rollback, audit hardening (§5),
+and a real client library — per `docs/V1_PLAN.md`, in five slice
+commits on this branch. **Verified on Muse's Linux VM: 57 tests
+pass** (1 Windows-only skip) plus a client-CLI smoke run. **PC
+staging verification is still pending** (see `docs/MUSE_HANDOFF.md`)
+and the live agent on the PC is still v0.1 — v1 is *implemented and
+VM-verified*, not yet *staged or cut over*.

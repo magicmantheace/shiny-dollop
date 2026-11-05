@@ -101,3 +101,105 @@ audit log is the owner's explicit decision (2026-11-04) — see
   update cycle). The friction observed that day is the evidence base
   for `docs/V1_PLAN.md`. Connection details (IP, token) stay
   out-of-band per the hard rules — never in this repo.
+
+## State update (2026-11-04 night): v1 built, VM-verified, NOT yet staged on the PC
+
+**Version:** agent `1.0.0`. Built overnight per `docs/V1_PLAN.md` in
+five slice commits on `muse-pc-bridge/foundation` (draft PR #27):
+S1 `1347b9a` (jobs/processes/sessions core), S2 `488bc29` (eyes/
+hands), S3 `db4947c` (supervisor + self-update), S4 `b91d0b6`
+(files/client), S5 `6440762` (hardening tests), plus this docs pass.
+Every push verified via ls-remote. The live PC agent is untouched
+and still runs v0.1.0.
+
+### What v1 adds (all in the S1–S5 commits above)
+
+- **Jobs:** `POST /v1/exec` submits a job (202 + job id); polling
+  with byte offsets; cancel; `wait_s` keeps the v0 inline shape.
+  Client disconnects can no longer lose work. Detached processes
+  with log files + a persisted registry. Interactive sessions (PTY
+  on POSIX, pipes on Windows — stdlib has no ConPTY).
+- **Eyes/hands (Windows):** screenshot captured in-agent via ctypes
+  GDI + a pure-Python PNG encoder (no script-based capture pattern
+  anywhere — see DESIGN.md); SendInput host input; clipboard;
+  UI Automation through the bundled fixed `agent/helpers/uia.ps1`.
+  Off Windows these return 501 and list in `platform_limited`.
+- **Lifecycle:** `agent/supervisor.py` (visible console, crash
+  restart with backoff, supervisor-status.json) and self-update:
+  the agent stages bundles (`agent/bridge_update.py`, SHA-256 +
+  manifest verified, zip-slip guarded); the supervisor applies at a
+  restart boundary with backup, health-checks, and **rolls back
+  automatically** on failure. `scripts/bridge-service.ps1` manages
+  a per-user logon task for the supervised form — owner-run only;
+  **nothing was installed on the PC during this build**.
+- **Files/client:** chunked resumable uploads (persisted under
+  `state/`), ranged downloads, server-side SHA-256, tree/mkdir/
+  move/delete, configurable multi-root file config. The client is
+  now a real library (`BridgeClient`) with the v0 CLI preserved.
+- **§5 audit changes (owner approved the plan as a whole; listed
+  here distinctly for review):** (1) size-based audit rotation
+  (`audit_max_bytes` 10 MiB, `audit_keep` 5; 0 disables); (2) new
+  `job_finish` audit events carrying job_id, exit code, byte totals,
+  and stdout/stderr SHA-256s; (3) job-related request entries may
+  carry `job_id` / `output_sha256` fields; (4) new
+  `GET /v1/audit/tail` endpoint; (5) auth-failure rate limiting —
+  blocked attempts still audited as `auth_failed` with
+  `"rate_limited": true`, correct-token requests from a blocked IP
+  still succeed. No entries were dropped, reordered, or redacted;
+  every `/v1/*` request is still audited.
+
+### Verified (Muse's Linux VM, 2026-11-04 night)
+
+- `python3 -m unittest discover -s tests` → **57 tests, OK
+  (1 skip: the Windows-only real-capture test)** — 10 v0 + 47 v1
+  across jobs/platform/lifecycle/files/hardening suites.
+- Client CLI smoke against a local v1 agent: status, exec, put,
+  get, jobs, hash, audit-tail, update-status all exit 0, hashes
+  verified.
+
+### NOT verified — PC staging still pending, and why
+
+The overnight build session could reach the live bridge through
+the tunnel (an unauthenticated request returned 401 as expected)
+but the live token was **not present in the build session's
+environment**, so no authenticated staging run happened. Nothing
+was deployed to the PC; the live checkout, its config, and the
+running v0.1 agent were not touched. Staging procedure, ready to
+run from a session that has the token:
+
+1. Copy the v1 `agent/` + `client/` files through the live bridge
+   into `D:\bridge-work\bridge-v1-stage\` (never the live checkout).
+2. In the staging dir on the PC, create a staging config (host =
+   the PC's tailnet IP, **port 8766**, its own staging token kept
+   only in the staging dir, file root + state + audit under the
+   staging dir) and start the v1 agent detached.
+3. Through the tunnel against 8766: status/capabilities; job
+   submit/poll/cancel + submit-now-fetch-later; detached process
+   spawn/kill; **real screenshot** (verify PNG magic + dimensions
+   + SHA-256); hash endpoint; chunked round-trip of a multi-MB
+   file via the new client library with SHA-256 verification;
+   input limited to cursor query/zero-distance move; UIA window
+   enumeration (+ a Notepad tree read, then close Notepad);
+   clipboard set-then-restore.
+4. Kill the staging agent, confirm 8766 is closed and 8765 still
+   healthy, leave the staging files in place, record results here.
+
+Also still unverified anywhere: the v1 suite under Windows Python,
+the supervisor/service scripts on Windows, a staged self-update
+apply cycle on the PC, and the plan's elapsed-time exit criteria
+(reboot survival, a week unattended).
+
+### Cutover (owner, when ready — see INSTALL_WINDOWS.md upgrade path)
+
+The first cutover cannot use v1 self-update (v0.1 has no staging
+endpoint): stop the v0 console, update the checkout, run the suite
+on Windows, restart — via `scripts\start-bridge.cmd` (same as v0)
+or the new supervised form. Installing the supervised logon task
+(`scripts\bridge-service.ps1 -Action install`) may prompt for UAC —
+that step is the owner's to run. A `v1.0.0` tag is prepared but NOT
+applied; the owner applies it after cutover:
+
+```
+git tag -a v1.0.0 -m "muse-pc-bridge v1.0.0" <v1-tip-commit>
+git push origin v1.0.0
+```
