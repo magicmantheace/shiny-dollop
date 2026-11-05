@@ -83,24 +83,44 @@ def _quiet_stdio(state_dir: Path) -> None:
 
 
 class GifPlayer:
-    """Cycles the frames of one animated GIF on a Tk label."""
+    """Cycles the frames of one animated GIF on a Tk label.
+
+    Loading is lazy and chunked: Tk re-scans a GIF from the top for
+    every -index frame, so loading 80 frames synchronously would
+    freeze the window for many seconds. Frame 0 loads immediately;
+    the rest stream in via load_more() driven by the window's pump,
+    and playback cycles whatever frames have arrived.
+    """
+
+    LOAD_CHUNK = 6
 
     def __init__(self, label, path: Path):
         self.label = label
         self.frames = []
         self.index = 0
+        self.complete = False
         self._after_id = None
+        self._path = path
+        self._next = 0
         if path.exists():
-            import tkinter as tk
-            i = 0
-            while True:
-                try:
-                    self.frames.append(
-                        tk.PhotoImage(file=str(path),
-                                      format=f"gif -index {i}"))
-                    i += 1
-                except tk.TclError:
-                    break
+            self.load_more()
+
+    def load_more(self) -> None:
+        if self.complete or not self._path.exists():
+            self.complete = True
+            return
+        import tkinter as tk
+        loaded = 0
+        while loaded < self.LOAD_CHUNK:
+            try:
+                self.frames.append(
+                    tk.PhotoImage(file=str(self._path),
+                                  format=f"gif -index {self._next}"))
+                self._next += 1
+                loaded += 1
+            except tk.TclError:
+                self.complete = True
+                break
 
     @property
     def ok(self) -> bool:
@@ -238,6 +258,15 @@ class AvatarWindow:
         self._apply(view)
         self.root.after(POLL_MS, self._poll)
 
+    def _pump_loads(self) -> None:
+        """Stream in the current animation's remaining frames."""
+        if self._stopped:
+            return
+        player = self._players.get(self._current_art or "")
+        if player is not None and not player.complete:
+            player.load_more()
+            self.root.after(25, self._pump_loads)
+
     def _apply(self, view: dict) -> None:
         art = view["art"]
         if view["state"] != self._current_state:
@@ -267,6 +296,7 @@ class AvatarWindow:
                 self.avatar_label.configure(image=player.frames[0],
                                             text="")
                 player.start()
+                self.root.after(25, self._pump_loads)
             else:  # asset missing: stay honest and legible, never crash
                 self.avatar_label.configure(image="", text="◐")
             self._current_art = art
