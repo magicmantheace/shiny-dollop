@@ -109,14 +109,14 @@ START_URL = f"https://{HOST_NAME}:{GOOD_PORT}/"
 
 # Frame-proof colors (RGB). Chosen to collide with nothing else in
 # the session: generation wallpapers (0x101820 / 0x0B3D2E /
-# 0x3D0B0B), the update GUI (title 0x5B2E6E), the files window
-# (title 0x1D5C57), terminal black.
+# 0x3D0B0B), the update GUI (title 0x383838), the files window
+# (title 0x345160), terminal black.
 PAGE_BG = (0x1F, 0x4E, 0x79)
 LINK_PAYLOAD = (0xE0, 0x7B, 0x24)
 LINK_PAYLOAD2 = (0x27, 0xAE, 0x60)
 LINK_BIG = (0x7D, 0x3C, 0x98)
 LINK_BAD = (0xC0, 0x39, 0x2B)
-FILES_TITLE = (0x1D, 0x5C, 0x57)
+FILES_TITLE = (0x34, 0x51, 0x60)
 
 PAYLOAD_SIZE = 256 * 1024
 BIG_SIZE = 448 * 1024 * 1024  # exceeds the 384 MiB DATA partition's

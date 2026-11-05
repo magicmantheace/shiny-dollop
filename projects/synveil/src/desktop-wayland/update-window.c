@@ -49,8 +49,8 @@
 #define FONT_BOLD "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf"
 
 enum { WIN_W = 720, WIN_H = 520, WIN_MIN_W = 640, WIN_MIN_H = 480,
-       TITLE_H = 30, BANNER_H = 52, MAX_W = 4096, MAX_H = 2160,
-       MAX_BUFFERS = 3 };
+       TITLE_H = 32, BANNER_H = 52, MAX_W = 4096, MAX_H = 2160,
+       MAX_BUFFERS = 3, CORNER_R = 8, ANIM_MS = 200 };
 
 /* ------------------------------------------------------------------ */
 /* Minimal strict JSON reader. The agent's replies are the only     */
@@ -619,7 +619,7 @@ struct app {
     int width, height, pending_w, pending_h, floating_w, floating_h;
     int pointer_x, pointer_y;
     int configured, closed, failed, redraw, maximized;
-    struct font font_body, font_bold, font_small, font_banner;
+    struct font font_body, font_bold, font_small, font_banner, font_title;
     struct worker worker;
     int worker_wake_fd;
     struct snapshot snap;
@@ -631,9 +631,88 @@ struct app {
     long long last_refresh_ms;
     int btn_enabled[BTN_COUNT];
     int btn_pressed;
+    /* ADR 0024 presentation animation: frames are painted into a
+     * scratch buffer, then composited over the previously displayed
+     * frame (first show fades in; content changes crossfade, 200 ms
+     * ease-out, driven by the poll loop). Presentation only: the
+     * frames differ, the state and actions do not. */
+    uint32_t *paint;
+    uint32_t *target_frame;
+    uint32_t *from_frame;
+    uint32_t *out_frame;
+    int frame_w, frame_h;
+    long long anim_start_ms;
+    int anim_active;
+    int shown_once;
 };
 
 static int render(struct app *a);
+static long long now_ms(void);
+
+/* ADR 0024 chrome helpers (duplicated per client; the clients are
+ * standalone translation units by design). */
+static unsigned ease_out_q(long long elapsed, long long total) {
+    if (elapsed <= 0) return 0;
+    if (elapsed >= total) return 255;
+    unsigned p = (unsigned)(elapsed * 255 / total);
+    unsigned q = 255 - p;
+    return 255 - (q * q * q) / (255 * 255);
+}
+
+static void plot(struct app *a, uint32_t *px, int x, int y, uint32_t color) {
+    if (x < 0 || y < 0 || x >= a->width || y >= a->height) return;
+    px[(size_t)y * (size_t)a->width + (size_t)x] = color;
+}
+
+static void draw_app_glyph(struct app *a, uint32_t *px) {
+    /* Accent rounded square at (10, 8), 16x16, radius 3. */
+    for (int y = 0; y < 16; y++)
+        for (int x = 0; x < 16; x++) {
+            int dx = x < 3 ? 3 - x : (x > 12 ? x - 12 : 0);
+            int dy = y < 3 ? 3 - y : (y > 12 ? y - 12 : 0);
+            if (dx * dx + dy * dy > 9) continue;
+            plot(a, px, 10 + x, 8 + y, 0xff4cc2ffu);
+        }
+}
+
+static void draw_close_glyph(struct app *a, uint32_t *px, int cx, int cy,
+                             uint32_t color) {
+    for (int d = -5; d <= 5; d++) {
+        plot(a, px, cx + d, cy + d, color);
+        plot(a, px, cx + d + 1, cy + d, color);
+        plot(a, px, cx + d, cy - d, color);
+        plot(a, px, cx + d + 1, cy - d, color);
+    }
+}
+
+/* Rounded window corners (radius CORNER_R, transparent outside) and
+ * the 1 px stroke border, drawn into a painted frame. */
+static void finish_frame(struct app *a, uint32_t *px) {
+    const int w = a->width, h = a->height, r = CORNER_R;
+    const uint32_t stroke = 0xff454545u;
+    for (int y = 0; y <= r; y++)
+        for (int x = 0; x <= r; x++) {
+            int dx = r - x, dy = r - y;
+            int d2 = dx * dx + dy * dy;
+            size_t corners[4] = {
+                (size_t)y * (size_t)w + (size_t)x,
+                (size_t)y * (size_t)w + (size_t)(w - 1 - x),
+                (size_t)(h - 1 - y) * (size_t)w + (size_t)x,
+                (size_t)(h - 1 - y) * (size_t)w + (size_t)(w - 1 - x)};
+            for (int i = 0; i < 4; i++) {
+                if (d2 > (r + 1) * (r + 1)) px[corners[i]] = 0;
+                else if (d2 > (r - 1) * (r - 1)) px[corners[i]] = stroke;
+            }
+        }
+    for (int x = r + 1; x < w - 1 - r; x++) {
+        px[x] = stroke;
+        px[(size_t)(h - 1) * (size_t)w + (size_t)x] = stroke;
+    }
+    for (int y = r + 1; y < h - 1 - r; y++) {
+        px[(size_t)y * (size_t)w] = stroke;
+        px[(size_t)y * (size_t)w + (size_t)(w - 1)] = stroke;
+    }
+}
 
 static void discard_buffer(struct buffer *b) {
     struct app *a = b->app;
@@ -844,14 +923,32 @@ static int render(struct app *a) {
     if (data == MAP_FAILED) { close(fd); return -1; }
     struct buffer *b = calloc(1, sizeof(*b));
     if (!b) { munmap(data, size); close(fd); return -1; }
-    uint32_t *px = data;
-    const uint32_t bg = 0xfff2f0ebu, dark = 0xff1b1b1bu, dim = 0xff5a564eu;
+    int size_changed = a->shown_once &&
+        (a->frame_w != a->width || a->frame_h != a->height);
+    if (a->frame_w != a->width || a->frame_h != a->height ||
+        !a->paint) {
+        free(a->paint); free(a->target_frame);
+        free(a->from_frame); free(a->out_frame);
+        a->paint = malloc(size);
+        a->target_frame = calloc(1, size);
+        a->from_frame = calloc(1, size);
+        a->out_frame = calloc(1, size);
+        if (!a->paint || !a->target_frame || !a->from_frame ||
+            !a->out_frame) { munmap(data, size); free(b); close(fd); return -1; }
+        a->frame_w = a->width; a->frame_h = a->height;
+        a->anim_active = 0;
+    }
+    uint32_t *px = a->paint;
+    const uint32_t bg = 0xff202020u, dark = 0xffffffffu, dim = 0xffc8c8c8u;
     for (size_t i = 0; i < (size_t)a->width * (size_t)a->height; i++) px[i] = bg;
 
-    /* Title bar (the window's pixel identity: this purple). */
-    fill_rect(a, px, 0, 0, a->width, TITLE_H, 0xff5b2e6eu);
-    fill_rect(a, px, a->width - 28, 0, 28, TITLE_H, 0xffa84455u);
-    draw_text(a, px, &a->font_bold, 12, 21, "Synveil System Updates", 0xffffffffu);
+    /* Title bar (the window's pixel identity: surface-hi with the
+     * accent app glyph and a glyph close caption; ADR 0024). */
+    fill_rect(a, px, 0, 0, a->width, TITLE_H, 0xff383838u);
+    draw_app_glyph(a, px);
+    draw_text(a, px, &a->font_title, 34, 21, "Synveil System Updates",
+              0xffffffffu);
+    draw_close_glyph(a, px, a->width - 23, 16, 0xffffffffu);
 
     /* State banner. */
     enum banner_kind kind = banner_of(a);
@@ -939,22 +1036,78 @@ static int render(struct app *a) {
         row += 18;
     }
 
-    /* Buttons. */
+    /* Buttons (geometry unchanged from the pre-redesign window: the
+     * harness and the owner's muscle memory agree on it). */
     compute_buttons(a);
     for (int i = 0; i < BTN_COUNT; i++) {
         int x, y, w, h;
         button_rect(a, i, &x, &y, &w, &h);
-        fill_rect(a, px, x, y, w, h, a->btn_enabled[i] ? 0xff33566eu : 0xffc9c4bbu);
+        fill_rect(a, px, x, y, w, h,
+                  a->btn_enabled[i] ? 0xff383838u : 0xff2c2c2cu);
+        for (int bx = x; bx < x + w; bx++) {
+            plot(a, px, bx, y, 0xff454545u);
+            plot(a, px, bx, y + h - 1, 0xff454545u);
+        }
+        for (int by = y; by < y + h; by++) {
+            plot(a, px, x, by, 0xff454545u);
+            plot(a, px, x + w - 1, by, 0xff454545u);
+        }
+        /* radius-4 corners show the body colour */
+        plot(a, px, x, y, bg); plot(a, px, x + w - 1, y, bg);
+        plot(a, px, x, y + h - 1, bg); plot(a, px, x + w - 1, y + h - 1, bg);
         const char *label = BTN_LABELS[i];
         int tw = text_width(&a->font_body, label);
         draw_text(a, px, &a->font_body, x + (w - tw) / 2, y + 24, label,
-                  a->btn_enabled[i] ? 0xffffffffu : 0xff7a766eu);
+                  a->btn_enabled[i] ? 0xffffffffu : 0xff8a8a8au);
     }
 
     /* Message line: the last action's outcome, the agent's words on
      * a refusal, never a paraphrase that softens it. */
     draw_text_fit(a, px, &a->font_small, 16, a->height - 16, a->message,
                   a->width - 32, a->message_error ? 0xffa82a2au : dim);
+
+    finish_frame(a, px);
+    /* Composite over the previously displayed frame (ADR 0024:
+     * first show fades in; content changes crossfade, 200 ms). */
+    {
+        const size_t count = (size_t)a->width * (size_t)a->height;
+        long long now = now_ms();
+        if (size_changed) {
+            memcpy(a->out_frame, px, size);
+            a->anim_active = 0;
+        } else {
+            if (!a->anim_active &&
+                memcmp(px, a->target_frame, size) != 0) {
+                memcpy(a->from_frame, a->out_frame, size);
+                a->anim_start_ms = now;
+                a->anim_active = 1;
+            }
+            if (a->anim_active) {
+                unsigned e = ease_out_q(now - a->anim_start_ms, ANIM_MS);
+                if (e >= 255) {
+                    memcpy(a->out_frame, px, size);
+                    a->anim_active = 0;
+                } else {
+                    for (size_t i = 0; i < count; i++) {
+                        uint32_t f = a->from_frame[i], t = px[i];
+                        uint32_t out = 0;
+                        for (int ch = 0; ch < 4; ch++) {
+                            int fv = (int)((f >> (ch * 8)) & 0xff);
+                            int tv = (int)((t >> (ch * 8)) & 0xff);
+                            out |= (uint32_t)(fv + (tv - fv) * (int)e / 255)
+                                   << (ch * 8);
+                        }
+                        a->out_frame[i] = out;
+                    }
+                }
+            } else {
+                memcpy(a->out_frame, px, size);
+            }
+        }
+        memcpy(a->target_frame, px, size);
+        memcpy(data, a->out_frame, size);
+        a->shown_once = 1;
+    }
 
     struct wl_shm_pool *pool = wl_shm_create_pool(a->shm, fd, (int)size);
     close(fd);
@@ -1001,7 +1154,7 @@ static void pointer_button(void *ctx, struct wl_pointer *pointer, uint32_t seria
     if (!a->configured || button != BTN_LEFT ||
         state != WL_POINTER_BUTTON_STATE_PRESSED) return;
     if (a->pointer_y < TITLE_H) {
-        if (a->pointer_x >= a->width - 28) a->closed = 1;
+        if (a->pointer_x >= a->width - 46) a->closed = 1;
         else xdg_toplevel_move(a->top, a->seat, serial);
         return;
     }
@@ -1273,10 +1426,11 @@ int main(int argc, char **argv) {
     if (geteuid() == 0) { fputs("refusing root window client\n", stderr); return 1; }
     FT_Library ft;
     if (FT_Init_FreeType(&ft)) { fputs("freetype unavailable\n", stderr); return 1; }
-    if (font_load(ft, FONT_REGULAR, 13, &a.font_body) < 0 ||
-        font_load(ft, FONT_BOLD, 13, &a.font_bold) < 0 ||
-        font_load(ft, FONT_REGULAR, 11, &a.font_small) < 0 ||
-        font_load(ft, FONT_BOLD, 15, &a.font_banner) < 0) {
+    if (font_load(ft, FONT_REGULAR, 14, &a.font_body) < 0 ||
+        font_load(ft, FONT_BOLD, 14, &a.font_bold) < 0 ||
+        font_load(ft, FONT_REGULAR, 12, &a.font_small) < 0 ||
+        font_load(ft, FONT_BOLD, 12, &a.font_title) < 0 ||
+        font_load(ft, FONT_BOLD, 20, &a.font_banner) < 0) {
         puts("SYNVEIL_UPDATE_GUI_FONT_FAILED");
         fflush(stdout);
         return 1;
@@ -1328,7 +1482,7 @@ int main(int argc, char **argv) {
             { wl_fd, POLLIN, 0 },
             { a.worker_wake_fd, POLLIN, 0 },
         };
-        int ready = poll(fds, 2, 200);
+        int ready = poll(fds, 2, a.anim_active ? 16 : 200);
         if (ready > 0 && (fds[0].revents & POLLIN)) {
             if (wl_display_read_events(a.display) < 0) goto out;
         } else {
@@ -1351,6 +1505,7 @@ int main(int argc, char **argv) {
             worker_submit(&a.worker, "status");
             a.last_refresh_ms = now_ms();
         }
+        if (a.anim_active) a.redraw = 1;
         if (a.redraw && render(&a) < 0) { a.failed = 1; break; }
     }
     if (!a.failed && a.configured) success = 1;

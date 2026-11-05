@@ -284,8 +284,8 @@ def check_link_closure(rootfs, tools, added):
 
 
 def browser_icon_png():
-    """A deterministic 48x48 RGB PNG: the files window's teal
-    with a paper-white disc — the panel launcher's icon. Generated,
+    """A deterministic 48x48 RGB PNG: the files window's title
+    blend with a white disc — the panel launcher's icon. Generated,
     never a binary blob in Git."""
     import struct
     import zlib
@@ -296,9 +296,9 @@ def browser_icon_png():
         for x in range(width):
             dx, dy = x - 23.5, y - 23.5
             if dx * dx + dy * dy <= 14.0 * 14.0:
-                row += bytes((0xF2, 0xF0, 0xEB))
+                row += bytes((0xFF, 0xFF, 0xFF))
             else:
-                row += bytes((0x1D, 0x5C, 0x57))
+                row += bytes((0x34, 0x51, 0x60))
         rows.append(bytes(row))
     raw = b"".join(rows)
 

@@ -276,13 +276,16 @@ def next_frame(boot):
         boot.qmp, boot.dir, boot.frame_base + boot.frame_seq)
 
 
-# The update GUI's pixel identity (src/desktop-wayland/update-window.c):
-# a purple title bar, a paper-white body, and a state banner whose
-# color is the coarse on-screen state. The GUI smoke and the
-# terminal focus helper both locate the window by these colors.
-GUI_TITLE = (0x5B, 0x2E, 0x6E)
+# The update GUI's pixel identity (src/desktop-wayland/update-window.c,
+# ADR 0024): a surface-hi title bar, a shell body, and a state banner
+# whose color is the coarse on-screen state. The close caption is a
+# glyph, not a color block, so the title-run probe below simply finds
+# no GUI_CLOSE run and keeps the title run's own width. The GUI smoke
+# and the terminal focus helper both locate the window by these
+# colors.
+GUI_TITLE = (0x38, 0x38, 0x38)
 GUI_CLOSE = (0xA8, 0x44, 0x55)
-GUI_PAPER = (0xF2, 0xF0, 0xEB)
+GUI_PAPER = (0x20, 0x20, 0x20)
 GUI_BANNERS = {
     "normal": (0x2E, 0x7D, 0x4F),
     "trial": (0xB0, 0x7A, 0x1E),

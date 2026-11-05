@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <time.h>
 #include <unistd.h>
 #include <wayland-client.h>
 #include "xdg-shell-client.h"
@@ -38,9 +39,120 @@ struct app {
     int pointer_x, pointer_y;
     int configured, closed, failed, redraw, interactive, exercise;
     int maximized, exercise_stage;
+    /* ADR 0024 first-show fade-in, paced by frame callbacks. */
+    long long show_ms;
+    struct wl_callback *frame_cb;
 };
 
 static int render(struct app *a);
+
+/* ADR 0024 chrome helpers (duplicated per client; the clients are
+ * standalone translation units by design). This client has no font
+ * by design: its title bar carries glyphs only. */
+static long long now_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+static unsigned ease_out_q(long long elapsed, long long total) {
+    if (elapsed <= 0) return 0;
+    if (elapsed >= total) return 255;
+    unsigned p = (unsigned)(elapsed * 255 / total);
+    unsigned q = 255 - p;
+    return 255 - (q * q * q) / (255 * 255);
+}
+
+static void plot(struct app *a, uint32_t *px, int x, int y, uint32_t color) {
+    if (x < 0 || y < 0 || x >= a->width || y >= a->height) return;
+    px[(size_t)y * (size_t)a->width + (size_t)x] = color;
+}
+
+static void draw_app_glyph(struct app *a, uint32_t *px) {
+    for (int y = 0; y < 16; y++)
+        for (int x = 0; x < 16; x++) {
+            int dx = x < 3 ? 3 - x : (x > 12 ? x - 12 : 0);
+            int dy = y < 3 ? 3 - y : (y > 12 ? y - 12 : 0);
+            if (dx * dx + dy * dy > 9) continue;
+            plot(a, px, 10 + x, 8 + y, 0xff4cc2ffu);
+        }
+}
+
+static void draw_close_glyph(struct app *a, uint32_t *px, int cx, int cy,
+                             uint32_t color) {
+    for (int d = -5; d <= 5; d++) {
+        plot(a, px, cx + d, cy + d, color);
+        plot(a, px, cx + d + 1, cy + d, color);
+        plot(a, px, cx + d, cy - d, color);
+        plot(a, px, cx + d + 1, cy - d, color);
+    }
+}
+
+static void draw_max_glyph(struct app *a, uint32_t *px, int cx, int cy,
+                           uint32_t color, int maximized) {
+    int x0 = cx - 5, y0 = cy - 5;
+    if (maximized) { x0 += 2; y0 -= 2; }
+    for (int i = 0; i < 10; i++) {
+        plot(a, px, x0 + i, y0, color);
+        plot(a, px, x0 + i, y0 + 1, color);
+        plot(a, px, x0 + i, y0 + 9, color);
+        plot(a, px, x0, y0 + i, color);
+        plot(a, px, x0 + 1, y0 + i, color);
+        plot(a, px, x0 + 9, y0 + i, color);
+    }
+    if (maximized) {
+        int bx = cx - 7, by = cy - 3;
+        for (int i = 0; i < 10; i++) {
+            if (i > 2) {
+                plot(a, px, bx + i, by, color);
+                plot(a, px, bx + i, by + 1, color);
+            }
+            plot(a, px, bx + 9, by + i, color);
+            if (i > 2) plot(a, px, bx + i, by + 9, color);
+        }
+    }
+}
+
+static void finish_frame(struct app *a, uint32_t *px) {
+    const int w = a->width, h = a->height, r = 8;
+    const uint32_t stroke = 0xff454545u;
+    for (int y = 0; y <= r; y++)
+        for (int x = 0; x <= r; x++) {
+            int dx = r - x, dy = r - y;
+            int d2 = dx * dx + dy * dy;
+            size_t corners[4] = {
+                (size_t)y * (size_t)w + (size_t)x,
+                (size_t)y * (size_t)w + (size_t)(w - 1 - x),
+                (size_t)(h - 1 - y) * (size_t)w + (size_t)x,
+                (size_t)(h - 1 - y) * (size_t)w + (size_t)(w - 1 - x)};
+            for (int i = 0; i < 4; i++) {
+                if (d2 > (r + 1) * (r + 1)) px[corners[i]] = 0;
+                else if (d2 > (r - 1) * (r - 1)) px[corners[i]] = stroke;
+            }
+        }
+    for (int x = r + 1; x < w - 1 - r; x++) {
+        px[x] = stroke;
+        px[(size_t)(h - 1) * (size_t)w + (size_t)x] = stroke;
+    }
+    for (int y = r + 1; y < h - 1 - r; y++) {
+        px[(size_t)y * (size_t)w] = stroke;
+        px[(size_t)y * (size_t)w + (size_t)(w - 1)] = stroke;
+    }
+}
+
+static void frame_done(void *ctx, struct wl_callback *cb, uint32_t time_ms) {
+    (void)time_ms;
+    struct app *a = ctx;
+    if (cb == a->frame_cb) a->frame_cb = NULL;
+    wl_callback_destroy(cb);
+    if (a->show_ms && ease_out_q(now_ms() - a->show_ms, 200) < 255) {
+        a->redraw = 1;
+        if (render(a) < 0) a->failed = 1;
+    }
+}
+static const struct wl_callback_listener frame_handlers = {
+    .done = frame_done
+};
 static void discard_buffer(struct buffer *b) {
     struct app *a = b->app;
     struct buffer **link = &a->buffers;
@@ -81,8 +193,12 @@ static void pointer_button(void *ctx, struct wl_pointer *pointer, uint32_t seria
     struct app *a = ctx;
     if (!a->interactive || !a->configured || button != BTN_LEFT ||
         state != WL_POINTER_BUTTON_STATE_PRESSED) return;
-    if (a->pointer_y < 28) {
-        if (a->pointer_x >= a->width - 28) a->closed = 1;
+    if (a->pointer_y < 32) {
+        if (a->pointer_x >= a->width - 46) a->closed = 1;
+        else if (a->pointer_x >= a->width - 92) {
+            if (a->maximized) xdg_toplevel_unset_maximized(a->top);
+            else xdg_toplevel_set_maximized(a->top);
+        }
         else xdg_toplevel_move(a->top, a->seat, serial);
     } else if (a->pointer_x >= a->width - 20 && a->pointer_y >= a->height - 20) {
         xdg_toplevel_resize(a->top, a->seat, serial,
@@ -231,15 +347,44 @@ static int render(struct app *a) {
     struct buffer *b = calloc(1, sizeof(*b));
     if (!b) { munmap(data, size); close(fd); return -1; }
     uint32_t *px = data;
+    if (!a->show_ms) a->show_ms = now_ms();
+    /* Body identity: the spec desktop gradient, vertical, over the
+     * body below the 32 px shell title bar (ADR 0024). */
+    int span = a->height - 32;
+    if (span < 1) span = 1;
     for (int y = 0; y < a->height; y++)
         for (int x = 0; x < a->width; x++) {
-            uint32_t color = 0xff000000u |
-                ((uint32_t)(30 + (45 * x / a->width)) << 16) |
-                ((uint32_t)(45 + (35 * y / a->height)) << 8) | 0x74;
-            if (y < 28) color = x >= a->width - 28 ? 0xffa84455u : 0xff263c56u;
-            if (x >= a->width - 20 && y >= a->height - 20) color = 0xff68bbccu;
+            uint32_t color;
+            if (y < 32) {
+                color = 0xff202020u;
+            } else {
+                int t = y - 32;
+                color = 0xff000000u |
+                    ((uint32_t)(15 + 12 * t / span) << 16) |
+                    ((uint32_t)(43 + 32 * t / span) << 8) |
+                    (uint32_t)(91 + 52 * t / span);
+            }
+            if (x >= a->width - 20 && y >= a->height - 20)
+                color = 0xff383838u;
             px[(size_t)y * (size_t)a->width + (size_t)x] = color;
         }
+    draw_app_glyph(a, px);
+    draw_max_glyph(a, px, a->width - 69, 16, 0xffffffffu, a->maximized);
+    draw_close_glyph(a, px, a->width - 23, 16, 0xffffffffu);
+    finish_frame(a, px);
+    unsigned fade = ease_out_q(now_ms() - a->show_ms, 200);
+    if (fade < 255) {
+        size_t count = (size_t)a->width * (size_t)a->height;
+        for (size_t i = 0; i < count; i++) {
+            uint32_t c = px[i];
+            uint32_t out = 0;
+            for (int ch = 0; ch < 4; ch++) {
+                unsigned v = (c >> (ch * 8)) & 0xff;
+                out |= (uint32_t)(v * fade / 255) << (ch * 8);
+            }
+            px[i] = out;
+        }
+    }
     struct wl_shm_pool *pool = wl_shm_create_pool(a->shm, fd, (int)size);
     close(fd);
     if (!pool) { munmap(data, size); free(b); return -1; }
@@ -253,6 +398,10 @@ static int render(struct app *a) {
     wl_surface_attach(a->surface, b->object, 0, 0);
     wl_surface_damage(a->surface, 0, 0, a->width, a->height);
     wl_surface_commit(a->surface);
+    if (fade < 255 && !a->frame_cb) {
+        a->frame_cb = wl_surface_frame(a->surface);
+        wl_callback_add_listener(a->frame_cb, &frame_handlers, a);
+    }
     a->redraw = 0; a->configured++;
     printf("SYNVEIL_XDG_SHM_SIZE %d %d\n", a->width, a->height);
     if (a->configured == 1) puts("SYNVEIL_XDG_TOPLEVEL_SHM_SUBMITTED");

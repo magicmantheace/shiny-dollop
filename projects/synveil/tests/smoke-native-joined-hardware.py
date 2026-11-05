@@ -547,16 +547,16 @@ def _near(rgb, color, tol=8):
     return all(abs(a - b) <= tol for a, b in zip(rgb, color))
 
 
-_FILES_TITLE = (0x1D, 0x5C, 0x57)
-_GUI_TITLE = (0x5B, 0x2E, 0x6E)
+_FILES_TITLE = (0x34, 0x51, 0x60)
+_GUI_TITLE = (0x38, 0x38, 0x38)
 _GUI_CLOSE = (0xA8, 0x44, 0x55)
-_GUI_PAPER = (0xF2, 0xF0, 0xEB)
+_GUI_PAPER = (0x20, 0x20, 0x20)
 _GUI_BANNERS = {(0x2E, 0x7D, 0x4F), (0xB0, 0x7A, 0x1E),
                 (0xA8, 0x2A, 0x2A), (0x6E, 0x6E, 0x6E)}
 
 
 def _files_title_block(width, height, data):
-    """The files window by its app-drawn teal title bar (the
+    """The files window by its app-drawn title bar (the
     same identity tests/smoke-native-browser.py uses): scan
     below the desktop's top panel band and bound the title
     pixels. Returns (x, y, w, h) of the title block or None."""
@@ -576,9 +576,11 @@ def _files_title_block(width, height, data):
 
 
 def _gui_window_rect(width, height, data):
-    """The update GUI window by its drawn purple title bar and
-    close box (the same identity tests/smoke-native-ab.py
-    uses). Returns (x, y, w, h) or None."""
+    """The update GUI window by its drawn title bar (the same
+    identity tests/smoke-native-ab.py uses; the close caption
+    is a glyph now, so the close-box probe finds nothing and
+    the title run's width stands). Returns (x, y, w, h) or
+    None."""
     interior = _GUI_BANNERS | {_GUI_PAPER, _GUI_TITLE}
     for yy in range(0, height - 200):
         xx = 0

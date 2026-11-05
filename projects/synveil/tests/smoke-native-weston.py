@@ -40,9 +40,19 @@ def pixels(path):
 def original_window(width, height, data):
     # The source-native client's known opaque gradient supplies actual pixel
     # evidence distinct from firmware/boot text or a compositor background.
+    # ADR 0024: the body is the spec desktop gradient, the segment from
+    # (15, 43, 91) to (27, 75, 143) — matched by the segment's cross
+    # products with rounding tolerance. The exact start point is
+    # excluded: the desktop background paints it full-screen (S3), so
+    # accepting it would "find" the window on an empty desktop.
     def gradient(offset):
         r, g, b = data[offset:offset + 3]
-        return b == 116 and 30 <= r <= 75 and 45 <= g <= 80
+        if (r, g, b) == (15, 43, 91):
+            return False
+        if not (15 <= r <= 27 and 43 <= g <= 75 and 91 <= b <= 143):
+            return False
+        return (abs((g - 43) * 52 - (b - 91) * 32) <= 90 and
+                abs((r - 15) * 32 - (g - 43) * 12) <= 50)
     for y in range(28, height):
         start = None
         for x in range(width + 1):
@@ -54,7 +64,7 @@ def original_window(width, height, data):
                     bottom = y
                     while bottom + 1 < height and gradient(((bottom + 1) * width + start + 2) * 3):
                         bottom += 1
-                    top = y - 28
+                    top = y - 32
                     return start, top, x - start, bottom - top + 1
                 start = None
     return None
