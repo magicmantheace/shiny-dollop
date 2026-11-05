@@ -348,7 +348,10 @@ def gui_window_rect(width, height, data):
 def gui_banner_kind(width, height, data, rect):
     """Sample the GUI's state banner: a GUI_BANNERS key or None."""
     x, y, w, _h = rect
-    rgb = _px(data, width, x + w // 2, y + 30 + 26)
+    # Sample near the banner's right end: since ADR 0024 S2 the
+    # banner head renders at 20px and its glyphs (incl. descenders)
+    # reach the window centre on this row, which read as no-banner.
+    rgb = _px(data, width, x + w - 20, y + 30 + 26)
     for kind, color in GUI_BANNERS.items():
         if _near(rgb, color, tol=6):
             return kind
