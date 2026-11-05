@@ -1122,6 +1122,65 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 5 — Abstention purity-only recovery: support leg removed from the abstention gate (FAILED)
+
+Optional `AbstentionPurityOnlyRecoveryMemory` is identical to the
+graded abstention-higher-corroboration candidate in acting model,
+extended signal, retained archive, archive concordance, joint
+recovery test, recovery model, abstention trigger, the full
+three-leg authority condition, the minority branch in full, and
+the reference-purity gate on both recovery branches and as leg P
+of the abstention gate; the SINGLE changed element is the
+abstention gate's composition — leg S (acting-window opposition
+support) is REMOVED entirely, leaving leg P (reference purity
+≥ 0.70) as the gate's sole leg, with the acting-window records
+kept records-only and the support threshold recorded as null —
+under a protocol frozen before implementation (new cohorts
+422003-family / 423001-family, now INSPECTED). **Graded Failed
+under the protocol's own definitions (PRIMARY criterion 8,
+criterion 5, and criterion 4 all FAIL on the additional cohort —
+any one triggers the Failed clause); NOT a Regression** (pooled
+onset harm 143/161 well below recent8's 239/251; control
+successes 129/106 vs recent8's 126/106; k=32 successes 63/71
+against the recent8 − 4 lines of 58/66). What the experiment
+establishes is stated as prominently as the failure: leg P
+blocked ZERO B1 onset firings on either cohort, every triggered
+and authority-armed B1 state was taken (4/4 across cohorts,
+including the additional zero-support state, seed 423041
+checkpoint 2, acting_opposed_count 2 / supporting 0, that BOTH
+combined gates blocked), and B1 pooled onset harm is below the
+guard's and below recent8's on BOTH cohorts for the first time
+in this line (43 vs 59/68 development; 63 vs 78/78 additional) —
+criterion 8 PASSes development (taken 3/6) and FAILs additional
+on engagement alone (taken 1/6; the ungated purity-rule
+derivation also took only that 1 state, so the failure is the
+pre-registered trigger sparsity, not gate blockage: the other
+five additional B1 states never triggered, opposed_count ≤ 1).
+Criterion 6 PASSes both as a no-trigger PASS on the abstention
+side (0/240 abstentions both; no stationary trigger occurred
+under any gate variant; one productive development control
+recovery). Criterion 5 FAILs additional on the records
+sub-condition alone (non-recent8 branch in 3/9 k=32 states — two
+minority routings that outscored recent8 at their states and one
+retained routing; abstained branch 0/9 on both cohorts, on
+additional via an exercised leg-P release of the one late
+trigger, purity 0.643 disarmed). Criterion 1 FAILs development
+on the B2 harm ceiling (63 vs the 56.4 ceiling at exactly
+threshold minority engagement 3/6; harm concentrated at the
+three non-engaged states) and PASSes additional (42 vs guard 66,
+minority 5/6). Criterion 4 FAILs additional on the carried
+profile, identical to both combined-gate baseline methods at
+return-A onset (56 vs guard 47, ceiling 55.2 fails by 0.8).
+Criteria 2, 3 and 7 PASS on both cohorts — pooled onset harm is
+below the guard's on both, which the preceding candidate
+failed. Plain cumulative and frozen_A again dominate the
+candidate at return-A on both axes on both cohorts (64/68 and
+64/60 successes at 32/28 and 32/36 harm vs the candidate's 59/40
+at 37/56) — the fifth consecutive graded cohort pair. Learner
+acquisition actions zero; external TRAIN actor harm published
+in full in the report. Optional only, no promotion, no merge.
+[Full graded report](docs/ABSTENTION_PURITY_ONLY_RECOVERY.md).
+
 ### November 4 — Abstention higher corroboration recovery: raised support bar on the abstention release gate (FAILED)
 
 Optional `AbstentionHigherCorroborationRecoveryMemory` is identical
