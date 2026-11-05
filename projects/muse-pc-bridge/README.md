@@ -56,11 +56,15 @@ and token to Muse **out-of-band** — never via git.
 | --- | --- |
 | `agent/bridge_agent.py` | the server (runs on the PC) |
 | `agent/supervisor.py` | v1 service form: visible-console supervisor (auto-restart, staged-update apply + health check + auto-rollback) |
+| `agent/supervisor_gui.py` | avatar-display supervisor form: same Supervisor core in a floating window — Muse's avatar animated by real bridge activity; closing the window is the kill switch |
+| `agent/display_state.py` | pure signal→display-state mapping for the avatar window (idle / working / session / connecting / celebrate / alert) |
+| `agent/assets/avatar/` | avatar animation loops, one full-frame GIF per display state |
 | `agent/bridge_update.py` | self-update mechanics (bundle verify, staged apply, rollback) |
 | `agent/helpers/uia.ps1` | fixed UI Automation helper driven by the agent (JSON parameters only) |
 | `client/bridge_client.py` | Muse-side library + CLI (jobs, processes, sessions, chunked files, screenshot/input/clipboard/uia) |
 | `scripts/start-bridge.cmd` | start the agent in a visible console |
 | `scripts/start-bridge-service.cmd` | start the supervised agent (v1 service form) |
+| `scripts/start-bridge-gui.cmd` | start the avatar-display supervisor form (no console window) |
 | `scripts/bridge-service.ps1` | manage the supervised form as a logon task (install/start/stop/status/uninstall) |
 | `scripts/install-autostart.ps1` | OPTIONAL logon autostart (same visible console) |
 | `config.example.json` | config shape (real `config.json` is git-ignored) |

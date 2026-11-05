@@ -444,3 +444,72 @@ babysits while the live agent is swapped) and was present for it.
   the plan's elapsed-time criteria (reboot survival, a week
   unattended) — those are now running in production and will be
   proven by time, not by claim.
+
+## 2026-11-05 afternoon — avatar-display supervisor form (owner's request)
+
+The owner asked for the bridge's display to be Muse's avatar in a
+floating window, animated by what the bridge is doing, instead of
+the console window. Built as a third supervisor form beside the
+console forms (nothing replaced):
+
+- `agent/supervisor_gui.py` — the same `Supervisor` core hosted by
+  a tkinter floating window (always-on-top, draggable, ✕ and
+  right-click "Stop bridge"). Closing/stopping the window stops
+  supervisor + agent: the kill-switch semantics are unchanged, and
+  the window is the visible indicator (no hidden mode). Stdlib
+  only (tkinter ships with Python). Launched console-free via
+  `scripts/start-bridge-gui.cmd` (pyw/pythonw; supervisor prints
+  go to `state/supervisor-gui.log`).
+- `agent/display_state.py` — pure mapping from real signals
+  (supervisor-status.json, agent /v1/status, update status) to
+  idle / working / session / connecting / celebrate / alert.
+  Nothing is faked: the avatar reflects bridge activity only.
+- The window also publishes its current state to
+  `state/display-state.json` on every change — a read-only local
+  hook other apps on the PC (e.g. the owner's desktop pet) can
+  observe. No token material, no new network surface, no new
+  inputs to the bridge.
+- Assets: `agent/assets/avatar/*.gif`, one loop per state,
+  rendered from the avatar's own state-variant videos. They MUST
+  stay full-frame GIFs (see below).
+
+**Verification (owner's PC, temporary instance, port 8768,
+production untouched throughout — uptime continuous):** the full
+live state sequence was observed via display-state.json and
+PrintWindow captures — idle → working (job running) → session
+(session open) → connecting (sampled in an agent-kill restart
+gap) → idle; supervisor restarts work under the GUI form; the
+kill switch (WM_CLOSE) stopped everything and, after the fix
+below, `supervisor-status.json` ends at "stopped". Temp instance
+and all staged files were removed afterward. VM suite: 80 tests
+OK (1 skip), including 17 new display tests.
+
+**Defects the PC run found (all fixed, regression-noted):**
+1. Window placed off-screen: geometry was computed before the
+   first animation frame set the window's real size. The window
+   now stays withdrawn until the first frame is applied, then
+   places itself bottom-right.
+2. Tk does not composite GIF difference frames: ffmpeg's default
+   GIF output rendered as a speckled ghost after frame 0. Assets
+   regenerated with `-gifflags -offsetting-transdiff` (full
+   frames), 192-color palette, bayer dithering. Do not
+   re-encode them with default GIF settings.
+3. Synchronous GIF loading froze the window before it could
+   appear (Tk re-scans the file per -index frame). Loading is now
+   lazy and chunked; playback cycles frames as they arrive.
+4. A window-close stop left `supervisor-status.json` stale at
+   "running" (the process exited before the supervisor thread's
+   final write). `main()` now joins the supervisor thread briefly
+   at shutdown so the file records "stopped".
+
+**Observation:** the agent's full-screen screenshot does not show
+the avatar window (the capturing agent process is DPI-virtualized;
+the GUI is per-monitor DPI-aware). The window's rendering was
+proven by Win32 rect + `PrintWindow` + state files instead. A
+human at the PC sees the window normally.
+
+**Not done, by design:** production still runs the console form.
+Switching the logon task to `start-bridge-gui.cmd` is the owner's
+separate go. The celebrate/alert states were verified by unit
+test only (no update was staged on the temp instance to drive
+them live).

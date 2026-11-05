@@ -40,6 +40,13 @@ PC during install verification.
 | `tests/test_v1_files.py` (9) | hash endpoint + ranged get; chunked upload round-trip through the client library; **resume after partial upload** (2 chunks sent, client resumes by id); hash mismatch at completion rejected with no file placed; wrong chunk size rejected; upload discard; tree/mkdir/move/delete incl. root protection; a second named root (and unknown root → 400); path escapes still confined; client `exec_run` |
 | `tests/test_v1_hardening.py` (6) | audit rotation bounds the log and honors `audit_keep`; audit tail returns well-formed recent entries from the current file and clamps n; the rate-limit flow end-to-end (401 → 429 + `retry_after_s`, real token unaffected, blocked attempts still audited with `rate_limited: true`); update staging API (empty → staged; running agent untouched) |
 
+### Avatar-display suites (added 2026-11-05)
+
+| File | Covers |
+| --- | --- |
+| `tests/test_display_state.py` (14) | the pure signal→display mapping: idle / working (job or tracked process) / session outranks working / staged update → connecting / fresh `applied_ok` → celebrate, stale → falls through / apply + rollback failures and a fresh rollback → alert / supervisor failure states → alert / agent unreachable: briefly → connecting, during restart states → connecting, too long → alert / alert outranks activity |
+| `tests/test_supervisor_gui.py` (3) | import-level smoke only (module imports with no window created); every art key the mapping can emit has a committed animation asset; the mapping only ever emits known art keys. A real Tk window needs a display and is verified on the owner's PC, never claimed from a headless run |
+
 ### Verified so far
 
 - 2026-11-04, Muse's Linux VM (Python 3.12.3): **10 tests, all
@@ -141,6 +148,31 @@ PC during install verification.
   the skip remains the Windows-only real-capture test.
   **Windows re-verification is PENDING** the parent session's
   re-run on the PC; the Windows suite is not claimed green.
+- 2026-11-05 afternoon (avatar-display form, owner's PC, TEMPORARY
+  instance on port 8768 beside the untouched production bridge —
+  the same isolation pattern as the self-update test): full suite
+  on the VM **80 tests, OK (1 skip)** including the 17 new display
+  tests. On the PC the GUI supervisor was verified live: window
+  rendered fully on-screen (Win32 rect + PrintWindow capture) with
+  the idle animation; display state followed real signals —
+  **working** during a running job, **session** while a session
+  was open (outranking the job), **connecting** sampled during an
+  agent-kill restart gap, back to **idle** after; the supervisor
+  restarted the killed agent under the GUI form (restarts counted,
+  new pid); the **kill switch** (WM_CLOSE to the window) stopped
+  supervisor + agent, the port closed, and after a shutdown fix
+  `supervisor-status.json` records the final **stopped** state.
+  Three defects were found by this PC run and fixed (window placed
+  off-screen when sized before its first frame; Tk not compositing
+  GIF difference frames — assets regenerated full-frame; slow
+  synchronous GIF loading freezing the window — now lazy/chunked).
+  One observation, not a defect of the window: the agent's own
+  full-screen capture does not show the DPI-aware avatar window
+  (the capturing process is DPI-virtualized); the window itself
+  was proven by window rect + PrintWindow + state files.
+  **Not yet done: the production form has NOT been switched** —
+  the console supervisor still runs production; switching the
+  logon task to the GUI form is the owner's separate call.
 
 ## What the tests cannot prove
 
