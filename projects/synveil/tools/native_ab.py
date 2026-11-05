@@ -168,11 +168,16 @@ def overlay_generation(rootfs, spec, commit, public_hex):
     launcher.chmod(0o755)
     weston_ini = config / "weston.ini"
     text = weston_ini.read_text()
-    if text.count("background-color=0xFF101820") != 1:
+    # Anchor on the key, not a pinned value: the base background is
+    # a product token (ADR 0024 S3 set it to 0xFF0F2B5B) while each
+    # generation's fixture color above stays deliberately distinct.
+    lines = text.splitlines(keepends=True)
+    hits = [i for i, line in enumerate(lines)
+            if line.startswith("background-color=")]
+    if len(hits) != 1:
         raise ValueError("weston.ini background anchor missing")
-    weston_ini.write_text(text.replace(
-        "background-color=0xFF101820",
-        "background-color=" + spec["background"], 1))
+    lines[hits[0]] = "background-color=" + spec["background"] + "\n"
+    weston_ini.write_text("".join(lines))
     if spec["seat_stub"]:
         seat = rootfs / "usr/sbin/veil-seat"
         seat.write_text("#!/bin/sh\n"
