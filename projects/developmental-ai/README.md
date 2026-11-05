@@ -1122,6 +1122,53 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 5 — Partial opposition abstention recovery: abstention trigger widened to partial opposition (FAILED / REGRESSION at stationary control)
+
+Optional `PartialOppositionAbstentionRecoveryMemory` is identical to the
+graded abstention-purity-only candidate in acting model, extended
+signal, retained archive, archive concordance, joint recovery test,
+recovery model, the full three-leg authority condition, the minority
+branch in full, and the purity-only abstention gate (leg P ≥ 0.70 sole
+leg, support threshold null); the SINGLE changed element is the
+abstention trigger — `opposed_count >= 1` (partial or full) in place of
+`== 2`, with `abstention_trigger_kind` (full / partial / none) added to
+the decision record — under a protocol frozen before implementation
+(new cohorts 432003-family / 433001-family, now INSPECTED). **Graded
+Failed under the protocol's own definitions (criterion 6 FAILs on the
+additional cohort and criterion 4 FAILs on the additional cohort —
+either triggers the Failed clause), and a Regression under its
+stationary-control clause** (control successes 66 vs recent8's 84
+development and 109 vs 143 additional — below by more than 6 on BOTH
+cohorts; pooled onset harm 75/102 well below recent8's 264/255 and
+k=32 successes 82/65 equal to recent8's, so the other Regression
+clauses do not trigger). The PRIMARY criterion 9 PASSes on BOTH
+cohorts — the first PRIMARY engagement pass on both cohorts in this
+line: abstention TAKEN at 6/6 development (4 partial-only firings) and
+5/6 additional (2 partial-only; the sole untaken state at
+opposed_count 0), B1 pooled onset harm 0 vs guard 62 / recent8 90
+development and 16 vs guard 70 / recent8 78 additional, the widening
+credited with exactly the added firings against the records-only
+purity-only-rule (2 and 3 taken). Criterion 6 FAILs on BOTH cohorts
+on the pre-registered central cost: 48/240 stationary abstentions on
+each (budget ≤ 32), successes −18/−34 vs recent8, harm 126/83 vs
+156/97 — five partial stationary firings across cohorts, each a full
+16-episode refusal, plus one additional full firing the unwidened
+rule also took. Criterion 5 FAILs development on the records
+sub-condition alone (non-recent8 branch in 2/9 k=32 states, both
+carried minority routings; abstained branch 0/9 on BOTH cohorts —
+the widened trigger produced no late abstention) and PASSes
+additional. Criterion 4 FAILs additional on the ceiling alone (53 vs
+guard 53 passes at equality, ceiling 51.0 fails by 2; identical to
+every carried gate-generation baseline at return-A onset there).
+Criteria 1, 2, 3 and 7 PASS on both cohorts. Cumulative again beats
+the candidate at return-A on both axes on both cohorts (68/60
+successes at 28/36 harm vs the candidate's 60/43 at 36/53) — the
+sixth consecutive graded cohort pair; frozen_A beats it on
+additional and exactly ties it on development. Learner acquisition
+actions zero; external TRAIN actor harm published in full in the
+report. Optional only, no promotion, no merge.
+[Full graded report](docs/PARTIAL_OPPOSITION_ABSTENTION_RECOVERY.md).
+
 ### November 5 — Abstention purity-only recovery: support leg removed from the abstention gate (FAILED)
 
 Optional `AbstentionPurityOnlyRecoveryMemory` is identical to the

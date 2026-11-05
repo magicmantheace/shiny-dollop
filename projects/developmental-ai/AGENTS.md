@@ -1,3 +1,107 @@
+# Partial opposition abstention recovery: abstention trigger widened to partial opposition — 2026-11-05 (FAILED / REGRESSION at stationary control)
+
+Optional `developmental_ai/partial_opposition_abstention_recovery.py`
+(identical to the graded abstention-purity-only candidate in acting
+model, extended signal, archive, concordance definition, joint
+recovery test, recovery model, the full three-leg authority
+condition, the minority branch in full, and the purity-only
+abstention gate — leg P >= 0.70 sole leg, support threshold null,
+acting records records-only; the SINGLE changed element is the
+abstention trigger: opposed_count >= 1 (partial or full) in place of
+== 2, with abstention_trigger_kind (full / partial / none) added to
+the decision record) was evaluated under the protocol frozen BEFORE
+implementation at
+`benchmarks/partial_opposition_abstention_recovery_protocol.json` on
+NEW cohorts 432003/432021/432039 and 433001/433017/433041, both now
+INSPECTED — never re-tune against them. **Graded Failed under the
+protocol's own definitions (criterion 6 FAILs on the additional
+cohort and criterion 4 FAILs on the additional cohort — either
+triggers the Failed clause) and a Regression under its
+stationary-control clause (control successes below recent8 by more
+than 6 on BOTH cohorts); the other Regression clauses do not trigger
+(pooled onset harm 75/102 well below recent8 264/255, k=32 successes
+82/65 equal to recent8, suite + transfer pass).** Per-criterion,
+development / additional, PRIMARY criterion 9 first, then co-graded
+guards 6, 5, 1, 4: C9 B1 partial-opposition engagement PASS/PASS
+((a) abstention TAKEN 6/6 dev (3/3 k=2, 3/3 k=4; partial 4, full 2)
+and 5/6 add (2/3 k=2, 3/3 k=4; partial 2, full 3) — the records-only
+purity-only-rule took only the 2 / 3 full states, so the widening is
+credited with 4 / 2 added firings, leg P blocking none on either
+cohort; the sole untaken additional state is seed 433001 k=2 at
+opposed_count 0, signal absence not gate blockage, carrying all 16
+of that cohort's remaining B1 harm; (b) B1 harm 0 vs guard 62 dev,
+16 vs guard 70 add; (c) 0 < recent8 90, 16 < 78; B1 successes 0 vs
+recent8 6 / guard 2 dev and 0 vs 18 / 10 add, stated in full — the
+first PRIMARY engagement PASS on both cohorts in this line), C6
+stationary selectivity FAIL/FAIL ((a) abstentions 48/240 on BOTH
+cohorts vs the <= 32 budget; (b) successes 66 vs recent8 84 (need
+>= 78) dev and 109 vs 143 (need >= 137) add; (c) harm 126 vs 156
+and 83 vs 97 PASS both — the entire success deficit is the
+abstained stationary states: dev three PARTIAL firings (seed
+432003 k=8 purity 0.853, seed 432003 k=32 purity 0.872, seed 432039
+k=4 purity 0.825; recent8 successes 5+6+7 = the 18 deficit), add
+two partial firings (seed 433017 k=2 purity 0.829, seed 433041 k=8
+purity 0.842) plus one FULL firing the unwidened rule also took
+(seed 433001 k=4 purity 0.813; recent8 successes 12+13+9 = the 34
+deficit); neither leg P nor the carried authority releases a
+stationary partial firing, exactly the pre-registered cost), C5
+release FAIL/PASS (abstentions 0/144 both, abstained branch 0/9
+both — the widened trigger produced NO late abstention on either
+cohort, dev via an exercised leg-P release at B1 k=32 seed 432003
+(purity 0.658 disarmed) and add via two leg-P-disarmed return-A
+k=32 partial triggers; dev successes 82 = recent8 82 PASS but
+non-recent8 2/9 FAIL — both carried B2 minority routings, seeds
+432003 / 432039 at purity 0.758 / 0.733, identical to the
+purity-only baseline method at k=32; add 65 = 65, 0/9 PASS), C1 B2
+protection PASS/PASS ((a) minority TAKEN 5/6 dev and 6/6 add;
+(b) 0/6 B1 and 0/6 return-A both; (c) B2 harm 39 vs guard 61
+ceiling 52.2, 33 vs guard 48 ceiling 55.2; (d) successes 57 vs
+guard+16=19, 63 vs 16), C4 return-A harm PASS/FAIL (dev 36 vs
+guard 75 ceiling 52.2 PASS; add 53 vs guard 53 PASS at equality
+but ceiling 51.0 FAIL by 2 — candidate identical to every carried
+gate-generation baseline method at return-A onset on additional,
+regular recovery TAKEN 4/6 there and 6/6 dev: inherited from the
+carried profile, charged unchanged), C2 return-A successes
+PASS/PASS (60 vs frozen_A 60 floors 24.0 and guard+16=21; 43 vs 66
+/ 27 — cumulative 68/60 successes at 28/36 harm beats the candidate
+on BOTH axes on BOTH cohorts for the sixth consecutive graded
+cohort pair; frozen_A beats it on additional (66 at 30) and
+exactly ties it on development (60 at 36)), C3 pooled onset harm
+PASS/PASS (75 vs guard 198, 6/6 cells <= recent8; 102 vs guard
+171, 6/6), C7 full accounting PASS/PASS (full decision records
+incl. abstention_trigger_kind at every checkpoint and the complete
+abstention-gate record with support threshold null, replay
+identity true at every checkpoint in both cohorts — 72/72 entries
+per cohort, learner acquisition 0). **Both trigger generations are
+now answered: the full-pair trigger starves B1 (preceding cycle),
+the partial trigger protects B1 completely on these cohorts (harm
+0 / 16) but cannot distinguish a genuine first switch from
+stationary noise — partial opposition is not onset-specific in
+this simulator, and no trigger threshold on the newest pair alone,
+at either setting, holds the frozen stationary margins while
+protecting B1.** Full unit suite (1195) and historical transfer
+benchmark passed in the evaluation and grading stages; no CI
+claimed for the evaluation or grading commits (UNVERIFIED). See
+`docs/PARTIAL_OPPOSITION_ABSTENTION_RECOVERY.md`. Keep the learner
+optional and unpromoted, default controller unchanged, no merge,
+no AthenZ/Synveil integration, D1–D10/V2A/V2B unchanged. Next
+limitation selected: P1 stationary selectivity under a
+partial-opposition trigger — whether a condition derived from
+observed evidence beyond the newest pair's opposition count and
+the reference-purity leg (neither separates the populations:
+stationary partial firings realized purity 0.825–0.872, squarely
+inside the B1 taken states' 0.750–0.865 range) can distinguish a
+genuine switch onset from stationary partial opposition well
+enough to hold criterion 6's frozen margins (abstentions <=
+32/240, successes >= recent8 − 6) while keeping criterion 9's B1
+engagement and harm profile and checkpoint-32 release, on NEW
+cohorts under a NEW protocol. Recorded but not selected: C5's
+development failure is the carried recovery branches' k=32
+records, not a trigger effect; C4's additional failure is shared
+identically with every carried gate generation at return-A;
+cumulative's return-A dominance on both axes on both cohorts is
+now total on six consecutive cohort pairs.
+
 # Abstention purity-only recovery: support leg removed from the abstention gate — 2026-11-05 (FAILED)
 
 Optional `developmental_ai/abstention_purity_only_recovery.py`
