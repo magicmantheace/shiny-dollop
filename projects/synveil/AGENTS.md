@@ -127,6 +127,19 @@ production root shells, no destructive writes to Windows media, no invented
 hardware validation, no installer without explicit disk authorization and
 independent recovery. See ADR 0013 and `docs/FIRST_INSTALL.md`.
 
+## Owner decision addendum — 2026-11-05 (ADR 0023)
+
+Physical validation is parked by owner decision, and the boot/update
+mechanisms are frozen at the ADR 0022 fixpass state (source `a236213`).
+See ADR 0023 for the frozen zone, the rule that changes inside it need
+explicit owner approval plus a full QEMU re-validation (boot to the
+authenticated desktop + complete update round trip), and the payload
+rules. The 2026-10-20 deferral of observer, policy, evaluator, and
+AthenZ work is lifted for QEMU-scoped development in roadmap
+dependency order; the working queue resumes at the Phase 2 durable
+audit record format. All validation claims remain QEMU-scoped — no
+physical claim may be made while the physical items are parked.
+
 ## Roadmap discipline
 
 Work from the earliest incomplete dependency on the roadmap unless the user directs otherwise.

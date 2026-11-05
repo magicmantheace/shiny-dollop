@@ -8,14 +8,39 @@
 > See [ADR 0013](docs/adr/0013-first-boot-desktop-priority.md).
 >
 > - [ ] Physical UEFI USB boot on the HP Pavilion TG01, owner validated.
+>   **(PARKED 2026-11-05 — ADR 0023.)**
 > - [ ] Login plus real multiwindow compositor/panel/launcher/terminal/files/settings.
+>   (QEMU-demonstrated, including on the owner's machine under WHPX on
+>   2026-11-04; physical validation **PARKED 2026-11-05 — ADR 0023**.)
 > - [ ] Dedicated external SSD install with isolated A/B and persistent data.
+>   **(PARKED 2026-11-05 — ADR 0023.)**
 > - [ ] Signed inactive-slot update with interrupted-update and rollback tests.
+>   (Signed update and rollback QEMU-demonstrated, including the full
+>   round trip on 2026-11-04; interrupted-update tests and physical
+>   validation **PARKED 2026-11-05 — ADR 0023**.)
 > - [x] Owner-approved graphical update controls. (QEMU-demonstrated
 >   2026-10-26 in the authenticated Weston desktop — stage → trial
 >   reboot → owner confirm, and rollback, driven through the GUI;
 >   see `docs/validation/ab-gui-qemu-proof-2026-10-26/`. Physical
 >   validation still pending with the TG01 boot item above.)
+>
+> **Owner decision (2026-11-05, [ADR 0023](docs/adr/0023-physical-validation-parked-boot-update-freeze.md)): physical validation PARKED; boot/update mechanisms frozen.**
+> The four unchecked priority items above are parked by owner decision —
+> not complete, not abandoned — and remain in force, with the
+> `docs/PHYSICAL_BOOT.md` gates, for any future unparking. The boot and
+> update mechanisms (kernel/boot configuration, bootstrap `/init`,
+> slot selection and attempt accounting, health/owner-confirm and
+> rollback logic, the update transaction and signature verification,
+> supervision/session infrastructure) are frozen at the ADR 0022
+> fixpass state, source `a236213`: changes need explicit owner
+> approval plus a full QEMU re-validation (boot to the authenticated
+> desktop + complete update round trip including rollback). Userspace
+> payload delivered through the existing mechanisms is not frozen,
+> provided each image change passes the standing joined QEMU
+> acceptance. The ADR 0013 deferral of observer/policy/evaluator/
+> AthenZ work is lifted for QEMU-scoped development; the working
+> queue resumes at the Phase 2 durable audit record format. All
+> claims remain QEMU-scoped.
 >
 > **Current scope:** The source-built native Synveil kernel/EFI image and
 > separate opt-in hardware profile have passed *build* validation but are
