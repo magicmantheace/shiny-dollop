@@ -208,24 +208,53 @@ def shell_argv(shell: str) -> list[str]:
     raise ValueError(f"unknown shell: {shell!r}")
 
 
+def _declare_process_signatures(kernel32) -> None:
+    """Declare argtypes/restype for the kernel32 process calls in
+    pid_alive.
+
+    Same defect class the capture-signature fix removed from the
+    screenshot path: OpenProcess returns a HANDLE, which is
+    pointer-sized in this 64-bit process. With the default c_int
+    restype ctypes truncates that handle, and passing it on to
+    GetExitCodeProcess / CloseHandle with undeclared argtypes
+    converts the Python int through the platform C long — 32-bit on
+    Windows — which raises ``OverflowError: int too long to
+    convert`` for handle values above INT_MAX. A jobs/process
+    liveness check would then fail intermittently, depending only
+    on the handle value the OS happened to hand out. Declaring
+    every handle slot as c_void_p removes that failure class.
+    """
+    import ctypes
+    P = ctypes.c_void_p
+    I = ctypes.c_int
+    UL = ctypes.c_ulong
+    kernel32.OpenProcess.argtypes = [UL, I, UL]
+    kernel32.OpenProcess.restype = P
+    kernel32.GetExitCodeProcess.argtypes = [P, ctypes.POINTER(UL)]
+    kernel32.GetExitCodeProcess.restype = I          # BOOL
+    kernel32.CloseHandle.argtypes = [P]
+    kernel32.CloseHandle.restype = I                 # BOOL
+
+
 def pid_alive(pid: int) -> bool:
     if pid <= 0:
         return False
     if IS_WINDOWS:
         import ctypes
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        _declare_process_signatures(kernel32)
         PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
         STILL_ACTIVE = 259
-        handle = ctypes.windll.kernel32.OpenProcess(  # type: ignore[attr-defined]
+        handle = kernel32.OpenProcess(
             PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
         if not handle:
             return False
         try:
             code = ctypes.c_ulong(0)
-            ok = ctypes.windll.kernel32.GetExitCodeProcess(  # type: ignore[attr-defined]
-                handle, ctypes.byref(code))
+            ok = kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
             return bool(ok) and code.value == STILL_ACTIVE
         finally:
-            ctypes.windll.kernel32.CloseHandle(handle)  # type: ignore[attr-defined]
+            kernel32.CloseHandle(handle)
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -1532,14 +1561,53 @@ def inject_input(actions: list[dict]) -> list[dict]:
 
 # -- clipboard (Windows, ctypes) ------------------------------------------------
 
+def _declare_clipboard_signatures(user32, kernel32) -> None:
+    """Declare argtypes/restype for every user32/kernel32 call in
+    the clipboard path.
+
+    Same defect class as the capture/process signature fixes: the
+    clipboard handle (HGLOBAL) is pointer-sized in this 64-bit
+    process. The handle-returning calls already had c_void_p
+    restypes declared, but no argtypes were declared anywhere, so
+    passing the handle on to GlobalLock / GlobalUnlock /
+    GlobalFree / SetClipboardData converted the Python int through
+    the platform C long — 32-bit on Windows — raising
+    ``OverflowError: int too long to convert`` for handle values
+    above INT_MAX. GlobalAlloc's size parameter is SIZE_T
+    (pointer-sized) for the same reason. Declaring the full table
+    removes that failure class.
+    """
+    import ctypes
+    P = ctypes.c_void_p
+    I = ctypes.c_int
+    U = ctypes.c_uint
+    user32.OpenClipboard.argtypes = [P]
+    user32.OpenClipboard.restype = I                    # BOOL
+    user32.CloseClipboard.argtypes = []
+    user32.CloseClipboard.restype = I                   # BOOL
+    user32.EmptyClipboard.argtypes = []
+    user32.EmptyClipboard.restype = I                   # BOOL
+    user32.GetClipboardData.argtypes = [U]
+    user32.GetClipboardData.restype = P                 # HANDLE
+    user32.SetClipboardData.argtypes = [U, P]
+    user32.SetClipboardData.restype = P                 # HANDLE
+    kernel32.GlobalAlloc.argtypes = [U, ctypes.c_size_t]
+    kernel32.GlobalAlloc.restype = P                    # HGLOBAL
+    kernel32.GlobalLock.argtypes = [P]
+    kernel32.GlobalLock.restype = P                     # LPVOID
+    kernel32.GlobalUnlock.argtypes = [P]
+    kernel32.GlobalUnlock.restype = I                   # BOOL
+    kernel32.GlobalFree.argtypes = [P]
+    kernel32.GlobalFree.restype = P                     # HLOCAL (NULL on success)
+
+
 def clipboard_get() -> str:
     _require_windows("clipboard")
     import ctypes
     user32 = ctypes.windll.user32  # type: ignore[attr-defined]
     kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
     CF_UNICODETEXT = 13
-    user32.GetClipboardData.restype = ctypes.c_void_p
-    kernel32.GlobalLock.restype = ctypes.c_void_p
+    _declare_clipboard_signatures(user32, kernel32)
     for _attempt in range(10):
         if user32.OpenClipboard(None):
             break
@@ -1568,8 +1636,7 @@ def clipboard_set(text: str) -> None:
     kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
     CF_UNICODETEXT = 13
     GMEM_MOVEABLE = 0x0002
-    kernel32.GlobalAlloc.restype = ctypes.c_void_p
-    kernel32.GlobalLock.restype = ctypes.c_void_p
+    _declare_clipboard_signatures(user32, kernel32)
     data = (text + "\x00").encode("utf-16-le")
     for _attempt in range(10):
         if user32.OpenClipboard(None):

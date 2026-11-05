@@ -254,3 +254,59 @@ re-run on the PC; BMP was verified live on Windows by that session
 touched by this fix: the same undeclared-signature pattern exists
 in the jobs process-exit helper (`OpenProcess` /
 `GetExitCodeProcess` near the top of `bridge_agent.py`).
+
+## State update (2026-11-04 night, later still): same signature defect class fixed in pid_alive + clipboard
+
+The future pass noted above has now happened. The whole Windows
+ctypes surface of the agent was audited for the undeclared-
+signature class (a pointer-sized handle or size value crossing a
+ctypes call without declared `argtypes`/`restype`):
+
+**Fixed — `pid_alive` (jobs/process liveness, core path):**
+`OpenProcess` had no declared `restype` (HANDLE truncated to the
+default `c_int`) and `GetExitCodeProcess` / `CloseHandle` had no
+`argtypes`, so the handle was passed on through the 32-bit Windows
+C long conversion — the identical latent failure to the screenshot
+one: intermittent `OverflowError: int too long to convert`
+whenever the OS handed out a handle above INT_MAX.
+`_declare_process_signatures()` now declares all three
+(`OpenProcess`, `GetExitCodeProcess`, `CloseHandle`; handle slots
+`c_void_p`) and runs at the top of `pid_alive`'s Windows branch.
+
+**Fixed — clipboard path (`clipboard_get` / `clipboard_set`):**
+the handle-returning calls already declared `c_void_p` restypes,
+but nothing declared `argtypes`, so the HGLOBAL was passed on to
+`GlobalLock` / `GlobalUnlock` / `GlobalFree` /
+`SetClipboardData` through the same 32-bit conversion, and
+`GlobalAlloc`'s size parameter is `SIZE_T` (pointer-sized), not
+the assumed 32-bit long. `_declare_clipboard_signatures()` now
+declares the full table (OpenClipboard, CloseClipboard,
+EmptyClipboard, GetClipboardData, SetClipboardData, GlobalAlloc,
+GlobalLock, GlobalUnlock, GlobalFree), replacing the ad-hoc
+per-function restype lines.
+
+**Inspected, not in the class, no change:** the capture path
+(fully declared by the screenshot fix); `SendInput` (arguments
+are small ints plus a ctypes INPUT array passed by reference;
+return is a UINT count); `GetSystemMetrics` (int in, int out);
+`GetCursorPos` (takes a `byref` POINT, returns BOOL).
+`agent/supervisor.py` and `agent/bridge_update.py` use no ctypes
+at all — so the self-update / rollback path contains no instance
+of this defect class.
+
+**Regression coverage** (`tests/test_v1_platform.py`, 14 → 16):
+`ProcessSignatureTests.test_process_signatures_declared` and
+`ClipboardSignatureTests.test_clipboard_signatures_declared` pin
+the two new declared tables with stand-in function objects, in
+the same style as `CaptureSignatureTests`. Both were confirmed
+to fail (errors=2) against the pre-fix agent code and pass with
+the fix.
+
+**Verification state:** full suite on Muse's Linux VM: before
+59 tests OK (1 skip), after **61 tests, OK (1 skip)** — the skip
+remains the Windows-only real-capture test. That is a VM result
+only. **Live Windows verification of these two paths is PENDING**
+and rides on the parent session's staging re-run on the PC (the
+jobs-liveness and clipboard endpoints exercised against the
+staging instance), alongside the still-pending `format=png`
+re-verification.

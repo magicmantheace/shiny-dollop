@@ -155,6 +155,90 @@ class CaptureSignatureTests(unittest.TestCase):
                 self.assertIs(funcs[name].restype, restype)
 
 
+class ProcessSignatureTests(unittest.TestCase):
+    """Regression guard for the same undeclared-signature defect
+    class in the jobs/process liveness helper: pid_alive round-trips
+    a pointer-sized process HANDLE (OpenProcess -> GetExitCodeProcess
+    / CloseHandle), so every signature it relies on must be declared
+    with c_void_p handle slots. Undeclared, the HANDLE return is
+    truncated to c_int and passing it on converts through the 32-bit
+    Windows C long, raising "OverflowError: int too long to convert"
+    for handle values above INT_MAX. pid_alive's Windows branch is
+    Windows-only, so this test drives the declaration routine with
+    stand-in function objects and pins the declared table."""
+
+    def test_process_signatures_declared(self):
+        import ctypes
+        import types
+
+        kernel32 = types.SimpleNamespace(
+            **{name: types.SimpleNamespace() for name in
+               ("OpenProcess", "GetExitCodeProcess", "CloseHandle")})
+        bridge_agent._declare_process_signatures(kernel32)
+        P, I, UL = (ctypes.c_void_p, ctypes.c_int, ctypes.c_ulong)
+        expected = {
+            "OpenProcess": ([UL, I, UL], P),
+            "GetExitCodeProcess": ([P, ctypes.POINTER(UL)], I),
+            "CloseHandle": ([P], I),
+        }
+        for name, (argtypes, restype) in expected.items():
+            with self.subTest(function=name):
+                func = getattr(kernel32, name)
+                self.assertEqual(func.argtypes, argtypes)
+                self.assertIs(func.restype, restype)
+
+
+class ClipboardSignatureTests(unittest.TestCase):
+    """Regression guard for the same defect class in the clipboard
+    path: clipboard_get/clipboard_set round-trip a pointer-sized
+    HGLOBAL (GlobalAlloc/GetClipboardData -> GlobalLock/GlobalUnlock/
+    GlobalFree/SetClipboardData). The handle-returning calls already
+    declared c_void_p restypes, but no argtypes existed, so passing
+    the handle on converted through the 32-bit Windows C long and
+    raised "OverflowError: int too long to convert" for handle values
+    above INT_MAX; GlobalAlloc's SIZE_T parameter is pointer-sized
+    too. The clipboard functions are Windows-only, so this test
+    drives the declaration routine with stand-in function objects
+    and pins the declared table."""
+
+    def test_clipboard_signatures_declared(self):
+        import ctypes
+        import types
+
+        def fake_dll(*names):
+            return types.SimpleNamespace(
+                **{name: types.SimpleNamespace() for name in names})
+
+        user32 = fake_dll("OpenClipboard", "CloseClipboard",
+                          "EmptyClipboard", "GetClipboardData",
+                          "SetClipboardData")
+        kernel32 = fake_dll("GlobalAlloc", "GlobalLock",
+                            "GlobalUnlock", "GlobalFree")
+        bridge_agent._declare_clipboard_signatures(user32, kernel32)
+        P, I, U = ctypes.c_void_p, ctypes.c_int, ctypes.c_uint
+        expected = {
+            "OpenClipboard": ([P], I),
+            "CloseClipboard": ([], I),
+            "EmptyClipboard": ([], I),
+            "GetClipboardData": ([U], P),
+            "SetClipboardData": ([U, P], P),
+            "GlobalAlloc": ([U, ctypes.c_size_t], P),
+            "GlobalLock": ([P], P),
+            "GlobalUnlock": ([P], I),
+            "GlobalFree": ([P], P),
+        }
+        funcs = {}
+        for dll in (user32, kernel32):
+            for name in expected:
+                if hasattr(dll, name):
+                    funcs[name] = getattr(dll, name)
+        self.assertEqual(set(funcs), set(expected))
+        for name, (argtypes, restype) in expected.items():
+            with self.subTest(function=name):
+                self.assertEqual(funcs[name].argtypes, argtypes)
+                self.assertIs(funcs[name].restype, restype)
+
+
 class PlatformEndpointTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

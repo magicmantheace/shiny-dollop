@@ -93,11 +93,13 @@ host input / clipboard / UI Automation, chunked resumable transfers
 with server-side SHA-256, multi-root files, a supervised service
 form with self-update + automatic rollback, audit hardening (§5),
 and a real client library — per `docs/V1_PLAN.md`, in five slice
-commits on this branch. **Verified on Muse's Linux VM: 59 tests
+commits on this branch. **Verified on Muse's Linux VM: 61 tests
 pass** (1 Windows-only skip) plus a client-CLI smoke run. The first
 PC staging run found a screenshot defect (`format=png` → HTTP 500,
 undeclared ctypes signatures in the GDI capture); it is fixed on
-this branch and VM-verified, with live Windows re-verification of
-the PNG path still pending (see `docs/MUSE_HANDOFF.md`). The live
+this branch and VM-verified, and the same signature defect class
+has since been fixed in the `pid_alive` process helper and the
+clipboard path, with live Windows re-verification still pending
+(see `docs/MUSE_HANDOFF.md`). The live
 agent on the PC is still v0.1 — v1 is *implemented and
 VM-verified*, not yet *cut over*.

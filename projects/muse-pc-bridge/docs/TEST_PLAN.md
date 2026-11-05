@@ -35,7 +35,7 @@ PC during install verification.
 | File | Covers |
 | --- | --- |
 | `tests/test_v1_jobs.py` (12) | job submit returns immediately with a job id; result/output/exit code; incremental byte-offset reads (head + tail reconstruct the whole, no repeats); cancel → killed; timeout → failed + timed_out + null exit code; job list; unknown job → 404; **job_finish audited with a 64-char stdout SHA-256**; detached process spawn/list/kill with log tails; PTY session echo round-trip; missing session → 400 |
-| `tests/test_v1_platform.py` (14) | PNG encoder structure (IHDR, filter-0 scanlines round-trip), BMP structure, BGRA→RGBA conversion; PNG round-trip at real capture size (1536x864, per-chunk CRC + pixel-exact decode) and the declared ctypes capture-signature table pinned with stand-in functions (regressions for the staging-found screenshot HTTP 500); capabilities vs platform_limited in /v1/status; screenshot/input/clipboard/UIA → 501 off Windows; bad format → 400; empty input actions → 400; real-capture test is Windows-only (skipped on the VM) |
+| `tests/test_v1_platform.py` (16) | PNG encoder structure (IHDR, filter-0 scanlines round-trip), BMP structure, BGRA→RGBA conversion; PNG round-trip at real capture size (1536x864, per-chunk CRC + pixel-exact decode) and the declared ctypes capture-signature table pinned with stand-in functions (regressions for the staging-found screenshot HTTP 500); the same signature pinning for the kernel32 process calls in `pid_alive` (OpenProcess/GetExitCodeProcess/CloseHandle) and for the clipboard path's user32/kernel32 calls (HGLOBAL round-trip, incl. GlobalAlloc's SIZE_T parameter); capabilities vs platform_limited in /v1/status; screenshot/input/clipboard/UIA → 501 off Windows; bad format → 400; empty input actions → 400; real-capture test is Windows-only (skipped on the VM) |
 | `tests/test_v1_lifecycle.py` (8) | update stage/apply/rollback file cycle; wrong SHA-256, version mismatch, and zip-slip bundles rejected; apply without pending → error; supervisor restarts a twice-crashing agent and reports it; a staged **unhealthy update is rolled back automatically** (file bytes restored); a healthy update stays applied |
 | `tests/test_v1_files.py` (9) | hash endpoint + ranged get; chunked upload round-trip through the client library; **resume after partial upload** (2 chunks sent, client resumes by id); hash mismatch at completion rejected with no file placed; wrong chunk size rejected; upload discard; tree/mkdir/move/delete incl. root protection; a second named root (and unknown root → 400); path escapes still confined; client `exec_run` |
 | `tests/test_v1_hardening.py` (6) | audit rotation bounds the log and honors `audit_keep`; audit tail returns well-formed recent entries from the current file and clamps n; the rate-limit flow end-to-end (401 → 429 + `retry_after_s`, real token unaffected, blocked attempts still audited with `rate_limited: true`); update staging API (empty → staged; running agent untouched) |
@@ -68,6 +68,22 @@ PC during install verification.
   round-trip and capture-signature regression tests. Live Windows
   re-verification of `format=png` is still pending (the staging
   session re-runs it on the PC).
+- 2026-11-04 night, later still (same-class follow-up): the
+  undeclared-signature pattern the screenshot fix noted in the jobs
+  process-exit helper was fixed, and an audit of the remaining
+  Windows ctypes surface found the same class in the clipboard
+  path (HGLOBAL handle arguments and GlobalAlloc's SIZE_T
+  parameter had no declared `argtypes`). Signatures are now
+  declared for the `pid_alive` kernel32 calls and the full
+  clipboard table; the rest of the surface was inspected and is
+  not in the class (SendInput and GetSystemMetrics pass only
+  small ints / ctypes arrays; GetCursorPos takes a byref;
+  `supervisor.py` and `bridge_update.py` use no ctypes). **Full
+  suite on the VM: 61 tests, OK (1 skip)**, including the two new
+  signature-pinning tests — both confirmed to fail (errors)
+  against the pre-fix agent code. VM result only: live Windows
+  verification of the process/clipboard paths rides on the
+  staging session's re-run on the PC.
 
 ## What the tests cannot prove
 
