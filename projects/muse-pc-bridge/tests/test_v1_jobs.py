@@ -123,17 +123,20 @@ class JobsTestCase(unittest.TestCase):
         cls.server.shutdown()
         cls.server.server_close()
         cls.thread.join(timeout=5)
-        # Short retry: a just-killed process can release its log
-        # handles a moment after it stops reporting alive. Genuine
+        # Retry with a generous window: a just-killed process (or a
+        # virus scanner briefly holding a fresh log) can release its
+        # handles well after it stops reporting alive — the full
+        # Windows suite run flaked on exactly this race twice with a
+        # 3 s window while the isolated module passed. Genuine
         # cleanup failures still surface after the retries.
-        for attempt in range(10):
+        for attempt in range(40):
             try:
                 cls.tmp.cleanup()
                 break
             except PermissionError:
-                if attempt == 9:
+                if attempt == 39:
                     raise
-                time.sleep(0.3)
+                time.sleep(0.5)
 
     def wait_job(self, job_id, timeout=15):
         deadline = time.time() + timeout

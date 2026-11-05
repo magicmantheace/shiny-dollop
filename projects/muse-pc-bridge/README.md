@@ -102,11 +102,11 @@ has since been fixed in the `pid_alive` process helper and the
 clipboard path, with live Windows staging
 verification completed the same night (see
 `docs/MUSE_HANDOFF.md`). The first suite run under Windows
-Python (2026-11-05, during the cutover attempt) found one more
+Python (2026-11-05, during the cutover) found one more
 defect — interactive-session output starving behind a 64 KiB
 buffered pipe read, plus a Windows-only test-teardown error —
-both fixed on this branch and VM-verified; Windows
-re-verification is pending (see `docs/MUSE_HANDOFF.md`). The live
-agent on the PC is still v0.1 — v1 is *implemented,
-VM-verified, and staging-verified on the PC*, not yet
-*cut over*.
+both fixed on this branch, and the **full suite then passed
+under Windows Python: 63 tests, OK (4 platform skips)**. The
+cutover completed the same morning: the live agent on the PC
+now runs **v1.0.0 in the supervised (service) form** — see
+`docs/MUSE_HANDOFF.md` for the full record.

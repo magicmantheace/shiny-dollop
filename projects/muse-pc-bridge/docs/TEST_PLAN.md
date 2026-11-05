@@ -93,6 +93,18 @@ PC during install verification.
   output hashes), and UIA window enumeration all verified
   working. Staging agent stopped afterwards; live v0.1 agent
   untouched and healthy. See `docs/MUSE_HANDOFF.md`.
+- 2026-11-05 morning (cutover): the full suite ran under Windows
+  Python on the PC. First run (at `bc48202`): 61 tests,
+  failures=1/errors=1/skipped=4 — session output starvation
+  (product bug, pump read) + a jobs tearDownClass WinError 32
+  (test cleanup race). After the fixes, re-run at `14970e4`:
+  **63 tests, OK (skipped=4)**; the teardown error is flaky
+  (absent in an isolated module run and in the green full run,
+  present in two earlier full runs) and its retry window was
+  widened. The supervised service form was then installed and
+  started on the PC, and the live v1.0.0 agent verified end to
+  end (status, job, session round-trip, PNG screenshot). See
+  `docs/MUSE_HANDOFF.md`.
 - 2026-11-05 morning (owner PC): **the full suite ran under
   Windows Python for the first time** (Windows 11, Python 3.14.2,
   checkout at tip `bc48202`): **61 tests, FAILED (failures=1,

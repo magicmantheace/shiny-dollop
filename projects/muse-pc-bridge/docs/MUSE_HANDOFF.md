@@ -403,3 +403,44 @@ re-pull the PC checkout and re-run the suite under Windows
 Python before the cutover resumes. The Windows suite is NOT
 claimed green. Also still unverified: the supervised service
 form and self-update apply on the PC.
+
+### State update — 2026-11-05 morning, final: CUTOVER COMPLETE, v1.0.0 LIVE
+
+The owner approved the staging-assisted cutover (staging instance
+babysits while the live agent is swapped) and was present for it.
+
+- **Windows suite GREEN**: after the pump/teardown fixes
+  (`14970e4`), the PC checkout was re-pulled and the full suite
+  run under Windows Python: **63 tests, OK (skipped=4)** — the
+  four skips are the off-Windows 501 assertions, skipped by
+  construction on Windows. One flake is on record: the jobs
+  `tearDownClass` error (WinError 32 on a detached-process log)
+  appeared in two full-suite runs and in neither the isolated
+  module run nor the green full run — a Windows handle-release
+  race in test cleanup, not product behavior; the teardown retry
+  window was widened (40 × 0.5 s) in the same commit as this note.
+- **One more defect found by the cutover itself**:
+  `scripts/bridge-service.ps1` install failed on its first-ever
+  Windows run — the local `$action` variable collided with the
+  `$Action` parameter (PowerShell names are case-insensitive) and
+  tripped the parameter's ValidateSet. Fixed at `d0f787b`
+  (renamed to `$taskAction`); install then succeeded.
+- **Cutover sequence as executed**: staging agent (8766)
+  verified up → v0.1 agent (pid 36060) and its launcher console
+  stopped through staging → service install (registered the
+  per-user logon task "Muse PC Bridge (supervised)"; **no UAC
+  prompt was required**) → `-Action start` → supervisor running,
+  agent pid 40472, port 8765 listening.
+- **Live verification against the production install** (owner's
+  real token, port 8765): `/v1/status` reports **1.0.0** with 18
+  capabilities; a job ran to done; an interactive **PowerShell
+  session round-tripped** (`echo` marker returned — the pump fix
+  proven end-to-end); a native **PNG screenshot** returned a
+  valid 1536x864 frame. The staging agent was then stopped (8766
+  closed) and the live agent re-confirmed healthy.
+- The `v1.0.0` tag is applied at the tip containing this note.
+- Still unverified (unchanged, honestly): self-update *apply*
+  on the PC (nothing has been staged/applied through it yet) and
+  the plan's elapsed-time criteria (reboot survival, a week
+  unattended) — those are now running in production and will be
+  proven by time, not by claim.
