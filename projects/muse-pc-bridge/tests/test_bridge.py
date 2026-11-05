@@ -121,24 +121,29 @@ class BridgeTestCase(unittest.TestCase):
 
     # -- exec -------------------------------------------------------------------
     def test_exec_echo(self):
+        # v1: wait_s asks the agent to block until the job finishes and
+        # return the result inline (the v0 one-call shape, plus job_id).
         status, obj = self.request("POST", "/v1/exec",
-                                   {"command": cmd_echo(), "shell": SHELL})
+                                   {"command": cmd_echo(), "shell": SHELL,
+                                    "wait_s": 10})
         self.assertEqual(status, 200)
         self.assertEqual(obj["exit_code"], 0)
         self.assertIn("bridge-ok", obj["stdout"])
         self.assertFalse(obj["timed_out"])
         self.assertFalse(obj["truncated"])
+        self.assertIn("job_id", obj)
 
     def test_exec_nonzero_exit(self):
         status, obj = self.request("POST", "/v1/exec",
-                                   {"command": cmd_exit(3), "shell": SHELL})
+                                   {"command": cmd_exit(3), "shell": SHELL,
+                                    "wait_s": 10})
         self.assertEqual(status, 200)
         self.assertEqual(obj["exit_code"], 3)
 
     def test_exec_timeout(self):
         status, obj = self.request("POST", "/v1/exec",
                                    {"command": cmd_sleep(), "shell": SHELL,
-                                    "timeout_s": 0.3})
+                                    "timeout_s": 0.3, "wait_s": 10})
         self.assertEqual(status, 200)
         self.assertTrue(obj["timed_out"])
         self.assertIsNone(obj["exit_code"])

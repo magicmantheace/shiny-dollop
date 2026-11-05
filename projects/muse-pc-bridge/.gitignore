@@ -2,6 +2,7 @@
 config.json
 logs/
 bridge-files/
+state/
 
 # Python
 __pycache__/
