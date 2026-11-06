@@ -1,3 +1,128 @@
+# Preceding pair partial abstention recovery: preceding-pair corroboration leg on partial abstention triggers — 2026-11-06 (FAILED / REGRESSION at checkpoint 32)
+
+Optional `developmental_ai/preceding_pair_partial_abstention_recovery.py`
+(identical to the graded partial-opposition candidate in acting
+model, extended signal, archive, concordance definition, joint
+recovery test, recovery model, the full three-leg authority
+condition, the minority branch in full, the partial-or-full
+abstention trigger (opposed_count >= 1), and the purity-only
+abstention gate — leg P >= 0.70, support threshold null, acting
+records records-only; the SINGLE changed element is leg R on
+PARTIAL triggers only: preceding_pair_opposed_count >= 1 over
+events[-4:-2] scored vs the same extended-reference majorities,
+full triggers unchanged behind leg P alone) was evaluated under
+the protocol frozen BEFORE implementation at
+`benchmarks/preceding_pair_partial_abstention_recovery_protocol.json` on
+NEW cohorts 442003/442021/442039 and 443001/443017/443041, both now
+INSPECTED — never re-tune against them. **Graded Failed under the
+protocol's own definitions (PRIMARY criterion 10 FAILs on the
+additional cohort; criteria 9, 6, 1, and 4 also FAIL there — any
+one triggers the Failed clause) and a Regression under its
+checkpoint-32 clause (k=32 successes 60 vs the recent8 − 4 line
+of 64 development, 57 vs 61 additional — each deficit in full
+one stale minority routing at return-A k=32, seeds 442021 /
+443001, scoring 0/16 vs recent8 8/8, candidate identical to the
+partial baseline method at k=32 on both cohorts; the other
+Regression clauses do not trigger: pooled onset harm 170/188
+well below recent8 259/251, control successes 110 = 110 dev so
+the both-cohorts control clause does not trigger, suite +
+transfer pass).**
+Per-criterion, development / additional, PRIMARY criterion 10
+first, then co-graded guards 9, 6, 5, 1, 4: C10 conjunction
+FAIL/FAIL (development stationary side PASS in full, B1 side
+FAIL on engagement alone; additional BOTH sides FAIL — the
+stationary side on successes by 1, the B1 side on engagement),
+C9 B1 engagement FAIL/FAIL (abstention TAKEN 1/6 on BOTH cohorts
+— a sole full firing each, seeds 442003 k=4 purity 0.800 and
+443017 k=4 purity 0.865; RETAINED partial-only firings 0/6 on
+both, every partial B1 state realizing
+preceding_pair_opposed_count 0: the development k=2 partial
+(seed 442021, purity 0.870) disarmed by leg R as pre-registered,
+and on additional all three partials (443017 k=2 0.889, 443041
+k=2 0.895, 443001 k=4 0.849) disarmed by leg R — the sole
+checkpoint-4 partial across both cohorts also realized
+preceding 0, so the design's checkpoint-4 rescue did not occur
+on these draws; (b)/(c) PASS both: B1 harm 78 = guard 78 and
+78 < recent8 92 / 94; B1 successes 2 vs recent8 4 / 2 stated in
+full; the records-only partial-purity-rule took 2/6 dev — even
+un-corroborated, development FAILs the floor on signal absence,
+opposed_count 0 at 4 of 6 states — and 4/6 add, leg R removing
+1 dev / 3 add firings), C6 stationary selectivity PASS/FAIL
+(dev abstentions 0/240, successes 110 = 110, harm 130 = 130 — a
+leg-retention PASS: the partial-purity-rule took 2 states and
+leg R disarmed both partials, seeds 442003 k=2 / k=32 at
+preceding 0; add abstentions 16/240 and harm 122 vs 131 PASS
+but successes 102 vs 109 required >= 103 FAIL by 1 — leg R
+disarmed all three partial stationary states (seed 443041 k=2 /
+k=16 / k=32, preceding 0 throughout; partial baseline method
+control line 86/90/64 → candidate 102/122/16) and the entire
+remaining deficit is ONE carried FULL firing, seed 443017 k=2
+purity 0.889, also taken by the unwidened rule; branch diffs vs
+the purity-only-rule 0/15 on both cohorts), C5 release FAIL/PASS
+(abstentions 0/144 and abstained branch 0/9 BOTH — no late
+abstention on either cohort, dev via a leg-P release at
+return-A k=32 seed 442039 (purity 0.645, preceding 1) and add
+via a both-legs block at seed 443041 (purity 0.692, preceding
+0); successes 60 / 57 exactly at the recent8 − 8 lines; dev
+non-recent8 2/9 FAIL — B1 retained seed 442021 and the return-A
+minority routing that is the cohort's entire k=32 deficit; add
+1/9), C1 B2 protection FAIL/FAIL ((a) minority TAKEN 4/6 dev,
+3/6 add PASS; (b) 0/6 B1 and 0/6 return-A both; (c) harm 58 vs
+guard 94 but ceiling 56.4 FAIL by 1.6 dev, 65 vs guard 80 but
+ceiling 51.6 FAIL by 13.4 add — harm at the three non-engaged
+recent8 states on additional, 16 each; (d) successes 38 / 31
+PASS; no abstention fired at B2 onset on either cohort — the
+carried B2 profile on new cohorts), C4 return-A harm PASS/FAIL
+(dev 34 vs guard 57 ceiling 43.8; add 45 vs guard 71 PASS but
+ceiling 42.6 FAIL by 2.4 — candidate identical to the carried
+baseline methods at return-A onset on additional), C2 return-A
+successes PASS/PASS (62 vs frozen_A 62; 51 vs 62 — cumulative
+68/60 successes at 28/36 harm beats the candidate on BOTH axes
+on BOTH cohorts for the seventh consecutive graded cohort
+pair; frozen_A exactly ties dev at 62/34 and beats add), C3
+pooled onset harm PASS/PASS (170 vs guard 229, 6/6 cells
+<= recent8; 188 vs guard 229, 6/6 — stated in full: the
+decisive partial baseline method is BELOW the candidate on
+both, 154 / 141, leg R's onset give-back), C7 full accounting
+PASS/PASS (replay 72/72 per cohort, preceding-pair fields
+complete, support_threshold null everywhere, gate recomputable
+everywhere, preceding-pair-rule == branch everywhere,
+acquisition 0). **The four-event window is answered in the same
+shape as the newest pair alone: leg R removed every partial
+stationary firing on both cohorts and retained no partial B1
+firing on either — on these cohorts the corroborated-partial
+population was empty in every graded arm, so a partial state
+corroborated by its preceding pair carries too little
+onset-specific information in this simulator to satisfy both
+frozen floors at once.** Full unit suite (1241) and historical
+transfer benchmark passed in the evaluation and grading stages;
+no CI claimed for the evaluation or grading commits
+(UNVERIFIED). See
+`docs/PRECEDING_PAIR_PARTIAL_ABSTENTION_RECOVERY.md`. Keep the
+learner optional and unpromoted, default controller unchanged,
+no merge, no AthenZ/Synveil integration, D1–D10/V2A/V2B
+unchanged. Next limitation selected: P1 first-switch (B1) onset
+engagement beyond the newest four events — B1 protection has
+now failed from both directions on the newest-window signal
+(un-corroborated partials engage but fail stationary
+selectivity; four-event corroboration holds the stationary
+partial arm but engages nothing, and on development
+opposed_count was 0 at half the B1 states so no newest-window
+rule reaches the floor); whether an onset signal accumulated
+over a wider evidence window than the newest four events can
+reach criterion 9's engagement floor and harm profile while
+holding the stationary profile demonstrated on development
+(exact recent8 parity) and checkpoint-32 abstention release,
+on NEW cohorts under a NEW protocol. Recorded but not
+selected: C6's additional failure is a single carried FULL
+stationary firing the leg never claimed to gate; the C5 dev
+failure and the k=32 Regression are one stale minority routing
+per cohort at return-A k=32, identical to the decisive
+baseline there; C1's B2 ceiling failures are the carried B2
+profile at non-engaged states; C4's additional failure is
+shared with the carried baselines; cumulative's return-A
+dominance is now seven consecutive cohort pairs.
+
 # Partial opposition abstention recovery: abstention trigger widened to partial opposition — 2026-11-05 (FAILED / REGRESSION at stationary control)
 
 Optional `developmental_ai/partial_opposition_abstention_recovery.py`

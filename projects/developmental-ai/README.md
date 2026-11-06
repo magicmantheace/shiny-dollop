@@ -1122,6 +1122,55 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 6 — Preceding pair partial abstention recovery: preceding-pair corroboration leg on partial abstention triggers (FAILED / REGRESSION at checkpoint 32)
+
+Optional `PrecedingPairPartialAbstentionRecoveryMemory` is identical to the
+graded partial-opposition candidate in acting model, extended signal,
+retained archive, archive concordance, joint recovery test, recovery
+model, the full three-leg authority condition, the minority branch in
+full, the partial-or-full abstention trigger (`opposed_count >= 1`), and
+the purity-only abstention gate (leg P ≥ 0.70, support threshold null);
+the SINGLE changed element is leg R on PARTIAL triggers only —
+`preceding_pair_opposed_count >= 1` over the two events immediately
+preceding the newest pair, full triggers unchanged behind leg P alone —
+under a protocol frozen before implementation (new cohorts 442003-family
+/ 443001-family, now INSPECTED). **Graded Failed under the protocol's own
+definitions (PRIMARY criterion 10 FAILs on the additional cohort — also
+criteria 9, 6, 1 and 4 there — any one triggers the Failed clause), and a
+Regression under its checkpoint-32 clause** (k=32 successes 60 vs the
+recent8 − 4 line of 64 development and 57 vs 61 additional, each deficit
+in full one stale minority routing at return-A k=32 scoring 0/16 vs
+recent8's 8/8, identical to the partial baseline method there; pooled
+onset harm 170/188 well below recent8's 259/251 and the control clause
+requires both cohorts while development is level). The leg did exactly
+the stationary half of its hypothesis: it removed EVERY partial
+stationary firing on both cohorts (decisive-baseline control abstentions
+32/64 episodes → candidate 0/16, development's control arm restored to
+exact recent8 parity 110/130/0), so criterion 6 PASSes development — and
+FAILs additional by one success (102 vs recent8's 109, required ≥ 103)
+on a single carried FULL stationary firing the leg never claimed to
+gate. The B1 price was total: abstention TAKEN at 1/6 pooled B1 onset
+states on BOTH cohorts (a sole full firing each), retained partial-only
+firings 0/6 on both, because every partial B1 state realized
+preceding_pair_opposed_count 0 — including the sole checkpoint-4 partial
+(seed 443001 k=4), whose preceding pair the design arithmetic expected
+to retain at 0.89–0.97; on development even the un-corroborated
+partial-purity-rule took only 2/6, opposed_count being 0 at half the B1
+states. Criteria 9 and 10 therefore FAIL on both cohorts, criterion 5
+FAILs development on the carried k=32 records (2/9; abstained branch
+0/9 on BOTH cohorts — no late abstention) and PASSes additional,
+criterion 1 FAILs on both on the B2 harm ceiling alone (58 vs 56.4
+development; 65 vs 51.6 additional, harm concentrated at non-engaged
+states), criterion 4 FAILs additional on the carried ceiling (45 vs
+42.6), and criteria 2, 3 and 7 PASS on both. Cumulative again beats the
+candidate at return-A on both axes on both cohorts (68/60 successes at
+28/36 harm vs the candidate's 62/51 at 34/45) — the seventh consecutive
+graded cohort pair; frozen_A exactly ties it on development and beats
+it on additional. Learner acquisition actions zero; external TRAIN
+actor harm published in full in the report. Optional only, no
+promotion, no merge.
+[Full graded report](docs/PRECEDING_PAIR_PARTIAL_ABSTENTION_RECOVERY.md).
+
 ### November 5 — Partial opposition abstention recovery: abstention trigger widened to partial opposition (FAILED / REGRESSION at stationary control)
 
 Optional `PartialOppositionAbstentionRecoveryMemory` is identical to the
