@@ -34,6 +34,7 @@ surface; the GUI itself is not faked in tests.
 | IPC action mapping | Payload validation accepts all nine UI kinds and rejects malformed payloads (`bad_payload`); each kind maps to the right core action with exact need deltas (snack +8, meal +35/clamp, play −7 energy…); wrong-stage/state actions raise the core's typed errors (`not_ready`, `asleep`, `not_sick`, `not_dead`, `is_egg`); clean is allowed while asleep; medicine cures an injected sick pet; new-egg starts generation 2. |
 | Visual state | state→animation mapping (egg/egg-ready/idle/sleeping/sick/dead), transient eating/playing from events, resolution priority (base > transient > hopping > idle); bridge reactions add a bubble-only transient except `celebrate`, which maps to the playing bounce. |
 | Bridge link | `desktop/tests/bridge-link.test.ts` (12): display-state parsing (junk/missing state → null, optional fields tolerated); reaction mapping (busy states + celebrate react, alert reacts even on first sighting, repeats/connecting/first-sighting calm stay quiet, busy→idle relaxes, alert→idle says "All clear"); the polling service against an injected reader + fake scheduler (reacts on change only; missing/corrupt file is a quiet no-op and recovery works; start/stop wiring); env-override path priority. |
+| Auto care | `desktop/tests/auto-care.test.ts` (12): the pure decision function (threshold edges for hunger/cleanliness/happiness, medicine-first ordering when sick, play refused for a tired pet, never acts on egg/dead/asleep); the config store (missing → off and nothing written, round-trip with no `.tmp`, corrupt file preserved aside + defaults); the service against a fake pet (silent while off, acts on init when the persisted switch is on, enabling mid-run acts immediately and persists). |
 | Build + smoke | `npm run build` clean (core tsc, main/preload tsc strict, Vite production build of both windows). `npm run smoke`: the real Electron binary launches under Xvfb, creates a fresh save in a throwaway userData, and loads both windows (`SMOKE_OK`). |
 | **Owner-PC only** | Transparent window behaviour, perching/roaming feel on a real desktop, tray, always-on-top over real windows, multi-monitor, high-DPI — never claimed from VM runs. |
 
@@ -49,6 +50,21 @@ flip to `alert`. The owner's real pet save was not touched. Live
 pairing against the real bridge state file begins whenever the
 bridge's production form is the GUI supervisor (owner's call);
 until then the file simply doesn't exist and the link stays quiet.
+
+**Auto care — owner-PC deployment (2026-11-05 evening):** the
+desktop suite on the VM is now **75 tests** (auto-care 12 added),
+core unchanged at 46. The production bridge having switched to
+its GUI form earlier that evening, the bridge link is live in
+production too. On the owner's PC the pet app was rebuilt from
+the branch, restarted with `auto-care.json` pre-enabled at the
+owner's request (he was testing), and came up clean on his real
+save. Honest limits: no auto-care action had fired by verification
+time — the pet's needs were all high (the owner had just been
+caring for it), so nothing was due; the first firing comes when a
+need crosses a threshold. The new panel section's rendering was
+not independently captured (forcing the hidden panel window open
+from outside Electron shows a blank surface — the panel itself
+was owner-verified in normal use the same evening).
 
 ## P3 — companion server (`desktop/tests/companion-*.test.ts`)
 

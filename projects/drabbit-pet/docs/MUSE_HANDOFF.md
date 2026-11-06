@@ -227,6 +227,35 @@ new Muse PC Bridge avatar window. Shipped as a one-way link:
   The link activates by itself the day the bridge's GUI form runs
   (owner's separate call) — no pet-side change needed then.
 
+## 2026-11-05 evening — auto care (owner's request)
+
+The owner asked for an auto-care option "while testing is
+happening" — the pet shouldn't need babysitting while he puts
+everything through its paces. Shipped as a proper persisted
+option, not a test hack:
+
+- `desktop/src/shared/auto-care.ts` — the pure decision function
+  (thresholds sit well inside the sim's danger lines: meal when
+  hunger < 40, clean on any mess or cleanliness < 40, play when
+  happiness < 35 and energy ≥ 25, medicine first when sick;
+  never egg/dead/asleep). `desktop/src/main/auto-care.ts` — the
+  service, evaluating on the pet's existing change notifications
+  (tick cadence, no second clock) and performing through the
+  shared `dispatchAction`, so auto-care actions are ordinary
+  event-logged actions. `auto-care.json` config store +
+  `autocare:*` IPC mirror the companion patterns; the panel gets
+  an "🛟 Auto care" section above Companion.
+- Verified: VM desktop suite **75/75** (was 63; +12 auto-care),
+  core **46/46**, full build clean. Deployed to the owner's PC:
+  worktree pulled, built, pet app restarted on his real save
+  with the switch pre-enabled per his request — app healthy, pet
+  (a baby, hatched that evening) unaffected in state.
+- Not yet demonstrated live: an actual auto-care firing — needs
+  were all high at deploy time. The panel section's rendering
+  wasn't independently captured (Electron windows forced open
+  externally paint blank; the panel in normal owner use was
+  confirmed by the owner the same evening).
+
 ## Next step
 
 The v1 queue is complete; everything left is owner-side

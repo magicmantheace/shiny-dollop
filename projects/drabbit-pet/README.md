@@ -42,6 +42,16 @@ presentation only — the deterministic sim never sees them. If the
 bridge runs its console form (no state file), the pet simply never
 reacts. Path override: `DRABBIT_BRIDGE_STATE_FILE`.
 
+**Auto care (2026-11-05):** a care-panel switch (persisted in
+`auto-care.json`, default off). While on, the app itself keeps the
+drabbit out of trouble: it feeds a meal when hunger runs low,
+cleans up messes and grime, plays when happiness dips, and gives
+medicine when the pet is sick — through the same action dispatcher
+the panel and phone use, so auto-care shows in the event log like
+any other care. Sleep is never forced (the pet naps and wakes on
+its own). Decisions are a pure function of the pet summary
+(`desktop/src/shared/auto-care.ts`); the sim never knows.
+
 ## Layout
 
 | Folder | Contents | Slice |
