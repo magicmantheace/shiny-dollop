@@ -175,6 +175,119 @@ body,
   }
 }
 
+/* --- cleaning / healing / hatching transients ---------------------------- */
+.anim-cleaning .body-all {
+  animation: pet-scrub 0.18s ease-in-out 9;
+}
+@keyframes pet-scrub {
+  0%,
+  100% {
+    transform: rotate(-2.6deg) translateX(-1.5px);
+  }
+  50% {
+    transform: rotate(2.6deg) translateX(1.5px);
+  }
+}
+.bubbles circle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bubble-rise 1.05s ease-out infinite;
+}
+.bubbles circle:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.bubbles circle:nth-child(3) {
+  animation-delay: 0.34s;
+}
+.bubbles circle:nth-child(4) {
+  animation-delay: 0.1s;
+}
+.bubbles circle:nth-child(5) {
+  animation-delay: 0.26s;
+}
+.bubbles circle:nth-child(6) {
+  animation-delay: 0.42s;
+}
+@keyframes bubble-rise {
+  0% {
+    transform: translateY(7px);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateY(-13px);
+    opacity: 0;
+  }
+}
+.anim-healing .body-all {
+  animation: pet-pulse 0.8s ease-in-out 2;
+}
+@keyframes pet-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.045);
+  }
+}
+.heal-sparks path {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: heal-rise 1.3s ease-out infinite;
+}
+.heal-sparks g:nth-child(2) path {
+  animation-delay: 0.3s;
+}
+.heal-sparks g:nth-child(3) path {
+  animation-delay: 0.6s;
+}
+@keyframes heal-rise {
+  0% {
+    transform: translateY(5px);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-15px);
+    opacity: 0;
+  }
+}
+.anim-hatching .body-all {
+  animation: pet-celebrate 0.52s ease-in-out 3;
+}
+.anim-hatching .wing-near,
+.anim-hatching .wing-far {
+  animation: wing-flap 0.3s ease-in-out infinite;
+}
+@keyframes pet-celebrate {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-22px);
+  }
+}
+.burst path {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sparkle-pulse 0.65s ease-in-out infinite;
+}
+.burst path:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.burst path:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.burst path:nth-child(4) {
+  animation-delay: 0.45s;
+}
+
 /* --- sick: droop + sway -------------------------------------------------- */
 .anim-sick .ear-l {
   transform: rotate(-38deg);

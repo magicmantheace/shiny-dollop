@@ -15,6 +15,9 @@ export type PetAnimState =
   | 'sleeping'
   | 'eating'
   | 'playing'
+  | 'cleaning'
+  | 'healing'
+  | 'hatching'
   | 'sick'
   | 'dead';
 
@@ -27,14 +30,25 @@ export function baseAnimState(s: PetSummary): PetAnimState {
   return 'idle';
 }
 
-export type TransientAnim = 'eating' | 'playing';
+export type TransientAnim =
+  | 'eating'
+  | 'playing'
+  | 'cleaning'
+  | 'healing'
+  | 'hatching';
 
-/** A just-happened care action briefly overrides the idle animation. */
+/**
+ * A just-happened care action briefly overrides the idle animation.
+ * Priority is by kind, not event order — a hatch outranks everything
+ * in its batch, a cure outranks a feeding, and so on.
+ */
 export function transientFromEvents(events: readonly PetEvent[]): TransientAnim | null {
-  for (const e of events) {
-    if (e.kind === 'fed') return 'eating';
-    if (e.kind === 'played') return 'playing';
-  }
+  const kinds = new Set(events.map((e) => e.kind));
+  if (kinds.has('hatched')) return 'hatching';
+  if (kinds.has('cured')) return 'healing';
+  if (kinds.has('cleaned')) return 'cleaning';
+  if (kinds.has('fed') || kinds.has('overfed')) return 'eating';
+  if (kinds.has('played')) return 'playing';
   return null;
 }
 

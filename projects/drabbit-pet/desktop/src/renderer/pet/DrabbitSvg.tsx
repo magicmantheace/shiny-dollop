@@ -171,6 +171,39 @@ export function DrabbitSvg({ summary, anim }: { summary: PetSummary; anim: PetAn
         )}
       </g>
 
+      {/* care-action adornments (transient animations) */}
+      {anim === 'cleaning' && (
+        <g className="bubbles" fill="#d9efff" stroke="#ffffff" strokeWidth="1.6">
+          <circle cx="52" cy="128" r="7" />
+          <circle cx="66" cy="102" r="5" />
+          <circle cx="146" cy="116" r="6" />
+          <circle cx="134" cy="88" r="4.5" />
+          <circle cx="100" cy="70" r="5.5" />
+          <circle cx="84" cy="140" r="4" />
+        </g>
+      )}
+      {anim === 'healing' && (
+        <g className="heal-sparks" fill="#79d98c">
+          <g transform="translate(56 96)">
+            <path d="M-2.5 -8 L2.5 -8 L2.5 -2.5 L8 -2.5 L8 2.5 L2.5 2.5 L2.5 8 L-2.5 8 L-2.5 2.5 L-8 2.5 L-8 -2.5 L-2.5 -2.5 Z" />
+          </g>
+          <g transform="translate(146 76) scale(0.8)">
+            <path d="M-2.5 -8 L2.5 -8 L2.5 -2.5 L8 -2.5 L8 2.5 L2.5 2.5 L2.5 8 L-2.5 8 L-2.5 2.5 L-8 2.5 L-8 -2.5 L-2.5 -2.5 Z" />
+          </g>
+          <g transform="translate(104 44) scale(0.65)">
+            <path d="M-2.5 -8 L2.5 -8 L2.5 -2.5 L8 -2.5 L8 2.5 L2.5 2.5 L2.5 8 L-2.5 8 L-2.5 2.5 L-8 2.5 L-8 -2.5 L-2.5 -2.5 Z" />
+          </g>
+        </g>
+      )}
+      {anim === 'hatching' && (
+        <g className="burst" fill="#ffe066">
+          <path transform="translate(34 84)" d="M0 -8 L2.3 -2.3 L8 0 L2.3 2.3 L0 8 L-2.3 2.3 L-8 0 L-2.3 -2.3 Z" />
+          <path transform="translate(168 66) scale(0.85)" d="M0 -8 L2.3 -2.3 L8 0 L2.3 2.3 L0 8 L-2.3 2.3 L-8 0 L-2.3 -2.3 Z" />
+          <path transform="translate(156 138) scale(0.7)" d="M0 -8 L2.3 -2.3 L8 0 L2.3 2.3 L0 8 L-2.3 2.3 L-8 0 L-2.3 -2.3 Z" />
+          <path transform="translate(44 146) scale(0.6)" d="M0 -8 L2.3 -2.3 L8 0 L2.3 2.3 L0 8 L-2.3 2.3 L-8 0 L-2.3 -2.3 Z" />
+        </g>
+      )}
+
       {/* gravestone for the departed */}
       {summary.stage === 'dead' && (
         <g className="gravestone">

@@ -54,6 +54,19 @@ describe('transientFromEvents', () => {
     expect(transientFromEvents([ev('mess'), ev('stage')])).toBeNull();
     expect(transientFromEvents([])).toBeNull();
   });
+
+  it('maps clean/cure/hatch events to their animations', () => {
+    expect(transientFromEvents([ev('cleaned')])).toBe('cleaning');
+    expect(transientFromEvents([ev('cured')])).toBe('healing');
+    expect(transientFromEvents([ev('hatched')])).toBe('hatching');
+    expect(transientFromEvents([ev('overfed')])).toBe('eating');
+  });
+
+  it('prioritises by kind, not event order', () => {
+    expect(transientFromEvents([ev('fed'), ev('hatched')])).toBe('hatching');
+    expect(transientFromEvents([ev('played'), ev('cured')])).toBe('healing');
+    expect(transientFromEvents([ev('fed'), ev('cleaned')])).toBe('cleaning');
+  });
 });
 
 describe('resolveAnimState', () => {
