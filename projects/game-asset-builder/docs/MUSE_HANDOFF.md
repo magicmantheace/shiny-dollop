@@ -39,13 +39,45 @@ scorer now committed at `benchmarks/pip/` (`score_render.py`,
 - **Stable Fast 3D — BLOCKED:** gated HF repo; needs the owner to accept
   Stability's licence and supply a token. Not chased.
 
-Next (P0):
-1. Build the pipeline around the Hunyuan3D-2 pair: prep → shape →
-   paint → rig (winged-creature template) → animate → catalog, reusing
-   the lab's stage environments on the PC.
-2. Prove it end-to-end on a second creature that isn't Pip.
-3. Owner decisions outstanding: PR #36 merge; whether to unblock
+## P0 pipeline — BUILT AND PROVEN (2026-11-06)
+
+The pipeline is implemented around the Hunyuan pair and ran end-to-end
+on a second creature, the **Ember Dragon** (concept → cutout → shape →
+paint → rig → animate → catalogued GLB):
+
+- Code: `pipeline.py` (orchestrator), `gpu_bridge.py` (bridge dispatch,
+  env-configured, GET-retry + job reattach), stage modules under
+  `stages/` (prep cutout; mesh/texture PC scripts with the bake-off's
+  exact parameters; rig template + Blender rigger; animate pose
+  recipes ported from Drabbit Pet's pose driver; catalog metadata +
+  cold re-import verifier with preview renders). CLI grew `run`,
+  `cutout`, and `catalog-verify` commands. 23 unit tests pass.
+- Ember Dragon run (PC, RTX 3060): shape 334 s (peak 7,233 MiB;
+  423,908 verts out), paint 909 s (peak 12,043 MiB — ~250 MiB headroom
+  again; 657,672 verts textured), VRAM back at baseline after each
+  stage. Rig: welded 395,731 → decimated 45,012 verts, 14 bones
+  (arms in, ears out), idle (4.8 s) + hop (1.24 s) clips baked; final
+  GLB 20.7 MB, sha256 pinned in `catalog/ember-dragon/metadata.json`
+  and re-verified via `catalog-verify`.
+- Skinning reality: Blender bone-heat yields **zero** weights on these
+  Hunyuan meshes (both Pip and the dragon), so the rig's deterministic
+  distance-to-bone fallback did the skinning both times — coverage
+  1.0, and the hop renders show clean, tear-free deformation with
+  both wings sweeping up. Treat distance weights as the working
+  method, bone heat as an attempted-first check.
+- Incident, recovered honestly: the first pipeline process died on a
+  transient bridge disconnect while polling the paint job. The job
+  kept running server-side and finished; its outputs were adopted via
+  the new reattach path, and the catalog provenance records the
+  recovery. (The bridge job wrapper also reported that job "failed"
+  while the stage's own result JSON records exit 0 — the stage
+  artifacts and result JSON are the authority.)
+
+Next:
+1. Owner decisions outstanding: PR #36 merge; whether to unblock
    Stable Fast 3D (owner-side HF action, only if wanted).
+2. P1 when directed: quadruped/biped rig templates, the unrigged prop
+   path, and trying the optional rembg prep upgrade.
 
 Boundaries: no cloud fallback exists or may be added; weights and outputs
 never enter git; GPU claims only from PC runs; merges are the owner's call.

@@ -1,9 +1,14 @@
 # Game Asset Builder
 
-**Status: bake-off round 1 complete (2026-11-06) — the Hunyuan3D-2
-shape+paint pair won the Pip benchmark (RIGGABLE, front silhouette IoU
-0.84 vs the Meshy reference; full scores in `benchmarks/pip/scores.md`).
-P0 pipeline build around that pair is next; no pipeline release yet.**
+**Status: P0 pipeline built and proven end-to-end (2026-11-06). The
+Hunyuan3D-2 shape+paint pair won the Pip bake-off (RIGGABLE, front
+silhouette IoU 0.84 vs the Meshy reference; `benchmarks/pip/scores.md`),
+and the full pipeline — cutout → mesh → texture → rig → animate →
+catalog — ran a brand-new creature (the Ember Dragon) from concept
+image to a rigged, animated, catalogued .glb. Run it with
+`python3 asset_builder.py run --concept <image> --name "<Name>"`.
+Catalogue record: `catalog/ember-dragon/metadata.json` (the .glb
+itself lives in the local `outputs/` area, pinned by sha256).**
 
 A fully local, no-API pipeline that builds game assets — creatures included —
 on the owner's own hardware:

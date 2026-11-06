@@ -2,9 +2,27 @@
 
 ## Verified on the build VM (no GPU) — 2026-11-06
 
-- Stage registry unit tests: 8/8 pass (`python3 -m unittest discover -s tests`).
-  They pin the pipeline order, the mesh-before-texture rule, and the
-  unload discipline (every model stage is an isolated GPU process).
+- Unit tests: 23/23 pass (`python3 -m unittest discover -s tests`).
+  The original 8 pin the pipeline order, the mesh-before-texture rule,
+  and the unload discipline (every model stage is an isolated GPU
+  process). The P0 additions pin the rig template's shape (Pip config
+  = the proven 14 bones; dragon config swaps ears for arms; parents
+  precede children), the pose recipes' math (hop arch, lift peak,
+  idle bounds, clip frame counts), the catalog record (sha256
+  round-trip + tamper detection), the flood-fill cutout on a synthetic
+  image, and the bridge runner's token discipline.
+- Prep stage on the real Ember Dragon concept: clean cutout
+  (foreground 29.6% of frame), visually inspected against the concept.
+- Rig + animate + verify chain exercised twice in Blender: on the
+  bake-off's Hunyuan Pip GLB as a stand-in (ears config) and on the
+  Ember Dragon's own textured GLB (arms config). Both produced a
+  14-bone armature, 14 populated vertex groups, weight coverage 1.0,
+  embedded `idle` + `hop` clips, and cold-re-import renders showing
+  rest pose intact and the hop apex airborne (+0.17–0.19 ground
+  clearance) with both wings swept up and no tearing.
+- Skinning: bone-heat automatic weights produced ZERO weights on both
+  Hunyuan meshes (recorded in each rig report); the deterministic
+  distance-to-bone fallback skinned both, coverage 1.0.
 - CLI `stages` and `benchmark-plan` run and print the registry/protocol.
 - CLI `doctor` runs and honestly reports this machine: no GPU, GPU stages
   "CANNOT RUN on this machine". That report is correct for the VM and is
@@ -27,6 +45,16 @@
   the VM and re-verified (counts + sha256) before scoring.
 - Stable Fast 3D did NOT run: its HF repo is gated (401). Recorded as
   BLOCKED in `benchmarks/pip/scores.md`, not as a failure of the model.
+- **P0 pipeline proof run (Ember Dragon)**: dispatched through the
+  project's own `gpu_bridge.py` + lab stage runner. Shape: exit 0,
+  334 s, peak 7,233 MiB, after-exit 790 MiB (≈ baseline 809). Paint:
+  exit 0 (stage result JSON; the bridge job wrapper misreported the
+  job as failed — artifacts + result JSON are the authority), 909 s,
+  peak 12,043 MiB, after-exit 778 MiB (≈ baseline 788). The mesh
+  process had fully exited before paint was dispatched — unload
+  discipline verified by the runner's VRAM samples, not assumed.
+  One transient bridge disconnect killed the first local poller
+  mid-paint; the job completed server-side and was reattached.
 
 ## Verified on the build VM — 2026-11-06 (scoring)
 
@@ -46,9 +74,11 @@
 
 - TRELLIS's proper textured export — blocked on the
   `diff_gaussian_rasterization` CUDA build on the PC.
-- Rig/animation stages against a locally generated mesh — proven in
-  2026-11 against the Meshy Pip mesh (Drabbit Pet), not yet against a
-  local (Hunyuan) mesh; that is the P0 pipeline's acceptance test.
+- The catalogued GLB in a game engine (Godot/three.js playback of the
+  baked clips) — verified in Blender only; engine hand-off is P3.
+- The rig template on non-dragonoid winged creatures (the template's
+  proportions were exercised on two Hunyuan outputs with similar
+  anatomy: Pip and the Ember Dragon).
 
 ## Rules
 

@@ -11,6 +11,7 @@ model framework.
 """
 
 import argparse
+import os
 import platform
 import shutil
 import subprocess
@@ -64,12 +65,62 @@ def cmd_benchmark_plan(_args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_cutout(args: argparse.Namespace) -> int:
+    here = os.path.dirname(os.path.abspath(__file__))
+    proc = subprocess.run([sys.executable,
+                           os.path.join(here, "stages/prep/cutout.py"),
+                           args.input, args.output])
+    return proc.returncode
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    import json
+
+    from pipeline import run_pipeline
+    manifest = run_pipeline(
+        args.concept, args.name, ears=args.ears, arms=not args.no_arms,
+        target_verts=args.target_verts, resume=args.resume)
+    print(json.dumps({k: manifest[k] for k in
+                      ("name", "slug", "seconds_total", "final_glb",
+                       "catalog_entry")}, indent=1))
+    return 0
+
+
+def cmd_catalog_verify(args: argparse.Namespace) -> int:
+    import pipeline
+    entry = pipeline.catalog_mod.read_entry(pipeline.CATALOG_DIR, args.slug)
+    glb = os.path.join(pipeline.OUTPUTS_DIR, args.slug, entry["asset_file"])
+    ok = pipeline.catalog_mod.verify_entry(entry, glb)
+    print(f"{args.slug}: sha256 {'MATCH' if ok else 'MISMATCH'} "
+          f"({entry['sha256'][:16]}...)")
+    return 0 if ok else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="asset_builder")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("doctor").set_defaults(fn=cmd_doctor)
     sub.add_parser("stages").set_defaults(fn=cmd_stages)
     sub.add_parser("benchmark-plan").set_defaults(fn=cmd_benchmark_plan)
+    p_cut = sub.add_parser("cutout", help="prep stage: image -> RGBA cutout")
+    p_cut.add_argument("input")
+    p_cut.add_argument("output")
+    p_cut.set_defaults(fn=cmd_cutout)
+    p_run = sub.add_parser("run", help="run the full pipeline on a concept")
+    p_run.add_argument("--concept", required=True)
+    p_run.add_argument("--name", required=True)
+    p_run.add_argument("--ears", action="store_true",
+                       help="template option: include ear bones")
+    p_run.add_argument("--no-arms", action="store_true",
+                       help="template option: omit arm bones")
+    p_run.add_argument("--target-verts", type=int, default=50000)
+    p_run.add_argument("--resume", action="store_true",
+                       help="skip prep/mesh/texture if artifacts exist")
+    p_run.set_defaults(fn=cmd_run)
+    p_cat = sub.add_parser("catalog-verify",
+                           help="verify a catalogued asset's sha256")
+    p_cat.add_argument("--slug", required=True)
+    p_cat.set_defaults(fn=cmd_catalog_verify)
     args = parser.parse_args(argv)
     return args.fn(args)
 
