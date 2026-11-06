@@ -17,15 +17,38 @@
 - These numbers bound the bake-off: any candidate needing more than the
   free VRAM must offload or be recorded as not fitting.
 
-## Not yet verified (P0 bake-off)
+## Verified on the owner's PC (GPU stages) — 2026-11-06
 
-- Every candidate model (Hunyuan3D-2 shape + paint, TripoSR on GPU,
-  Stable Fast 3D, TRELLIS) — none has run on the PC yet.
-- The silhouette-IoU scorer (Blender matched-camera renders) — protocol is
-  written in `docs/DESIGN.md`; the scorer is built and first exercised
-  during the bake-off.
-- Rig/animation stages against a locally generated mesh — proven in 2026-11
-  against the Meshy Pip mesh (Drabbit Pet), not yet against a local mesh.
+- Bake-off round 1 ran end-to-end (lab at `D:\asset-forge-lab`, per-stage
+  venvs, uv-managed Python 3.12): Hunyuan3D-2 shape (305 s, peak
+  8,762 MiB) and paint (1,520 s, peak 12,086 MiB) as separate processes
+  with VRAM released between; TripoSR (39 s, 6,100 MiB); TRELLIS
+  inference (176 s, 12,020 MiB, no OOM). Output meshes were fetched to
+  the VM and re-verified (counts + sha256) before scoring.
+- Stable Fast 3D did NOT run: its HF repo is gated (401). Recorded as
+  BLOCKED in `benchmarks/pip/scores.md`, not as a failure of the model.
+
+## Verified on the build VM — 2026-11-06 (scoring)
+
+- The silhouette-IoU scorer (`benchmarks/pip/score_render.py` +
+  `iou_sheet.py`) scored all three delivered candidates against the
+  Meshy reference: Hunyuan3D-2 RIGGABLE (front IoU 0.84), TRELLIS and
+  TripoSR MELTED — full table and method notes in
+  `benchmarks/pip/scores.md`. The comparison sheet was inspected
+  visually; it overruled TRELLIS's numeric 0.55, per protocol.
+- Two scorer defects were caught by that inspection and fixed before
+  the recorded scores were produced: importer axis-conversion rotations
+  must be baked before transform work, and yaw is orbited by the camera
+  because glTF objects in quaternion mode ignore `rotation_euler`
+  writes. (Details in `scores.md` method notes.)
+
+## Not yet verified
+
+- TRELLIS's proper textured export — blocked on the
+  `diff_gaussian_rasterization` CUDA build on the PC.
+- Rig/animation stages against a locally generated mesh — proven in
+  2026-11 against the Meshy Pip mesh (Drabbit Pet), not yet against a
+  local (Hunyuan) mesh; that is the P0 pipeline's acceptance test.
 
 ## Rules
 

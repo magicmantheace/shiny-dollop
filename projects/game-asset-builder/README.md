@@ -1,7 +1,9 @@
 # Game Asset Builder
 
-**Status: scaffold (2026-11-06). Model bake-off in progress; no pipeline
-release yet.**
+**Status: bake-off round 1 complete (2026-11-06) — the Hunyuan3D-2
+shape+paint pair won the Pip benchmark (RIGGABLE, front silhouette IoU
+0.84 vs the Meshy reference; full scores in `benchmarks/pip/scores.md`).
+P0 pipeline build around that pair is next; no pipeline release yet.**
 
 A fully local, no-API pipeline that builds game assets — creatures included —
 on the owner's own hardware:
