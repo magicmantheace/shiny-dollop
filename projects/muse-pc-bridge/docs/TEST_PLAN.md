@@ -187,9 +187,14 @@ PC during install verification.
   show; the alert flash moved to the status strip so it no longer
   paints the window background. A new byte-level test proves
   every asset declares a transparent colour. **Full suite on the
-  VM: 81 tests, OK (1 skip).** Owner-PC verification of the
-  transparent rendering is recorded in the next entry — until
-  then it is NOT claimed.
+  VM: 81 tests, OK (1 skip). Owner-PC verification (same
+  evening):** the production checkout was pulled to the change
+  and the GUI form restarted through its own kill switch
+  (WM_CLOSE) + the avatar logon task; a screen grab of the
+  window's region shows the working avatar composited directly
+  over the desktop wallpaper and taskbar — no backdrop box, no
+  key colour visible — with the status line and ✕ rendered over
+  the desktop. The pet (running concurrently) was unaffected.
 
 ## What the tests cannot prove
 

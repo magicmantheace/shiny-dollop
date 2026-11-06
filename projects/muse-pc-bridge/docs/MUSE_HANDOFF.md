@@ -550,6 +550,13 @@ transparent. Two halves:
 
 VM suite: **81 tests OK (1 skip)** — the new test is byte-level
 (every GIF must declare a transparent colour in a Graphic Control
-Extension). Rendering on Windows is verified on the owner's PC
-and recorded in TEST_PLAN when done; it is not claimed from the
-VM.
+Extension). **PC verification (same evening):** production
+checkout pulled; the GUI form was restarted via its own kill
+switch (a detached restarter posted WM_CLOSE, waited for the
+port to close, then started the "Muse PC Bridge (avatar)" task —
+no sibling-instance stop this time). A screen grab of the new
+window's region shows the working animation composited straight
+over the desktop wallpaper/taskbar: no backdrop box, no key
+colour, status line and ✕ floating over the desktop. The
+owner's desktop pet, running at the same time, kept polling the
+state file throughout.
