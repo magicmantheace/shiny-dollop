@@ -60,7 +60,7 @@ describe('constrainRectToWorkArea', () => {
       width: SIZE,
       height: SIZE,
     });
-    expect(constrainRectToWorkArea({ x: 1104, y: 612, width: SIZE, height: SIZE }, wa, SIZE)).toBeNull();
+    expect(constrainRectToWorkArea({ x: 1044, y: 612, width: SIZE, height: SIZE }, wa, SIZE)).toBeNull();
   });
 
   it('pins to the work-area origin when the area is smaller than the pet', () => {
