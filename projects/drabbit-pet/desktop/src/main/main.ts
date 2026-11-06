@@ -21,6 +21,7 @@ import { AutoCareService } from './auto-care.js';
 import { AutoCareConfigStore } from './auto-care-config.js';
 import { registerAutoCareIpc } from './auto-care-ipc.js';
 import { RoamPlanner, type RoamBounds } from './roaming.js';
+import { constrainRectToWorkArea } from './window-bounds.js';
 import { registerPetIpc } from './ipc.js';
 import { registerCompanionIpc } from './companion-ipc.js';
 import { CompanionConfigStore } from './server/companion-config.js';
@@ -103,6 +104,25 @@ function workAreaBounds(): { bounds: RoamBounds; y: number } {
     bounds: { minX: wa.x, maxX: wa.x + wa.width - PET_SIZE },
     y: wa.y + wa.height - PET_SIZE,
   };
+}
+
+/**
+ * The pet can never be lost: whatever Windows, a display change,
+ * or a bad restore does to the window, force it back to exactly
+ * PET_SIZE, fully inside the primary work area. Runs on the roam
+ * cadence (so it also repairs a hidden window before it is shown
+ * again), on display changes, and before every explicit show.
+ */
+function guardPetWindowOnScreen(): void {
+  if (!petWindow || petWindow.isDestroyed()) return;
+  const wa = screen.getPrimaryDisplay().workArea;
+  const fixed = constrainRectToWorkArea(petWindow.getBounds(), wa, PET_SIZE);
+  if (fixed) {
+    petWindow.setBounds(fixed);
+    log(
+      `[drabbit] pet window pulled back on screen (${fixed.x},${fixed.y} ${fixed.width}x${fixed.height})`,
+    );
+  }
 }
 
 function createPetWindow(): void {
@@ -201,6 +221,7 @@ function createTray(): void {
     {
       label: 'Show pet',
       click: () => {
+        guardPetWindowOnScreen();
         petWindow?.show();
         petWindow?.focus();
       },
@@ -230,6 +251,7 @@ function createTray(): void {
 function startRoaming(): void {
   roamTimer = setInterval(() => {
     if (!petWindow || petWindow.isDestroyed() || !service) return;
+    guardPetWindowOnScreen();
     const { bounds, y } = workAreaBounds();
     const summary = service.getSummary();
     const [currentX] = petWindow.getPosition();
@@ -288,6 +310,13 @@ function startApp(): void {
   createPanelWindow();
   createTray();
 
+  // A monitor sleeping, a resolution change, or a dock/undock can
+  // strand the window — pull it back the moment the display
+  // layout shifts (the roam-cadence guard covers the rest).
+  screen.on('display-metrics-changed', guardPetWindowOnScreen);
+  screen.on('display-added', guardPetWindowOnScreen);
+  screen.on('display-removed', guardPetWindowOnScreen);
+
   tickService = new TickService(service);
   tickService.start();
   startRoaming();
@@ -325,6 +354,7 @@ if (!gotLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
+    guardPetWindowOnScreen();
     petWindow?.show();
     petWindow?.focus();
   });
