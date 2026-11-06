@@ -106,6 +106,20 @@ healing, hatching, egg, dead) and all other furs still render
 the SVG — visible as a brief style change for the 1.6 s care
 transients until/unless portrait sets are generated for them.
 
+**Rigged 3D pet — verification (2026-11-06):** automated on
+the VM: `desktop/tests/pose-driver.test.ts` (8 tests) pins the
+procedural pose contract (sick folds ears > 0.7 rad and bows
+past idle; sleeping between idle and sick; the hop cycle lifts
+the root > 0.12 m and sweeps wings > 0.4 rad; playing flaps
+harder than idle; eating dips repeatedly; damping converges
+without overshoot). Desktop suite **96 tests**, typecheck and
+build clean, Electron smoke SMOKE_OK. The rig itself was
+pose-tested in Blender before integration (idle / hop / sick
+renders from the armature + automatic weights). Owner-PC live
+verification (3D model in the real pet window) is recorded
+here when it happens; until then the Windows rendering is
+unverified by design honesty.
+
 ## P3 — companion server (`desktop/tests/companion-*.test.ts`)
 
 Automated: vitest suites driving the **real HTTP server** on

@@ -63,9 +63,12 @@ its own). Decisions are a pure function of the pet summary
 | `docs/` | [Pet design bible](docs/PET_DESIGN.md), [architecture](docs/DESIGN.md), [test plan](docs/TEST_PLAN.md), [handoff](docs/MUSE_HANDOFF.md) | P0 |
 
 Art: the desktop pet normally renders a hand-drawn SVG, but the
-royal fur has a generated **painterly portrait set** (the owner's
-pet, Pip) covering the idle/eating/playing/sick/sleeping states —
-see the handoff's 2026-11-05 painterly-art entry for scope.
+royal fur (the owner's pet, Pip) has a generated **painterly
+portrait set** covering idle/eating/playing/sick/sleeping — and,
+since 2026-11-06, a **rigged 3D model** of the same pet (Meshy
+mesh, Blender armature, three.js) that renders those same states
+with real bone motion, falling back to the portraits if WebGL or
+the model fails. See the handoff's 2026-11-06 3D entry.
 
 ## Try it
 

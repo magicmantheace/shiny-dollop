@@ -8,6 +8,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 // Two renderer windows: the pet itself and the care panel.
 export default defineConfig({
   plugins: [react()],
+  // The rigged pet model ships as a bundled asset URL (PetArt3D).
+  assetsInclude: ['**/*.glb'],
   root: path.join(here, 'src', 'renderer'),
   base: './',
   build: {

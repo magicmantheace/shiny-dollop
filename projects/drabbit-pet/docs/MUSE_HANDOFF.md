@@ -338,6 +338,41 @@ feathered alpha, QA'd over a busy test background.
   and build clean; owner-PC live capture of the painterly pet
   (see TEST_PLAN).
 
+## 2026-11-06 — rigged 3D Pip in the pet window (royal fur)
+
+The owner took the 3D route after a spike proved the motion
+pipeline: he generated the mesh himself on Meshy from the
+painterly idle portrait (1.12M verts / 2.25M faces, 2048px
+texture — his file is the master asset, kept outside the repo),
+and the working copy was decimated in Blender to ~101k faces
+(50k verts) and fitted with a 14-bone armature (root, spine,
+head, ear.L/R, wing.L/R + wing2.L/R, leg.L/R, tail.1–3) with
+automatic skin weights. Pose tests in Blender (idle undistorted,
+hop airborne with both wings swept up, sick with ears folded
+forward + wings drooped + head bowed) passed before any app
+work started.
+
+- `desktop/src/renderer/pet/PetArt3D.tsx` — three.js stage
+  (transparent WebGL canvas, ACES tone mapping) loading
+  `assets/pip-3d.glb` (7.3 MB, 1024px texture). Renders only
+  where `hasAiArt` already gated the portraits (royal fur;
+  idle/hopping/eating/playing/sick/sleeping). On any failure
+  (no WebGL, load error) it swaps to the state's painterly
+  portrait — the pet is never a black square. Everything else
+  (cleaning/healing/hatching/egg/dead, other furs) is the SVG,
+  unchanged.
+- `desktop/src/renderer/pet/pose-driver.ts` — pure
+  (anim, time) → pose targets (ear/wing/head pitches, tail yaw,
+  root lift, sway), damped toward live in the component so
+  state changes glide. No baked animation clips.
+- New dependency: `three` (+ `@types/three`). Vite needed
+  `assetsInclude: ['**/*.glb']` for the model asset.
+- Verified (VM): desktop **96/96** (+8 pose-driver tests),
+  typecheck (4 configs) and build clean, Electron smoke
+  SMOKE_OK. Owner-PC live verification is recorded in
+  TEST_PLAN when it happens — VM results say nothing about
+  the Windows window itself.
+
 ## Next step
 
 The v1 queue is complete; everything left is owner-side
