@@ -79,6 +79,18 @@ the first demo pet was sick, which had correctly suppressed it
 under the old rule) — showed the rising soap bubbles. Captures
 are in the session record (`gui-test-shots/cap-*`).
 
+**Window guard — owner-PC attack test (2026-11-05 night):** the
+desktop suite is now **85 tests**. After the pet was lost once
+(hidden during a display change; window found ~10,108 px wide,
+effectively off-screen), the guard was deployed to the owner's
+PC and attacked directly: the live pet window was shoved fully
+off-screen right (x=6000), stretched to the incident's exact
+geometry (10,108 px wide), and pushed off the left/bottom
+corner with raw SetWindowPos calls. Each time the window was
+back at exactly 550×550 and fully inside the screen within the
+1.5 s observation window (the guard ticks every 200 ms), and
+the pet rendered on, unbothered.
+
 ## P3 — companion server (`desktop/tests/companion-*.test.ts`)
 
 Automated: vitest suites driving the **real HTTP server** on
