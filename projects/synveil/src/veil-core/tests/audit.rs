@@ -142,10 +142,26 @@ fn exercise_core_journal(incomplete: bool) {
             .lines()
             .map(|line| serde_json::from_str(line).unwrap())
             .collect();
-        assert_eq!(
-            persisted, records,
-            "journal must match console event stream"
-        );
+        // The journal stores the hash-chained v2 form of the same
+        // event stream the console mirrors in v1 form (Phase 2,
+        // docs/DURABLE_AUDIT_V2_DESIGN.md): identical records once
+        // the chain fields are removed and the schema is mapped
+        // back, with each record's prev_digest linking the
+        // previous record's record_digest from a genesis anchor.
+        assert_eq!(persisted.len(), records.len());
+        let mut expected_prev = "0".repeat(128);
+        for (stored, console_record) in persisted.iter().zip(&records) {
+            assert_eq!(stored["schema"], "synveil.audit/v2");
+            assert_eq!(stored["prev_digest"], expected_prev);
+            expected_prev = stored["record_digest"].as_str().unwrap().to_owned();
+            assert_eq!(expected_prev.len(), 128);
+            let mut unchained = stored.clone();
+            let object = unchained.as_object_mut().unwrap();
+            object.remove("prev_digest");
+            object.remove("record_digest");
+            object.insert("schema".to_owned(), json!("synveil.audit/v1"));
+            assert_eq!(&unchained, console_record);
+        }
     }
     assert_eq!(
         std::fs::metadata(&journal).unwrap().permissions().mode() & 0o777,

@@ -172,3 +172,54 @@ Chain continuity rules:
   first open after upgrade (chain anchored to the v1 tail by
   digesting its last line), or is rotation-boundary migration
   (proposed above) acceptable?
+
+---
+
+## Implementation amendment (2026-11-06) — slice 1 landed at host level
+
+Written after implementing slice 1 against the actual code; it
+corrects four things the proposal above got wrong or left open:
+
+- **Digest: SHA-512, not BLAKE2b-512.** There is no `digest.rs`
+  and no BLAKE2b in the tree; `veil-core` ships an in-tree
+  SHA-512 (`src/veil-core/src/sha512.rs`), which the chain uses.
+- **Writer: the veil-core journal path, not `audit_json.rs`.**
+  The durable journal is written by `audit::emit` →
+  `append_record` in `src/veil-core/src/audit.rs` (the
+  `audit_json.rs` writer serves the A/B agents' separate
+  journals, which still write v1 — chaining them is future
+  work, not slice 1). The chained append shares the existing
+  locked append flow via a prepare step that reads the journal
+  tail inside the directory lock.
+- **Link definition (resolves the chain-continuity question):**
+  a v2 record's `record_digest` = SHA-512(prev_digest bytes ‖
+  canonical record bytes without `record_digest`); a **v1
+  record's link hash is defined as SHA-512 of its raw line
+  bytes**, so pre-chain journals link into the chain at the
+  upgrade boundary with no migration event, and the first
+  record after a rollover chains from the `.1` archive's tail.
+  New records use schema `synveil.audit/v2` (the v1 envelope
+  plus the two digest fields); the checker accepts exactly the
+  v1 or v2 shape and verifies links within the file, reporting
+  the first chained record's `prev_digest` as the chain
+  `anchor`. Anchoring that value in export receipts (the
+  proposal's slice 2) is **not** implemented yet.
+- **Status:** slice 1 (writer chaining + checker verification
+  + tests) is implemented and the full `veil-core` suite
+  passes (158 library tests + integration targets). Slice 2
+  (export/verify/release anchoring) and slice 3 (native QEMU
+  acceptance — the ADR 0023 Decision 3 re-validation) remain
+  open, so per that decision the format is **not yet accepted**:
+  it must not be described as accepted until an image carrying
+  it passes the joined acceptance and a full update round trip.
+
+One environment note from the test work: the rollover-chain
+test intermittently saw flock `WouldBlock` under parallel test
+load because the crash-worker tests fork child processes while
+other tests hold the journal's directory lock (the child
+inherits the locked description until exec; strace-verified —
+the lock file was touched by no other thread). The writer takes
+the lock before any write, so the contention is a clean,
+retryable failure; the test retries on `WouldBlock` for that
+reason. Production append rates make the window vanishingly
+small, and `emit` already degrades truthfully on write failure.

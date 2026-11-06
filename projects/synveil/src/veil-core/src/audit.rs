@@ -12,6 +12,16 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const AUDIT_SCHEMA_V1: &str = "synveil.audit/v1";
+pub const AUDIT_SCHEMA_V2: &str = "synveil.audit/v2";
+// Phase 2 durable audit format (docs/DURABLE_AUDIT_V2_DESIGN.md):
+// records written to the persistent journal are hash-chained. A v2
+// record carries prev_digest (the link hash of the previous
+// record) and record_digest = SHA-512(prev_digest_bytes ||
+// canonical record bytes without record_digest). The link hash of
+// a v1 record is defined as SHA-512 of its raw line bytes, so a
+// journal written before the chain existed links seamlessly into
+// it. The chain's genesis prev_digest is 64 zero bytes.
+pub(crate) const GENESIS_DIGEST: [u8; 64] = [0; 64];
 // Prototype protection against unbounded persistent journal growth. A
 // production release still requires retention policy and independent integrity.
 const MAX_AUDIT_BYTES: u64 = 4 * 1024 * 1024;
@@ -75,12 +85,14 @@ fn record_at(event: &str, fields: Value, unix_time_ms: Option<u64>) -> Value {
 }
 
 pub fn emit(event: &str, fields: Value) {
-    let line = record(event, fields).to_string();
-    eprintln!("{line}");
+    let value = record(event, fields);
+    // The console mirror prints the record as built; the persistent
+    // journal stores its hash-chained v2 form (see append_chained).
+    eprintln!("{value}");
     // Opt-in audit journal, only set by bootstrap after /var is mounted.
     // Console logging remains available even if persistent storage fails.
     if let Some(path) = std::env::var_os("SYNVEIL_AUDIT_PATH") {
-        match append_record(Path::new(&path), &line) {
+        match append_chained(Path::new(&path), &value) {
             Ok(()) => {
                 LAST_PERSISTENT_WRITE_SUCCEEDED.store(true, Ordering::SeqCst);
                 PERSISTENT_WRITE_ATTEMPTED.store(true, Ordering::SeqCst);
@@ -232,10 +244,120 @@ trait JournalIo {
 struct FilesystemIo;
 impl JournalIo for FilesystemIo {}
 
+/// Decode a 64-byte digest from its 128-char lowercase hex form.
+pub(crate) fn digest_from_hex(text: &str) -> Option<[u8; 64]> {
+    if text.len() != 128 {
+        return None;
+    }
+    let mut out = [0u8; 64];
+    for (index, byte) in out.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(text.get(index * 2..index * 2 + 2)?, 16).ok()?;
+    }
+    Some(out)
+}
+
+/// The chain link hash of one stored journal line (without its
+/// trailing newline): a v2 record's committed record_digest, or —
+/// for a v1 record — SHA-512 of the raw line bytes.
+pub(crate) fn link_hash_of_line(line: &[u8]) -> io::Result<[u8; 64]> {
+    let value = super::audit_json::decode(line).map_err(|_| {
+        io::Error::new(io::ErrorKind::InvalidData, "audit journal line is not valid JSON")
+    })?;
+    if let Some(text) = value["record_digest"].as_str() {
+        return digest_from_hex(text).ok_or_else(|| {
+            io::Error::new(io::ErrorKind::InvalidData, "audit record_digest is malformed")
+        });
+    }
+    Ok(crate::sha512::sha512(line))
+}
+
+/// Extract the final line (without trailing newline) from the tail
+/// of an opened journal-like file of length `current`.
+fn final_line(file: &mut fs::File, current: u64) -> io::Result<Vec<u8>> {
+    let window = current.min(MAX_AUDIT_RECORD_BYTES as u64 + 2);
+    let mut tail = vec![0u8; window as usize];
+    file.seek(SeekFrom::Start(current - window))?;
+    file.read_exact(&mut tail)?;
+    if tail.last() == Some(&b'\n') {
+        tail.pop();
+    }
+    let start = tail
+        .iter()
+        .rposition(|byte| *byte == b'\n')
+        .map(|index| index + 1)
+        .unwrap_or(0);
+    Ok(tail[start..].to_vec())
+}
+
+/// The link hash the next record must chain from: the active
+/// file's last record, or — for an empty/absent active file — the
+/// `.1` archive's last record, or genesis when neither exists.
+fn tail_link_hash(path: &Path, file: &mut fs::File, current: u64) -> io::Result<[u8; 64]> {
+    if current != 0 {
+        return link_hash_of_line(&final_line(file, current)?);
+    }
+    let archive = archive_path(path)?;
+    let mut archive_file = match OpenOptions::new().read(true).open(&archive) {
+        Ok(file) => file,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(GENESIS_DIGEST),
+        Err(error) => return Err(error),
+    };
+    let archive_len = archive_file.metadata()?.len();
+    if archive_len == 0 {
+        return Ok(GENESIS_DIGEST);
+    }
+    link_hash_of_line(&final_line(&mut archive_file, archive_len)?)
+}
+
+/// Produce the stored v2 form of a record: schema upgraded,
+/// prev_digest inserted, record_digest computed over
+/// prev_digest_bytes || canonical bytes (record without
+/// record_digest), both digests as lowercase hex.
+pub(crate) fn chain_record(record: &Value, prev: &[u8; 64]) -> io::Result<(String, [u8; 64])> {
+    let mut value = record.clone();
+    {
+        let object = value.as_object_mut().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::InvalidInput, "audit record must be an object")
+        })?;
+        object.insert("schema".to_owned(), json!(AUDIT_SCHEMA_V2));
+        object.insert("prev_digest".to_owned(), json!(crate::sha256::hex(prev)));
+    }
+    let canonical = value.to_string();
+    let mut input = prev.to_vec();
+    input.extend_from_slice(canonical.as_bytes());
+    let digest = crate::sha512::sha512(&input);
+    value
+        .as_object_mut()
+        .unwrap()
+        .insert("record_digest".to_owned(), json!(crate::sha256::hex(&digest)));
+    Ok((value.to_string(), digest))
+}
+
+// The unchained line append is retained for the test suite (the
+// v1 journal form and the rollover/crash gates are exercised
+// through it); production writes go through append_chained.
+#[cfg(test)]
 fn append_record(path: &Path, line: &str) -> io::Result<()> {
     append_record_with_io(path, line, &mut FilesystemIo)
 }
 
+fn append_chained(path: &Path, record: &Value) -> io::Result<()> {
+    append_chained_with_io(path, record, &mut FilesystemIo)
+}
+
+fn append_chained_with_io(
+    path: &Path,
+    record: &Value,
+    storage: &mut impl JournalIo,
+) -> io::Result<()> {
+    append_prepared_with_io(path, storage, |file, current, path| {
+        let prev = tail_link_hash(path, file, current)?;
+        let (line, _digest) = chain_record(record, &prev)?;
+        Ok(line.into_bytes())
+    })
+}
+
+#[cfg(test)]
 fn append_record_with_io(path: &Path, line: &str, storage: &mut impl JournalIo) -> io::Result<()> {
     // A record must remain one bounded line even if an internal caller errs.
     if line.is_empty() || line.contains(['\n', '\r']) || line.len() >= MAX_AUDIT_RECORD_BYTES {
@@ -244,6 +366,20 @@ fn append_record_with_io(path: &Path, line: &str, storage: &mut impl JournalIo) 
             "audit event must be one bounded nonempty line",
         ));
     }
+    let owned = line.as_bytes().to_vec();
+    append_prepared_with_io(path, storage, move |_, _, _| Ok(owned))
+}
+
+/// Shared append flow: validate the destination, take the
+/// directory lock, open the journal, refuse an incomplete final
+/// record, let `prepare` produce the record bytes from the opened
+/// file (the chained writer reads the tail here, inside the
+/// lock), roll over at capacity, then write and sync.
+fn append_prepared_with_io(
+    path: &Path,
+    storage: &mut impl JournalIo,
+    prepare: impl FnOnce(&mut fs::File, u64, &Path) -> io::Result<Vec<u8>>,
+) -> io::Result<()> {
     let parent = path.parent().ok_or_else(unsafe_journal)?;
     let directory = fs::symlink_metadata(parent)?;
     if !directory.file_type().is_dir() || directory.mode() & 0o022 != 0 {
@@ -258,11 +394,6 @@ fn append_record_with_io(path: &Path, line: &str, storage: &mut impl JournalIo) 
         Err(error) => return Err(error),
     }
     let mut file = open_journal(path, &directory)?;
-    let mut bytes = line.as_bytes().to_vec();
-    bytes.push(b'\n');
-    if bytes.len() as u64 > MAX_AUDIT_BYTES {
-        return Err(io::Error::other("audit event exceeds journal limit"));
-    }
     let current = file.metadata()?.len();
     if current > MAX_AUDIT_BYTES {
         return Err(io::Error::new(
@@ -282,6 +413,11 @@ fn append_record_with_io(path: &Path, line: &str, storage: &mut impl JournalIo) 
                 "persistent audit journal has an incomplete final record",
             ));
         }
+    }
+    let mut bytes = prepare(&mut file, current, path)?;
+    bytes.push(b'\n');
+    if bytes.len() as u64 > MAX_AUDIT_BYTES {
+        return Err(io::Error::other("audit event exceeds journal limit"));
     }
     if current
         .checked_add(bytes.len() as u64)
@@ -331,6 +467,106 @@ mod tests {
     #[test]
     fn unavailable_clock_is_explicit() {
         assert!(record_at("start", json!({}), None)["unix_time_ms"].is_null());
+    }
+
+    fn journal_lines(path: &Path) -> Vec<Value> {
+        fs::read_to_string(path)
+            .unwrap()
+            .lines()
+            .map(|line| crate::audit_json::decode(line.as_bytes()).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn chained_records_link_from_genesis_and_verify() {
+        let dir = test_dir("chain");
+        let journal = dir.join("journal");
+        for event in ["chain-a", "chain-b", "chain-c"] {
+            append_chained(&journal, &record(event, json!({}))).unwrap();
+        }
+        let lines = journal_lines(&journal);
+        assert_eq!(lines.len(), 3);
+        let genesis = crate::sha256::hex(&GENESIS_DIGEST);
+        assert_eq!(lines[0]["schema"], AUDIT_SCHEMA_V2);
+        assert_eq!(lines[0]["prev_digest"], genesis);
+        assert_eq!(lines[1]["prev_digest"], lines[0]["record_digest"]);
+        assert_eq!(lines[2]["prev_digest"], lines[1]["record_digest"]);
+        // Each append re-read the tail from disk (no in-process
+        // chain state), and the offline checker verifies the file.
+        let report = super::super::audit_check::inspect(&journal).unwrap();
+        assert_eq!(report["records"], 3);
+        assert_eq!(report["chain"]["chained_records"], 3);
+        assert_eq!(report["chain"]["anchor"], genesis);
+        assert_eq!(
+            report["chain"]["tail"],
+            lines[2]["record_digest"].as_str().unwrap()
+        );
+    }
+
+    #[test]
+    fn chained_append_after_v1_records_links_by_line_hash() {
+        let dir = test_dir("chain-upgrade");
+        let journal = dir.join("journal");
+        let v1_line = record("legacy", json!({})).to_string();
+        append_record(&journal, &v1_line).unwrap();
+        append_chained(&journal, &record("chained", json!({}))).unwrap();
+        let lines = journal_lines(&journal);
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0]["schema"], AUDIT_SCHEMA_V1);
+        let expected = crate::sha256::hex(&crate::sha512::sha512(v1_line.as_bytes()));
+        assert_eq!(lines[1]["prev_digest"], expected);
+        assert!(super::super::audit_check::inspect(&journal).is_ok());
+    }
+
+    /// Append with a bounded retry on lock contention. Under
+    /// parallel test load the crash-worker tests spawn child
+    /// processes; a child forked while this test holds the
+    /// directory lock inherits the locked open file description
+    /// until exec, so a following append can transiently see
+    /// WouldBlock even though no live writer holds the journal
+    /// (verified by strace: the failing flock is on this test's
+    /// own lock file, touched by no other thread). The lock is
+    /// taken before any write, so a contended attempt wrote
+    /// nothing and retrying the same record is safe.
+    fn append_chained_patient(path: &Path, value: &Value) {
+        for attempt in 0..100 {
+            match append_chained(path, value) {
+                Ok(()) => return,
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock && attempt < 99 => {
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+                Err(error) => panic!("chained append failed: {error}"),
+            }
+        }
+    }
+
+    #[test]
+    fn chained_rollover_continues_chain_from_archive() {
+        let dir = test_dir("chain-rollover");
+        let journal = dir.join("journal");
+        let archive = archive_path(&journal).unwrap();
+        // ~60 KiB records: the journal fills in tens of appends.
+        let blob = "x".repeat(60_000);
+        // Fill past capacity so the writer rolls over exactly once;
+        // the archive slot is single, so stop soon after.
+        let mut appends = 0;
+        while !archive.exists() && appends < 3000 {
+            append_chained_patient(&journal, &record("fill", json!({ "blob": blob })));
+            appends += 1;
+        }
+        assert!(archive.exists(), "rollover never happened");
+        append_chained_patient(&journal, &record("after", json!({})));
+        let archived = journal_lines(&archive);
+        let active = journal_lines(&journal);
+        assert!(!archived.is_empty() && !active.is_empty());
+        // The chain crosses the rollover boundary: the first active
+        // record chains from the archived file's last record.
+        assert_eq!(
+            active[0]["prev_digest"],
+            archived[archived.len() - 1]["record_digest"]
+        );
+        assert!(super::super::audit_check::inspect(&journal).is_ok());
+        assert!(super::super::audit_check::inspect(&archive).is_ok());
     }
 
     fn test_dir(label: &str) -> std::path::PathBuf {

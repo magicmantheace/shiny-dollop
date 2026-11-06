@@ -71,27 +71,80 @@ pub(crate) fn inspect_bytes(bytes: &[u8]) -> io::Result<Value> {
         return Err(invalid());
     }
     let mut records = 0u64;
+    // Phase 2 chain verification (docs/DURABLE_AUDIT_V2_DESIGN.md):
+    // every v2 record's record_digest must recompute and its
+    // prev_digest must equal the previous record's link hash (a v1
+    // record's link hash is SHA-512 of its raw line). The first
+    // chained record's prev_digest is reported as the chain anchor:
+    // a single file cannot authenticate its own anchor (that is
+    // what export anchoring is for), so "authenticated" stays
+    // false — but any edit, deletion or reordering inside the file
+    // breaks the chain and is refused here.
+    let mut link: Option<[u8; 64]> = None;
+    let mut chained = 0u64;
+    let mut anchor: Option<String> = None;
     for line in bytes.split_inclusive(|byte| *byte == b'\n') {
         if line.len() > MAX_LINE || line.contains(&b'\r') {
             return Err(invalid());
         }
         let value = super::audit_json::decode(line).map_err(|_| invalid())?;
         check_record(&value)?;
+        let raw = &line[..line.len() - 1];
+        if value["schema"] == super::audit::AUDIT_SCHEMA_V2 {
+            let prev = super::audit::digest_from_hex(
+                value["prev_digest"].as_str().ok_or_else(invalid)?,
+            )
+            .ok_or_else(invalid)?;
+            if let Some(expected) = link {
+                if prev != expected {
+                    return Err(invalid());
+                }
+            } else {
+                anchor = Some(value["prev_digest"].as_str().unwrap().to_owned());
+            }
+            let mut unsigned = value.clone();
+            unsigned.as_object_mut().unwrap().remove("record_digest");
+            let mut input = prev.to_vec();
+            input.extend_from_slice(unsigned.to_string().as_bytes());
+            let digest = crate::sha512::sha512(&input);
+            if crate::sha256::hex(&digest) != value["record_digest"].as_str().unwrap() {
+                return Err(invalid());
+            }
+            link = Some(digest);
+            chained += 1;
+        } else {
+            link = Some(crate::sha512::sha512(raw));
+        }
         records += 1;
     }
-    Ok(json!({
+    let mut report = json!({
         "schema": "synveil.audit-inspection/v1",
         "record_schema": super::audit::AUDIT_SCHEMA_V1,
         "records": records,
         "bytes": bytes.len(),
         "authenticated": false,
-    }))
+    });
+    if chained > 0 {
+        report["chain"] = json!({
+            "chained_records": chained,
+            "anchor": anchor,
+            "tail": crate::sha256::hex(&link.unwrap()),
+        });
+    }
+    Ok(report)
 }
 
 fn bounded_text(value: &Value) -> bool {
     value
         .as_str()
         .is_some_and(|text| !text.is_empty() && text.len() <= 128)
+}
+
+fn digest_text(value: &Value) -> bool {
+    value.as_str().is_some_and(|text| {
+        text.len() == 128
+            && text.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    })
 }
 
 fn check_record(value: &Value) -> io::Result<()> {
@@ -106,9 +159,22 @@ fn check_record(value: &Value) -> io::Result<()> {
         "event",
         "fields",
     ];
-    let valid = value.as_object().is_some_and(|object| {
+    // A record is either the v1 shape (exactly the envelope keys)
+    // or the v2 shape (the envelope plus the two chain digests,
+    // with the v2 schema string).
+    let v1_shape = value.as_object().is_some_and(|object| {
         object.len() == keys.len() && keys.iter().all(|key| object.contains_key(*key))
-    }) && value["schema"] == super::audit::AUDIT_SCHEMA_V1
+    }) && value["schema"] == super::audit::AUDIT_SCHEMA_V1;
+    let v2_shape = value.as_object().is_some_and(|object| {
+        object.len() == keys.len() + 2
+            && keys.iter().all(|key| object.contains_key(*key))
+            && object.contains_key("prev_digest")
+            && object.contains_key("record_digest")
+    }) && value["schema"] == super::audit::AUDIT_SCHEMA_V2
+        && digest_text(&value["prev_digest"])
+        && digest_text(&value["record_digest"]);
+    let shape = v1_shape || v2_shape;
+    let valid = shape
         && value["component"] == "veil-core"
         && value["pid"]
             .as_u64()
@@ -178,6 +244,76 @@ mod tests {
             value[key] = wrong;
             assert!(check_record(&value).is_err(), "accepted invalid {key}");
         }
+    }
+
+    fn chained_bytes(count: usize) -> Vec<u8> {
+        let mut prev = super::super::audit::GENESIS_DIGEST;
+        let mut out = Vec::new();
+        for _ in 0..count {
+            let (line, digest) =
+                super::super::audit::chain_record(&record(), &prev).unwrap();
+            out.extend_from_slice(line.as_bytes());
+            out.push(b'\n');
+            prev = digest;
+        }
+        out
+    }
+
+    #[test]
+    fn chained_journal_verifies_and_reports_its_anchor() {
+        let report = inspect_bytes(&chained_bytes(3)).unwrap();
+        assert_eq!(report["records"], 3);
+        assert_eq!(report["chain"]["chained_records"], 3);
+        assert_eq!(
+            report["chain"]["anchor"],
+            crate::sha256::hex(&super::super::audit::GENESIS_DIGEST)
+        );
+        // A v1-only journal reports no chain, exactly as before.
+        let line = format!("{}\n", record());
+        let report = inspect_bytes(line.as_bytes()).unwrap();
+        assert!(report.get("chain").is_none());
+    }
+
+    #[test]
+    fn chain_detects_edit_deletion_and_reordering() {
+        let bytes = chained_bytes(3);
+        let text = String::from_utf8(bytes).unwrap();
+        // Edit inside the first record's fields.
+        let edited = text.replacen("private-value", "private-valuf", 1);
+        assert!(inspect_bytes(edited.as_bytes()).is_err());
+        // Delete the middle record: the third record's prev_digest
+        // no longer matches the first record's link hash.
+        let mut lines: Vec<&str> = text.lines().collect();
+        lines.remove(1);
+        let deleted = lines.join("\n") + "\n";
+        assert!(inspect_bytes(deleted.as_bytes()).is_err());
+        // Reorder two records.
+        let mut lines: Vec<&str> = text.lines().collect();
+        lines.swap(0, 1);
+        let reordered = lines.join("\n") + "\n";
+        assert!(inspect_bytes(reordered.as_bytes()).is_err());
+        // Forge a record_digest: shape stays valid, digest fails.
+        let mut value = super::super::audit_json::decode(lines[0].as_bytes()).unwrap();
+        value["record_digest"] = json!("0".repeat(128));
+        let forged = format!("{value}\n");
+        assert!(inspect_bytes(forged.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn chain_links_across_the_v1_v2_boundary() {
+        let v1 = record().to_string();
+        let prev = crate::sha512::sha512(v1.as_bytes());
+        let (v2, _digest) = super::super::audit::chain_record(&record(), &prev).unwrap();
+        let bytes = format!("{v1}\n{v2}\n");
+        let report = inspect_bytes(bytes.as_bytes()).unwrap();
+        assert_eq!(report["records"], 2);
+        assert_eq!(report["chain"]["chained_records"], 1);
+        // The same v2 record anchored anywhere else is refused.
+        let (orphan, _digest) =
+            super::super::audit::chain_record(&record(), &super::super::audit::GENESIS_DIGEST)
+                .unwrap();
+        let bytes = format!("{v1}\n{orphan}\n");
+        assert!(inspect_bytes(bytes.as_bytes()).is_err());
     }
 
     #[test]

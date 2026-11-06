@@ -158,6 +158,50 @@ This is structural inspection, not proof of origin or completeness: it cannot
 identify fabricated well-formed events, edits, removed records, reordered
 events or lost console-only records. It does not impose global PID/sequence ordering across restarts.
 An attacker with write access can still create a structurally valid file.
+(The hash chain added 2026-11-06 narrows this for journals written
+since: see the next section.)
+
+## Hash-chained records — tamper evidence (2026-11-06)
+
+Phase 2 durable audit format, slice 1 (design:
+`docs/DURABLE_AUDIT_V2_DESIGN.md`, including its implementation
+amendment). Records the core writes to the persistent journal are
+now hash-chained as `synveil.audit/v2`: each carries
+`prev_digest` (the previous record's link hash; 64 zero bytes —
+genesis — for the first) and
+`record_digest = SHA-512(prev_digest_bytes || canonical record
+bytes without record_digest)`, both lowercase hex, using the
+in-tree SHA-512. A v1 record's link hash is defined as SHA-512 of
+its raw line bytes, so an existing v1 journal links seamlessly
+into the chain at the upgrade boundary, and the chain continues
+across rollover: the first record of a new active file chains
+from the `.1` archive's last record (the writer reads the tail
+inside the existing directory lock; the append's other
+guarantees — incomplete-tail refusal, capacity, sync order —
+are unchanged).
+
+`veil-audit check` verifies the chain while inspecting: every
+v2 record's digest must recompute and every link must match, or
+the journal is refused. The report gains a `chain` object
+(`chained_records`, `anchor` = the first chained record's
+prev_digest, `tail` = the last record's link hash);
+`authenticated` stays `false`, because one file cannot
+authenticate its own anchor — a truncated head is visible only
+against an independently kept anchor, which is the export
+anchoring slice that remains planned. Host evidence: the full
+`veil-core` suite (158 library tests plus the integration
+targets) passes with new tests for genesis linkage, append
+reopen continuity, the v1→v2 boundary, rollover continuity,
+and checker refusal of edited, deleted, reordered and forged
+records; the real-core integration test now asserts the journal
+holds the chained v2 form of the console's lifecycle stream.
+
+Not yet done: export receipts do not yet carry the chain
+anchor/tail (slice 2); the A/B agents' separate journals still
+write v1; and no image carrying the v2 writer has been through
+the joined QEMU acceptance + update round trip, which ADR 0023
+Decision 3 requires before the format is called accepted — the
+Phase 2 roadmap item stays open.
 Cryptographic integrity, retention/rotation and power-loss testing remain open.
 
 The native builder audits the new `veil-audit` ELF and link inputs alongside

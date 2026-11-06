@@ -206,8 +206,11 @@ Persistent journal appends now enforce a prototype 4 MiB per-file limit
 with nonblocking stable-directory/per-file locks. One no-overwrite archive
 slot is implemented; later capacity failures retain console events without
 deleting history. Guest rollover passed at
-[f973531](docs/validation/native-f973531/README.md). Extended archive retention,
-disk-full policy and tamper evidence remain open. Offline read-only `veil-audit check` structural
+[f973531](docs/validation/native-f973531/README.md). Extended archive retention
+and disk-full policy remain open. Tamper evidence for the core journal was
+implemented at host level on 2026-11-06 (hash-chained v2 records,
+`docs/DURABLE_AUDIT_V2_DESIGN.md`); its native acceptance is still
+pending under ADR 0023 Decision 3. Offline read-only `veil-audit check` structural
 inspection is implemented with a bounded schema/count report; it does not
 authenticate records or prove completeness. Its exact-revision native guest
 validation passed at [262d275](docs/validation/native-262d275/README.md).
@@ -229,7 +232,8 @@ remount recovery extension passed in the
 [partial ffd0b0a run](docs/validation/native-ffd0b0a/README.md), whose graphical
 settings gate failed. Full revalidation, including settings reboot persistence,
 passed at [612bd80](docs/validation/native-612bd80/README.md).
-Ext4 disk-full policy, power-loss and tamper evidence remain open.
+Ext4 disk-full policy and power-loss evidence remain open (tamper
+evidence: see the 2026-11-06 hash-chain note above).
 Owner-controlled offline snapshot export and verification against a separately
 retained digest passed native validation at
 [612bd80](docs/validation/native-612bd80/README.md). Later unnamed-inode
