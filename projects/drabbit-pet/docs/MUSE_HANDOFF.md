@@ -256,6 +256,32 @@ option, not a test hack:
   externally paint blank; the panel in normal owner use was
   confirmed by the owner the same evening).
 
+## 2026-11-05 evening — care-action animations completed
+
+The owner asked which care actions animate. Audit found eating
+(fed) and playing covered, but **clean, medicine, and hatch had
+no animation at all** (the event fired; the sprite just idled).
+Added, in the existing CSS-keyframe idiom:
+
+- `cleaned` → **cleaning**: fast side-to-side scrub shake +
+  soap bubbles rising around the body. `cured` → **healing**:
+  gentle body pulse + green plus-signs floating up. `hatched` →
+  **hatching**: big celebration bounce (higher than playing) +
+  wing flap + star burst. `overfed` now munches too.
+  `transientFromEvents` prioritises by kind (hatch > cure >
+  clean > feed > play). Adornments are conditional SVG groups in
+  `DrabbitSvg` keyed on the anim state.
+- **Behaviour change (same pass):** care transients now outrank
+  the sick base state in `resolveAnimState` — previously ANY
+  transient was suppressed while sick, so cleaning a sick pet
+  showed nothing. Egg/dead/sleeping still outrank everything;
+  the sick sway resumes when the transient ends.
+- Verified: VM desktop **78/78**; on the owner's PC, throwaway
+  demo pets (fabricated saves, driven over the companion API)
+  showed all three new animations in captured frames; the real
+  pet was then relaunched on the new build. Demo profiles and
+  captures cleaned up on the PC afterwards.
+
 ## Next step
 
 The v1 queue is complete; everything left is owner-side

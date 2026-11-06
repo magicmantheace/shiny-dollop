@@ -32,7 +32,7 @@ surface; the GUI itself is not faked in tests.
 | Tick service | Fresh egg persisted once at startup; a tick that changes nothing writes nothing; crossing the incubation boundary persists and emits `egg_ready`; scheduler wiring (5 s default, start/stop, no double-schedule); a dead pet is never advanced or persisted; `onChanged` fires only on change. |
 | Roaming planner | Bounds respected under adversarial randomness (always-right / scripted-left), out-of-bounds starts clamped; never moves while asleep, panel-open, paused, an egg, or dead; hop → arrive exactly on target → sit; sit bias gives long idle sits. |
 | IPC action mapping | Payload validation accepts all nine UI kinds and rejects malformed payloads (`bad_payload`); each kind maps to the right core action with exact need deltas (snack +8, meal +35/clamp, play −7 energy…); wrong-stage/state actions raise the core's typed errors (`not_ready`, `asleep`, `not_sick`, `not_dead`, `is_egg`); clean is allowed while asleep; medicine cures an injected sick pet; new-egg starts generation 2. |
-| Visual state | state→animation mapping (egg/egg-ready/idle/sleeping/sick/dead), transient eating/playing from events, resolution priority (base > transient > hopping > idle); bridge reactions add a bubble-only transient except `celebrate`, which maps to the playing bounce. |
+| Visual state | state→animation mapping (egg/egg-ready/idle/sleeping/sick/dead), care transients from events (fed/overfed → eating, played → playing, cleaned → cleaning, cured → healing, hatched → hatching; priority by kind), resolution priority (egg/dead/sleeping > transient > sick > hopping > idle — a care transient plays over the sick sway, then the sway resumes); bridge reactions add a bubble-only transient except `celebrate`, which maps to the playing bounce. |
 | Bridge link | `desktop/tests/bridge-link.test.ts` (12): display-state parsing (junk/missing state → null, optional fields tolerated); reaction mapping (busy states + celebrate react, alert reacts even on first sighting, repeats/connecting/first-sighting calm stay quiet, busy→idle relaxes, alert→idle says "All clear"); the polling service against an injected reader + fake scheduler (reacts on change only; missing/corrupt file is a quiet no-op and recovery works; start/stop wiring); env-override path priority. |
 | Auto care | `desktop/tests/auto-care.test.ts` (12): the pure decision function (threshold edges for hunger/cleanliness/happiness, medicine-first ordering when sick, play refused for a tired pet, never acts on egg/dead/asleep); the config store (missing → off and nothing written, round-trip with no `.tmp`, corrupt file preserved aside + defaults); the service against a fake pet (silent while off, acts on init when the persisted switch is on, enabling mid-run acts immediately and persists). |
 | Build + smoke | `npm run build` clean (core tsc, main/preload tsc strict, Vite production build of both windows). `npm run smoke`: the real Electron binary launches under Xvfb, creates a fresh save in a throwaway userData, and loads both windows (`SMOKE_OK`). |
@@ -65,6 +65,18 @@ need crosses a threshold. The new panel section's rendering was
 not independently captured (forcing the hidden panel window open
 from outside Electron shows a blank surface — the panel itself
 was owner-verified in normal use the same evening).
+
+**Care-action animations — owner-PC verification (2026-11-05
+evening):** the desktop suite is now **78 tests**. The three new
+transients (cleaning/healing/hatching) were demonstrated live on
+the owner's PC against throwaway demo pets (fabricated saves via
+the companion API, owner's real pet untouched): medicine showed
+the rising green pluses on a cured pet, hatch showed the star
+burst on a just-hatched pet, and clean — after the priority fix
+in the same pass (care transients now outrank the sick sway;
+the first demo pet was sick, which had correctly suppressed it
+under the old rule) — showed the rising soap bubbles. Captures
+are in the session record (`gui-test-shots/cap-*`).
 
 ## P3 — companion server (`desktop/tests/companion-*.test.ts`)
 
