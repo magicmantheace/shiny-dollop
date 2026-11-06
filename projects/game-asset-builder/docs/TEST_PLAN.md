@@ -2,7 +2,7 @@
 
 ## Verified on the build VM (no GPU) — 2026-11-06
 
-- Unit tests: 23/23 pass (`python3 -m unittest discover -s tests`).
+- Unit tests: 28/28 pass (`python3 -m unittest discover -s tests`).
   The original 8 pin the pipeline order, the mesh-before-texture rule,
   and the unload discipline (every model stage is an isolated GPU
   process). The P0 additions pin the rig template's shape (Pip config
@@ -10,7 +10,10 @@
   precede children), the pose recipes' math (hop arch, lift peak,
   idle bounds, clip frame counts), the catalog record (sha256
   round-trip + tamper detection), the flood-fill cutout on a synthetic
-  image, and the bridge runner's token discipline.
+  image, and the bridge runner's token discipline. The skinning
+  additions pin the heat-acceptance policy (healthy result accepted;
+  low coverage, an empty bone, and wingtips left to other bones each
+  rejected with named reasons; multiple failures all reported).
 - Prep stage on the real Ember Dragon concept: clean cutout
   (foreground 29.6% of frame), visually inspected against the concept.
 - Rig + animate + verify chain exercised twice in Blender: on the
@@ -20,9 +23,30 @@
   embedded `idle` + `hop` clips, and cold-re-import renders showing
   rest pose intact and the hop apex airborne (+0.17–0.19 ground
   clearance) with both wings swept up and no tearing.
-- Skinning: bone-heat automatic weights produced ZERO weights on both
-  Hunyuan meshes (recorded in each rig report); the deterministic
-  distance-to-bone fallback skinned both, coverage 1.0.
+- Skinning (P0 state): bone-heat automatic weights produced ZERO
+  weights on both Hunyuan meshes (recorded in each rig report); the
+  deterministic distance-to-bone fallback skinned both, coverage 1.0.
+- Skinning hardening (2026-11-06, same VM): the failure was diagnosed
+  by measurement — rig inputs carried 28 (dragon) / 135 (Pip)
+  non-manifold edges plus debris shells after the weld, and only
+  5/28 template bone endpoints sat inside the dragon mesh (validated
+  ray-parity test, controls 6/6 and 0/6). With geometry cleanup +
+  endpoint snapping in the rigger, bone heat succeeds on both meshes
+  through the shipped code path: dragon — coverage 1.0, wingtip
+  dominance 1.0 (fallback: 0.0), distance rescue on 6 verts only;
+  Pip — coverage 1.0, wingtip 1.0, no rescue. The dragon was
+  re-animated and re-catalogued (catalog-verify MATCH on the new
+  sha256); cold re-import shows 14 bones / 14 groups / idle + hop,
+  hop apex clearance 0.19 vs 0.025 at rest.
+- Stress deformation (`stages/catalog/stress_render.py`): a pose
+  beyond the shipped clips (wing.L at 1.25 rad vs the hop's 0.65,
+  head turned 0.65 rad, tail curled ~1.75 rad total) rendered from
+  two angles and inspected: raised wing intact, no tearing, no joint
+  collapse, no candy-wrapper twist at the neck. A belly-centreline
+  texture-seam streak grows with deformation (faint at hop apex,
+  pronounced in the stress pose, absent at rest); the same artifact
+  is present in the P0 fallback rig's hop render, so it predates the
+  skinning change.
 - CLI `stages` and `benchmark-plan` run and print the registry/protocol.
 - CLI `doctor` runs and honestly reports this machine: no GPU, GPU stages
   "CANNOT RUN on this machine". That report is correct for the VM and is
@@ -79,6 +103,10 @@
 - The rig template on non-dragonoid winged creatures (the template's
   proportions were exercised on two Hunyuan outputs with similar
   anatomy: Pip and the Ember Dragon).
+- The cleanup's debris-shell rule (< 0.5% of the largest shell) on a
+  mesh whose small shells are real anatomy (detached eyes, teeth,
+  held props): unexercised — on both current meshes the dropped
+  shells were interior floaters, verified by vert counts only.
 
 ## Rules
 

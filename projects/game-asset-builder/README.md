@@ -10,6 +10,20 @@ image to a rigged, animated, catalogued .glb. Run it with
 Catalogue record: `catalog/ember-dragon/metadata.json` (the .glb
 itself lives in the local `outputs/` area, pinned by sha256).**
 
+**Skinning update (2026-11-06): the rig stage now produces real
+bone-heat (automatic) weights. The P0 build's heat failure was
+diagnosed to two causes — residual non-manifold geometry in Hunyuan
+output (Blender's heat solver needs a closed 2-manifold and otherwise
+fails silently with zero weights) and template bone endpoints landing
+outside the mesh volume (23 of 28 on the dragon; bbox fractions can't
+know where a generated model folded its wings). The rigger now repairs
+the geometry to (near-)manifold and snaps outside endpoints onto the
+surface before weighting; an acceptance policy in
+`stages/rig/skin_policy.py` decides whether a heat result ships, and
+the distance-to-bone fallback remains as the labelled last resort.
+Ember Dragon re-rigged: heat weights, wingtip dominance 0.0 → 1.0;
+details in `docs/MUSE_HANDOFF.md`.**
+
 A fully local, no-API pipeline that builds game assets — creatures included —
 on the owner's own hardware:
 
