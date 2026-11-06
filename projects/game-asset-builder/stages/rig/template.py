@@ -160,6 +160,27 @@ def biped(ears: bool = False, arms: bool = True) -> list[BoneSpec]:
     return bones
 
 
+def trunk_chain(bones: list[BoneSpec],
+                head_name: str = "head") -> set[str]:
+    """The axial (trunk) bones: the parent chain from ``head_name``
+    up to the root, inclusive. Every template's large-amplitude
+    recipe motion lives in the appendages (arms, legs, wings, ears,
+    tail); the trunk chain's segments run through the body mass they
+    legitimately own, so the rig stage's weight-distance veto
+    restrains only the non-trunk bones (see
+    stages/rig/skin_policy.py). Falls back to the first (root) bone
+    when the template has no bone named ``head_name``."""
+    parent = {b.name: b.parent for b in bones}
+    chain: set[str] = set()
+    cur = head_name if head_name in parent else None
+    while cur is not None:
+        chain.add(cur)
+        cur = parent.get(cur)
+    if not chain and bones:
+        chain = {bones[0].name}
+    return chain
+
+
 TEMPLATES = {"winged-creature": winged_creature,
              "quadruped": quadruped,
              "biped": biped}

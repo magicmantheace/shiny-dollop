@@ -2,7 +2,11 @@
 
 ## Verified on the build VM (no GPU) — 2026-11-06
 
-- Unit tests: 44/44 pass (`python3 -m unittest discover -s tests`).
+- Unit tests: 57/57 pass (`python3 -m pytest tests/`). Count history:
+  44 at P1; the P1.1 additions (13) pin the weight-distance veto
+  (redistribution + renormalization, radius kept, trunk exemption,
+  nearest-bone rescue, endpoint-aware rescue eligibility), the
+  torso-share gate, and the per-template trunk chains.
   The original 8 pin the pipeline order, the mesh-before-texture rule,
   and the unload discipline (every model stage is an isolated GPU
   process). The P0 additions pin the rig template's shape (Pip config
@@ -160,7 +164,9 @@
   with a bulky raised arm, and the beyond-clip stress pose
   (2.2 rad) drags a visible sail of side fur. No tearing at either
   amplitude. A weight-distance veto is the candidate mitigation —
-  future work, not attempted in P1.
+  future work, not attempted in P1. **Mitigated the same day —
+  see the P1.1 section below; this paragraph records the pre-fix
+  state.**
 - **Treasure Chest (prop)**: static path produced a 27,041-vert /
   50,530-face GLB (30,000 target) from a 1,082,755-vert textured
   mesh; cleanup took 109 non-manifold edges to 0. Cold re-import
@@ -172,6 +178,41 @@
 - All three catalog entries pass `catalog-verify` (sha256 MATCH),
   and rigged entries carry the weighting method and (for the
   triceratops) the `rotate_z` correction in provenance.
+
+## Verified on the build VM — 2026-11-06 (P1.1 weight-distance veto)
+
+- **Snow Goblin re-rig** (from the saved `textured.glb`; the mesh
+  and texture stages were NOT re-run, and the Ember Dragon,
+  Triceratops and Treasure Chest outputs and catalogue entries are
+  byte-identical — all re-verified with `catalog-verify`):
+  bone-heat + distance veto (factor 0.85, floor 0.19) accepted by
+  the policy gate, no fallback. Coverage 1.0; torso-zone arm share
+  **0.506 → 0.139** (9,394 zone verts); ruff-band arm share
+  0.614 → 0.448; hands (tip) dominance 1.0 → 0.997; head zone
+  0.667 → 0.787; feet zone 0.904 → 0.904; all 13 bones populated;
+  veto zeroed 101,175 (vertex, bone) entries and rescued 1,485
+  weightless verts. New GLB sha256 `86c91cd6…`, catalogue entry
+  re-issued and `catalog-verify` MATCH; cold re-import verify:
+  coverage 1.0, both clips present, grounded at rest and at the
+  wave apex frame.
+- Parameter choice was measured on the shipped mesh before any
+  code shipped: arm flesh sits at median 0.34 from the arm segment,
+  torso bleed at 0.51 (distributions overlap, so no radius is
+  clean). A tighter veto (0.7/0.16; torso share 0.065) was run end
+  to end and REJECTED on the renders: the raised arm stretched
+  into a fin because too much of its own flesh lost arm weight.
+  The shipped 0.85/0.19 keeps 86% of arm-dominated verts' arm
+  weight. Parameter sweeps and the before/fix renders are kept
+  under `outputs/snow-goblin/before-veto/`.
+- Visual verdict (rest / wave 1.9 rad / stress 2.2 rad renders
+  inspected): the owner's flagged defect — body texture stretching
+  with the raised arm, chest fur dragged diagonally — is gone at
+  the shipped wave; the ruff and chest stay with the body and the
+  raised paw reads as a paw. Residuals, honestly: a taut sheet of
+  fur still stretches in the armpit web at full raise (the arm and
+  torso are one fused mass geometrically), and the 2.2 rad stress
+  pose still sails the flank, reduced but not eliminated versus
+  pre-veto. No tearing at either amplitude.
 
 ## Not yet verified
 
@@ -187,8 +228,15 @@
   proportions (the goblin is a big-head chibi), and either template
   on a mesh whose facing needs `--rotate-z 180/270` (only 90 is
   exercised so far).
-- The biped arm fur-drag mitigation (weight-distance veto or
-  equivalent) — documented limit, not yet attempted.
+- The weight-distance veto on any creature besides the Snow
+  Goblin: the radius defaults were calibrated on one fused-fur
+  biped; the quadruped belly guard zone and the winged torso guard
+  zone are defined but unexercised, and no other asset has been
+  re-rigged with the veto (the shipped Ember Dragon / Triceratops
+  rigs predate it and were deliberately left untouched).
+- A clean 2.2 rad stress pose for the goblin: beyond the shipped
+  clip the flank still sails (see the P1.1 section) — a geodesic
+  or hand-cleanup pass would be needed; not attempted.
 - GLB playback of the P1 assets in a game engine — same P3 caveat
   as P0; Blender-verified only.
 - The cleanup's debris-shell rule (< 0.5% of the largest shell) on a

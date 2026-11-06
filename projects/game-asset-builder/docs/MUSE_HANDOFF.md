@@ -197,6 +197,9 @@ sha-verified):
   fused-fur ruff is partly arm-weighted — the shipped wave reads
   fine; a 2.2 rad stress raise drags a visible fur sail. No
   tearing. Mitigation (weight-distance veto) is future work.
+  **Superseded the same day by the P1.1 fix below** — the owner
+  flagged the shipped wave itself (body texture stretching with
+  the arm), and the goblin was re-rigged with the veto.
 - **Treasure Chest** (prop): 27,041 verts from a 1.08M-vert
   textured mesh, static verify clean (0 bones/groups/actions),
   renders match the concept.
@@ -211,14 +214,65 @@ pass initially overwrote the mesh-stage records with
 `{"resumed": true}` placeholders, which were restored from the
 PC-side result files before cataloguing. Suite: 44/44.
 
+## P1.1 weight-distance veto — BUILT AND PROVEN (2026-11-06, same branch)
+
+Owner verdict on the shipped goblin wave: "the body texture
+stretched with the arm." Correct — bone heat had diffused through
+the fused fur mass until 0.51 of the torso zone's total weight sat
+on the arm bones (the ruff band measured 0.61). The fix is a general
+skinning-stack step, not a goblin special case:
+
+- `skin_policy.apply_veto` (pure, unit-tested): after heat, a
+  non-trunk bone keeps a vertex's weight only within its reach
+  radius — max(factor × bone length, floor × mesh height), shipped
+  defaults factor 0.85, floor 0.19. Vetoed weight renormalizes onto
+  the survivors. The root→head trunk chain (`template.trunk_chain`)
+  is exempt: its segments run through the mass they own, so distance
+  measures body radius there, not bleed. A vertex left weightless is
+  rescued onto its nearest eligible bone — a vetoing bone is
+  eligible again only for flesh projecting past its segment
+  endpoints (fingertips, ear tips, toes), so the armpit web rescues
+  onto the trunk instead of back onto the arm.
+- `skin_policy.assess_zone_share` gates the result: torso-zone arm
+  share must be ≤ 0.25 (unvetoed goblin: 0.51 — the check would
+  have caught the defect at P1 time).
+- The radius was tuned by measurement, not taste: on this mesh the
+  arm's own flesh sits 0.34 (median) from its segment while torso
+  bleed sits at 0.51, and the distributions overlap — tighter
+  (0.7/0.16: torso share 0.065) hollowed the arm into a stretched
+  fin in the wave render; looser (1.0/0.16) kept the arm whole but
+  left the ruff at 0.56. The shipped point (0.85/0.19) is the
+  measured compromise; renders were the judge (iterations kept
+  under `outputs/snow-goblin/before-veto/`).
+
+Re-proof (goblin only, from the saved textured.glb; mesh/texture
+stages NOT re-run; Ember Dragon, Triceratops and Treasure Chest
+untouched, catalogue-verified byte-identical):
+
+- torso arm share 0.506 → **0.139**; ruff-band share 0.614 → 0.448
+- coverage 1.0; hands (tip) dominance 1.0 → 0.997; head zone
+  0.667 → **0.787**; feet zone 0.904 (unchanged); every bone
+  populated (arm.L 24,162 → 6,967 weighted verts)
+- new GLB sha256 `86c91cd6…` (catalogue re-verified); suite 57/57
+- Visual verdict on the new renders: at the wave's 1.9 rad peak the
+  chest and ruff stay with the body and the raised paw reads as a
+  paw — the flagged defect is gone. Residual, stated plainly: a
+  taut fur sheet still stretches in the armpit web at full raise
+  (arm and torso are one fused fur mass; some web must stretch),
+  and the 2.2 rad stress pose — beyond the shipped clip — still
+  sails the flank, as it did before the veto. Euclidean distance
+  cannot fully separate flesh from bleed on a near-spherical fur
+  character; a geodesic-weight cleanup would be the next step if
+  the owner wants the stress pose clean too.
+
 Next:
-1. Owner decisions outstanding: merge of this P1 PR (draft, against
-   main); whether to unblock Stable Fast 3D (owner-side HF action,
-   only if wanted).
+1. Owner decisions outstanding: merge of this P1/PR #38 (draft,
+   against main — now includes the P1.1 veto commits); whether to
+   unblock Stable Fast 3D (owner-side HF action, only if wanted).
 2. P2 when directed: a simple local UI over the catalog and
-   pipeline. Possible P1.1 hardening if wanted: a weight-distance
-   veto for fused-fur bipeds; a bridge-client adoption path for
-   >15 min stages instead of the manual recovery used here.
+   pipeline. Possible further hardening if wanted: a bridge-client
+   adoption path for >15 min stages instead of the manual recovery
+   used here.
 
 Boundaries: no cloud fallback exists or may be added; weights and outputs
 never enter git; GPU claims only from PC runs; merges are the owner's call.

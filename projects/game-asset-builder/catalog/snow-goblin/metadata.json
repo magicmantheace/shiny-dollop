@@ -5,7 +5,7 @@
  "source_concept": "media-generation-biped-snowgoblin-concept-0-7a45eb0e-b49c-4ecd-93c2-2db237069047.webp",
  "asset_file": "snow-goblin.glb",
  "asset_location": "outputs/<slug>/ (local; not in git)",
- "sha256": "638ee23ff04dfc231eb29bd350df978695a0bc75f9253bdbc5da14ef20196021",
+ "sha256": "86c91cd654ac179595f284463eaf0825b6e645d234c740da6c8999f8e849c49b",
  "bytes": 22196376,
  "counts": {
   "verts": 49080,
@@ -37,7 +37,7 @@
   "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
   "rigged": true,
   "rig_template": "biped",
-  "weight_method": "bone-heat (automatic weights)",
+  "weight_method": "bone-heat (automatic weights); distance veto (factor 0.85, floor 0.19); distance rescue on 1485 verts",
   "gpu_host": {
    "hostname": "AthenZ971",
    "agent": "1.0.0"

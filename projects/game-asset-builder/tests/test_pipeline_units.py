@@ -192,6 +192,119 @@ class SkinPolicyTests(unittest.TestCase):
         self.assertGreaterEqual(len(reasons), 3)
 
 
+class VetoTests(unittest.TestCase):
+    """The weight-distance veto: columns are [root, spine, arm];
+    only the arm column (index 2) is vetoable in these fixtures."""
+
+    RADII = [9.9, 9.9, 0.30]
+
+    def test_vetoed_weight_redistributes_and_renormalizes(self):
+        weights = [[0.2, 0.3, 0.5]]
+        distances = [[0.1, 0.1, 0.45]]  # arm beyond its radius
+        out, stats = skin_policy.apply_veto(
+            weights, distances, self.RADII, veto_cols=[2])
+        self.assertAlmostEqual(out[0][2], 0.0)
+        self.assertAlmostEqual(out[0][0], 0.4)
+        self.assertAlmostEqual(out[0][1], 0.6)
+        self.assertAlmostEqual(sum(out[0]), 1.0)
+        self.assertEqual(stats["vetoed_entries"], 1)
+        self.assertEqual(stats["verts_touched"], 1)
+        self.assertEqual(stats["rescued_verts"], [])
+
+    def test_weight_within_radius_is_kept(self):
+        weights = [[0.2, 0.3, 0.5]]
+        distances = [[0.1, 0.1, 0.25]]  # arm inside its radius
+        out, stats = skin_policy.apply_veto(
+            weights, distances, self.RADII, veto_cols=[2])
+        self.assertEqual(out[0], [0.2, 0.3, 0.5])
+        self.assertEqual(stats["vetoed_entries"], 0)
+        self.assertEqual(stats["verts_touched"], 0)
+
+    def test_non_veto_columns_survive_any_distance(self):
+        # Trunk bones are exempt: even a far-away spine keeps weight.
+        weights = [[0.1, 0.9, 0.0]]
+        distances = [[5.0, 5.0, 0.1]]
+        out, _ = skin_policy.apply_veto(
+            weights, distances, self.RADII, veto_cols=[2])
+        self.assertAlmostEqual(out[0][1], 0.9)
+        self.assertAlmostEqual(sum(out[0]), 1.0)
+
+    def test_fully_vetoed_vertex_is_rescued_to_nearest_bone(self):
+        weights = [[0.0, 0.0, 1.0]]  # all its weight was arm bleed
+        distances = [[0.4, 0.2, 0.9]]  # spine is nearest
+        out, stats = skin_policy.apply_veto(
+            weights, distances, self.RADII, veto_cols=[2])
+        self.assertEqual(out[0], [0.0, 1.0, 0.0])
+        self.assertEqual(stats["rescued_verts"], [0])
+
+    def test_unweighted_vertex_is_rescued_too(self):
+        out, stats = skin_policy.apply_veto(
+            [[0.0, 0.0, 0.0]], [[0.3, 0.1, 0.2]], self.RADII,
+            veto_cols=[2])
+        self.assertEqual(out[0], [0.0, 1.0, 0.0])
+        self.assertEqual(stats["rescued_verts"], [0])
+
+    def test_rescue_beside_the_shaft_skips_the_vetoing_bone(self):
+        # The armpit-web case: all weight was arm bleed, the arm is
+        # nearest, but the vertex sits beside the arm's shaft — it
+        # must rescue onto the trunk, not back onto the arm.
+        weights = [[0.0, 0.0, 1.0]]
+        distances = [[0.4, 0.5, 0.35]]  # arm nearest but vetoed it
+        beyond = [[False, False, False]]
+        out, _ = skin_policy.apply_veto(
+            weights, distances, self.RADII, veto_cols=[2],
+            beyond_end=beyond)
+        self.assertEqual(out[0], [1.0, 0.0, 0.0])
+
+    def test_rescue_beyond_the_endpoint_may_take_the_vetoing_bone(self):
+        # The fingertip case: flesh past the arm's tail belongs to
+        # the arm chain even outside the capsule radius.
+        weights = [[0.0, 0.0, 1.0]]
+        distances = [[0.4, 0.5, 0.35]]
+        beyond = [[False, False, True]]
+        out, _ = skin_policy.apply_veto(
+            weights, distances, self.RADII, veto_cols=[2],
+            beyond_end=beyond)
+        self.assertEqual(out[0], [0.0, 0.0, 1.0])
+
+
+class ZoneShareTests(unittest.TestCase):
+    def test_share_under_the_cap_passes(self):
+        self.assertEqual(skin_policy.assess_zone_share(0.07), [])
+
+    def test_the_goblins_unvetoed_share_would_fail(self):
+        reasons = skin_policy.assess_zone_share(0.506)
+        self.assertEqual(len(reasons), 1)
+        self.assertIn("torso", reasons[0])
+        self.assertIn("arm", reasons[0])
+
+    def test_custom_labels_and_cap(self):
+        reasons = skin_policy.assess_zone_share(
+            0.4, max_share=0.3, zone_label="belly", group_label="leg")
+        self.assertIn("belly leg weight share", reasons[0])
+
+
+class TrunkChainTests(unittest.TestCase):
+    def test_biped_trunk_is_root_spine_head(self):
+        bones = template.build_template("biped", ears=True, arms=True)
+        self.assertEqual(template.trunk_chain(bones),
+                         {"root", "spine", "head"})
+
+    def test_quadruped_trunk_runs_through_the_neck(self):
+        bones = template.build_template("quadruped")
+        self.assertEqual(template.trunk_chain(bones),
+                         {"root", "spine", "neck", "head"})
+        self.assertNotIn("hips", template.trunk_chain(bones))
+
+    def test_winged_trunk_excludes_wings_ears_tail(self):
+        bones = template.build_template("winged-creature",
+                                        ears=True, arms=True)
+        trunk = template.trunk_chain(bones)
+        self.assertEqual(trunk, {"root", "spine", "head"})
+        for name in ("wing.L", "ear.R", "arm.L", "leg.L", "tail.1"):
+            self.assertNotIn(name, trunk)
+
+
 class QuadrupedTemplateTests(unittest.TestCase):
     def test_fifteen_bones_with_four_two_segment_legs(self):
         bones = template.build_template("quadruped")

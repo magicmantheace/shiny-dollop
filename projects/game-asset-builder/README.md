@@ -39,6 +39,23 @@ arm-weighted, so poses well beyond the shipped wave drag fur.
 Catalogue records: `catalog/triceratops/`, `catalog/snow-goblin/`,
 `catalog/treasure-chest/` (GLBs in local `outputs/`, sha-pinned).**
 
+**P1.1 update (2026-11-06): the weight-distance veto is now part of
+the rig stage** (owner-flagged on the goblin's wave render: the body
+texture stretched with the raised arm). After bone heat, any
+non-trunk bone's weight on a vertex beyond its reach radius
+(0.85 × bone length, floored at 0.19 × mesh height; the root→head
+trunk chain is exempt) is zeroed and renormalized onto the surviving
+bones; `skin_policy.py` additionally gates the torso zone's arm
+weight share (≤ 0.25). The Snow Goblin was re-rigged from its saved
+textured mesh — no GPU stages re-ran: torso arm share 0.51 → 0.14,
+head-zone dominance 0.67 → 0.79, hands dominance 0.997, coverage
+still 1.0, and in the re-rendered wave the chest and ruff stay put.
+Residual honesty: a taut fur sheet still stretches in the armpit web
+at the wave's peak (the arm and torso are one fused fur mass — some
+web must stretch), and the 2.2 rad stress raise still sails the
+flank. The other P1 assets were not regenerated; their catalogue
+entries are byte-identical. Details in `docs/MUSE_HANDOFF.md`.**
+
 A fully local, no-API pipeline that builds game assets — creatures included —
 on the owner's own hardware:
 
