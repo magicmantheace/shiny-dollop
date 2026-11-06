@@ -145,7 +145,7 @@ body {
   margin: 4px 0 0;
 }
 
-.companion {
+.companion, .autocare {
   background: #2c2440;
   border-radius: 10px;
   padding: 12px 14px;
@@ -153,7 +153,7 @@ body {
   flex-direction: column;
   gap: 9px;
 }
-.companion h2 {
+.companion h2, .autocare h2 {
   font-size: 15px;
   margin: 0;
 }
@@ -176,7 +176,7 @@ body {
 .companion-dot.error {
   background: #e05252;
 }
-.companion-toggle {
+.companion-toggle, .autocare-toggle {
   display: flex;
   align-items: center;
   gap: 8px;

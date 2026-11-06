@@ -90,9 +90,14 @@ export interface CompanionServerStats {
 
 export type CompanionStatus = 'off' | 'on' | 'error';
 
+/** Everything the care panel's Auto-care section renders. */
+export interface AutoCareState {
+  /** The persisted master switch in auto-care.json. */
+  enabled: boolean;
+}
+
 /** Everything the care panel's Companion section renders. */
-export interface CompanionState {
-  /** The persisted master switch in companion.json. */
+export interface CompanionState {  /** The persisted master switch in companion.json. */
   enabled: boolean;
   status: CompanionStatus;
   host: string;
@@ -123,4 +128,7 @@ export interface DrabbitApi {
   getCompanionState(): Promise<CompanionState>;
   setCompanionEnabled(enabled: boolean): Promise<CompanionState>;
   regenerateCompanionToken(): Promise<CompanionState>;
+  // Auto-care
+  getAutoCareState(): Promise<AutoCareState>;
+  setAutoCareEnabled(enabled: boolean): Promise<AutoCareState>;
 }

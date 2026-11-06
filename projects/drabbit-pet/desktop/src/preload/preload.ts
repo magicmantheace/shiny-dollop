@@ -11,6 +11,7 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import type {
   ActionKind,
   ActionOutcome,
+  AutoCareState,
   BridgeReaction,
   ChangedEvent,
   CompanionState,
@@ -32,6 +33,8 @@ const CH = {
   companionGetState: 'companion:getState',
   companionSetEnabled: 'companion:setEnabled',
   companionRegenerateToken: 'companion:regenerateToken',
+  autocareGetState: 'autocare:getState',
+  autocareSetEnabled: 'autocare:setEnabled',
 } as const;
 
 async function invoke<T>(channel: string, payload?: unknown): Promise<T> {
@@ -77,6 +80,9 @@ const api: DrabbitApi = {
   setCompanionEnabled: (enabled: boolean) =>
     invoke<CompanionState>(CH.companionSetEnabled, { enabled }),
   regenerateCompanionToken: () => invoke<CompanionState>(CH.companionRegenerateToken),
+  getAutoCareState: () => invoke<AutoCareState>(CH.autocareGetState),
+  setAutoCareEnabled: (enabled: boolean) =>
+    invoke<AutoCareState>(CH.autocareSetEnabled, { enabled }),
 };
 
 contextBridge.exposeInMainWorld('drabbit', api);

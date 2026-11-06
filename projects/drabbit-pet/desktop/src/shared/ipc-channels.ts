@@ -25,3 +25,11 @@ export const CompanionChannels = {
   /** invoke → IpcResult<CompanionState> */
   regenerateToken: 'companion:regenerateToken',
 } as const;
+
+/** Auto-care channels. */
+export const AutoCareChannels = {
+  /** invoke → IpcResult<AutoCareState> */
+  getState: 'autocare:getState',
+  /** invoke { enabled } → IpcResult<AutoCareState> */
+  setEnabled: 'autocare:setEnabled',
+} as const;

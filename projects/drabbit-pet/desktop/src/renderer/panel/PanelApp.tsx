@@ -3,6 +3,7 @@ import type { PetEvent } from 'drabbit-core';
 import type { ActionKind, PetSummary } from '../../shared/api-types.js';
 import { ADULT_FORM_LABELS, MOOD_DISPLAY, STAGE_LABELS, formatAge, formatClock } from '../format.js';
 import { CompanionSection } from './CompanionSection.js';
+import { AutoCareSection } from './AutoCareSection.js';
 import './panel.css';
 
 const FEED_SIZE = 30;
@@ -184,6 +185,8 @@ export function PanelApp() {
           ))}
         {isEgg && !summary.readyToHatch && <p className="hint">The egg needs its incubation time before it can hatch.</p>}
       </section>
+
+      <AutoCareSection />
 
       <CompanionSection />
 

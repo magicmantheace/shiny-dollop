@@ -17,6 +17,9 @@ import { PetService, systemClock } from './pet-service.js';
 import { SaveStore } from './save-store.js';
 import { TickService } from './tick-service.js';
 import { BridgeLinkService } from './bridge-link.js';
+import { AutoCareService } from './auto-care.js';
+import { AutoCareConfigStore } from './auto-care-config.js';
+import { registerAutoCareIpc } from './auto-care-ipc.js';
 import { RoamPlanner, type RoamBounds } from './roaming.js';
 import { registerPetIpc } from './ipc.js';
 import { registerCompanionIpc } from './companion-ipc.js';
@@ -42,6 +45,7 @@ let service: PetService | null = null;
 let companion: CompanionService | null = null;
 let tickService: TickService | null = null;
 let bridgeLink: BridgeLinkService | null = null;
+let autoCare: AutoCareService | null = null;
 let roamTimer: ReturnType<typeof setInterval> | null = null;
 let roamingPaused = false;
 let isQuitting = false;
@@ -88,6 +92,9 @@ function broadcast(channel: string, payload: unknown): void {
 
 function onPetChanged(summary: ChangedEvent['summary'], events: ChangedEvent['events']): void {
   broadcast(PetChannels.changed, { summary, events } satisfies ChangedEvent);
+  // Auto-care rides the same change notifications (tick cadence) —
+  // no second clock. It reads the fresh summary itself.
+  autoCare?.consider();
 }
 
 function workAreaBounds(): { bounds: RoamBounds; y: number } {
@@ -265,6 +272,17 @@ function startApp(): void {
   });
   registerCompanionIpc({ companion });
   void companion.init();
+
+  // Auto-care: while the persisted switch is on, the app performs
+  // due care actions itself through the shared dispatcher. Default
+  // off; evaluation rides onPetChanged (the tick cadence).
+  autoCare = new AutoCareService({
+    store: new AutoCareConfigStore(app.getPath('userData'), { log }),
+    service,
+    log,
+  });
+  registerAutoCareIpc({ autoCare });
+  autoCare.init();
 
   createPetWindow();
   createPanelWindow();
