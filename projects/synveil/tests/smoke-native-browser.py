@@ -81,6 +81,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -521,24 +522,44 @@ def wait_download_get(log, port, path, count, timeout=240):
 
 def _teal_title_block(width, height, data):
     """The files app's own title bar (COL_TITLE teal, drawn at the
-    top of its content). The desktop's top panel is a similar
-    dark teal and unions into any full-frame color search —
-    observed rect (0, 0, 1038, ...) spanning panel + window —
-    so only scan below the panel band (y >= 40) and take the
-    title pixels' own bounding box."""
-    min_x, min_y, max_x, max_y = width, height, -1, -1
-    hits = 0
-    for y in range(40, height):
-        for x in range(width):
-            if _near(ab._px(data, width, x, y), FILES_TITLE, 6):
-                hits += 1
-                min_x = min(min_x, x)
-                max_x = max(max_x, x)
-                min_y = min(min_y, y)
-                max_y = max(max_y, y)
-    if hits < 400 or max_x < 0:
+    top of its content), as (x, y, w, h) of the title band only.
+
+    Teal pixels are grouped into row bands and the band with the
+    most hits wins; a whole-frame bounding box is wrong in both
+    panel eras: pre-S3 the TOP panel was a similar dark teal and
+    unioned with the title (observed rect (0, 0, 1038, ...)), and
+    post-S3 the bottom panel's files-app task button carries the
+    same teal, which stretched one measured 'title' to y 112..799
+    (title_h 688) and put refresh_files_window's fallback click
+    outside the display. The old y >= 40 scan guard is equally
+    wrong post-S3: the window now opens at y ~= 13, mostly above
+    the guard. Rows need >= 400 teal hits to count toward a band,
+    so a task button (~150 px wide) never forms one."""
+    row_hits = {}
+    for y in range(height):
+        xs = [x for x in range(width)
+              if _near(ab._px(data, width, x, y), FILES_TITLE, 6)]
+        if len(xs) >= 400:
+            row_hits[y] = xs
+    if not row_hits:
         return None
-    return (min_x, min_y, max_x - min_x + 1, max_y - min_y + 1)
+    bands = []
+    band = [min(row_hits), min(row_hits),
+            list(row_hits[min(row_hits)])]
+    prev = min(row_hits)
+    for y in sorted(row_hits):
+        if y == prev + 1:
+            band[1] = y
+            band[2] = band[2] + row_hits[y]
+        elif y != prev:
+            bands.append(tuple(band))
+            band = [y, y, list(row_hits[y])]
+        prev = y
+    bands.append(tuple(band))
+    top, bottom, xs = max(bands, key=lambda b: len(b[2]))
+    if len(xs) < 400:
+        return None
+    return (min(xs), top, max(xs) - min(xs) + 1, bottom - top + 1)
 
 
 def files_window_rect(width, height, data):
@@ -563,7 +584,15 @@ def close_files_window(boot):
     if not rect:
         return True  # already closed
     x, y, w, _h, _title_h = rect
-    click(boot, x + w - 14, y + 14)
+    frame_w, frame_h = frame[0], frame[1]
+    cx, cy = x + w - 14, y + 14
+    if not (0 <= cx < frame_w and 0 <= cy < frame_h):
+        # A mis-measured rect must fail this close attempt (the
+        # caller retries, then fails its own scenario honestly),
+        # not raise out of the pointer helper and abort every
+        # later scenario in the proof.
+        return False
+    click(boot, cx, cy)
     time.sleep(0.8)
     return True
 
@@ -1031,14 +1060,16 @@ def ensure_page(boot):
 
 def _find_refresh_button(width, height, data, x, y, w, h, title_h):
     """Locate the files app's Refresh button by its fill color
-    (COL_BTN 0x2E7D4F in files-window.c) below the window's
-    measured title bar, returning the centroid or None. Other
-    elements share the color (the update window's banner), so
-    matching pixels are clustered into row bands and the band
-    shaped like the button (90-170 wide, 24-48 tall, thousands
-    of pixels) wins — measured on a real session frame: band
-    rows 472-507, x 362-489, 4459 px."""
-    target = (0x2E, 0x7D, 0x4F)
+    (COL_BTN in files-window.c) below the window's measured
+    title bar, returning the centroid or None. Other elements
+    share the color, so matching pixels are clustered into row
+    bands and the band shaped like the button (90-170 wide,
+    24-48 tall, thousands of pixels) wins. COL_BTN was the
+    green 0x2E7D4F before ADR 0024; S2 made it the accent
+    0x4CC2FF (REFRESH_W x REFRESH_H is still 128x36 at
+    (16, height-92) in the client) — this locator still hunted
+    the green and never found the button after the reskin."""
+    target = (0x4C, 0xC2, 0xFF)
     x0 = max(0, x - 4)
     x1 = min(width, x + w + 4)
     y0 = max(0, y + title_h)
@@ -1100,7 +1131,14 @@ def refresh_files_window(boot):
                 click(boot, btn[0], btn[1])
             else:
                 ab.save_failure_frame(boot, "files-refresh-nobtn")
-                click(boot, x + 16 + 64, y + title_h + h - 92 + 18)
+                fx, fy = x + 16 + 64, y + title_h + h - 92 + 18
+                if not (0 <= fx < frame[0] and 0 <= fy < frame[1]):
+                    # Degenerate measured geometry: fail this
+                    # refresh (the scenario gates on the missing
+                    # scan) instead of raising out of the pointer
+                    # helper and aborting every later scenario.
+                    return False
+                click(boot, fx, fy)
             time.sleep(1.5)
             return True
         time.sleep(0.5)
@@ -1209,6 +1247,7 @@ def main():
         code = 0
     except Exception as exc:  # a crashed driver is a FAILED proof,
         results["error"] = repr(exc)  # never a missing receipt
+        results["error_traceback"] = traceback.format_exc()
         results.setdefault("server_log", log.snapshot())
         results.setdefault("build", {"browser_test_ca_sha256":
                                      browser_record.get("test_ca_sha256")})
