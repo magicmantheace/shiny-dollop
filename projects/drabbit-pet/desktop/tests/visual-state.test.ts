@@ -1,0 +1,98 @@
+import { describe, expect, it } from 'vitest';
+import type { PetEvent } from 'drabbit-core';
+import type { PetSummary } from '../src/shared/api-types.js';
+import {
+  baseAnimState,
+  bridgeTransientFor,
+  resolveAnimState,
+  transientFromEvents,
+} from '../src/renderer/pet/visual-state.js';
+
+function summary(over: Partial<PetSummary> = {}): PetSummary {
+  return {
+    id: 'x',
+    name: 'Pip',
+    fur: 'royal',
+    stage: 'adult',
+    adultForm: 'content',
+    mood: 'content',
+    needs: { hunger: 80, happiness: 80, energy: 90, cleanliness: 90 },
+    health: 100,
+    careScore: 70,
+    ageMs: 20 * 60 * 60 * 1000,
+    asleep: false,
+    sick: false,
+    messes: 0,
+    readyToHatch: false,
+    generation: 1,
+    deathCause: null,
+    ...over,
+  };
+}
+
+const ev = (kind: string): PetEvent => ({ t: 0, kind, detail: '' });
+
+describe('baseAnimState', () => {
+  it('maps stages and conditions', () => {
+    expect(baseAnimState(summary({ stage: 'egg' }))).toBe('egg');
+    expect(baseAnimState(summary({ stage: 'egg', readyToHatch: true }))).toBe('egg-ready');
+    expect(baseAnimState(summary({ stage: 'dead' }))).toBe('dead');
+    expect(baseAnimState(summary({ asleep: true }))).toBe('sleeping');
+    expect(baseAnimState(summary({ sick: true }))).toBe('sick');
+    expect(baseAnimState(summary())).toBe('idle');
+  });
+
+  it('prioritises sleep over sickness (a sleeping sick pet breathes, not droops)', () => {
+    expect(baseAnimState(summary({ asleep: true, sick: true }))).toBe('sleeping');
+  });
+});
+
+describe('transientFromEvents', () => {
+  it('maps fed/played events to brief animations', () => {
+    expect(transientFromEvents([ev('fed')])).toBe('eating');
+    expect(transientFromEvents([ev('played')])).toBe('playing');
+    expect(transientFromEvents([ev('mess'), ev('stage')])).toBeNull();
+    expect(transientFromEvents([])).toBeNull();
+  });
+
+  it('maps clean/cure/hatch events to their animations', () => {
+    expect(transientFromEvents([ev('cleaned')])).toBe('cleaning');
+    expect(transientFromEvents([ev('cured')])).toBe('healing');
+    expect(transientFromEvents([ev('hatched')])).toBe('hatching');
+    expect(transientFromEvents([ev('overfed')])).toBe('eating');
+  });
+
+  it('prioritises by kind, not event order', () => {
+    expect(transientFromEvents([ev('fed'), ev('hatched')])).toBe('hatching');
+    expect(transientFromEvents([ev('played'), ev('cured')])).toBe('healing');
+    expect(transientFromEvents([ev('fed'), ev('cleaned')])).toBe('cleaning');
+  });
+});
+
+describe('resolveAnimState', () => {
+  it('hard base states (egg/sleeping) beat transient and hopping', () => {
+    expect(resolveAnimState(summary({ asleep: true }), true, 'playing')).toBe('sleeping');
+    expect(resolveAnimState(summary({ stage: 'egg' }), true, null)).toBe('egg');
+  });
+
+  it('a care transient beats the sick sway, which resumes after', () => {
+    expect(resolveAnimState(summary({ sick: true }), true, 'cleaning')).toBe('cleaning');
+    expect(resolveAnimState(summary({ sick: true }), true, null)).toBe('sick');
+  });
+
+  it('transient beats hopping, hopping beats idle', () => {
+    expect(resolveAnimState(summary(), true, 'eating')).toBe('eating');
+    expect(resolveAnimState(summary(), true, null)).toBe('hopping');
+    expect(resolveAnimState(summary(), false, null)).toBe('idle');
+  });
+});
+
+describe('bridgeTransientFor', () => {
+  it('only a bridge celebrate earns a body animation', () => {
+    expect(bridgeTransientFor('celebrate')).toBe('playing');
+    expect(bridgeTransientFor('working')).toBeNull();
+    expect(bridgeTransientFor('session')).toBeNull();
+    expect(bridgeTransientFor('alert')).toBeNull();
+    expect(bridgeTransientFor('idle')).toBeNull();
+  });
+});

@@ -1,0 +1,11 @@
+# Build outputs
+/dist/
+# Dependencies
+/node_modules/
+# Pet save files are runtime state — never commit a real pet
+drabbit-save*.json
+# Logs
+*.log
+# OS/editor noise
+.DS_Store
+Thumbs.db
