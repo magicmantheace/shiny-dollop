@@ -24,6 +24,21 @@ the distance-to-bone fallback remains as the labelled last resort.
 Ember Dragon re-rigged: heat weights, wingtip dominance 0.0 → 1.0;
 details in `docs/MUSE_HANDOFF.md`.**
 
+**P1 update (2026-11-06): quadruped + biped rig templates and the
+unrigged prop path are built and proven end-to-end on three new
+assets, all through the same pipeline: a baby **Triceratops**
+(quadruped template, 15 bones, `idle` + `bounce`), a **Snow Goblin**
+(biped template with ears, 13 bones, `idle` + `wave`), and a
+**Treasure Chest** (prop path — static GLB, no armature, catalogued
+as unrigged). All three shipped real bone-heat weights where rigged
+(coverage 1.0; feet/hands tip dominance 1.0). Two honest wrinkles,
+detailed in `docs/MUSE_HANDOFF.md`: the triceratops mesh came out
+of Hunyuan sideways and needed the pipeline's per-run `--rotate-z`
+facing correction, and the goblin's fused-fur ruff is partly
+arm-weighted, so poses well beyond the shipped wave drag fur.
+Catalogue records: `catalog/triceratops/`, `catalog/snow-goblin/`,
+`catalog/treasure-chest/` (GLBs in local `outputs/`, sha-pinned).**
+
 A fully local, no-API pipeline that builds game assets — creatures included —
 on the owner's own hardware:
 
@@ -66,5 +81,6 @@ cloud-generated reference Pip the owner already has.
 - **P0** — model bake-off on Pip + the winning creature pipeline end-to-end
   (image → rigged, animated .glb + catalog entry).
 - **P1** — more rig templates (quadruped, biped) + the unrigged prop path.
+  **Done 2026-11-06** (see the P1 status note above).
 - **P2** — a simple local UI over the catalog and pipeline.
 - **P3** — hand-off integrations (animation studio library, Godot projects).

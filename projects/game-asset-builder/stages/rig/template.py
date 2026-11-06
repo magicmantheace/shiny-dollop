@@ -1,15 +1,22 @@
-"""Winged-creature armature template (pure data — no Blender imports).
+"""Armature templates (pure data — no Blender imports).
 
 Bone positions are fractions of the canonical bounding box:
   x: -0.5 (character's right) .. +0.5 (left), of width
   y: -0.5 (front) .. +0.5 (back), of depth   (character faces -Y)
   z:  0 (ground) .. 1 (top), of height
 
-The base layout is Pip's proven 14-bone rig from Drabbit Pet. Optional
-bone groups are parameterized: ``ears`` for earred characters (Pip) and
-``arms`` for armed ones (the Ember Dragon) — with either option off, its
-bones are simply absent and the animate stage's recipes skip them.
-Parents always precede children in the returned list.
+Templates:
+- ``winged-creature`` — Pip's proven 14-bone layout from Drabbit Pet,
+  with parameterized ``ears`` / ``arms`` groups.
+- ``quadruped`` (P1) — horizontal spine chain, neck + head at the
+  front, four two-segment legs, tail chain at the rear.
+- ``biped`` (P1) — vertical spine, head, two-segment arms and legs,
+  optional ``ears``.
+
+With an option off, its bones are simply absent and the animate
+stage's recipes skip them. Parents always precede children in the
+returned list. Every template function accepts (and ignores) the
+options it does not use, so callers can pass the full option set.
 """
 
 from dataclasses import dataclass
@@ -71,7 +78,91 @@ def winged_creature(ears: bool = True, arms: bool = False) -> list[BoneSpec]:
     return bones
 
 
-TEMPLATES = {"winged-creature": winged_creature}
+def quadruped(ears: bool = False, arms: bool = False) -> list[BoneSpec]:
+    # Horizontal body plan: the spine chain runs along Y (front is
+    # -Y), the back line sits near z 0.55 of the height (chubby
+    # stylized quadrupeds are leg + belly below that), legs are two
+    # segments (upper + lower, mirroring the wing/wing2 naming).
+    bones = [
+        BoneSpec("root", (0, 0.06, 0.30), (0, 0.06, 0.56), None,
+                 "vertical"),
+        BoneSpec("spine", (0, 0.08, 0.52), (0, -0.16, 0.56), "root",
+                 "horizontal"),
+        BoneSpec("hips", (0, 0.04, 0.52), (0, 0.28, 0.54), "root",
+                 "horizontal"),
+        BoneSpec("neck", (0, -0.16, 0.56), (0, -0.32, 0.70), "spine",
+                 "horizontal"),
+        BoneSpec("head", (0, -0.32, 0.70), (0, -0.44, 0.80), "neck",
+                 "horizontal"),
+    ]
+    for side, sx in (("L", 1), ("R", -1)):
+        bones += [
+            BoneSpec(f"leg.F{side}", (sx * 0.17, -0.17, 0.46),
+                     (sx * 0.18, -0.18, 0.23), "spine", "vertical"),
+            BoneSpec(f"leg2.F{side}", (sx * 0.18, -0.18, 0.23),
+                     (sx * 0.18, -0.19, 0.02), f"leg.F{side}",
+                     "vertical"),
+            BoneSpec(f"leg.H{side}", (sx * 0.17, 0.25, 0.46),
+                     (sx * 0.18, 0.26, 0.23), "hips", "vertical"),
+            BoneSpec(f"leg2.H{side}", (sx * 0.18, 0.26, 0.23),
+                     (sx * 0.18, 0.26, 0.02), f"leg.H{side}",
+                     "vertical"),
+        ]
+    bones += [
+        BoneSpec("tail.1", (0, 0.32, 0.52), (0, 0.44, 0.42), "hips",
+                 "vertical"),
+        BoneSpec("tail.2", (0, 0.44, 0.42), (0, 0.48, 0.30), "tail.1",
+                 "vertical"),
+    ]
+    return bones
+
+
+def biped(ears: bool = False, arms: bool = True) -> list[BoneSpec]:
+    # Upright body plan: vertical spine (Pip proportions — head takes
+    # the top third on chubby stylized bipeds), arms hanging at the
+    # sides in two segments, legs in two segments.
+    bones = [
+        BoneSpec("root", (0, 0, 0.02), (0, 0, 0.32), None, "vertical"),
+        BoneSpec("spine", (0, 0, 0.32), (0, 0, 0.60), "root",
+                 "vertical"),
+        BoneSpec("head", (0, -0.02, 0.62), (0, -0.04, 0.92), "spine",
+                 "vertical"),
+    ]
+    if ears:
+        bones += [
+            BoneSpec("ear.L", (0.09, -0.02, 0.85), (0.16, -0.02, 1.00),
+                     "head", "vertical"),
+            BoneSpec("ear.R", (-0.09, -0.02, 0.85), (-0.16, -0.02, 1.00),
+                     "head", "vertical"),
+        ]
+    if arms:
+        # Arm bones use the "horizontal" roll: probed on the template
+        # geometry, it makes local X the raise axis — +X lifts either
+        # hand up and outward symmetrically (the wave), where the
+        # "vertical" roll only swings a hanging arm fore-aft or sweeps
+        # it horizontally.
+        for side, sx in (("L", 1), ("R", -1)):
+            bones += [
+                BoneSpec(f"arm.{side}", (sx * 0.18, -0.02, 0.56),
+                         (sx * 0.27, -0.03, 0.35), "spine", "horizontal"),
+                BoneSpec(f"arm2.{side}", (sx * 0.27, -0.03, 0.35),
+                         (sx * 0.29, -0.04, 0.16), f"arm.{side}",
+                         "horizontal"),
+            ]
+    for side, sx in (("L", 1), ("R", -1)):
+        bones += [
+            BoneSpec(f"leg.{side}", (sx * 0.11, 0, 0.32),
+                     (sx * 0.13, 0, 0.17), "root", "vertical"),
+            BoneSpec(f"leg2.{side}", (sx * 0.13, 0, 0.17),
+                     (sx * 0.13, -0.01, 0.02), f"leg.{side}",
+                     "vertical"),
+        ]
+    return bones
+
+
+TEMPLATES = {"winged-creature": winged_creature,
+             "quadruped": quadruped,
+             "biped": biped}
 
 
 def build_template(name: str = "winged-creature", **options) -> list[BoneSpec]:

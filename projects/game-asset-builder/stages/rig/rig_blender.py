@@ -22,6 +22,15 @@ Usage:
   blender -b --python rig_blender.py -- --input textured.glb \
       --output rigged.glb --blend rigged.blend --report rig-report.json \
       --template winged-creature --ears 0 --arms 1 --target-verts 50000
+
+``--template`` selects the armature template (winged-creature,
+quadruped, biped — stages/rig/template.py); the skinning stack
+(cleanup -> snap -> bone heat -> skin_policy) and the report shape are
+the same for all of them, with the policy's tip check and the zone
+checks chosen per template. ``--rotate-z`` turns the canonicalized
+mesh about Z before fitting: generated meshes do not guarantee the
+character faces -Y, and the honest fix is a recorded per-run rotation
+(chosen from renders of the raw mesh), not a template that pretends.
 """
 
 import argparse
@@ -52,6 +61,10 @@ def parse_args():
     p.add_argument("--ears", type=int, default=0)
     p.add_argument("--arms", type=int, default=1)
     p.add_argument("--target-verts", type=int, default=50000)
+    p.add_argument("--rotate-z", type=int, default=0,
+                   choices=(0, 90, 180, 270),
+                   help="rotate the canonicalized mesh about Z so the "
+                        "character faces -Y before fitting the template")
     return p.parse_args(argv)
 
 
@@ -100,6 +113,26 @@ def canonicalize(obj):
     obj.location.y -= (y0 + y1) / 2
     obj.location.z -= z0
     bpy.ops.object.transform_apply(location=True, rotation=False,
+                                   scale=False)
+
+
+def rotate_z(obj, degrees):
+    """Rotate about the world Z axis through the origin (the mesh is
+    XY-centered and grounded after canonicalize, so this is a pure
+    facing change), baking the rotation into the vertices.
+
+    Applied through matrix_world, NOT rotation_euler: glTF imports
+    arrive in QUATERNION rotation mode, where euler writes are
+    silently ignored (the bake-off scorer's lesson, relearned here —
+    the first quadruped run's rotate-z was a no-op for exactly this
+    reason)."""
+    if not degrees:
+        return
+    from mathutils import Matrix
+    obj.matrix_world = Matrix.Rotation(
+        math.radians(degrees), 4, "Z") @ obj.matrix_world
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.transform_apply(location=False, rotation=True,
                                    scale=False)
 
 
@@ -366,22 +399,46 @@ def dominant_check(obj, dims, bone_names):
     return (ok / total if total else 0.0), total
 
 
-def zone_dominance(obj, dims):
-    """Head- and tail-zone dominance, same idea as the wingtip check:
-    verts in the head zone (high, central) should be driven by the head
-    bone; verts in the tail zone (back quarter, low) by the tail chain.
-    Zones are bbox-relative, so a model whose tail curls sideways may
-    legitimately score low — the numbers are evidence, not gates."""
+def _zone_defs(template, dims):
+    """Per-template evidence zones: (predicate, wanted bone names).
+    Zones are bbox-relative, so a model whose anatomy departs from the
+    template's assumptions may legitimately score low — the numbers
+    are evidence; only the tip check (tip_dominance) gates."""
     (x0, x1), (y0, y1), (z0, z1) = dims
     w, d, h = x1 - x0, y1 - y0, z1 - z0
-    zones = {
+    if template == "quadruped":
+        return {
+            "head": (lambda x, y, z: y < y0 + 0.20 * d
+                     and z > z0 + 0.40 * h, ("neck", "head")),
+            "tail": (lambda x, y, z: y > y0 + 0.78 * d,
+                     ("tail.1", "tail.2")),
+        }
+    if template == "biped":
+        return {
+            # No centre-strip constraint, unlike the winged head zone:
+            # a biped's ears sit at the silhouette edge but are head
+            # appendages, so the zone spans the full width and counts
+            # the ear bones as head bones. (First measured on the Snow
+            # Goblin: the strip version read 0.24 while the actual
+            # skull zone was ~87% head/ear-driven.)
+            "head": (lambda x, y, z: z > z0 + 0.62 * h,
+                     ("head", "ear.L", "ear.R")),
+            "feet": (lambda x, y, z: z < z0 + 0.10 * h,
+                     ("leg.L", "leg2.L", "leg.R", "leg2.R")),
+        }
+    return {
         "head": (lambda x, y, z: z > z0 + 0.62 * h and abs(x) < 0.30 * w,
                  ("head",)),
         "tail": (lambda x, y, z: y > y0 + 0.72 * d and z < z0 + 0.45 * h,
                  ("tail.1", "tail.2", "tail.3")),
     }
+
+
+def zone_dominance(obj, dims, template="winged-creature"):
+    """Zone dominance checks, same idea as the wingtip check: verts in
+    a zone should be driven by that zone's own bones."""
     out = {}
-    for zone, (test, want) in zones.items():
+    for zone, (test, want) in _zone_defs(template, dims).items():
         ok = total = 0
         for v in obj.data.vertices:
             if not test(v.co.x, v.co.y, v.co.z):
@@ -394,6 +451,51 @@ def zone_dominance(obj, dims):
                 ok += 1
         out[zone] = (round(ok / total, 4) if total else 0.0, total)
     return out
+
+
+def _dominance_where(obj, test, want_for):
+    """Share of verts passing ``test`` whose dominant group is in
+    ``want_for(vertex)``. Returns (fraction, verts_checked)."""
+    ok = total = 0
+    for v in obj.data.vertices:
+        if not test(v.co.x, v.co.y, v.co.z):
+            continue
+        total += 1
+        if not v.groups:
+            continue
+        top = max(v.groups, key=lambda g: g.weight)
+        if obj.vertex_groups[top.group].name in want_for(v.co.x):
+            ok += 1
+    return (ok / total if total else 0.0), total
+
+
+def tip_dominance(obj, dims, template="winged-creature"):
+    """The skin_policy gate check, per template: the extremity the
+    template most often loses to the body mass.
+    - winged-creature: wingtips (see dominant_check)
+    - quadruped: the feet — lowest 10% of verts should belong to the
+      leg bones, not the belly/spine
+    - biped: the hands — verts outboard and below shoulder height
+      should belong to that side's arm bones, not the torso
+    Returns (fraction, verts_checked, label)."""
+    (x0, x1), (y0, y1), (z0, z1) = dims
+    w, d, h = x1 - x0, y1 - y0, z1 - z0
+    if template == "quadruped":
+        legs = ("leg.FL", "leg2.FL", "leg.FR", "leg2.FR",
+                "leg.HL", "leg2.HL", "leg.HR", "leg2.HR")
+        frac, total = _dominance_where(
+            obj, lambda x, y, z: z < z0 + 0.10 * h, lambda x: legs)
+        return frac, total, "feet"
+    if template == "biped":
+        frac, total = _dominance_where(
+            obj,
+            lambda x, y, z: abs(x) > 0.30 * w and z < z0 + 0.55 * h,
+            lambda x: ("arm.L", "arm2.L") if x > 0
+            else ("arm.R", "arm2.R"))
+        return frac, total, "hands"
+    frac, total = dominant_check(obj, dims,
+                                 [g.name for g in obj.vertex_groups])
+    return frac, total, "wingtip"
 
 
 def weight_metrics(obj, bone_names):
@@ -516,6 +618,7 @@ def main():
     obj = import_mesh(args.input)
     raw_verts, raw_faces = len(obj.data.vertices), len(obj.data.polygons)
     canonicalize(obj)
+    rotate_z(obj, args.rotate_z)
     weld(obj)
     welded_verts = len(obj.data.vertices)
     pre_verts, post_verts = decimate(obj, args.target_verts)
@@ -544,7 +647,7 @@ def main():
     heat_checks = None
     rescue_filled = 0
     coverage, per_bone = 0.0, {}
-    wing_frac, wing_total = 0.0, 0
+    tip_frac, tip_total, tip_label = 0.0, 0, "wingtip"
     if heat_error is None and obj.vertex_groups:
         # Heat fields leave small per-vert sum residuals; normalize so
         # shipped influences sum to 1.
@@ -552,14 +655,15 @@ def main():
         bpy.ops.object.vertex_group_normalize_all(
             group_select_mode="ALL", lock_active=False)
         coverage, per_bone = weight_coverage(obj, bone_names)
-        wing_frac, wing_total = dominant_check(obj, dims, bone_names)
-        zones = zone_dominance(obj, dims)
+        tip_frac, tip_total, tip_label = tip_dominance(
+            obj, dims, args.template)
+        zones = zone_dominance(obj, dims, args.template)
         heat_checks = {"coverage": round(coverage, 4),
-                       "wingtip_dominance": round(wing_frac, 4),
-                       "head_dominance": zones["head"][0],
-                       "tail_dominance": zones["tail"][0]}
+                       f"{tip_label}_dominance": round(tip_frac, 4)}
+        for zone_name, (zone_frac, _n) in zones.items():
+            heat_checks[f"{zone_name}_dominance"] = zone_frac
         accepted, reasons = assess_heat(coverage, per_bone, bone_names,
-                                        wing_frac)
+                                        tip_frac, tip_label=tip_label)
         if accepted:
             method = "bone-heat (automatic weights)"
             # Rescue: verts the heat field never reached still need
@@ -580,7 +684,8 @@ def main():
                 rescue_filled = int(len(bare))
                 method += f"; distance rescue on {rescue_filled} verts"
             coverage, per_bone = weight_coverage(obj, bone_names)
-            wing_frac, wing_total = dominant_check(obj, dims, bone_names)
+            tip_frac, tip_total, tip_label = tip_dominance(
+                obj, dims, args.template)
         else:
             heat_checks["rejected_because"] = reasons
     elif heat_error is not None:
@@ -590,14 +695,15 @@ def main():
         why = heat_error or "heat result rejected by skin_policy"
         method = f"distance-to-bone fallback ({why})"
         coverage, per_bone = weight_coverage(obj, bone_names)
-        wing_frac, wing_total = dominant_check(obj, dims, bone_names)
+        tip_frac, tip_total, tip_label = tip_dominance(
+            obj, dims, args.template)
         if not any(m.type == "ARMATURE" and m.object == arm
                    for m in obj.modifiers):
             mod = obj.modifiers.new("Armature", "ARMATURE")
             mod.object = arm
         obj.parent = arm
     metrics = weight_metrics(obj, bone_names)
-    zones = zone_dominance(obj, dims)
+    zones = zone_dominance(obj, dims, args.template)
 
     report = {
         "stage": "rig",
@@ -624,15 +730,21 @@ def main():
         "bone_heat_checks": heat_checks,
         "rescue_filled_verts": rescue_filled,
         "weight_metrics": metrics,
-        "zone_dominance": {"head": zones["head"], "tail": zones["tail"]},
+        "zone_dominance": zones,
         "weight_coverage": round(coverage, 4),
         "per_bone_weighted_verts": per_bone,
-        "wingtip_dominance": round(wing_frac, 4),
-        "wingtip_verts_checked": wing_total,
+        "tip_label": tip_label,
+        "tip_dominance": round(tip_frac, 4),
+        "tip_verts_checked": tip_total,
+        "rotate_z": args.rotate_z,
         "bbox_dims": [round(dims[0][1] - dims[0][0], 3),
                       round(dims[1][1] - dims[1][0], 3),
                       round(dims[2][1] - dims[2][0], 3)],
     }
+    if args.template == "winged-creature":
+        # P0 report keys, kept for the winged template's comparability.
+        report["wingtip_dominance"] = report["tip_dominance"]
+        report["wingtip_verts_checked"] = report["tip_verts_checked"]
     if args.blend:
         bpy.ops.wm.save_as_mainfile(filepath=args.blend)
     bpy.ops.object.select_all(action="SELECT")

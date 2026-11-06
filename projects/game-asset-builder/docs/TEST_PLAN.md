@@ -2,7 +2,7 @@
 
 ## Verified on the build VM (no GPU) — 2026-11-06
 
-- Unit tests: 28/28 pass (`python3 -m unittest discover -s tests`).
+- Unit tests: 44/44 pass (`python3 -m unittest discover -s tests`).
   The original 8 pin the pipeline order, the mesh-before-texture rule,
   and the unload discipline (every model stage is an isolated GPU
   process). The P0 additions pin the rig template's shape (Pip config
@@ -14,6 +14,14 @@
   additions pin the heat-acceptance policy (healthy result accepted;
   low coverage, an empty bone, and wingtips left to other bones each
   rejected with named reasons; multiple failures all reported).
+  The P1 additions pin the quadruped and biped templates' shapes
+  (bone counts, parenting, ground contact, template extents), the
+  per-template recipe registries (every recipe channel exists in its
+  template's channel set; bounce lift and wave envelope shapes), the
+  generalized tip labels in the acceptance policy, and the prop
+  path's catalog honesty (an unrigged entry has no bones, no actions,
+  and `weight_method: null` in provenance — never fabricated rig
+  metadata).
 - Prep stage on the real Ember Dragon concept: clean cutout
   (foreground 29.6% of frame), visually inspected against the concept.
 - Rig + animate + verify chain exercised twice in Blender: on the
@@ -79,6 +87,27 @@
   discipline verified by the runner's VRAM samples, not assumed.
   One transient bridge disconnect killed the first local poller
   mid-paint; the job completed server-side and was reattached.
+- **P1 proof runs (2026-11-06)**: three assets through the same
+  bridge + lab path. Triceratops — shape: exit 0, 301 s, peak
+  7,224 MiB; paint: exit 0, 598 s, peak 12,040 MiB, VRAM back to
+  ≈ baseline after each stage. Snow Goblin — shape: exit 0, 296 s,
+  peak 7,280 MiB; paint: exit 0, 1,479 s, peak 12,010 MiB.
+  Treasure Chest — shape: exit 0, 298 s, peak 7,288 MiB; paint:
+  exit 0, 1,986 s, peak 12,002 MiB. Paint peaks sit ~250 MiB under
+  the card's 12,288 MiB on all three — the headroom warning from
+  the bake-off stands.
+- Bridge job-tracking limit, observed twice in P1 (and consistent
+  with the P0 disconnect): for the goblin (1,479 s) and chest
+  (1,986 s) paint stages, the bridge reported the exec job terminal
+  at ~15 minutes and the client's result fetch 404'd, while the
+  PC-side stage processes were unharmed and ran to completion
+  (worker CPU time climbing steadily throughout; GPU held). Both
+  stages were recovered by adopting the lab-side artifacts
+  (stage_runner's own result JSON + the textured GLB) once the
+  processes finished — the adopted runner records are what the
+  catalog provenance carries. The triceratops paint (598 s) stayed
+  under the limit and needed no recovery. Mechanism not confirmed
+  beyond the timing pattern (~900 s on every affected job).
 
 ## Verified on the build VM — 2026-11-06 (scoring)
 
@@ -94,6 +123,56 @@
   because glTF objects in quaternion mode ignore `rotation_euler`
   writes. (Details in `scores.md` method notes.)
 
+## Verified on the build VM — 2026-11-06 (P1 rigging and props)
+
+- **Triceratops (quadruped)**: the Hunyuan mesh arrived SIDEWAYS
+  (body axis along X; the template assumes −Y facing). The first
+  rig exposed it honestly — bone-heat shipped with coverage 1.0 but
+  the head-zone dominance read 0.05 because the "front" strip was
+  the creature's flank. Re-rigged with the pipeline's `--rotate-z
+  90` facing correction (after fixing the correction itself: glTF
+  imports are in quaternion rotation mode, where `rotation_euler`
+  writes are silently ignored — the bake-off scorer's lesson; the
+  fix applies the rotation through `matrix_world`). Final rig:
+  bone-heat, coverage 1.0, feet dominance 1.0 (6,870 verts), head
+  zone 0.9998, tail zone 0.49 (evidence only — the rear strip is
+  mostly rump on a stubby-tailed creature), 13 endpoints snapped,
+  0 failed; 45,001 verts / 89,998 faces, 15 bones, `idle` +
+  `bounce`; bounce apex ground clearance +0.042 vs −0.006 at rest.
+  Rest, bounce-apex, and stress renders inspected: the stress pose
+  (neck stretched + turned, one front leg tucked hard) deforms
+  cleanly, no tearing or collapse. Noted texture quality: the
+  paint stage left mottled dark patches on the back — a texture
+  artifact, present at rest, not a rig defect.
+- **Snow Goblin (biped, ears)**: rig input was the messiest mesh
+  yet (137 non-manifold edges, 58 shells, 804 debris verts);
+  cleanup left 18 residual non-manifold edges and heat still
+  shipped: coverage 1.0, hands dominance 1.0 (10,234 verts), feet
+  zone 0.90, head zone 0.67 (the zone definition was corrected
+  during P1 to count the ear bones as head bones across the full
+  width — the inherited centre-strip definition read 0.24 while an
+  independent dominant-group histogram of the shipped GLB showed
+  the skull zone ~87% head/ear-driven). 49,080 verts / 98,583
+  faces, 13 bones, `idle` + `wave`; rest and wave renders
+  inspected. Known cosmetic limit: the ruff band between head and
+  shoulders is ~75% arm-dominated (heat diffusion over one fused
+  fur mass), so the shipped wave (1.9 rad peak) reads as a wave
+  with a bulky raised arm, and the beyond-clip stress pose
+  (2.2 rad) drags a visible sail of side fur. No tearing at either
+  amplitude. A weight-distance veto is the candidate mitigation —
+  future work, not attempted in P1.
+- **Treasure Chest (prop)**: static path produced a 27,041-vert /
+  50,530-face GLB (30,000 target) from a 1,082,755-vert textured
+  mesh; cleanup took 109 non-manifold edges to 0. Cold re-import
+  in `--static` verify mode proves the honesty contract: no
+  armature object, 0 vertex groups, 0 actions, `rigged: false`,
+  grounded at z = 0. Beauty and front renders inspected — the
+  chest reads exactly as the concept (domed lid, brass bands,
+  padlock), facing the camera.
+- All three catalog entries pass `catalog-verify` (sha256 MATCH),
+  and rigged entries carry the weighting method and (for the
+  triceratops) the `rotate_z` correction in provenance.
+
 ## Not yet verified
 
 - TRELLIS's proper textured export — blocked on the
@@ -103,6 +182,15 @@
 - The rig template on non-dragonoid winged creatures (the template's
   proportions were exercised on two Hunyuan outputs with similar
   anatomy: Pip and the Ember Dragon).
+- The P1 templates beyond their proof creatures: the quadruped on a
+  long-tailed or long-necked animal, the biped on humanoid
+  proportions (the goblin is a big-head chibi), and either template
+  on a mesh whose facing needs `--rotate-z 180/270` (only 90 is
+  exercised so far).
+- The biped arm fur-drag mitigation (weight-distance veto or
+  equivalent) — documented limit, not yet attempted.
+- GLB playback of the P1 assets in a game engine — same P3 caveat
+  as P0; Blender-verified only.
 - The cleanup's debris-shell rule (< 0.5% of the largest shell) on a
   mesh whose small shells are real anatomy (detached eyes, teeth,
   held props): unexercised — on both current meshes the dropped

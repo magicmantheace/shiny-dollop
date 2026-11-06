@@ -192,6 +192,148 @@ class SkinPolicyTests(unittest.TestCase):
         self.assertGreaterEqual(len(reasons), 3)
 
 
+class QuadrupedTemplateTests(unittest.TestCase):
+    def test_fifteen_bones_with_four_two_segment_legs(self):
+        bones = template.build_template("quadruped")
+        names = [b.name for b in bones]
+        self.assertEqual(len(names), 15)
+        for leg in ("leg.FL", "leg2.FL", "leg.FR", "leg2.FR",
+                    "leg.HL", "leg2.HL", "leg.HR", "leg2.HR"):
+            self.assertIn(leg, names)
+        for part in ("root", "spine", "hips", "neck", "head",
+                     "tail.1", "tail.2"):
+            self.assertIn(part, names)
+
+    def test_spine_chain_runs_front_to_back(self):
+        bones = {b.name: b for b in template.build_template("quadruped")}
+        # Head end of the chain sits at the front (-Y), tail at back.
+        self.assertLess(bones["head"].head[1], bones["neck"].head[1])
+        self.assertLess(bones["neck"].head[1], bones["spine"].head[1])
+        self.assertGreater(bones["tail.2"].tail[1],
+                           bones["hips"].tail[1])
+
+    def test_front_legs_parent_to_spine_hind_to_hips(self):
+        bones = {b.name: b for b in template.build_template("quadruped")}
+        self.assertEqual(bones["leg.FL"].parent, "spine")
+        self.assertEqual(bones["leg.HR"].parent, "hips")
+        self.assertEqual(bones["leg2.FL"].parent, "leg.FL")
+
+
+class BipedTemplateTests(unittest.TestCase):
+    def test_eleven_bones_without_ears_thirteen_with(self):
+        plain = template.build_template("biped")
+        self.assertEqual(len(plain), 11)
+        self.assertNotIn("ear.L", [b.name for b in plain])
+        eared = template.build_template("biped", ears=True)
+        names = [b.name for b in eared]
+        self.assertEqual(len(names), 13)
+        self.assertIn("ear.R", names)
+
+    def test_two_segment_arms_and_legs(self):
+        bones = {b.name: b for b in template.build_template("biped")}
+        self.assertEqual(bones["arm2.L"].parent, "arm.L")
+        self.assertEqual(bones["leg2.R"].parent, "leg.R")
+        self.assertEqual(bones["arm.L"].parent, "spine")
+        self.assertEqual(bones["leg.L"].parent, "root")
+
+    def test_new_templates_parents_precede_and_bounds(self):
+        for name, options in (("quadruped", {}), ("biped", {}),
+                              ("biped", {"ears": True})):
+            bones = template.build_template(name, **options)
+            names = [b.name for b in bones]
+            self.assertEqual(len(names), len(set(names)))
+            for bone in bones:
+                if bone.parent:
+                    self.assertLess(names.index(bone.parent),
+                                    names.index(bone.name))
+                for frac in bone.head + bone.tail:
+                    self.assertGreaterEqual(frac, -0.55)
+                    self.assertLessEqual(frac, 1.0)
+
+
+class PerTemplatePoseTests(unittest.TestCase):
+    def test_every_template_recipe_covers_exactly_its_channels(self):
+        for tname, spec in poses.TEMPLATE_RECIPES.items():
+            for clip, (fn, _seconds) in spec["recipes"].items():
+                self.assertEqual(set(fn(0.3)), set(spec["channels"]),
+                                 f"{tname}/{clip}")
+
+    def test_quadruped_idle_is_gentle(self):
+        for t in range(0, 480):
+            for channel, value in poses.quad_idle(t / 100).items():
+                self.assertLessEqual(abs(value), 0.12, channel)
+
+    def test_quadruped_bounce_lifts_and_tucks(self):
+        peak = max(poses.quad_bounce(t / 100)["root_y"]
+                   for t in range(0, 125))
+        self.assertGreater(peak, 0.08)
+        self.assertLessEqual(peak, 0.12)
+        apex = poses.quad_bounce(0.31)
+        for leg in ("leg.FL", "leg.FR", "leg.HL", "leg.HR"):
+            self.assertGreater(apex[leg], 0.1, leg)
+            self.assertGreater(apex["leg2." + leg[-2:]], apex[leg])
+
+    def test_biped_wave_raises_then_lowers(self):
+        self.assertAlmostEqual(poses.biped_wave(0.0)["arm_wave"], 0.0)
+        self.assertGreater(poses.biped_wave(1.2)["arm_wave"], 1.8)
+        self.assertAlmostEqual(poses.biped_wave(2.4)["arm_wave"], 0.0)
+
+    def test_biped_idle_is_gentle(self):
+        for t in range(0, 480):
+            for channel, value in poses.biped_idle(t / 100).items():
+                self.assertLessEqual(abs(value), 0.09, channel)
+
+    def test_sample_for_frame_counts(self):
+        self.assertEqual(len(poses.sample_for("quadruped", "bounce")),
+                         round(1.24 * 24))
+        self.assertEqual(len(poses.sample_for("biped", "wave")),
+                         round(2.4 * 24))
+        self.assertEqual(poses.showcase_clip("quadruped"), "bounce")
+        self.assertEqual(poses.showcase_clip("biped"), "wave")
+        self.assertEqual(poses.showcase_clip("winged-creature"), "hop")
+
+
+class SkinPolicyTipLabelTests(unittest.TestCase):
+    def test_custom_tip_label_is_named_in_the_reason(self):
+        accepted, reasons = skin_policy.assess_heat(
+            0.995, {"root": 10}, ["root"], 0.1, tip_label="feet")
+        self.assertFalse(accepted)
+        self.assertTrue(any("feet" in r for r in reasons))
+
+    def test_default_label_stays_wingtip(self):
+        accepted, reasons = skin_policy.assess_heat(
+            0.995, {"root": 10}, ["root"], 0.1)
+        self.assertFalse(accepted)
+        self.assertTrue(any("wingtip" in r for r in reasons))
+
+    def test_good_tip_passes_for_other_templates(self):
+        accepted, reasons = skin_policy.assess_heat(
+            0.995, {"root": 10}, ["root"], 0.9, tip_label="hands")
+        self.assertTrue(accepted)
+        self.assertEqual(reasons, [])
+
+
+class PropCatalogTests(unittest.TestCase):
+    def test_prop_entry_records_no_rig(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            glb = os.path.join(tmp, "treasure-chest.glb")
+            with open(glb, "wb") as fh:
+                fh.write(b"glTF-fake-bytes" * 32)
+            entry = catalog.build_entry(
+                "Treasure Chest", "chest.webp", glb,
+                {"verts": 10, "faces": 12}, [], [],
+                {"rigged": False, "rig_template": None,
+                 "weight_method": None})
+            self.assertEqual(entry["bones"], [])
+            self.assertEqual(entry["actions"], [])
+            self.assertFalse(entry["provenance"]["rigged"])
+            self.assertIsNone(entry["provenance"]["weight_method"])
+            path = catalog.write_entry(tmp, entry)
+            loaded = catalog.read_entry(tmp, "treasure-chest")
+            self.assertEqual(loaded["sha256"], entry["sha256"])
+            self.assertTrue(os.path.exists(path))
+
+
 class BridgeDisciplineTests(unittest.TestCase):
     def test_bridge_runner_requires_a_token(self):
         sys.path.insert(0, PROJECT)

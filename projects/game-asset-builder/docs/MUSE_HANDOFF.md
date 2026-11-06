@@ -136,12 +136,89 @@ coverage 1.0, wingtip 1.0, no rescue needed. Note the head-zone check
 reads 0.0 for Pip by definition — with ears fitted, the ear bones
 rightly dominate the top-central zone the check credits to "head".
 
+## P1 templates + prop path — BUILT AND PROVEN (2026-11-06, branch game-asset-builder/p1-templates)
+
+PR #37 (skinning) was merged by the owner; this branch starts from
+main at `cc28756`. What landed:
+
+- **Templates** (`stages/rig/template.py`): `quadruped()` — 15 bones
+  (root; spine + hips splitting the body so front and rear pitch
+  independently; neck, head; two-segment legs at four corners;
+  tail.1–2) and `biped(ears=False)` — 11 bones, 13 with ears
+  (vertical root/spine/head, two-segment arms and legs). Both are
+  bbox-fraction layouts in the same parameterized system as
+  `winged-creature`, and both run the unchanged skinning stack
+  (cleanup → snap → bone heat → `skin_policy` acceptance). One
+  measured design point: biped arm bones use a horizontal roll —
+  probed in Blender, that makes local +X the symmetric raise axis;
+  with the vertical roll no single axis raises a hanging arm.
+- **Recipes** (`stages/animate/poses.py` + per-template driver
+  tables in `animate_blender.py`): quadruped `idle` + `bounce`
+  (two-hop bounce chosen over a walk cycle — a walk's footfall
+  timing would be invented; the bounce's lift is measurable in a
+  still: apex ground clearance vs rest); biped `idle` + `wave`
+  (1.9 rad arm raise with a smoothstep hold envelope and a forearm
+  wiggle). The winged recipes/drivers are byte-for-byte the P0
+  behaviour (winged back-compat re-verified on the Ember Dragon).
+- **Tip checks generalized**: the acceptance policy's extremities
+  check is now labelled per template — wingtips (winged), feet
+  (quadruped: lowest 10% of verts, leg-dominated), hands (biped:
+  outer-low verts, same-side-arm dominated). Zone evidence is
+  per-template too; the biped head zone now counts ear bones across
+  the full head width (the inherited centre-strip definition
+  under-reported by ~0.4 on the goblin — metric fix, not a rig
+  change; the re-rigged GLB was byte-identical).
+- **Prop path** (`stages/prop/prop_blender.py`, pipeline `--prop`
+  mode): prep → mesh → texture → weld/decimate/cleanup → static
+  GLB → catalog. No rig/animate stage runs; the catalog entry has
+  empty bones/actions and provenance `rigged: false`,
+  `weight_method: null`. `render_verify.py --static` proves the
+  absence of an armature on cold re-import and refuses to pass a
+  rigged file. The stage registry is unchanged — a prop run is a
+  pipeline mode, not a fake stage.
+- **Facing correction**: `rig_blender.py --rotate-z {0,90,180,270}`,
+  plumbed through the pipeline/CLI and recorded in the rig report
+  and catalog provenance. Implemented via `matrix_world` after the
+  first implementation silently no-opped (glTF imports sit in
+  quaternion rotation mode; `rotation_euler` writes are ignored —
+  the bake-off scorer's lesson, second time it has bitten).
+
+Proof assets (all numbers in `docs/TEST_PLAN.md`; catalog entries
+sha-verified):
+
+- **Triceratops** (quadruped): Hunyuan emitted the body SIDEWAYS
+  (axis along X). First rig: heat shipped, coverage 1.0, head zone
+  0.05 — the metric exposed the mismatch instead of hiding it.
+  Re-rigged at rotate-z 90: coverage 1.0, feet 1.0, head zone
+  0.9998, 45,001 verts, idle + bounce, stress pose clean.
+- **Snow Goblin** (biped + ears): messiest rig input yet (137
+  non-manifold edges, 58 shells); heat shipped, coverage 1.0,
+  hands 1.0, 49,080 verts, idle + wave. Known cosmetic limit: the
+  fused-fur ruff is partly arm-weighted — the shipped wave reads
+  fine; a 2.2 rad stress raise drags a visible fur sail. No
+  tearing. Mitigation (weight-distance veto) is future work.
+- **Treasure Chest** (prop): 27,041 verts from a 1.08M-vert
+  textured mesh, static verify clean (0 bones/groups/actions),
+  renders match the concept.
+
+Incidents: the bridge's exec-job tracking ends at ~15 min on long
+jobs (observed on the goblin and chest paint stages; the P0 paint
+disconnect fits the same pattern). The PC-side processes were
+unharmed both times and finished; their outputs were adopted from
+the lab (stage_runner result JSON is the authority) and the
+manifests/catalogues carry the true adopted records — a resume
+pass initially overwrote the mesh-stage records with
+`{"resumed": true}` placeholders, which were restored from the
+PC-side result files before cataloguing. Suite: 44/44.
+
 Next:
-1. Owner decisions outstanding: merge of the skinning PR (draft,
-   against main; PR #36 merged 2026-11-06 at `8b6609b`); whether to
-   unblock Stable Fast 3D (owner-side HF action, only if wanted).
-2. P1 when directed: quadruped/biped rig templates, the unrigged prop
-   path, and trying the optional rembg prep upgrade.
+1. Owner decisions outstanding: merge of this P1 PR (draft, against
+   main); whether to unblock Stable Fast 3D (owner-side HF action,
+   only if wanted).
+2. P2 when directed: a simple local UI over the catalog and
+   pipeline. Possible P1.1 hardening if wanted: a weight-distance
+   veto for fused-fur bipeds; a bridge-client adoption path for
+   >15 min stages instead of the manual recovery used here.
 
 Boundaries: no cloud fallback exists or may be added; weights and outputs
 never enter git; GPU claims only from PC runs; merges are the owner's call.
