@@ -45,7 +45,7 @@ PC during install verification.
 | File | Covers |
 | --- | --- |
 | `tests/test_display_state.py` (14) | the pure signal→display mapping: idle / working (job or tracked process) / session outranks working / staged update → connecting / fresh `applied_ok` → celebrate, stale → falls through / apply + rollback failures and a fresh rollback → alert / supervisor failure states → alert / agent unreachable: briefly → connecting, during restart states → connecting, too long → alert / alert outranks activity |
-| `tests/test_supervisor_gui.py` (3) | import-level smoke only (module imports with no window created); every art key the mapping can emit has a committed animation asset; the mapping only ever emits known art keys. A real Tk window needs a display and is verified on the owner's PC, never claimed from a headless run |
+| `tests/test_supervisor_gui.py` (4) | import-level smoke only (module imports with no window created); every art key the mapping can emit has a committed animation asset; the mapping only ever emits known art keys; every asset declares a transparent colour (byte-level Graphic Control Extension check — the floating window is colour-key transparent). A real Tk window needs a display and is verified on the owner's PC, never claimed from a headless run |
 
 ### Verified so far
 
@@ -170,9 +170,26 @@ PC during install verification.
   full-screen capture does not show the DPI-aware avatar window
   (the capturing process is DPI-virtualized); the window itself
   was proven by window rect + PrintWindow + state files.
-  **Not yet done: the production form has NOT been switched** —
-  the console supervisor still runs production; switching the
-  logon task to the GUI form is the owner's separate call.
+  **Production form, updated 2026-11-05 evening:** the owner
+  approved the switch; the console production was stopped and its
+  logon task disabled (kept as the rollback path), the owner
+  started the GUI form directly, and a new enabled logon task
+  "Muse PC Bridge (avatar)" now autostarts the GUI form. The
+  avatar window and live `display-state.json` were verified on
+  the production instance after the switch.
+- 2026-11-05 evening (transparent avatar, owner's request): the
+  six state GIFs were regenerated with the videos' near-white
+  backdrop keyed out (border-connected flood keying + 1 px
+  foreground erosion; full frames, shared 255-colour palette,
+  index 255 transparent — frame transparency 42–66%). The GUI
+  window now colour-keys that transparency on Windows
+  (`-transparentcolor`): only the character and the status line
+  show; the alert flash moved to the status strip so it no longer
+  paints the window background. A new byte-level test proves
+  every asset declares a transparent colour. **Full suite on the
+  VM: 81 tests, OK (1 skip).** Owner-PC verification of the
+  transparent rendering is recorded in the next entry — until
+  then it is NOT claimed.
 
 ## What the tests cannot prove
 

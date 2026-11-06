@@ -8,6 +8,12 @@ window, a small floating window shows Muse's avatar, animated
 according to what the bridge is actually doing (display_state.py maps
 real supervisor/agent signals to the animation — nothing is faked).
 
+The avatar GIFs have their backdrop keyed out, and on Windows the
+window itself is colour-key transparent: only the character (and the
+small status line) is visible against the desktop, and clicks pass
+through the transparent parts. Platforms without colour-key support
+fall back to the plain dark window.
+
 Kill-switch semantics are preserved exactly: the floating window IS
 the visible indicator, and stopping it (the x control or the
 right-click menu) stops the supervisor AND the agent. There is no
@@ -42,6 +48,9 @@ ASSET_DIR = Path(__file__).resolve().parent / "assets" / "avatar"
 BG = "#202020"
 BG_ALERT = "#5a1216"
 FG = "#f2f2f2"
+# Colour-key for window transparency: the avatar art contains no
+# magenta, so keying this colour out leaves only the character.
+KEY = "#ff00ff"
 
 
 def _agent_dir() -> Path:
@@ -166,16 +175,26 @@ class AvatarWindow:
         root.title("Muse PC Bridge")
         root.overrideredirect(True)
         root.attributes("-topmost", True)
-        root.configure(bg=BG)
+        self._transparent = False
+        try:
+            root.wm_attributes("-transparentcolor", KEY)
+            self._transparent = True
+        except tk.TclError:
+            pass  # no colour-key support: plain dark window fallback
+        root.configure(bg=KEY if self._transparent else BG)
 
-        self.avatar_label = tk.Label(root, bg=BG, bd=0)
+        self.avatar_label = tk.Label(
+            root, bg=KEY if self._transparent else BG, bd=0)
         self.avatar_label.pack(side="top")
-        self.text_label = tk.Label(root, bg=BG, fg=FG, bd=0,
-                                   font=("Segoe UI", 9),
-                                   text="Muse PC Bridge — starting")
+        self.text_label = tk.Label(
+            root, bg=KEY if self._transparent else BG, fg=FG, bd=0,
+            font=("Segoe UI", 9),
+            text="Muse PC Bridge — starting")
         self.text_label.pack(side="top", fill="x", pady=(2, 4))
-        self.close_label = tk.Label(root, text="✕", bg=BG, fg=FG, bd=0,
-                                    font=("Segoe UI", 10, "bold"))
+        self.close_label = tk.Label(
+            root, text="✕",
+            bg=KEY if self._transparent else BG, fg=FG, bd=0,
+            font=("Segoe UI", 10, "bold"))
         self.close_label.place(relx=1.0, x=-4, y=2, anchor="ne")
         self.close_label.bind("<Button-1>", lambda _e: self.stop())
 
@@ -304,13 +323,19 @@ class AvatarWindow:
         self.text_label.configure(text=f"Muse — {view['label']}{ver}")
         if view["state"] == "alert":
             self._alert_flash = not self._alert_flash
-            bg = BG_ALERT if self._alert_flash else BG
         else:
-            bg = BG
-        self.root.configure(bg=bg)
-        self.avatar_label.configure(bg=bg)
-        self.text_label.configure(bg=bg)
-        self.close_label.configure(bg=bg)
+            self._alert_flash = False
+        if self._transparent:
+            # Only the status strip flashes now: flashing the window
+            # background would defeat the colour-key transparency.
+            self.text_label.configure(
+                bg=BG_ALERT if self._alert_flash else KEY)
+        else:
+            bg = BG_ALERT if self._alert_flash else BG
+            self.root.configure(bg=bg)
+            self.avatar_label.configure(bg=bg)
+            self.text_label.configure(bg=bg)
+            self.close_label.configure(bg=bg)
         if not self._placed:
             self._placed = True
             self.root.update_idletasks()

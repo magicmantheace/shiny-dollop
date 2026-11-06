@@ -56,9 +56,9 @@ and token to Muse **out-of-band** — never via git.
 | --- | --- |
 | `agent/bridge_agent.py` | the server (runs on the PC) |
 | `agent/supervisor.py` | v1 service form: visible-console supervisor (auto-restart, staged-update apply + health check + auto-rollback) |
-| `agent/supervisor_gui.py` | avatar-display supervisor form: same Supervisor core in a floating window — Muse's avatar animated by real bridge activity; closing the window is the kill switch |
+| `agent/supervisor_gui.py` | avatar-display supervisor form: same Supervisor core in a floating window — Muse's avatar animated by real bridge activity, colour-key transparent so only the character shows on the desktop; closing the window is the kill switch |
 | `agent/display_state.py` | pure signal→display-state mapping for the avatar window (idle / working / session / connecting / celebrate / alert) |
-| `agent/assets/avatar/` | avatar animation loops, one full-frame GIF per display state |
+| `agent/assets/avatar/` | avatar animation loops, one full-frame transparent GIF per display state |
 | `agent/bridge_update.py` | self-update mechanics (bundle verify, staged apply, rollback) |
 | `agent/helpers/uia.ps1` | fixed UI Automation helper driven by the agent (JSON parameters only) |
 | `client/bridge_client.py` | Muse-side library + CLI (jobs, processes, sessions, chunked files, screenshot/input/clipboard/uia) |

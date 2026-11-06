@@ -32,6 +32,28 @@ class SupervisorGuiSmokeTests(unittest.TestCase):
             self.assertGreater(path.stat().st_size, 1000,
                                f"asset suspiciously small: {path}")
 
+    def test_every_asset_declares_a_transparent_colour(self):
+        # The floating window is colour-key transparent, so the GIFs
+        # themselves must carry transparency: a Graphic Control
+        # Extension (0x21 0xF9 0x04) whose packed byte has the
+        # transparent-colour flag (bit 0) set. Byte-level check —
+        # rendering is verified on the owner's PC.
+        for key in ART_KEYS:
+            data = (AGENT_DIR / "assets" / "avatar"
+                    / f"{key}.gif").read_bytes()
+            found = False
+            idx = 0
+            while True:
+                idx = data.find(b"\x21\xf9\x04", idx)
+                if idx < 0:
+                    break
+                if data[idx + 3] & 0x01:
+                    found = True
+                    break
+                idx += 1
+            self.assertTrue(found,
+                            f"{key}.gif has no transparent colour")
+
     def test_display_state_only_emits_known_art_keys(self):
         cases = [
             ({"state": "running"}, {"jobs_running": 0,

@@ -508,8 +508,48 @@ the GUI is per-monitor DPI-aware). The window's rendering was
 proven by Win32 rect + `PrintWindow` + state files instead. A
 human at the PC sees the window normally.
 
-**Not done, by design:** production still runs the console form.
-Switching the logon task to `start-bridge-gui.cmd` is the owner's
-separate go. The celebrate/alert states were verified by unit
-test only (no update was staged on the temp instance to drive
-them live).
+**Production switch (2026-11-05 evening, owner's go):** the
+console production was stopped and its logon task disabled (kept,
+disabled, as the rollback path). One hard lesson: the stop was
+issued through a throwaway monitor instance on port 8768, and
+`bridge-service.ps1 -Action stop` kills bridge python processes
+broadly — it took the monitor down with production, leaving no
+remote channel until the owner started the GUI form by hand at
+the PC. Never run a service stop through a sibling instance
+without reading its process-matching scope first. The owner then
+launched `start-bridge-gui.cmd` himself; a new logon task
+**"Muse PC Bridge (avatar)"** (enabled, Ready) now autostarts
+the GUI form, and the avatar window + live `display-state.json`
+were verified on production after the switch. The celebrate/alert
+states remain unit-tested only (never driven live).
+
+## 2026-11-05 evening — transparent avatar (owner's request)
+
+The owner asked for the floating window's background to be
+transparent. Two halves:
+
+- **Assets regenerated with the backdrop keyed out.** The source
+  videos sit the character on a near-white backdrop. Keying =
+  pixels similar to the backdrop AND connected to the frame
+  border (flood/labelling), plus 1 px of foreground erosion to
+  strip the bright fringe — connectedness is what protects the
+  pale skin and the black dress (neither touches the border as a
+  similar-coloured region). Full frames, 320×320, 10 fps, one
+  shared 255-colour palette per GIF + palette index 255 as the
+  transparent colour; per-frame transparency runs 42–66%. The
+  full-frame rule from the 2026-11-05 defect list still applies.
+- **Window colour-key:** `supervisor_gui.py` sets Tk's
+  `-transparentcolor` to a magenta key (`KEY = "#ff00ff"`, absent
+  from the art) on the root and every label, so on Windows only
+  the character and the status line are visible and clicks pass
+  through the transparent parts. If the attribute is unsupported,
+  the window falls back to the original dark box. The alert flash
+  no longer repaints the whole window background (that would
+  defeat the keying) — it flashes the status strip only; the
+  alert GIF's red border is unchanged.
+
+VM suite: **81 tests OK (1 skip)** — the new test is byte-level
+(every GIF must declare a transparent colour in a Graphic Control
+Extension). Rendering on Windows is verified on the owner's PC
+and recorded in TEST_PLAN when done; it is not claimed from the
+VM.
