@@ -227,3 +227,107 @@ Deviations and findings:
   session — passes). Future A/B builds pick up the new base ini
   through the fixed anchor in `tools/native_ab.py`.
 
+## Browser + files end-to-end — the S2 item closed (2026-11-06)
+
+The one unrun item from the S2 section — the files window's
+end-to-end exercise, `tests/smoke-native-browser.py` (B0–B7) —
+has now run against a browser proof disk built from current
+post-redesign source. **Verdict:
+`SYNVEIL_BROWSER_QEMU_PROOF_PASSED`** (driver exit 0; the
+receipt's independent gate re-validation reports zero failures).
+
+Build (host: this project's QEMU build VM, non-root runner):
+
+- `python3 tests/smoke-native-browser.py --prepare-tls`, then
+  `tools/native_ab.py --build --browser --rebuild-joined
+  --browser-test-ca out/browser-proof/tls-fixture/ca.pem
+  --browser-test-host 10.0.2.2 test.synveil.invalid
+  --browser-start-url https://test.synveil.invalid:8443/`.
+- Source `bec9581` (the S3 tip `d919b4c` plus the durable-audit
+  v2 design note; no product code differs). Proof disk sha256
+  `bf4a28c23cc977dca6597e48f4dde26798bc83421b033455caeb37831a71a987`;
+  generations v1 `18f20314…`, v2 `b15de887…`, v3 `8b502d63…`;
+  TLS fixture CA sha256 `8d5cb743…` (the October fixture's
+  3-day certificates had expired; regenerated);
+  Chromium 156.0.8078.47-1~deb13u1 as pinned.
+- The October receipts were preserved before the rebuild
+  overwrote them; the October record below
+  (`docs/validation/browser-qemu-proof-2026-10-27/`) is the
+  pre-redesign proof and is not modified.
+
+What the passing run demonstrated (receipt, re-derived from the
+disk + server log + guest session logs): B0 enrollment, network
+ready, verified-HTTPS start page rendered; B1 `payload.bin`
+download with matching host/guest digests; B2 uniquified
+`payload (1).bin`, original untouched; B3 oversized download
+refused on storage with the browser surviving; B4 bad-TLS
+endpoint (port 8444) refused, Back restored the good page; B5
+cold-reboot persistence and the **files window listing
+`payload.bin`** (its session log on DATA recorded the scans:
+`files_payload_scans` 2); B6 A/B update to v2 (staged, trial
+boot healthy, **files window listed `payload2.bin`**,
+`files_payload2_scans` 4, owner-confirmed) with downloads and
+the credential surviving; B7 rollback to v1 with downloads,
+profile and credential intact; sandboxed renderer records
+(user-namespace + seccomp) present for all three boots.
+
+![Start page proof](browser-files-page-proof.png)
+![Files window during the v2 confirm, update window behind](browser-files-window.png)
+![Start page on v2 with both payload links](browser-files-payload2-page.png)
+
+### Harness locator fixes (tests only; no gate semantics changed)
+
+The exercise had never run against the redesigned shell, and
+three locators in `tests/smoke-native-browser.py` were stale —
+each failure was reproduced, root-caused against captured
+frames and the client source, and verified offline against a
+real session frame before the passing run:
+
+- `_teal_title_block` unioned the files title bar with the
+  bottom panel's same-teal task button (measured "title" y
+  112..799, `title_h` 688), which put
+  `refresh_files_window`'s fallback click outside the display
+  and crashed the driver after B4
+  (`ValueError: pointer test coordinates outside guest
+  display` — the receipt now also records the traceback).
+  The pre-S3 `y >= 40` scan guard was equally wrong post-S3
+  (the window opens at y ≈ 13). The locator now bands teal
+  rows (≥400 hits/row) and takes the strongest band.
+- `_find_refresh_button` still hunted the pre-redesign green
+  `COL_BTN 0x2E7D4F`; ADR 0024 S2 made it the accent
+  `0x4CC2FF`. Updated to the current client constant (the
+  button's 128×36 geometry at (16, height−92) is unchanged).
+- `close_files_window` and the refresh fallback click now
+  fail soft (return False) on degenerate measured geometry
+  instead of raising out of the pointer helper and aborting
+  every later scenario; the affected scenario still fails its
+  own gates honestly.
+
+Run history, honestly: the first attempt failed B0 on TCG
+timing (Chromium's cold start exceeded the 300 s page-proof
+window under host load; the page rendered ~2 minutes after
+the driver gave up — the same quiet-host caveat as S2/S3);
+two attempts died to the driver crash above; three further
+attempts were lost to build-VM reboots and the environment
+repairs they forced (OVMF pair and iPXE ROMs restored to the
+system paths from `~/host-tools`); the next attempt
+reproduced the crash with the traceback that named the line;
+the following run passed end to end.
+
+One live-behaviour note: `_find_refresh_button` can still
+miss on live frames because ADR 0024's 200 ms crossfade leaves
+the button mid-blend at capture time (visible in the files
+screenshot); the geometry-derived fallback click performs the
+refresh, and the gate evidence is the session log's recorded
+scans, which were present. No product code changed for this
+exercise, and nothing in the ADR 0023 frozen zone was touched:
+the disk was built by the existing pipeline from the S3 tip,
+and the update round trip it exercised is the frozen
+mechanism's own behaviour, re-validated here as ADR 0023
+requires after payload changes.
+
+With this, every ADR 0024 slice that is authorized has QEMU
+evidence: S1, S2, S3 and the browser/files exercise. S4 (a
+custom taskbar shell) remains unauthorized and unstarted.
+Physical validation remains parked (ADR 0023); this proof is
+QEMU-only (`physical_boot_validated: false` in the receipt).

@@ -1,7 +1,10 @@
 # Networking and the graphical browser
 
 Status: **QEMU-proven** (Priority 3/4 acceptance,
-`docs/validation/browser-qemu-proof-2026-10-27/`). The
+`docs/validation/browser-qemu-proof-2026-10-27/`; re-proven
+against the post-ADR-0024 redesigned image on 2026-11-06 —
+`SYNVEIL_BROWSER_QEMU_PROOF_PASSED` from source `bec9581`,
+recorded in `docs/validation/ui-redesign-2026-11-05/`). The
 browser is stock-configured with no connection blocking
 (owner decision, 2026-10-27); the earlier privacy record
 (`docs/validation/browser-privacy-proof-2026-10-27/`)
