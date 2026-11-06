@@ -369,9 +369,12 @@ work started.
   `assetsInclude: ['**/*.glb']` for the model asset.
 - Verified (VM): desktop **96/96** (+8 pose-driver tests),
   typecheck (4 configs) and build clean, Electron smoke
-  SMOKE_OK. Owner-PC live verification is recorded in
-  TEST_PLAN when it happens — VM results say nothing about
-  the Windows window itself.
+  SMOKE_OK. Owner-PC live verification the same morning:
+  the real pet window renders the 3D Pip (textured, framed,
+  breathing between captures, bridge bubble compositing
+  over the canvas) — see TEST_PLAN for the honest split
+  (hop/sick/sleeping poses proven in Blender + unit tests,
+  not yet caught live in the window).
 
 ## Next step
 

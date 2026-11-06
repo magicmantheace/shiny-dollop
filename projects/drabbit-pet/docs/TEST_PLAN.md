@@ -115,10 +115,17 @@ harder than idle; eating dips repeatedly; damping converges
 without overshoot). Desktop suite **96 tests**, typecheck and
 build clean, Electron smoke SMOKE_OK. The rig itself was
 pose-tested in Blender before integration (idle / hop / sick
-renders from the armature + automatic weights). Owner-PC live
-verification (3D model in the real pet window) is recorded
-here when it happens; until then the Windows rendering is
-unverified by design honesty.
+renders from the armature + automatic weights). Owner-PC
+live verification (2026-11-06): pulled + built on the PC
+worktree, restarted the real pet, and PrintWindow-captured
+the live 550×550 window — the 3D model renders textured
+and framed in place of the portrait, the bridge-reaction
+bubble composites over the canvas, and consecutive captures
+differ (frame-to-frame breathing motion: the render loop
+and pose driver are live on Windows). The hop pose was not
+caught live (Pip stayed seated through the capture window);
+hop / sick / sleeping poses rest on the Blender rig proof
+plus the pose-driver unit tests until observed live.
 
 ## P3 — companion server (`desktop/tests/companion-*.test.ts`)
 
