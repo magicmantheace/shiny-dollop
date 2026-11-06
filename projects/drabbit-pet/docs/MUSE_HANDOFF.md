@@ -282,6 +282,34 @@ Added, in the existing CSS-keyframe idiom:
   pet was then relaunched on the new build. Demo profiles and
   captures cleaned up on the PC afterwards.
 
+## 2026-11-05 night — window guard (the pet can never be lost)
+
+The owner right-clicked the pet (the hide gesture), and when it
+came time to bring it back the pet was *gone*: its window
+measured (1463,1490)–(11571,2040) physical — ~10,108 px wide,
+effectively off-screen. Root weakness: roaming only ever set
+the window's left-edge position against the work area and
+nothing anywhere verified the window's size or full extent, so
+a corruption (likely a display change while hidden) was never
+corrected. The pet was recovered by restarting the app; then
+the owner asked for the guarantee, and it shipped:
+
+- `desktop/src/main/window-bounds.ts` — pure
+  `constrainRectToWorkArea(rect, workArea, size)`: force exactly
+  pet size, clamped fully inside the work area; null when
+  already right. `main.ts` applies it as `guardPetWindowOnScreen()`:
+  on every roam tick (200 ms — so even a hidden window is
+  repaired before it can be shown lost), on Electron `screen`
+  display added/removed/metrics-changed events, and before the
+  tray "Show pet" and second-instance shows.
+- Verified: VM desktop **85/85** (+7 window-bounds tests,
+  including the incident rect). Owner-PC attack test: the live
+  window was SetWindowPos'd fully off-screen right, stretched
+  to the incident's 10,108 px width, and pushed off the
+  left/bottom corner — each time it snapped back to exactly
+  550×550, fully on screen, within 1.5 s; Pip rendered on
+  throughout. Deployed and running on the owner's real pet.
+
 ## Next step
 
 The v1 queue is complete; everything left is owner-side
