@@ -29,6 +29,7 @@ def load(name, relpath):
 template = load("gab_template", "stages/rig/template.py")
 poses = load("gab_poses", "stages/animate/poses.py")
 catalog = load("gab_catalog", "stages/catalog/catalog.py")
+skin_policy = load("gab_skin_policy", "stages/rig/skin_policy.py")
 
 
 class TemplateTests(unittest.TestCase):
@@ -150,6 +151,45 @@ class CutoutTests(unittest.TestCase):
             self.assertEqual(alpha[0, 0], 0)  # corner transparent
             cy, cx = alpha.shape[0] // 2, alpha.shape[1] // 2
             self.assertGreater(alpha[cy, cx], 200)  # centre opaque
+
+
+class SkinPolicyTests(unittest.TestCase):
+    BONES = ["root", "spine", "wing.L", "wing.R"]
+
+    def per_bone(self, **overrides):
+        base = {name: 100 for name in self.BONES}
+        base.update(overrides)
+        return base
+
+    def test_healthy_heat_result_is_accepted(self):
+        accepted, reasons = skin_policy.assess_heat(
+            0.995, self.per_bone(), self.BONES, 0.83)
+        self.assertTrue(accepted)
+        self.assertEqual(reasons, [])
+
+    def test_low_coverage_is_rejected_with_reason(self):
+        accepted, reasons = skin_policy.assess_heat(
+            0.42, self.per_bone(), self.BONES, 0.83)
+        self.assertFalse(accepted)
+        self.assertTrue(any("coverage" in r for r in reasons))
+
+    def test_a_bone_with_no_verts_is_rejected_and_named(self):
+        accepted, reasons = skin_policy.assess_heat(
+            0.995, self.per_bone(**{"wing.R": 0}), self.BONES, 0.83)
+        self.assertFalse(accepted)
+        self.assertTrue(any("wing.R" in r for r in reasons))
+
+    def test_wingtips_left_to_other_bones_is_rejected(self):
+        accepted, reasons = skin_policy.assess_heat(
+            0.995, self.per_bone(), self.BONES, 0.0)
+        self.assertFalse(accepted)
+        self.assertTrue(any("wingtip" in r for r in reasons))
+
+    def test_multiple_failures_are_all_reported(self):
+        accepted, reasons = skin_policy.assess_heat(
+            0.0, self.per_bone(**{"wing.L": 0}), self.BONES, 0.0)
+        self.assertFalse(accepted)
+        self.assertGreaterEqual(len(reasons), 3)
 
 
 class BridgeDisciplineTests(unittest.TestCase):
