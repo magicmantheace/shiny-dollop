@@ -62,6 +62,11 @@ its own). Decisions are a pure function of the pet summary
 | `assets/` | Replaceable sprite/art assets | P2 |
 | `docs/` | [Pet design bible](docs/PET_DESIGN.md), [architecture](docs/DESIGN.md), [test plan](docs/TEST_PLAN.md), [handoff](docs/MUSE_HANDOFF.md) | P0 |
 
+Art: the desktop pet normally renders a hand-drawn SVG, but the
+royal fur has a generated **painterly portrait set** (the owner's
+pet, Pip) covering the idle/eating/playing/sick/sleeping states —
+see the handoff's 2026-11-05 painterly-art entry for scope.
+
 ## Try it
 
 ```sh

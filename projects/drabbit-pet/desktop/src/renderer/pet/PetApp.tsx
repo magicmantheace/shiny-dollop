@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PetSummary } from '../../shared/api-types.js';
-import { DrabbitSvg } from './DrabbitSvg.js';
+import { PetArt } from './PetArt.js';
 import {
   bridgeTransientFor,
   resolveAnimState,
@@ -71,7 +71,7 @@ export function PetApp() {
         void window.drabbit.openPanel().catch(() => undefined);
       }}
     >
-      <DrabbitSvg summary={summary} anim={anim} />
+      <PetArt summary={summary} anim={anim} />
       {bridgeNote && (
         <div className="bridge-bubble" aria-live="polite">
           {bridgeNote}

@@ -32,6 +32,7 @@ surface; the GUI itself is not faked in tests.
 | Tick service | Fresh egg persisted once at startup; a tick that changes nothing writes nothing; crossing the incubation boundary persists and emits `egg_ready`; scheduler wiring (5 s default, start/stop, no double-schedule); a dead pet is never advanced or persisted; `onChanged` fires only on change. |
 | Roaming planner | Bounds respected under adversarial randomness (always-right / scripted-left), out-of-bounds starts clamped; never moves while asleep, panel-open, paused, an egg, or dead; hop → arrive exactly on target → sit; sit bias gives long idle sits. |
 | Window guard | `desktop/tests/window-bounds.test.ts` (7): the pure constrain function — on-screen/right-sized → no-op; off any edge → pulled fully in; negative coords → origin-clamped; the 2026-11-05 incident rect (~4,043 DIP wide) → forced back to pet size; undersized → restored to pet size; offset work-area origins respected; work area smaller than the pet → pinned to its origin. |
+| Painterly portrait art | `desktop/tests/pet-art.test.ts` (3): `hasAiArt` — royal fur + the six covered states (idle, hopping, eating, playing, sick, sleeping) → art; egg/egg-ready/cleaning/healing/hatching/dead → SVG fallback; every other fur → SVG at every state. |
 | IPC action mapping | Payload validation accepts all nine UI kinds and rejects malformed payloads (`bad_payload`); each kind maps to the right core action with exact need deltas (snack +8, meal +35/clamp, play −7 energy…); wrong-stage/state actions raise the core's typed errors (`not_ready`, `asleep`, `not_sick`, `not_dead`, `is_egg`); clean is allowed while asleep; medicine cures an injected sick pet; new-egg starts generation 2. |
 | Visual state | state→animation mapping (egg/egg-ready/idle/sleeping/sick/dead), care transients from events (fed/overfed → eating, played → playing, cleaned → cleaning, cured → healing, hatched → hatching; priority by kind), resolution priority (egg/dead/sleeping > transient > sick > hopping > idle — a care transient plays over the sick sway, then the sway resumes); bridge reactions add a bubble-only transient except `celebrate`, which maps to the playing bounce. |
 | Bridge link | `desktop/tests/bridge-link.test.ts` (12): display-state parsing (junk/missing state → null, optional fields tolerated); reaction mapping (busy states + celebrate react, alert reacts even on first sighting, repeats/connecting/first-sighting calm stay quiet, busy→idle relaxes, alert→idle says "All clear"); the polling service against an injected reader + fake scheduler (reacts on change only; missing/corrupt file is a quiet no-op and recovery works; start/stop wiring); env-override path priority. |
@@ -90,6 +91,20 @@ corner with raw SetWindowPos calls. Each time the window was
 back at exactly 550×550 and fully inside the screen within the
 1.5 s observation window (the guard ticks every 200 ms), and
 the pet rendered on, unbothered.
+
+**Painterly portrait art — owner-PC verification (2026-11-05
+night):** the desktop suite is now **88 tests**. The owner chose
+generated painterly art (his reference style) over a vector
+redraw for his royal pet. Five portraits (idle, eating, happy,
+sick, sleeping) were generated on-model from one hero image,
+cut out with a region-growing background removal, QA'd
+composited over a deliberately harsh busy background (clean fur
+edges, no halo), then deployed: the live pet window on the
+owner's PC was captured rendering the painterly idle portrait
+in place of the SVG. States without portraits (cleaning,
+healing, hatching, egg, dead) and all other furs still render
+the SVG — visible as a brief style change for the 1.6 s care
+transients until/unless portrait sets are generated for them.
 
 ## P3 — companion server (`desktop/tests/companion-*.test.ts`)
 

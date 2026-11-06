@@ -310,6 +310,34 @@ the owner asked for the guarantee, and it shipped:
   550×550, fully on screen, within 1.5 s; Pip rendered on
   throughout. Deployed and running on the owner's real pet.
 
+## 2026-11-05 night — painterly portrait art for the royal pet
+
+The owner iterated on the pet's look (vector anime prototype →
+his reference image: a lush painterly anime dragon-bunny) and
+chose **generated art in that style** over the vector redraw,
+knowing the trade: portraits have no wing/ear layers, so motion
+becomes whole-picture; states and furs without a set keep the
+SVG. Shipped scope: **Pip's set** — royal fur, five portraits
+(idle, eating, happy, sick, sleeping) generated chained from
+one hero image so the character stays on-model, backgrounds
+removed by region-growing flood fill + component keep +
+feathered alpha, QA'd over a busy test background.
+
+- `desktop/src/renderer/pet/PetArt.tsx` — the swap point:
+  `hasAiArt(fur, anim)` (pure, in `visual-state.ts`) → portrait
+  `<img>` with the shared `pet-*` keyframes as whole-picture
+  motion; otherwise `DrabbitSvg` unchanged. Portraits live in
+  `desktop/src/renderer/pet/assets/pip-*.png` (~1–1.5 MB each).
+- Covered: idle, hopping (idle portrait + hop motion), eating,
+  playing, sick, sleeping — the persistent states. **Not
+  covered:** cleaning, healing, hatching, egg, dead (SVG, incl.
+  a brief style change during the 1.6 s clean/heal transients),
+  and every non-royal fur. The set is Pip's portraits, applied
+  across life stages — it is not per-stage art.
+- Verified: VM desktop **88/88** (+3 pet-art tests), typecheck
+  and build clean; owner-PC live capture of the painterly pet
+  (see TEST_PLAN).
+
 ## Next step
 
 The v1 queue is complete; everything left is owner-side

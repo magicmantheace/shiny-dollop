@@ -1,4 +1,4 @@
-import type { PetEvent } from 'drabbit-core';
+import type { FurVariant, PetEvent } from 'drabbit-core';
 import type { PetSummary } from '../../shared/api-types.js';
 import type { BridgeReactionKind } from '../../shared/bridge-reaction.js';
 
@@ -20,6 +20,27 @@ export type PetAnimState =
   | 'hatching'
   | 'sick'
   | 'dead';
+
+/**
+ * Painterly AI art exists for these states, for royal fur only (the
+ * owner's pet, Pip — a commissioned portrait set, 2026-11-05). Every
+ * other fur, and these states' missing siblings (cleaning, healing,
+ * hatching, egg, dead), render with the hand-drawn SVG instead.
+ * Whole-picture motion replaces the SVG's part animations for the
+ * states the set covers.
+ */
+export const AI_ART_STATES: ReadonlySet<PetAnimState> = new Set([
+  'idle',
+  'hopping',
+  'eating',
+  'playing',
+  'sick',
+  'sleeping',
+]);
+
+export function hasAiArt(fur: FurVariant, anim: PetAnimState): boolean {
+  return fur === 'royal' && AI_ART_STATES.has(anim);
+}
 
 /** The state implied by the pet summary alone. */
 export function baseAnimState(s: PetSummary): PetAnimState {

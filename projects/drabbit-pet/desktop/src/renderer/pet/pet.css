@@ -405,3 +405,31 @@ body,
   padding: 4px 9px;
   pointer-events: none;
 }
+
+/* --- painterly portrait art (royal set; see PetArt.tsx) ------------------ */
+.pet-art {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  transform-origin: 50% 92%;
+}
+.pet-art-idle {
+  animation: pet-bob 2.6s ease-in-out infinite;
+}
+.pet-art-hopping {
+  animation: pet-hop 0.38s ease-in-out infinite;
+}
+.pet-art-eating {
+  animation: pet-munch 0.32s ease-in-out 5;
+}
+.pet-art-playing {
+  animation: pet-bounce 0.45s ease-in-out 4;
+}
+.pet-art-sick {
+  animation: pet-sway 4s ease-in-out infinite;
+}
+.pet-art-sleeping {
+  animation: pet-breathe 3.4s ease-in-out infinite;
+}
