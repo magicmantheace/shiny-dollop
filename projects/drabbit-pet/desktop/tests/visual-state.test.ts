@@ -70,10 +70,14 @@ describe('transientFromEvents', () => {
 });
 
 describe('resolveAnimState', () => {
-  it('base state beats transient and hopping', () => {
-    expect(resolveAnimState(summary({ sick: true }), true, 'eating')).toBe('sick');
+  it('hard base states (egg/sleeping) beat transient and hopping', () => {
     expect(resolveAnimState(summary({ asleep: true }), true, 'playing')).toBe('sleeping');
     expect(resolveAnimState(summary({ stage: 'egg' }), true, null)).toBe('egg');
+  });
+
+  it('a care transient beats the sick sway, which resumes after', () => {
+    expect(resolveAnimState(summary({ sick: true }), true, 'cleaning')).toBe('cleaning');
+    expect(resolveAnimState(summary({ sick: true }), true, null)).toBe('sick');
   });
 
   it('transient beats hopping, hopping beats idle', () => {

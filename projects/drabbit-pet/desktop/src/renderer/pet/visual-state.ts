@@ -60,15 +60,22 @@ export function bridgeTransientFor(kind: BridgeReactionKind): TransientAnim | nu
   return kind === 'celebrate' ? 'playing' : null;
 }
 
-/** Priority: base state (egg/dead/sleep/sick) > transient > hopping > idle. */
+/**
+ * Priority: hard base states (egg/dead/sleeping) > transient > sick >
+ * hopping > idle. Sickness yields to a care transient — you can see
+ * the scrub/munch/bounce you just triggered — then the sway resumes.
+ */
 export function resolveAnimState(
   s: PetSummary,
   hopping: boolean,
   transient: TransientAnim | null,
 ): PetAnimState {
   const base = baseAnimState(s);
-  if (base !== 'idle') return base;
+  if (base === 'egg' || base === 'egg-ready' || base === 'dead' || base === 'sleeping') {
+    return base;
+  }
   if (transient) return transient;
+  if (base === 'sick') return base;
   if (hopping) return 'hopping';
   return 'idle';
 }
