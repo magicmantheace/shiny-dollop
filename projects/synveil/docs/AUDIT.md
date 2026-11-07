@@ -187,8 +187,8 @@ the journal is refused. The report gains a `chain` object
 prev_digest, `tail` = the last record's link hash);
 `authenticated` stays `false`, because one file cannot
 authenticate its own anchor — a truncated head is visible only
-against an independently kept anchor, which is the export
-anchoring slice that remains planned. Host evidence: the full
+against an independently kept anchor, which the export
+anchoring slice below provides. Host evidence: the full
 `veil-core` suite (158 library tests plus the integration
 targets) passes with new tests for genesis linkage, append
 reopen continuity, the v1→v2 boundary, rollover continuity,
@@ -196,12 +196,20 @@ and checker refusal of edited, deleted, reordered and forged
 records; the real-core integration test now asserts the journal
 holds the chained v2 form of the console's lifecycle stream.
 
-Not yet done: export receipts do not yet carry the chain
-anchor/tail (slice 2); the A/B agents' separate journals still
-write v1; and no image carrying the v2 writer has been through
-the joined QEMU acceptance + update round trip, which ADR 0023
-Decision 3 requires before the format is called accepted — the
-Phase 2 roadmap item stays open.
+Slice 2 (export anchoring) is implemented at host level: for a
+v2 journal the export receipt carries a `chain` object (anchor,
+head digest, and the head's position), `veil-audit verify`
+accepts `--receipt RECEIPT-FILE` as an alternative to `--digest`,
+and the retention release/inspect paths accept chained journals.
+Host evidence: the full `veil-core` suite (162 library tests plus
+the integration targets) passes with receipt generation,
+verification, and tamper tests (mutated record, wrong anchor,
+truncated export) and a CLI test over a genuine chained journal.
+Not yet done: the A/B agents' separate journals still write v1;
+and no image carrying the v2 writer has been through the joined
+QEMU acceptance + update round trip, which ADR 0023 Decision 3
+requires before the format is called accepted — the Phase 2
+roadmap item stays open.
 Cryptographic integrity, retention/rotation and power-loss testing remain open.
 
 The native builder audits the new `veil-audit` ELF and link inputs alongside
@@ -262,10 +270,18 @@ for these export-failure gates passed at
 
 The compact `synveil.audit-export/v1` stdout receipt includes the exact byte
 count, record count, BLAKE2b-512 digest and `authenticated: false`; it contains
-no supplied paths or event contents. Store the receipt separately from the
+no supplied paths or event contents. For a chained (v2) journal it additionally
+carries a `chain` object — the anchor the segment chains from, the head digest
+it ends at, and the head's position — so a retained receipt also pins the
+segment's place in the chain. Store the receipt separately from the
 snapshot. `veil-audit verify --path SNAPSHOT --digest DIGEST` performs bounded
 read-only structural inspection and requires an exact checksum match against
-that independently retained lowercase hexadecimal digest. The snapshot itself
+that independently retained lowercase hexadecimal digest.
+`veil-audit verify --path SNAPSHOT --receipt RECEIPT-FILE` instead verifies
+the snapshot against the retained receipt itself (byte count, record count,
+digest, and the chain anchor/head/position when present); a truncated export
+fails this check even though its remaining bytes still form a valid shorter
+chain. The snapshot itself
 contains private audit data and must remain local unless explicitly exported
 by its owner.
 

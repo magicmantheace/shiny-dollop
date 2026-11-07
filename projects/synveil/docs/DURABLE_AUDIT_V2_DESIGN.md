@@ -223,3 +223,48 @@ the lock before any write, so the contention is a clean,
 retryable failure; the test retries on `WouldBlock` for that
 reason. Production append rates make the window vanishingly
 small, and `emit` already degrades truthfully on write failure.
+
+## Implementation amendment (2026-11-06) — slice 2 landed at host level
+
+The tooling slice is implemented in `audit_export.rs` and the
+`veil-audit` CLI:
+
+- **Export receipts anchor the chain.** For a chained (v2)
+  journal, the `synveil.audit-export/v1` receipt gains a `chain`
+  object: `anchor` (the first chained record's `prev_digest`,
+  as reported by the checker), `head_digest` (the last record's
+  record digest — the checker's chain `tail`), `chained_records`,
+  and `records` (the head's position: the chained count within
+  the export's total record count). v1 receipts are unchanged.
+  This is the proposal's anchoring design with the slice-1
+  digest amendment applied: the anchor values are SHA-512 chain
+  digests; the snapshot's own checksum stays BLAKE2b-512.
+- **Receipt verification.** `veil-audit verify --path SNAPSHOT
+  --receipt RECEIPT-FILE` verifies a snapshot against its
+  retained receipt (the legacy `--digest` form is unchanged and
+  the two are mutually exclusive). The receipt file is bounded
+  (8 KiB) and decoded with the strict audit JSON decoder. The
+  receipt must name the exact byte count, record count and
+  snapshot digest, and — for a v2 export — the exact anchor,
+  head digest and head position. A mutated record, a receipt
+  naming the wrong anchor or head, and a truncated export all
+  fail verification; truncation is caught by the retained head
+  even though the truncated bytes still form an internally
+  valid shorter chain. The trust statement is unchanged:
+  verification detects changed bytes relative to a separately
+  retained receipt; it does not authenticate origin, and a root
+  attacker who can rewrite both snapshot and receipt is out of
+  scope, exactly as for digest verification.
+- **Release/inspect accept v2.** The retention release and
+  inspection paths run on the chain-aware inspector from
+  slice 1, so chained archives release and inspect like v1;
+  a regression test now covers release + inspection of a
+  chained journal.
+- **Status:** host gate green — the full `veil-core` suite
+  passes (162 library tests + integration targets, including
+  new receipt generation/verification unit tests, tamper cases,
+  and a CLI test that exports a genuine chained journal written
+  by the real core and verifies it against its receipt). Slice 3
+  (native QEMU acceptance per ADR 0023 Decision 3) remains
+  open, so the format is still **not accepted** and must not be
+  described as accepted until that pass lands.
