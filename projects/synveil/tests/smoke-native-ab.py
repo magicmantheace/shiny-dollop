@@ -56,6 +56,34 @@ from qmp_input import (  # noqa: E402
     QMPError, capture_test_scanout, exit_user_terminal, logout_user_desktop,
     open_user_terminal, send_keys, settings_toggle, type_ab_command,
     type_test_secret)
+import qmp_input as _qmp_input  # noqa: E402
+
+
+def _patient_hold_keys(sock, reader, keys):
+    """The harness's key hold with a longer press (as in the
+    audit-v2 smoke).
+
+    The stock hold is 75 ms; under TCG the emulated USB
+    keyboard's guest poll can stall past that, and a press+release
+    pair inside one poll window vanishes. Observed 2026-11-06:
+    of the 31 characters of the stage command exactly one
+    survived in the terminal, and S1 waited out its full marker
+    timeout; with a 200 ms hold the same command lands whole.
+    """
+    def edge(down):
+        ordered = keys if down else reversed(keys)
+        events = [{"type": "key", "data": {"down": down,
+                   "key": {"type": "qcode", "data": key}}} for key in ordered]
+        return {"execute": "input-send-event", "arguments": {"events": events}}
+
+    try:
+        _qmp_input.emit_command(sock, reader, edge(True))
+        time.sleep(0.2)
+    finally:
+        _qmp_input.emit_command(sock, reader, edge(False))
+
+
+_qmp_input._hold_keys = _patient_hold_keys
 
 _spec = importlib.util.spec_from_file_location(
     "smoke_native_weston", ROOT / "tests" / "smoke-native-weston.py")
