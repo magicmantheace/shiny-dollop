@@ -260,13 +260,34 @@ AB_COMMANDS = {
     # for host-side readback against the fixture's expected digests.
     "dl-sha256": "sha256sum /home/synveil/Downloads/payload.bin > /home/synveil/Downloads/payload.sha256; sync",
     "dl2-sha256": "sha256sum /home/synveil/Downloads/payload2.bin > /home/synveil/Downloads/payload2.sha256; sync",
+    # Observer proof (Phase 3): capture one real observe response
+    # inside the guest for host-side schema and pressure (PSI)
+    # assertions. The system core's socket is root-only (0600 in
+    # a 0700 directory) and the image offers no root shell, so —
+    # the project's fixture pattern — a user-level veil-core
+    # serves one connection on a /var/tmp socket, backgrounded
+    # in the session terminal, and synctl queries it on the same
+    # line: the real compiled code reads the real guest /proc
+    # end to end. The leading echo
+    # absorbs any characters a just-focused terminal eats before
+    # it takes input (observed in this harness family); the
+    # stderr file must stay empty because synctl validates the
+    # response itself and reports a refusal there. /var/tmp is
+    # the state partition: persistent and world-writable, while
+    # /home is not on a persistent partition on the joined image.
+    "observe": "echo synveil-observe-run; /usr/sbin/veil-core --socket /var/tmp/observe.sock --once & sleep 2; /usr/bin/synctl --socket /var/tmp/observe.sock --json observe > /var/tmp/observe.json 2> /var/tmp/observe.err; sync",
 }
 
 _AB_CHAR_KEYS = {c: c for c in "abcdefghijklmnopqrstuvwxyz0123456789"}
 _AB_CHAR_KEYS.update({c: "shift+" + c.lower()
                       for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"})
 _AB_CHAR_KEYS.update({" ": "spc", "/": "slash", "-": "minus", ".": "dot",
-                      "_": "shift+minus", ">": "shift+dot", ";": "semicolon"})
+                      "_": "shift+minus", ">": "shift+dot", ";": "semicolon",
+                      # Only for the observer fixture line below:
+                      # backgrounding its one-shot core. The map
+                      # never widens what a caller can type — the
+                      # command strings above remain constants.
+                      "&": "shift+7"})
 
 
 def type_ab_command(socket_path: Path, command_id: str, *, timeout=30.0):
