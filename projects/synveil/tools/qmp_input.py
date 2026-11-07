@@ -297,6 +297,19 @@ AB_COMMANDS = {
     # exits, later keystrokes echo into a readerless pty,
     # and the login never relocks).
     "observe-history": "echo synveil-history-run; SYNVEIL_OBSERVE_HISTORY=1 /usr/sbin/veil-core --socket /var/tmp/o.sock & sleep 8; /usr/bin/synctl --socket /var/tmp/o.sock --json observe-history > /var/tmp/h0.json 2> /var/tmp/h0.err; sleep 12 & echo $! > /var/tmp/p.pid; sleep 8; /usr/bin/synctl --socket /var/tmp/o.sock --json observe-history > /var/tmp/h1.json 2> /var/tmp/h1.err; sleep 10; /usr/bin/synctl --socket /var/tmp/o.sock --json observe-history > /var/tmp/h2.json 2> /var/tmp/h2.err; sync; kill %1",
+    # Wine proof (WINDOWS_COMPAT_DESIGN proof slice): launch
+    # the sealed Wine's bundled notepad via the image's
+    # launcher (fresh tmpfs prefix, win64, wayland driver
+    # pinned by the launcher). Backgrounded so the harness can
+    # observe the window; the launcher's own output lands in
+    # /var/tmp/wine.log for readback.
+    "wine-notepad": "echo synveil-wine-run; /usr/libexec/synveil/wine-notepad > /var/tmp/wine.log 2>&1 &",
+    # Wine proof teardown: point wineserver at the recorded
+    # prefix and stop the whole Wine session, then reap the
+    # launcher job — a live Wine would hold the terminal's pty
+    # open and the session could never end (the same trap the
+    # observer history fixture documents above).
+    "wine-stop": "export WINEPREFIX=$(cat /var/tmp/wineprefix.path); /usr/lib/wine/wineserver64 -k; sleep 3; kill %1; sync",
 }
 
 _AB_CHAR_KEYS = {c: c for c in "abcdefghijklmnopqrstuvwxyz0123456789"}
@@ -311,7 +324,8 @@ _AB_CHAR_KEYS.update({" ": "spc", "/": "slash", "-": "minus", ".": "dot",
                       # type — the command strings above remain
                       # constants.
                       "&": "shift+7", "=": "equal", "$": "shift+4",
-                      "!": "shift+1", "%": "shift+5"})
+                      "!": "shift+1", "%": "shift+5",
+                      "(": "shift+9", ")": "shift+0"})
 
 
 def type_ab_command(socket_path: Path, command_id: str, *, timeout=30.0):
