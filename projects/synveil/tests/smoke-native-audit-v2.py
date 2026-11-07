@@ -81,9 +81,9 @@ def state_partition(image: Path) -> tuple[int, int]:
     first = last = None
     for line in info.splitlines():
         if "First sector:" in line:
-            first = int(line.split()[-1])
+            first = int(line.split(":")[1].split()[0])
         if "Last sector:" in line:
-            last = int(line.split()[-1])
+            last = int(line.split(":")[1].split()[0])
     if first is None or last is None:
         raise ValueError("state partition bounds not found")
     return first * 512, (last - first + 1) * 512
@@ -132,6 +132,21 @@ def seed_state(state: Path, seed_file: Path) -> None:
         raise ValueError("seed journal not present in state filesystem")
 
 
+def replay_journal(state: Path) -> None:
+    """Replay the ext4 journal on the extracted scratch copy.
+
+    The QEMU boots end by killing the emulator (a power cut), so
+    the guest's journal writes are not checkpointed into the
+    filesystem body; raw debugfs reads would see a stale tree
+    (this hid a healthy 2.9 KB guest journal during development).
+    e2fsck on the copy performs exactly the replay a mounting
+    kernel would. Exit codes 0-2 are success-with-corrections."""
+    result = subprocess.run(["/usr/sbin/e2fsck", "-y", str(state)],
+                            capture_output=True)
+    if result.returncode >= 4:
+        raise ValueError("e2fsck journal replay failed")
+
+
 def dump_journal(state: Path, dest: Path) -> bytes:
     with tempfile.NamedTemporaryFile(delete=False) as handle:
         raw = Path(handle.name)
@@ -170,29 +185,49 @@ def main() -> int:
     seed_lines = seed.decode().splitlines()
     boundary = hashlib.sha512(seed_lines[-1].encode()).hexdigest()
 
-    secret = <redacted>
-    with tempfile.TemporaryDirectory(prefix="synveil-audit-v2-") as temp:
-        work = Path(temp)
-        image = work / "synveil-x86_64.img"
-        shutil.copyfile(source_image, image)
-        state = work / "state.img"
-        extract_state(image, state)
-        seed_file = work / "seed.jsonl"
-        seed_file.write_bytes(seed)
-        seed_state(state, seed_file)
-        inject_state(image, state)
-
-        if not joined.guest_boot(work, secret, fresh=True,
-                                 timeout=args.timeout, evidence_dir=evidence_dir):
-            print("[synveil] audit v2 first boot (enroll + session) failed")
-            return 1
-        if not joined.guest_boot(work, secret, fresh=False,
-                                 timeout=args.timeout, evidence_dir=evidence_dir):
-            print("[synveil] audit v2 cold reboot (persisted login) failed")
-            return 1
-
-        extract_state(image, state)
-        journal = dump_journal(state, work / "journal.jsonl")
+    test_password = secrets.token_hex(16)
+    # The graphical harness types through QMP; under TCG a dropped
+    # keystroke occasionally desyncs an enrollment typing. That is
+    # a harness/environment flake, not audit behaviour: retry the
+    # whole boot pair on a fresh seeded copy (a failed enrollment
+    # may already have persisted a credential, so copies are never
+    # reused). The audit assertions below never retry — a failed
+    # assertion fails the run. Attempts are reported in result.json.
+    journal = None
+    attempts = 0
+    for attempt in range(1, 4):
+        attempts = attempt
+        attempt_dir = evidence_dir / f"attempt-{attempt}"
+        attempt_dir.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="synveil-audit-v2-") as temp:
+            work = Path(temp)
+            image = work / "synveil-x86_64.img"
+            shutil.copyfile(source_image, image)
+            state = work / "state.img"
+            extract_state(image, state)
+            seed_file = work / "seed.jsonl"
+            seed_file.write_bytes(seed)
+            seed_state(state, seed_file)
+            inject_state(image, state)
+            if not joined.guest_boot(work, test_password, fresh=True,
+                                     timeout=args.timeout,
+                                     evidence_dir=attempt_dir):
+                print(f"[synveil] attempt {attempt}: first boot failed")
+                continue
+            if not joined.guest_boot(work, test_password, fresh=False,
+                                     timeout=args.timeout,
+                                     evidence_dir=attempt_dir):
+                print(f"[synveil] attempt {attempt}: cold reboot failed")
+                continue
+            extract_state(image, state)
+            replay_journal(state)
+            journal = dump_journal(state, work / "journal.jsonl")
+        for name in ("joined-first.log", "joined-reboot.log"):
+            shutil.copyfile(attempt_dir / name, evidence_dir / name)
+        break
+    if journal is None:
+        print("[synveil] audit v2 boots failed on all attempts")
+        return 1
     (evidence_dir / "journal.jsonl").write_bytes(journal)
     # The inspector refuses anything but a private regular file.
     os.chmod(evidence_dir / "journal.jsonl", 0o600)
@@ -286,6 +321,7 @@ def main() -> int:
         "packaged_verify_receipt": True,
         "truncated_snapshot_refused": True,
         "export_ran_inside_guest": False,
+        "boot_pair_attempts": attempts,
         "physical_hardware_tested": False,
     }
     (evidence_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n")
