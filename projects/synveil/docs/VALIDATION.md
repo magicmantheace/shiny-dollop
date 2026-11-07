@@ -1285,3 +1285,20 @@ so GUI-free sessions could never focus — fixed tests-only
 evidence README; no guest code changed for it. QEMU evidence
 only — no physical hardware is claimed. See
 [retained evidence](validation/shell-d526e55/README.md).
+
+## Observer PSI (Phase 3) — native validation (2026-11-07)
+
+The Phase 3 memory/pressure slice's required guest validation
+passed (`tests/smoke-native-observe.py`,
+`SYNVEIL_OBSERVE_QEMU_PASS`) on the joined image: a real
+in-guest `synctl --json observe` response — produced by a
+user-level fixture core against the real guest /proc, because
+the system core's socket is root-only by design and the image
+has no root shell — carried `synveil.observe/v1` with a ready
+utilization window, a ready 98-record process snapshot, and
+`pressure` cpu/memory/io all `ready` (the guest kernel is
+`CONFIG_PSI=y`, so the ready path is exercised, not only the
+unavailable path); synctl's own validation accepted the
+response (empty stderr). QEMU evidence only — no physical
+hardware is claimed. See
+[retained evidence](validation/observe-psi-d526e55/README.md).

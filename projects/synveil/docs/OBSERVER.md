@@ -115,3 +115,12 @@ Malformed, oversized, duplicate, or out-of-range PSI records return
 `status: invalid`, without inventing zero-pressure measurements or
 breaking unrelated CPU/memory observation. No sampling daemon, historical
 recording, process control, or inference authorization is introduced.
+
+Native QEMU validation passed 2026-11-07
+(`tests/smoke-native-observe.py`, `SYNVEIL_OBSERVE_QEMU_PASS`):
+on the CONFIG_PSI=y guest kernel all three pressure objects
+reported `ready` in a real observe response, with the client
+accepting it (empty synctl stderr). The system core's socket
+is root-only, so the gate exercised the compiled code through
+a user-level fixture core against the real guest /proc — see
+[retained evidence](validation/observe-psi-d526e55/README.md).

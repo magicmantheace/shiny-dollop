@@ -340,8 +340,12 @@ anchoring and physical power-loss testing remain open.
     and historical aggregation are not implemented.
 - [ ] memory/pressure metrics
   - Read-only MemTotal/MemAvailable and bounded Linux PSI CPU, memory, and I/O
-    stall snapshots implemented. Host/guest validation of PSI is required;
-    pressure history, attribution, and long-term measurements remain open.
+    stall snapshots implemented. Host validation passed with the producer
+    unit tests; native QEMU guest validation passed 2026-11-07
+    (`SYNVEIL_OBSERVE_QEMU_PASS` — cpu/memory/io pressure all ready in a
+    real in-guest response on the CONFIG_PSI=y guest kernel; see
+    [PSI evidence](docs/validation/observe-psi-d526e55/README.md)).
+    Pressure history, attribution, and long-term measurements remain open.
 - [ ] process lifecycle and resource metrics
   - Read-only 1/5/15-minute Linux load averages and runnable/total thread
     counts are now parsed with strict schema checks. They are not CPU
