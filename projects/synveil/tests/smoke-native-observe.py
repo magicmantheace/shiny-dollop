@@ -454,6 +454,44 @@ def check_observe(doc, err_bytes: bytes) -> list[str]:
             f"processes.status is {processes.get('status')!r}")
     if not processes.get("records"):
         failures.append("processes.records is empty")
+    utilization = processes.get("utilization")
+    if not isinstance(utilization, dict):
+        failures.append("processes.utilization missing")
+    else:
+        pu_status = utilization.get("status")
+        if pu_status not in ("ready", "partial", "truncated"):
+            failures.append(
+                f"processes.utilization.status is {pu_status!r}")
+        window = utilization.get("sample_window_ms")
+        if not isinstance(window, int) or window < 100:
+            failures.append(
+                "processes.utilization.sample_window_ms "
+                f"invalid: {window!r}")
+        rated = utilization.get("records")
+        if not isinstance(rated, list) or not rated:
+            failures.append(
+                "processes.utilization.records invalid")
+        else:
+            total_bp = 0
+            for entry in rated:
+                points = entry.get("busy_basis_points") \
+                    if isinstance(entry, dict) else None
+                if not isinstance(points, int) \
+                        or isinstance(points, bool) \
+                        or not 0 <= points <= 10_000:
+                    failures.append(
+                        "processes.utilization "
+                        f"busy_basis_points invalid: {points!r}")
+                else:
+                    total_bp += points
+            # Rated processes can never exceed the whole
+            # machine's busy share by more than per-record
+            # rounding slack (at most 1 bp each, <=128
+            # records).
+            if total_bp > 10_000 + 128:
+                failures.append(
+                    "processes.utilization rates sum above "
+                    f"10000 bp + slack: {total_bp}")
     pressure = doc.get("pressure")
     if not isinstance(pressure, dict):
         failures.append("pressure object missing")
