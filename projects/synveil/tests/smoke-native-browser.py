@@ -604,7 +604,18 @@ def focus_terminal(boot, timeout=240):
     deadline = time.monotonic() + timeout
     closed_files = False
     while time.monotonic() < deadline:
-        if ab.focus_terminal(boot, timeout=20):
+        # Per-attempt budget must exceed ab.focus_terminal's GUI-free
+        # settle (20 s of continuous GUI absence when the update GUI
+        # was never seen): at timeout=20 the attempt's own deadline
+        # expired exactly as the settle completed, so a GUI-free
+        # session could never focus — success depended on a stray
+        # GUI-rect detection flipping the settle to 3 s. Observed
+        # 2026-11-07 (S4 regression): the boot-2 reboot command's
+        # focus failed for the full 240 s with the terminal topmost
+        # and active, the guest never rebooted, and B6/B7 cascaded;
+        # the guest-side digest commands starved the same way in
+        # every boot. 60 s leaves the settle plus click margin.
+        if ab.focus_terminal(boot, timeout=60):
             return True
         if not closed_files:
             close_files_window(boot)
