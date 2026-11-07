@@ -68,7 +68,7 @@ pub(crate) fn checksum(bytes: &[u8]) -> String {
 }
 
 fn receipt(bytes: &[u8], inspected: &Value, schema: &str) -> Value {
-    json!({
+    let mut receipt = json!({
         "schema": schema,
         "record_schema": super::audit::AUDIT_SCHEMA_V1,
         "bytes": bytes.len(),
@@ -76,7 +76,24 @@ fn receipt(bytes: &[u8], inspected: &Value, schema: &str) -> Value {
         "algorithm": "blake2b-512",
         "digest": checksum(bytes),
         "authenticated": false,
-    })
+    });
+    // Slice 2 anchoring (docs/DURABLE_AUDIT_V2_DESIGN.md): for a
+    // chained (v2) journal the receipt additionally pins the chain
+    // segment the export covers — the anchor it chains from, the
+    // head digest it ends at, and the head's position (chained
+    // record count within the export's total record count). A
+    // retained receipt therefore detects tail truncation of the
+    // source journal on any later comparison, which the snapshot
+    // digest alone cannot do.
+    if let Some(chain) = inspected.get("chain") {
+        receipt["chain"] = json!({
+            "anchor": chain["anchor"],
+            "head_digest": chain["tail"],
+            "chained_records": chain["chained_records"],
+            "records": inspected["records"],
+        });
+    }
+    receipt
 }
 
 /// Copy a validated, bounded snapshot while holding the inspector's locks.
@@ -153,6 +170,117 @@ fn unsafe_output() -> io::Error {
     )
 }
 
+fn digest_text(value: &Value) -> bool {
+    value.as_str().is_some_and(|text| {
+        text.len() == 128
+            && text
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    })
+}
+
+fn receipt_mismatch() -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidData, "receipt mismatch")
+}
+
+/// Verify an exported snapshot against its retained export receipt.
+///
+/// The receipt is owner-supplied input and is validated strictly:
+/// it must be one of the two receipt schemas this tool emits, carry
+/// `authenticated: false`, and name the snapshot's exact byte count,
+/// record count and BLAKE2b-512 digest. When the receipt carries a
+/// chain block (a v2 export), the snapshot's chain must match the
+/// receipt's anchor, head digest and head position exactly — so a
+/// mutated record, a receipt naming the wrong anchor, and a
+/// truncated export all fail here even where the truncated bytes
+/// would still form an internally valid chain.
+pub fn verify_receipt(path: &Path, expected: &Value) -> io::Result<Value> {
+    let schema_ok = expected["schema"] == "synveil.audit-export/v1"
+        || expected["schema"] == "synveil.audit-verification/v1";
+    if !expected.is_object()
+        || !schema_ok
+        || expected["algorithm"] != "blake2b-512"
+        || expected["authenticated"] != false
+        || !digest_text(&expected["digest"])
+        || expected["bytes"].as_u64().is_none()
+        || expected["records"].as_u64().is_none()
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "invalid receipt",
+        ));
+    }
+    if let Some(chain) = expected.get("chain")
+        && (!chain.is_object()
+            || !digest_text(&chain["anchor"])
+            || !digest_text(&chain["head_digest"])
+            || chain["chained_records"].as_u64().is_none()
+            || chain["records"].as_u64().is_none())
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "invalid receipt",
+        ));
+    }
+    super::audit_check::with_snapshot(path, |bytes, inspected| {
+        let report = receipt(bytes, &inspected, "synveil.audit-verification/v1");
+        if report["digest"] != expected["digest"]
+            || report["bytes"] != expected["bytes"]
+            || report["records"] != expected["records"]
+        {
+            return Err(receipt_mismatch());
+        }
+        if let Some(chain) = expected.get("chain") {
+            let actual = report.get("chain").ok_or_else(receipt_mismatch)?;
+            if actual["anchor"] != chain["anchor"]
+                || actual["head_digest"] != chain["head_digest"]
+                || actual["chained_records"] != chain["chained_records"]
+                || actual["records"] != chain["records"]
+            {
+                return Err(receipt_mismatch());
+            }
+        }
+        Ok(report)
+    })
+}
+
+/// Verify a snapshot against a receipt read from a separate file.
+///
+/// The receipt file is bounded and decoded with the strict audit
+/// JSON decoder (duplicate keys and trailing input are refused),
+/// mirroring how the retention tooling treats owner-supplied
+/// receipts. Nothing about the receipt is echoed in errors.
+pub fn verify_receipt_file(path: &Path, receipt_path: &Path) -> io::Result<Value> {
+    const MAX_RECEIPT_BYTES: u64 = 8192;
+    let file = OpenOptions::new()
+        .read(true)
+        .custom_flags(NOFOLLOW_NONBLOCK)
+        .open(receipt_path)?;
+    let meta = file.metadata()?;
+    if !meta.is_file() || meta.len() > MAX_RECEIPT_BYTES {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "invalid receipt",
+        ));
+    }
+    let mut bytes = Vec::new();
+    (&file)
+        .take(MAX_RECEIPT_BYTES + 1)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > MAX_RECEIPT_BYTES || bytes.contains(&b'\r') {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "invalid receipt",
+        ));
+    }
+    if bytes.last() == Some(&b'\n') {
+        bytes.pop();
+    }
+    let expected = super::audit_json::decode(&bytes)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid receipt"))?;
+    verify_receipt(path, &expected)
+}
+
 /// Verify exact bytes against a separately retained owner-supplied digest.
 pub fn verify(path: &Path, expected: &str) -> io::Result<Value> {
     if expected.len() != 128
@@ -221,6 +349,152 @@ mod tests {
         assert_eq!(report["authenticated"], false);
         assert!(!report.to_string().contains("secret"));
         verify(&output, report["digest"].as_str().unwrap()).unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    fn chained_fixture() -> (
+        std::path::PathBuf,
+        std::path::PathBuf,
+        std::path::PathBuf,
+        String,
+    ) {
+        let (root, _v1_source, _v1_output) = fixture();
+        let source = root.join("chained-journal");
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&source)
+            .unwrap();
+        let mut prev = super::super::audit::GENESIS_DIGEST;
+        let mut head = String::new();
+        for _ in 0..3 {
+            let (line, digest) = super::super::audit::chain_record(
+                &super::super::audit::record("request", json!({"private": "secret"})),
+                &prev,
+            )
+            .unwrap();
+            writeln!(file, "{line}").unwrap();
+            head = crate::sha256::hex(&digest);
+            prev = digest;
+        }
+        drop(file);
+        let dest = root.join("copies").join("chained-snapshot");
+        (root, source, dest, head)
+    }
+
+    #[test]
+    fn v2_export_receipt_anchors_the_chain_and_verifies() {
+        let (root, source, output, head) = chained_fixture();
+        let report = export(&source, &output).unwrap();
+        let chain = &report["chain"];
+        assert_eq!(
+            chain["anchor"],
+            crate::sha256::hex(&super::super::audit::GENESIS_DIGEST)
+        );
+        assert_eq!(chain["head_digest"], head);
+        assert_eq!(chain["chained_records"], 3);
+        assert_eq!(chain["records"], 3);
+        assert!(!report.to_string().contains("secret"));
+        // The receipt verifies the export exactly, and the legacy
+        // digest path still works on the same snapshot.
+        verify_receipt(&output, &report).unwrap();
+        verify(&output, report["digest"].as_str().unwrap()).unwrap();
+        // A v1 export carries no chain block, exactly as before.
+        let (v1_root, v1_source, v1_output) = fixture();
+        let v1_report = export(&v1_source, &v1_output).unwrap();
+        assert!(v1_report.get("chain").is_none());
+        verify_receipt(&v1_output, &v1_report).unwrap();
+        fs::remove_dir_all(v1_root).unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn receipt_verification_refuses_mutation_wrong_anchor_and_truncation() {
+        let (root, source, output, _head) = chained_fixture();
+        let report = export(&source, &output).unwrap();
+        let original = fs::read(&output).unwrap();
+
+        // A well-formed edit inside a record breaks the chain/digest.
+        let edited = String::from_utf8(original.clone())
+            .unwrap()
+            .replace("secret", "edited");
+        fs::write(&output, edited).unwrap();
+        assert_eq!(
+            verify_receipt(&output, &report).unwrap_err().kind(),
+            io::ErrorKind::InvalidData
+        );
+
+        // Truncating the export's tail record leaves an internally
+        // valid shorter chain; the retained receipt still refuses it.
+        let text = String::from_utf8(original.clone()).unwrap();
+        let truncated = text
+            .lines()
+            .take(2)
+            .map(|line| format!("{line}\n"))
+            .collect::<String>();
+        fs::write(&output, truncated).unwrap();
+        assert_eq!(
+            verify_receipt(&output, &report).unwrap_err().kind(),
+            io::ErrorKind::InvalidData
+        );
+        fs::write(&output, original).unwrap();
+
+        // A receipt naming the wrong anchor or head is refused even
+        // against the untouched snapshot.
+        for key in ["anchor", "head_digest"] {
+            let mut wrong = report.clone();
+            wrong["chain"][key] = json!("1".repeat(128));
+            assert_eq!(
+                verify_receipt(&output, &wrong).unwrap_err().kind(),
+                io::ErrorKind::InvalidData,
+                "accepted wrong {key}"
+            );
+        }
+        // A chained receipt presented for an unchained journal fails.
+        let (v1_root, v1_source, _v1_output) = fixture();
+        assert!(verify_receipt(&v1_source, &report).is_err());
+        fs::remove_dir_all(v1_root).unwrap();
+        // Malformed receipts are refused as invalid input.
+        for bad in [
+            json!({"schema": "synveil.audit-export/v1", "algorithm": "blake2b-512",
+                   "authenticated": true, "digest": "0".repeat(128),
+                   "bytes": 1, "records": 1}),
+            json!({"schema": "other/v1", "algorithm": "blake2b-512",
+                   "authenticated": false, "digest": "0".repeat(128),
+                   "bytes": 1, "records": 1}),
+            json!({"schema": "synveil.audit-export/v1", "algorithm": "blake2b-512",
+                   "authenticated": false, "digest": "0".repeat(128),
+                   "bytes": 1, "records": 1,
+                   "chain": {"anchor": "x", "head_digest": "0".repeat(128),
+                             "chained_records": 1, "records": 1}}),
+        ] {
+            assert_eq!(
+                verify_receipt(&output, &bad).unwrap_err().kind(),
+                io::ErrorKind::InvalidInput
+            );
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn receipt_file_round_trip_and_refusals() {
+        let (root, source, output, _head) = chained_fixture();
+        let report = export(&source, &output).unwrap();
+        let receipt_path = root.join("receipt.json");
+        fs::write(&receipt_path, format!("{report}\n")).unwrap();
+        verify_receipt_file(&output, &receipt_path).unwrap();
+        // Garbage, oversized and missing receipt files are refused.
+        fs::write(&receipt_path, b"not json").unwrap();
+        assert_eq!(
+            verify_receipt_file(&output, &receipt_path)
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::InvalidInput
+        );
+        fs::write(&receipt_path, vec![b' '; 8193]).unwrap();
+        assert!(verify_receipt_file(&output, &receipt_path).is_err());
+        assert!(verify_receipt_file(&output, &root.join("absent.json")).is_err());
         fs::remove_dir_all(root).unwrap();
     }
 

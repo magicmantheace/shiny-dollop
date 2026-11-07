@@ -17,12 +17,14 @@ fn run() -> io::Result<Value> {
     let mut snapshot = None;
     let mut authorization = None;
     let mut digest: Option<OsString> = None;
+    let mut receipt = None;
     while let Some(flag) = args.next() {
         let value = args.next().ok_or_else(invalid_args)?;
         match flag.to_str() {
             Some("--path") if path.is_none() => path = Some(PathBuf::from(value)),
             Some("--output") if output.is_none() => output = Some(PathBuf::from(value)),
             Some("--digest") if digest.is_none() => digest = Some(value),
+            Some("--receipt") if receipt.is_none() => receipt = Some(PathBuf::from(value)),
             Some("--snapshot") if snapshot.is_none() => snapshot = Some(PathBuf::from(value)),
             Some("--authorization") if authorization.is_none() => {
                 authorization = Some(PathBuf::from(value))
@@ -30,7 +32,10 @@ fn run() -> io::Result<Value> {
             _ => return Err(invalid_args()),
         }
     }
-    if (command == "release-archive" || command == "inspect-release") && output.is_none() {
+    if (command == "release-archive" || command == "inspect-release")
+        && output.is_none()
+        && receipt.is_none()
+    {
         let operation = if command == "release-archive" {
             veil_core::audit_retention::release_archive
         } else {
@@ -50,20 +55,26 @@ fn run() -> io::Result<Value> {
         return Err(invalid_args());
     }
     match command.to_str() {
-        Some("check") if output.is_none() && digest.is_none() => veil_core::audit_check::inspect(
-            &path.unwrap_or_else(|| PathBuf::from("/var/log/synveil/core-audit.jsonl")),
-        ),
-        Some("export") if digest.is_none() => veil_core::audit_export::export(
+        Some("check") if output.is_none() && digest.is_none() && receipt.is_none() => {
+            veil_core::audit_check::inspect(
+                &path.unwrap_or_else(|| PathBuf::from("/var/log/synveil/core-audit.jsonl")),
+            )
+        }
+        Some("export") if digest.is_none() && receipt.is_none() => veil_core::audit_export::export(
             &path.ok_or_else(invalid_args)?,
             &output.ok_or_else(invalid_args)?,
         ),
-        Some("verify") if output.is_none() => veil_core::audit_export::verify(
-            &path.ok_or_else(invalid_args)?,
-            digest
-                .as_ref()
-                .and_then(|value| value.to_str())
-                .ok_or_else(invalid_args)?,
-        ),
+        Some("verify") if output.is_none() => match (digest, receipt) {
+            (Some(digest), None) => veil_core::audit_export::verify(
+                &path.ok_or_else(invalid_args)?,
+                digest.to_str().ok_or_else(invalid_args)?,
+            ),
+            (None, Some(receipt)) => veil_core::audit_export::verify_receipt_file(
+                &path.ok_or_else(invalid_args)?,
+                &receipt,
+            ),
+            _ => Err(invalid_args()),
+        },
         _ => Err(invalid_args()),
     }
 }

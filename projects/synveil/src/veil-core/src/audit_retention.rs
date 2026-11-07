@@ -476,6 +476,29 @@ mod tests {
 
     impl Fixture {
         fn new() -> Self {
+            Self::with_text(format!(
+                "{}\n",
+                super::super::audit::record("retained", json!({}))
+            ))
+        }
+
+        fn new_v2() -> Self {
+            let mut prev = super::super::audit::GENESIS_DIGEST;
+            let mut text = String::new();
+            for _ in 0..3 {
+                let (line, digest) = super::super::audit::chain_record(
+                    &super::super::audit::record("retained", json!({})),
+                    &prev,
+                )
+                .unwrap();
+                text.push_str(&line);
+                text.push('\n');
+                prev = digest;
+            }
+            Self::with_text(text)
+        }
+
+        fn with_text(text: String) -> Self {
             let root = std::env::temp_dir().join(format!(
                 "synveil-retention-{}-{}",
                 std::process::id(),
@@ -486,7 +509,6 @@ mod tests {
             fs::DirBuilder::new().mode(0o700).create(&copies).unwrap();
             let active = root.join("journal");
             let archive = root.join("journal.1");
-            let text = format!("{}\n", super::super::audit::record("retained", json!({})));
             for path in [&active, &archive] {
                 let mut file = OpenOptions::new()
                     .write(true)
@@ -596,6 +618,19 @@ mod tests {
         assert_eq!(fixture.inspect().unwrap()["state"], "completion-recorded");
         assert_eq!(fs::read(&fixture.archive).unwrap(), copy);
         assert!(!fixture.active.exists());
+    }
+
+    #[test]
+    fn release_and_inspection_accept_v2_chained_journals() {
+        // Slice 2 (docs/DURABLE_AUDIT_V2_DESIGN.md): the retention
+        // release/inspect paths run on the chain-aware inspector, so
+        // a chained v2 archive releases and inspects exactly like v1.
+        let fixture = Fixture::new_v2();
+        fixture.release_after_contention();
+        assert!(!fixture.archive.exists());
+        let result = fixture.inspect().unwrap();
+        assert_eq!(result["state"], "completion-recorded");
+        assert_eq!(result["authenticated"], false);
     }
 
     #[test]
