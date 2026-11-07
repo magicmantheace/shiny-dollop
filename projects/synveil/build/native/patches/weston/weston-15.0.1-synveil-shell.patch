@@ -1,0 +1,1507 @@
+diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/desktop-shell.c
+--- a/clients/desktop-shell.c	2026-11-07 08:52:24.049662343 +0000
++++ b/clients/desktop-shell.c	2026-11-07 08:52:24.078270465 +0000
+@@ -56,6 +56,7 @@
+ #include "single-pixel-buffer-v1-client-protocol.h"
+ #include "tablet-unstable-v2-client-protocol.h"
+ #include "weston-desktop-shell-client-protocol.h"
++#include "synveil-shell-panel-client-protocol.h"
+ 
+ #define DEFAULT_CLOCK_FORMAT CLOCK_FORMAT_MINUTES
+ #define DEFAULT_SPACING 10
+@@ -68,9 +69,23 @@
+ 	CLOCK_FORMAT_NONE
+ };
+ 
++/* Synveil shell panel (ADR 0025): one entry per toplevel
++ * window the shell publishes over synveil_shell_panel. The
++ * model lives on the desktop; each panel mirrors it with its
++ * own task-button widgets. */
++struct synveil_task {
++	uint32_t id;
++	char *app_id;
++	char *title;
++	uint32_t state;
++	struct wl_list link;
++};
++
+ struct desktop {
+ 	struct display *display;
+ 	struct weston_desktop_shell *shell;
++	struct synveil_shell_panel *synveil_panel;
++	struct wl_list synveil_tasks;
+ 	struct unlock_dialog *unlock_dialog;
+ 	struct task unlock_task;
+ 	struct wl_list outputs;
+@@ -99,6 +114,25 @@
+ 
+ struct output;
+ 
++struct panel_task {
++	struct widget *widget;
++	struct panel *panel;
++	struct synveil_task *task;
++	int focused, pressed;
++	struct wl_list link;
++};
++
++struct panel_menu_item {
++	struct widget *widget;
++	struct panel *panel;
++	const char *name;
++	const char *path;
++	const char *arg;
++	const char *app_id;
++	int focused, pressed;
++	struct wl_list link;
++};
++
+ struct panel {
+ 	struct surface base;
+ 
+@@ -112,6 +146,13 @@
+ 	enum weston_desktop_shell_panel_position panel_position;
+ 	enum clock_format clock_format;
+ 	uint32_t color;
++
++	/* Synveil shell panel (ADR 0025) */
++	struct widget *start_widget;
++	int start_focused, start_pressed;
++	struct wl_list task_list;
++	struct wl_list menu_list;
++	int menu_open;
+ };
+ 
+ struct background {
+@@ -300,11 +341,53 @@
+ 	cairo_surface_t *surface;
+ 	cairo_t *cr;
+ 	struct panel *panel = data;
++	struct rectangle alloc;
+ 
+ 	cr = widget_cairo_create(panel->widget);
+ 	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+-	set_hex_color(cr, panel->color);
+-	cairo_paint(cr);
++
++	if (panel->panel_position ==
++	    WESTON_DESKTOP_SHELL_PANEL_POSITION_BOTTOM) {
++		/* Synveil panel (ADR 0025): the surface is only as
++		 * tall as the strip, plus the Start menu card while
++		 * the menu is open. Everything else stays
++		 * transparent, and only the strip and the card are
++		 * input-active — the transparent remainder must not
++		 * eat clicks meant for the windows below. */
++		struct rectangle strip, card;
++
++		widget_get_allocation(panel->widget, &alloc);
++		cairo_set_source_rgba(cr, 0, 0, 0, 0);
++		cairo_paint(cr);
++
++		strip.x = 0;
++		strip.y = alloc.height - SV_STRIP_H;
++		strip.width = alloc.width;
++		strip.height = SV_STRIP_H;
++		set_hex_color(cr, panel->color);
++		cairo_rectangle(cr, strip.x, strip.y, strip.width,
++				strip.height);
++		cairo_fill(cr);
++		widget_input_region_add(panel->widget, &strip);
++
++		if (panel->menu_open) {
++			card.x = 4;
++			card.y = 4;
++			card.width = SV_MENU_WIDTH;
++			card.height = alloc.height - SV_STRIP_H - 8;
++			sv_rounded_rect(cr, card.x, card.y, card.width,
++					card.height, 8);
++			sv_set_rgb(cr, SV_COLOR_SURFACE);
++			cairo_fill_preserve(cr);
++			sv_set_rgb(cr, SV_COLOR_STROKE);
++			cairo_set_line_width(cr, 1);
++			cairo_stroke(cr);
++			widget_input_region_add(panel->widget, &card);
++		}
++	} else {
++		set_hex_color(cr, panel->color);
++		cairo_paint(cr);
++	}
+ 
+ 	cairo_destroy(cr);
+ 	surface = window_get_surface(panel->window);
+@@ -542,6 +625,736 @@
+ 	widget_set_redraw_handler(clock->widget, panel_clock_redraw_handler);
+ }
+ 
++/* ---- Synveil shell panel (ADR 0025): Start button, Start
++ * menu and task buttons in the bottom panel, in the
++ * docs/UI_DESIGN.md tokens. The shell publishes the window
++ * list over the private synveil_shell_panel protocol; every
++ * control drawn here performs a real action: task buttons
++ * activate/minimize through the shell, menu items focus the
++ * app's window when one exists and otherwise launch the app
++ * binary, and the Start button opens and closes the menu.
++ * No session actions are offered: the session machinery
++ * exposes no logout/lock request to invoke. */
++
++#define SV_STRIP_H 48
++#define SV_MENU_ITEM_H 40
++#define SV_MENU_WIDTH 328
++#define SV_COLOR_SURFACE 0x2C2C2C
++#define SV_COLOR_SURFACE_HI 0x383838
++#define SV_COLOR_STROKE 0x454545
++#define SV_COLOR_ACCENT 0x4CC2FF
++
++static void
++sv_set_rgb(cairo_t *cr, uint32_t hex)
++{
++	cairo_set_source_rgb(cr, ((hex >> 16) & 0xff) / 255.0,
++			     ((hex >> 8) & 0xff) / 255.0,
++			     (hex & 0xff) / 255.0);
++}
++
++static void
++sv_rounded_rect(cairo_t *cr, double x, double y, double w, double h,
++		double r)
++{
++	cairo_new_sub_path(cr);
++	cairo_arc(cr, x + w - r, y + r, r, -M_PI / 2, 0);
++	cairo_arc(cr, x + w - r, y + h - r, r, 0, M_PI / 2);
++	cairo_arc(cr, x + r, y + h - r, r, M_PI / 2, M_PI);
++	cairo_arc(cr, x + r, y + r, r, M_PI, 3 * M_PI / 2);
++	cairo_close_path(cr);
++}
++
++static double
++sv_text_width(const char *text, double size)
++{
++	static cairo_surface_t *measure_surface;
++	static cairo_t *measure_cr;
++	cairo_text_extents_t extents;
++
++	if (!measure_cr) {
++		measure_surface = cairo_image_surface_create(
++			CAIRO_FORMAT_ARGB32, 1, 1);
++		measure_cr = cairo_create(measure_surface);
++	}
++	cairo_set_font_size(measure_cr, size);
++	cairo_text_extents(measure_cr, text, &extents);
++	return extents.x_advance;
++}
++
++/* Draw text at the current point, shortened with an ellipsis
++ * when it exceeds max_width. */
++static void
++sv_show_text_clipped(cairo_t *cr, const char *text, double size,
++		     double max_width)
++{
++	cairo_text_extents_t extents;
++	char buf[256];
++	size_t len;
++
++	cairo_set_font_size(cr, size);
++	snprintf(buf, sizeof buf, "%s", text);
++	cairo_text_extents(cr, buf, &extents);
++	if (extents.x_advance <= max_width) {
++		cairo_show_text(cr, buf);
++		return;
++	}
++	len = strlen(buf);
++	while (len > 1) {
++		char trial[260];
++
++		snprintf(trial, sizeof trial, "%.*s…", (int) len, buf);
++		cairo_text_extents(cr, trial, &extents);
++		if (extents.x_advance <= max_width) {
++			cairo_show_text(cr, trial);
++			return;
++		}
++		len--;
++	}
++	cairo_show_text(cr, "…");
++}
++
++struct synveil_app {
++	const char *name;
++	const char *path;
++	const char *arg;
++	const char *app_id;
++	const char *marker;
++};
++
++/* The Start menu's applications, gated by the same marker
++ * files weston-session uses to decide what a session starts;
++ * an entry also requires its binary to be installed. */
++static const struct synveil_app synveil_apps[] = {
++	{ "Files", "/usr/bin/synveil-files", NULL,
++	  "org.synveil.files", "/etc/synveil/files-app" },
++	{ "Updates", "/usr/bin/synveil-update-gui", NULL,
++	  "org.synveil.update-gui", "/etc/synveil/ab-system" },
++	{ "Browser", "/usr/bin/synveil-browser", NULL,
++	  NULL, "/etc/synveil/browser" },
++	{ "Terminal", "/usr/bin/weston-terminal", NULL,
++	  NULL, NULL },
++	{ "Demo window", "/usr/bin/synveil-first-window", "--interactive",
++	  "org.synveil.first-window", NULL },
++};
++
++static int
++synveil_app_available(const struct synveil_app *app)
++{
++	if (app->marker && access(app->marker, F_OK) != 0)
++		return 0;
++	return access(app->path, X_OK) == 0;
++}
++
++static int
++sv_menu_height(struct panel *panel)
++{
++	struct panel_menu_item *item;
++	int n = 0;
++
++	wl_list_for_each(item, &panel->menu_list, link)
++		n++;
++	return 16 + n * SV_MENU_ITEM_H;
++}
++
++static struct desktop *
++panel_get_desktop(struct panel *panel)
++{
++	return display_get_user_data(window_get_display(panel->window));
++}
++
++static void
++panel_layout(struct panel *panel, int width, int height)
++{
++	struct panel_launcher *launcher;
++	struct panel_task *ptask;
++	struct panel_menu_item *item;
++	int strip_y = height - SV_STRIP_H;
++	int x;
++	int i;
++
++	widget_set_allocation(panel->start_widget, 6, strip_y + 5, 38, 38);
++	x = 6 + 38 + 6;
++
++	wl_list_for_each(launcher, &panel->launcher_list, link) {
++		widget_set_allocation(launcher->widget, x, strip_y,
++				      SV_STRIP_H, SV_STRIP_H);
++		x += SV_STRIP_H + 2;
++	}
++	if (!wl_list_empty(&panel->launcher_list))
++		x += 6;
++
++	wl_list_for_each(ptask, &panel->task_list, link) {
++		const char *title = ptask->task->title;
++		int w = (int) sv_text_width(title ? title : "", 12) + 28;
++
++		if (w < 84)
++			w = 84;
++		if (w > 176)
++			w = 176;
++		widget_set_allocation(ptask->widget, x, strip_y + 6, w, 36);
++		x += w + 4;
++	}
++
++	if (panel->clock) {
++		int w = panel->clock_format == CLOCK_FORMAT_SECONDS ?
++			170 : 150;
++
++		widget_set_allocation(panel->clock->widget, width - w,
++				      strip_y, w, SV_STRIP_H);
++	}
++
++	i = 0;
++	wl_list_for_each(item, &panel->menu_list, link) {
++		if (panel->menu_open)
++			widget_set_allocation(item->widget, 12,
++					      12 + i * SV_MENU_ITEM_H,
++					      SV_MENU_WIDTH - 24,
++					      SV_MENU_ITEM_H - 4);
++		else
++			widget_set_allocation(item->widget, 0, 0, 0, 0);
++		i++;
++	}
++}
++
++static void
++panel_set_menu_open(struct panel *panel, int open)
++{
++	struct desktop *desktop = panel_get_desktop(panel);
++	struct rectangle alloc;
++
++	if (panel->menu_open == open)
++		return;
++	panel->menu_open = open;
++	if (desktop->synveil_panel)
++		synveil_shell_panel_set_menu_open(desktop->synveil_panel,
++						  open);
++	widget_get_allocation(panel->widget, &alloc);
++	if (alloc.width > 0)
++		window_schedule_resize(panel->window, alloc.width,
++				       open ? SV_STRIP_H +
++					      sv_menu_height(panel)
++					    : SV_STRIP_H);
++	widget_schedule_redraw(panel->widget);
++	widget_schedule_redraw(panel->start_widget);
++}
++
++/* ---- Start button ---- */
++
++static void
++start_redraw_handler(struct widget *widget, void *data)
++{
++	struct panel *panel = data;
++	cairo_t *cr;
++	struct rectangle alloc;
++	double gx, gy;
++
++	widget_get_allocation(widget, &alloc);
++	if (alloc.width == 0)
++		return;
++
++	cr = widget_cairo_create(panel->widget);
++	if (panel->menu_open || panel->start_focused) {
++		sv_rounded_rect(cr, alloc.x, alloc.y, alloc.width,
++				alloc.height, 4);
++		sv_set_rgb(cr, SV_COLOR_SURFACE_HI);
++		cairo_fill(cr);
++	}
++	/* Original four-pane mark in the accent token. */
++	sv_set_rgb(cr, SV_COLOR_ACCENT);
++	gx = alloc.x + alloc.width / 2.0 - 9;
++	gy = alloc.y + alloc.height / 2.0 - 9;
++	sv_rounded_rect(cr, gx, gy, 8, 8, 2);
++	cairo_fill(cr);
++	sv_rounded_rect(cr, gx + 10, gy, 8, 8, 2);
++	cairo_fill(cr);
++	sv_rounded_rect(cr, gx, gy + 10, 8, 8, 2);
++	cairo_fill(cr);
++	sv_rounded_rect(cr, gx + 10, gy + 10, 8, 8, 2);
++	cairo_fill(cr);
++	cairo_destroy(cr);
++}
++
++static int
++start_enter_handler(struct widget *widget, struct input *input,
++		    float x, float y, void *data)
++{
++	struct panel *panel = data;
++
++	panel->start_focused = 1;
++	widget_schedule_redraw(widget);
++	return CURSOR_LEFT_PTR;
++}
++
++static void
++start_leave_handler(struct widget *widget, struct input *input,
++		    void *data)
++{
++	struct panel *panel = data;
++
++	panel->start_focused = 0;
++	widget_schedule_redraw(widget);
++}
++
++static void
++start_button_handler(struct widget *widget, struct input *input,
++		     uint32_t time, uint32_t button,
++		     enum wl_pointer_button_state state, void *data)
++{
++	struct panel *panel = data;
++
++	if (state == WL_POINTER_BUTTON_STATE_RELEASED)
++		panel_set_menu_open(panel, !panel->menu_open);
++}
++
++/* ---- Task buttons ---- */
++
++static void
++panel_task_redraw_handler(struct widget *widget, void *data)
++{
++	struct panel_task *ptask = data;
++	struct synveil_task *task = ptask->task;
++	cairo_t *cr;
++	struct rectangle alloc;
++	const char *title = task->title ? task->title : "";
++	int activated = (task->state &
++			 SYNVEIL_SHELL_PANEL_WINDOW_STATE_ACTIVATED) != 0;
++	int minimized = (task->state &
++			 SYNVEIL_SHELL_PANEL_WINDOW_STATE_MINIMIZED) != 0;
++	cairo_text_extents_t extents;
++
++	widget_get_allocation(widget, &alloc);
++	if (alloc.width == 0)
++		return;
++
++	cr = widget_cairo_create(ptask->panel->widget);
++	if (activated || ptask->focused) {
++		sv_rounded_rect(cr, alloc.x, alloc.y, alloc.width,
++				alloc.height, 4);
++		sv_set_rgb(cr, SV_COLOR_SURFACE_HI);
++		cairo_fill(cr);
++	}
++	if (activated) {
++		sv_set_rgb(cr, SV_COLOR_ACCENT);
++		cairo_rectangle(cr, alloc.x + alloc.width / 2 - 12,
++				alloc.y + alloc.height - 3, 24, 3);
++		cairo_fill(cr);
++	}
++	cairo_set_font_size(cr, 12);
++	cairo_text_extents(cr, "Ag", &extents);
++	if (minimized)
++		cairo_set_source_rgb(cr, 0x8A / 255.0, 0x8A / 255.0,
++				     0x8A / 255.0);
++	else if (activated)
++		cairo_set_source_rgb(cr, 1, 1, 1);
++	else
++		cairo_set_source_rgb(cr, 0xC8 / 255.0, 0xC8 / 255.0,
++				     0xC8 / 255.0);
++	cairo_move_to(cr, alloc.x + 10,
++		      alloc.y + alloc.height / 2 + extents.height / 2 - 1);
++	sv_show_text_clipped(cr, title, 12, alloc.width - 20);
++	cairo_destroy(cr);
++}
++
++static int
++panel_task_enter_handler(struct widget *widget, struct input *input,
++			 float x, float y, void *data)
++{
++	struct panel_task *ptask = data;
++
++	ptask->focused = 1;
++	widget_schedule_redraw(widget);
++	return CURSOR_LEFT_PTR;
++}
++
++static void
++panel_task_leave_handler(struct widget *widget, struct input *input,
++			 void *data)
++{
++	struct panel_task *ptask = data;
++
++	ptask->focused = 0;
++	widget_destroy_tooltip(widget);
++	widget_schedule_redraw(widget);
++}
++
++static void
++panel_task_motion_handler(struct widget *widget, struct input *input,
++			  void *data, float x, float y, float sx, float sy)
++{
++	struct panel_task *ptask = data;
++
++	if (ptask->task->title && ptask->task->title[0])
++		widget_set_tooltip(widget, ptask->task->title, x, y);
++}
++
++static void
++panel_task_button_handler(struct widget *widget, struct input *input,
++			  uint32_t time, uint32_t button,
++			  enum wl_pointer_button_state state, void *data)
++{
++	struct panel_task *ptask = data;
++	struct desktop *desktop = panel_get_desktop(ptask->panel);
++	struct synveil_task *task = ptask->task;
++	int activated = (task->state &
++			 SYNVEIL_SHELL_PANEL_WINDOW_STATE_ACTIVATED) != 0;
++	int minimized = (task->state &
++			 SYNVEIL_SHELL_PANEL_WINDOW_STATE_MINIMIZED) != 0;
++
++	if (state != WL_POINTER_BUTTON_STATE_RELEASED)
++		return;
++	if (!desktop->synveil_panel)
++		return;
++	if (ptask->panel->menu_open)
++		panel_set_menu_open(ptask->panel, 0);
++	if (activated && !minimized)
++		synveil_shell_panel_minimize_window(desktop->synveil_panel,
++						    task->id);
++	else
++		synveil_shell_panel_activate_window(desktop->synveil_panel,
++						    task->id);
++}
++
++static void
++panel_task_destroy(struct panel_task *ptask)
++{
++	widget_destroy(ptask->widget);
++	wl_list_remove(&ptask->link);
++	free(ptask);
++}
++
++static void
++panel_task_create(struct panel *panel, struct synveil_task *task)
++{
++	struct panel_task *ptask = xzalloc(sizeof *ptask);
++
++	ptask->panel = panel;
++	ptask->task = task;
++	ptask->widget = widget_add_widget(panel->widget, ptask);
++	wl_list_insert(panel->task_list.prev, &ptask->link);
++	widget_set_redraw_handler(ptask->widget, panel_task_redraw_handler);
++	widget_set_enter_handler(ptask->widget, panel_task_enter_handler);
++	widget_set_leave_handler(ptask->widget, panel_task_leave_handler);
++	widget_set_button_handler(ptask->widget, panel_task_button_handler);
++	widget_set_motion_handler(ptask->widget, panel_task_motion_handler);
++}
++
++/* Mirror the desktop's window model with this panel's widgets,
++ * then lay out and repaint. */
++static void
++panel_sync_tasks(struct panel *panel, struct desktop *desktop)
++{
++	struct panel_task *ptask, *tmp;
++	struct synveil_task *task;
++	struct rectangle alloc;
++	int found;
++
++	wl_list_for_each_safe(ptask, tmp, &panel->task_list, link) {
++		found = 0;
++		wl_list_for_each(task, &desktop->synveil_tasks, link)
++			if (task == ptask->task)
++				found = 1;
++		if (!found)
++			panel_task_destroy(ptask);
++	}
++	wl_list_for_each(task, &desktop->synveil_tasks, link) {
++		found = 0;
++		wl_list_for_each(ptask, &panel->task_list, link)
++			if (ptask->task == task)
++				found = 1;
++		if (!found)
++			panel_task_create(panel, task);
++	}
++	widget_get_allocation(panel->widget, &alloc);
++	if (alloc.width > 0)
++		panel_layout(panel, alloc.width, alloc.height);
++	widget_schedule_redraw(panel->widget);
++}
++
++/* ---- Start menu items ---- */
++
++static void
++panel_menu_item_activate(struct panel_menu_item *item)
++{
++	struct desktop *desktop = panel_get_desktop(item->panel);
++	struct synveil_task *task;
++	pid_t pid;
++
++	/* Focus-or-launch for the single-instance Synveil apps:
++	 * when a window with the app's id exists, the menu entry
++	 * raises it instead of starting a second copy. */
++	if (item->app_id && desktop->synveil_panel) {
++		wl_list_for_each(task, &desktop->synveil_tasks, link) {
++			if (task->app_id &&
++			    strcmp(task->app_id, item->app_id) == 0) {
++				synveil_shell_panel_activate_window(
++					desktop->synveil_panel, task->id);
++				return;
++			}
++		}
++	}
++
++	pid = fork();
++	if (pid < 0)
++		return;
++	if (pid)
++		return;
++	if (setsid() == -1)
++		exit(EXIT_FAILURE);
++	{
++		char *const argv_with_arg[] = {
++			(char *) item->path, (char *) item->arg, NULL
++		};
++		char *const argv_plain[] = { (char *) item->path, NULL };
++
++		execv(item->path, item->arg ? argv_with_arg : argv_plain);
++		fprintf(stderr, "exec '%s' failed: %s\n", item->path,
++			strerror(errno));
++		exit(1);
++	}
++}
++
++static void
++panel_menu_item_redraw_handler(struct widget *widget, void *data)
++{
++	struct panel_menu_item *item = data;
++	cairo_t *cr;
++	struct rectangle alloc;
++	cairo_text_extents_t extents;
++
++	widget_get_allocation(widget, &alloc);
++	if (alloc.width == 0)
++		return;
++
++	cr = widget_cairo_create(item->panel->widget);
++	if (item->focused) {
++		sv_rounded_rect(cr, alloc.x, alloc.y, alloc.width,
++				alloc.height, 4);
++		sv_set_rgb(cr, SV_COLOR_SURFACE_HI);
++		cairo_fill(cr);
++	}
++	/* Glyph: accent rounded square carrying the app's
++	 * initial — an original geometric mark, no artwork. */
++	sv_rounded_rect(cr, alloc.x + 4, alloc.y + 4, 28, 28, 4);
++	sv_set_rgb(cr, SV_COLOR_ACCENT);
++	cairo_fill(cr);
++	cairo_set_source_rgb(cr, 0x20 / 255.0, 0x20 / 255.0, 0x20 / 255.0);
++	cairo_set_font_size(cr, 15);
++	{
++		char initial[2] = { item->name[0], '\0' };
++
++		cairo_text_extents(cr, initial, &extents);
++		cairo_move_to(cr, alloc.x + 4 + 14 - extents.width / 2,
++			      alloc.y + 4 + 14 + extents.height / 2);
++		cairo_show_text(cr, initial);
++	}
++	cairo_set_source_rgb(cr, 1, 1, 1);
++	cairo_set_font_size(cr, 13);
++	cairo_text_extents(cr, "Ag", &extents);
++	cairo_move_to(cr, alloc.x + 44,
++		      alloc.y + alloc.height / 2 + extents.height / 2);
++	cairo_show_text(cr, item->name);
++	cairo_destroy(cr);
++}
++
++static int
++panel_menu_item_enter_handler(struct widget *widget, struct input *input,
++			      float x, float y, void *data)
++{
++	struct panel_menu_item *item = data;
++
++	item->focused = 1;
++	widget_schedule_redraw(widget);
++	return CURSOR_LEFT_PTR;
++}
++
++static void
++panel_menu_item_leave_handler(struct widget *widget, struct input *input,
++			      void *data)
++{
++	struct panel_menu_item *item = data;
++
++	item->focused = 0;
++	widget_schedule_redraw(widget);
++}
++
++static void
++panel_menu_item_button_handler(struct widget *widget, struct input *input,
++			       uint32_t time, uint32_t button,
++			       enum wl_pointer_button_state state, void *data)
++{
++	struct panel_menu_item *item = data;
++
++	if (state != WL_POINTER_BUTTON_STATE_RELEASED)
++		return;
++	panel_menu_item_activate(item);
++	panel_set_menu_open(item->panel, 0);
++}
++
++static void
++panel_build_menu(struct panel *panel)
++{
++	size_t i;
++
++	for (i = 0; i < ARRAY_LENGTH(synveil_apps); i++) {
++		const struct synveil_app *app = &synveil_apps[i];
++		struct panel_menu_item *item;
++
++		if (!synveil_app_available(app))
++			continue;
++		item = xzalloc(sizeof *item);
++		item->panel = panel;
++		item->name = app->name;
++		item->path = app->path;
++		item->arg = app->arg;
++		item->app_id = app->app_id;
++		item->widget = widget_add_widget(panel->widget, item);
++		wl_list_insert(panel->menu_list.prev, &item->link);
++		widget_set_redraw_handler(item->widget,
++					  panel_menu_item_redraw_handler);
++		widget_set_enter_handler(item->widget,
++					 panel_menu_item_enter_handler);
++		widget_set_leave_handler(item->widget,
++					 panel_menu_item_leave_handler);
++		widget_set_button_handler(item->widget,
++					  panel_menu_item_button_handler);
++	}
++}
++
++/* ---- synveil_shell_panel listener ---- */
++
++static void
++synveil_panels_sync(struct desktop *desktop)
++{
++	struct output *output;
++
++	wl_list_for_each(output, &desktop->outputs, link)
++		if (output->panel)
++			panel_sync_tasks(output->panel, desktop);
++}
++
++static void
++synveil_panels_redraw_task(struct desktop *desktop, uint32_t id)
++{
++	struct output *output;
++	struct panel_task *ptask;
++
++	wl_list_for_each(output, &desktop->outputs, link) {
++		if (!output->panel)
++			continue;
++		wl_list_for_each(ptask, &output->panel->task_list, link)
++			if (ptask->task->id == id)
++				widget_schedule_redraw(ptask->widget);
++		widget_schedule_redraw(output->panel->widget);
++	}
++}
++
++static struct synveil_task *
++synveil_find_task(struct desktop *desktop, uint32_t id)
++{
++	struct synveil_task *task;
++
++	wl_list_for_each(task, &desktop->synveil_tasks, link)
++		if (task->id == id)
++			return task;
++	return NULL;
++}
++
++static void
++synveil_handle_window_added(void *data, struct synveil_shell_panel *proto,
++			    uint32_t id, const char *app_id,
++			    const char *title)
++{
++	struct desktop *desktop = data;
++	struct synveil_task *task;
++
++	if (synveil_find_task(desktop, id))
++		return;
++	task = xzalloc(sizeof *task);
++	task->id = id;
++	task->app_id = xstrdup(app_id ? app_id : "");
++	task->title = xstrdup(title ? title : "");
++	task->state = 0;
++	wl_list_insert(desktop->synveil_tasks.prev, &task->link);
++	synveil_panels_sync(desktop);
++}
++
++static void
++synveil_handle_window_removed(void *data, struct synveil_shell_panel *proto,
++			      uint32_t id)
++{
++	struct desktop *desktop = data;
++	struct synveil_task *task = synveil_find_task(desktop, id);
++
++	if (!task)
++		return;
++	wl_list_remove(&task->link);
++	free(task->app_id);
++	free(task->title);
++	free(task);
++	synveil_panels_sync(desktop);
++}
++
++static void
++synveil_handle_window_properties(void *data,
++				 struct synveil_shell_panel *proto,
++				 uint32_t id, const char *app_id,
++				 const char *title)
++{
++	struct desktop *desktop = data;
++	struct synveil_task *task = synveil_find_task(desktop, id);
++	struct output *output;
++	struct rectangle alloc;
++
++	if (!task)
++		return;
++	free(task->app_id);
++	task->app_id = xstrdup(app_id ? app_id : "");
++	free(task->title);
++	task->title = xstrdup(title ? title : "");
++	/* A title change can resize the button. */
++	wl_list_for_each(output, &desktop->outputs, link) {
++		if (!output->panel)
++			continue;
++		widget_get_allocation(output->panel->widget, &alloc);
++		if (alloc.width > 0)
++			panel_layout(output->panel, alloc.width,
++				     alloc.height);
++	}
++	synveil_panels_redraw_task(desktop, id);
++}
++
++static void
++synveil_handle_window_state(void *data, struct synveil_shell_panel *proto,
++			    uint32_t id, uint32_t state)
++{
++	struct desktop *desktop = data;
++	struct synveil_task *task = synveil_find_task(desktop, id);
++
++	if (!task)
++		return;
++	task->state = state;
++	synveil_panels_redraw_task(desktop, id);
++}
++
++static void
++synveil_handle_menu_dismiss(void *data, struct synveil_shell_panel *proto)
++{
++	struct desktop *desktop = data;
++	struct output *output;
++
++	wl_list_for_each(output, &desktop->outputs, link)
++		if (output->panel && output->panel->menu_open)
++			panel_set_menu_open(output->panel, 0);
++}
++
++static const struct synveil_shell_panel_listener synveil_panel_listener = {
++	.window_added = synveil_handle_window_added,
++	.window_removed = synveil_handle_window_removed,
++	.window_properties_changed = synveil_handle_window_properties,
++	.window_state_changed = synveil_handle_window_state,
++	.menu_dismiss = synveil_handle_menu_dismiss,
++};
++
+ static void
+ panel_resize_handler(struct widget *widget,
+ 		     int32_t width, int32_t height, void *data)
+@@ -556,6 +1369,12 @@
+ 	int first_pad_h = horizontal ? 0 : DEFAULT_SPACING / 2;
+ 	int first_pad_w = horizontal ? DEFAULT_SPACING / 2 : 0;
+ 
++	if (panel->panel_position ==
++	    WESTON_DESKTOP_SHELL_PANEL_POSITION_BOTTOM) {
++		panel_layout(panel, width, height);
++		return;
++	}
++
+ 	wl_list_for_each(launcher, &panel->launcher_list, link) {
+ 		widget_set_allocation(launcher->widget, x, y,
+ 				      w + first_pad_w + 1, h + first_pad_h + 1);
+@@ -604,8 +1423,13 @@
+ 	}
+ 
+ 	switch (desktop->panel_position) {
+-	case WESTON_DESKTOP_SHELL_PANEL_POSITION_TOP:
+ 	case WESTON_DESKTOP_SHELL_PANEL_POSITION_BOTTOM:
++		/* Synveil panel (ADR 0025): 48 px strip, taller
++		 * while the Start menu is open. */
++		height = panel->menu_open ?
++			SV_STRIP_H + sv_menu_height(panel) : SV_STRIP_H;
++		break;
++	case WESTON_DESKTOP_SHELL_PANEL_POSITION_TOP:
+ 		height = 32;
+ 		break;
+ 	case WESTON_DESKTOP_SHELL_PANEL_POSITION_LEFT:
+@@ -649,6 +1473,8 @@
+ {
+ 	struct panel_launcher *tmp;
+ 	struct panel_launcher *launcher;
++	struct panel_task *ptask, *ptmp;
++	struct panel_menu_item *item, *itmp;
+ 
+ 	if (panel->clock)
+ 		panel_destroy_clock(panel->clock);
+@@ -656,6 +1482,16 @@
+ 	wl_list_for_each_safe(launcher, tmp, &panel->launcher_list, link)
+ 		panel_destroy_launcher(launcher);
+ 
++	wl_list_for_each_safe(ptask, ptmp, &panel->task_list, link)
++		panel_task_destroy(ptask);
++	wl_list_for_each_safe(item, itmp, &panel->menu_list, link) {
++		widget_destroy(item->widget);
++		wl_list_remove(&item->link);
++		free(item);
++	}
++	if (panel->start_widget)
++		widget_destroy(panel->start_widget);
++
+ 	widget_destroy(panel->widget);
+ 	window_destroy(panel->window);
+ 
+@@ -675,6 +1511,8 @@
+ 	panel->window = window_create_custom(desktop->display);
+ 	panel->widget = window_add_widget(panel->window, panel);
+ 	wl_list_init(&panel->launcher_list);
++	wl_list_init(&panel->task_list);
++	wl_list_init(&panel->menu_list);
+ 
+ 	window_set_title(panel->window, "panel");
+ 	window_set_user_data(panel->window, panel);
+@@ -682,6 +1520,14 @@
+ 	widget_set_redraw_handler(panel->widget, panel_redraw_handler);
+ 	widget_set_resize_handler(panel->widget, panel_resize_handler);
+ 
++	/* Synveil shell panel (ADR 0025): Start button and menu. */
++	panel->start_widget = widget_add_widget(panel->widget, panel);
++	widget_set_redraw_handler(panel->start_widget, start_redraw_handler);
++	widget_set_enter_handler(panel->start_widget, start_enter_handler);
++	widget_set_leave_handler(panel->start_widget, start_leave_handler);
++	widget_set_button_handler(panel->start_widget, start_button_handler);
++	panel_build_menu(panel);
++
+ 	panel->panel_position = desktop->panel_position;
+ 	panel->clock_format = desktop->clock_format;
+ 	if (panel->clock_format != CLOCK_FORMAT_NONE)
+@@ -693,6 +1539,11 @@
+ 
+ 	panel_add_launchers(panel, desktop);
+ 
++	/* Windows may already have been published before this
++	 * panel existed (the protocol can bind before the output
++	 * is processed). */
++	panel_sync_tasks(panel, desktop);
++
+ 	return panel;
+ }
+ 
+@@ -1506,6 +2357,13 @@
+ 		weston_desktop_shell_add_listener(desktop->shell,
+ 						  &listener,
+ 						  desktop);
++	} else if (!strcmp(interface, "synveil_shell_panel")) {
++		desktop->synveil_panel = display_bind(
++			desktop->display, id,
++			&synveil_shell_panel_interface, 1);
++		synveil_shell_panel_add_listener(desktop->synveil_panel,
++						 &synveil_panel_listener,
++						 desktop);
+ 	} else if (!strcmp(interface, "wl_output")) {
+ 		create_output(desktop, id);
+ 	}
+@@ -1627,6 +2485,7 @@
+ 
+ 	desktop.unlock_task.run = unlock_dialog_finish;
+ 	wl_list_init(&desktop.outputs);
++	wl_list_init(&desktop.synveil_tasks);
+ 
+ 	config_file = weston_config_get_name_from_env();
+ 	desktop.config = weston_config_parse(config_file);
+diff -ruN '--exclude=buildroot-build' a/clients/meson.build b/clients/meson.build
+--- a/clients/meson.build	2026-11-07 08:52:24.050242734 +0000
++++ b/clients/meson.build	2026-11-07 08:52:24.078553330 +0000
+@@ -490,6 +490,8 @@
+ 		'desktop-shell.c',
+ 		weston_desktop_shell_client_protocol_h,
+ 		weston_desktop_shell_protocol_c,
++		synveil_shell_panel_client_protocol_h,
++		synveil_shell_panel_protocol_c,
+ 		tablet_unstable_v2_client_protocol_h,
+ 		tablet_unstable_v2_protocol_c,
+ 		include_directories: common_inc,
+diff -ruN '--exclude=buildroot-build' a/desktop-shell/meson.build b/desktop-shell/meson.build
+--- a/desktop-shell/meson.build	2026-11-07 08:52:24.053848916 +0000
++++ b/desktop-shell/meson.build	2026-11-07 08:52:24.082439011 +0000
+@@ -6,6 +6,8 @@
+ 		'input-panel.c',
+ 		weston_desktop_shell_server_protocol_h,
+ 		weston_desktop_shell_protocol_c,
++		synveil_shell_panel_server_protocol_h,
++		synveil_shell_panel_protocol_c,
+ 		input_method_unstable_v1_server_protocol_h,
+ 		input_method_unstable_v1_protocol_c,
+ 	]
+diff -ruN '--exclude=buildroot-build' a/desktop-shell/shell.c b/desktop-shell/shell.c
+--- a/desktop-shell/shell.c	2026-11-07 08:52:24.053868525 +0000
++++ b/desktop-shell/shell.c	2026-11-07 08:52:24.082479412 +0000
+@@ -39,6 +39,7 @@
+ #include "shell.h"
+ #include "frontend/weston.h"
+ #include "weston-desktop-shell-server-protocol.h"
++#include "synveil-shell-panel-server-protocol.h"
+ #include <libweston/config-parser.h>
+ #include "shared/helpers.h"
+ #include "shared/timespec-util.h"
+@@ -1418,6 +1419,260 @@
+ 	return has_keyboard_focus;
+ }
+ 
++/* Synveil shell panel protocol (ADR 0025).
++ *
++ * The shell publishes its toplevel window list to its own
++ * helper client (the panel) over the private synveil_shell_panel
++ * interface, and the helper asks the shell to activate or
++ * minimize published windows. Requests are honored only from
++ * the resource bound by the shell's own launched client
++ * (shell->child.client); other binders get an inert object.
++ * Transient surfaces (those with a parent) are not published:
++ * a taskbar lists windows, not dialogs. */
++
++static void set_minimized(struct weston_surface *surface);
++
++static bool
++synveil_surface_is_minimized(struct shell_surface *shsurf)
++{
++	if (!shsurf->view)
++		return false;
++	return shsurf->view->layer_link.layer ==
++		&shsurf->shell->minimized_layer;
++}
++
++static uint32_t
++synveil_surface_state(struct shell_surface *shsurf)
++{
++	uint32_t state = 0;
++
++	if (shsurf->focus_count > 0)
++		state |= SYNVEIL_SHELL_PANEL_WINDOW_STATE_ACTIVATED;
++	if (synveil_surface_is_minimized(shsurf))
++		state |= SYNVEIL_SHELL_PANEL_WINDOW_STATE_MINIMIZED;
++	return state;
++}
++
++static void
++synveil_panel_broadcast_state(struct shell_surface *shsurf)
++{
++	struct desktop_shell *shell = shsurf->shell;
++	uint32_t state = synveil_surface_state(shsurf);
++
++	if (state == shsurf->synveil_state)
++		return;
++	shsurf->synveil_state = state;
++	if (shell->synveil_panel_resource && shsurf->synveil_id != 0)
++		synveil_shell_panel_send_window_state_changed(
++			shell->synveil_panel_resource, shsurf->synveil_id,
++			state);
++}
++
++/* Refresh the stored app id/title from the desktop surface.
++ * Returns true when either changed. */
++static bool
++synveil_refresh_properties(struct shell_surface *shsurf)
++{
++	const char *app_id =
++		weston_desktop_surface_get_app_id(shsurf->desktop_surface);
++	const char *title =
++		weston_desktop_surface_get_title(shsurf->desktop_surface);
++	bool changed = false;
++
++	if ((app_id == NULL) != (shsurf->synveil_app_id == NULL) ||
++	    (app_id && shsurf->synveil_app_id &&
++	     strcmp(app_id, shsurf->synveil_app_id) != 0)) {
++		free(shsurf->synveil_app_id);
++		shsurf->synveil_app_id = app_id ? strdup(app_id) : NULL;
++		changed = true;
++	}
++	if ((title == NULL) != (shsurf->synveil_title == NULL) ||
++	    (title && shsurf->synveil_title &&
++	     strcmp(title, shsurf->synveil_title) != 0)) {
++		free(shsurf->synveil_title);
++		shsurf->synveil_title = title ? strdup(title) : NULL;
++		changed = true;
++	}
++	return changed;
++}
++
++static void
++synveil_panel_broadcast_properties(struct shell_surface *shsurf)
++{
++	struct desktop_shell *shell = shsurf->shell;
++
++	if (!synveil_refresh_properties(shsurf))
++		return;
++	if (shell->synveil_panel_resource && shsurf->synveil_id != 0)
++		synveil_shell_panel_send_window_properties_changed(
++			shell->synveil_panel_resource, shsurf->synveil_id,
++			shsurf->synveil_app_id ? shsurf->synveil_app_id : "",
++			shsurf->synveil_title ? shsurf->synveil_title : "");
++}
++
++static void
++synveil_panel_publish(struct shell_surface *shsurf)
++{
++	struct desktop_shell *shell = shsurf->shell;
++
++	if (shsurf->synveil_id != 0)
++		return;
++	if (weston_desktop_surface_get_parent(shsurf->desktop_surface))
++		return;
++
++	shsurf->synveil_id = shell->synveil_next_id++;
++	if (shsurf->synveil_id == 0)
++		shsurf->synveil_id = shell->synveil_next_id++;
++	synveil_refresh_properties(shsurf);
++	shsurf->synveil_state = synveil_surface_state(shsurf);
++	if (shell->synveil_panel_resource) {
++		synveil_shell_panel_send_window_added(
++			shell->synveil_panel_resource, shsurf->synveil_id,
++			shsurf->synveil_app_id ? shsurf->synveil_app_id : "",
++			shsurf->synveil_title ? shsurf->synveil_title : "");
++		synveil_shell_panel_send_window_state_changed(
++			shell->synveil_panel_resource, shsurf->synveil_id,
++			shsurf->synveil_state);
++	}
++}
++
++static void
++synveil_panel_unpublish(struct shell_surface *shsurf)
++{
++	struct desktop_shell *shell = shsurf->shell;
++
++	if (shsurf->synveil_id == 0)
++		return;
++	if (shell->synveil_panel_resource)
++		synveil_shell_panel_send_window_removed(
++			shell->synveil_panel_resource, shsurf->synveil_id);
++	shsurf->synveil_id = 0;
++	free(shsurf->synveil_app_id);
++	shsurf->synveil_app_id = NULL;
++	free(shsurf->synveil_title);
++	shsurf->synveil_title = NULL;
++	shsurf->synveil_state = 0;
++}
++
++static struct shell_surface *
++synveil_find_surface(struct desktop_shell *shell, uint32_t id)
++{
++	struct shell_surface *shsurf;
++
++	if (id == 0)
++		return NULL;
++	wl_list_for_each(shsurf, &shell->shsurf_list, link)
++		if (shsurf->synveil_id == id)
++			return shsurf;
++	return NULL;
++}
++
++static void
++synveil_panel_activate_window(struct wl_client *client,
++			      struct wl_resource *resource, uint32_t id)
++{
++	struct desktop_shell *shell = wl_resource_get_user_data(resource);
++	struct shell_surface *shsurf;
++	struct weston_seat *seat;
++
++	if (resource != shell->synveil_panel_resource)
++		return;
++	shsurf = synveil_find_surface(shell, id);
++	if (!shsurf || !shsurf->view)
++		return;
++	if (wl_list_empty(&shell->compositor->seat_list))
++		return;
++	seat = wl_container_of(shell->compositor->seat_list.next,
++			       seat, link);
++	activate(shell, shsurf->view, seat,
++		 WESTON_ACTIVATE_FLAG_CONFIGURE);
++	synveil_panel_broadcast_state(shsurf);
++}
++
++static void
++synveil_panel_minimize_window(struct wl_client *client,
++			      struct wl_resource *resource, uint32_t id)
++{
++	struct desktop_shell *shell = wl_resource_get_user_data(resource);
++	struct shell_surface *shsurf;
++	struct weston_surface *surface;
++
++	if (resource != shell->synveil_panel_resource)
++		return;
++	shsurf = synveil_find_surface(shell, id);
++	if (!shsurf)
++		return;
++	surface = weston_desktop_surface_get_surface(
++		shsurf->desktop_surface);
++	set_minimized(surface);
++}
++
++static void
++synveil_panel_set_menu_open(struct wl_client *client,
++			    struct wl_resource *resource, uint32_t open)
++{
++	struct desktop_shell *shell = wl_resource_get_user_data(resource);
++
++	if (resource != shell->synveil_panel_resource)
++		return;
++	shell->synveil_menu_open = open != 0;
++}
++
++static const struct synveil_shell_panel_interface
++synveil_panel_interface = {
++	.activate_window = synveil_panel_activate_window,
++	.minimize_window = synveil_panel_minimize_window,
++	.set_menu_open = synveil_panel_set_menu_open,
++};
++
++static void
++synveil_panel_resource_destroy(struct wl_resource *resource)
++{
++	struct desktop_shell *shell = wl_resource_get_user_data(resource);
++
++	if (shell->synveil_panel_resource == resource) {
++		shell->synveil_panel_resource = NULL;
++		shell->synveil_menu_open = false;
++	}
++}
++
++static void
++bind_synveil_panel(struct wl_client *client, void *data,
++		   uint32_t version, uint32_t id)
++{
++	struct desktop_shell *shell = data;
++	struct wl_resource *resource;
++	struct shell_surface *shsurf;
++
++	resource = wl_resource_create(client,
++				      &synveil_shell_panel_interface,
++				      version, id);
++	if (!resource) {
++		wl_client_post_no_memory(client);
++		return;
++	}
++	wl_resource_set_implementation(resource, &synveil_panel_interface,
++				       shell, synveil_panel_resource_destroy);
++
++	if (client != shell->child.client)
++		return;
++
++	/* The shell's own helper: make it authoritative and bring
++	 * it up to date with the windows that already exist. */
++	shell->synveil_panel_resource = resource;
++	wl_list_for_each(shsurf, &shell->shsurf_list, link) {
++		if (shsurf->synveil_id == 0)
++			continue;
++		synveil_shell_panel_send_window_added(
++			resource, shsurf->synveil_id,
++			shsurf->synveil_app_id ? shsurf->synveil_app_id : "",
++			shsurf->synveil_title ? shsurf->synveil_title : "");
++		synveil_shell_panel_send_window_state_changed(
++			resource, shsurf->synveil_id,
++			shsurf->synveil_state);
++	}
++}
++
+ static void
+ sync_surface_activated_state(struct shell_surface *shsurf)
+ {
+@@ -1436,6 +1691,8 @@
+ 		weston_desktop_surface_set_activated(surface, true);
+ 	else
+ 		weston_desktop_surface_set_activated(surface, false);
++
++	synveil_panel_broadcast_state(shsurf);
+ }
+ 
+ static void
+@@ -1646,6 +1903,8 @@
+ 	surface_keyboard_focus_lost(surface);
+ 
+ 	shell_surface_update_child_surface_layers(shsurf);
++
++	synveil_panel_broadcast_state(shsurf);
+ }
+ 
+ 
+@@ -1993,6 +2252,8 @@
+ 	if (!shsurf)
+ 		return;
+ 
++	synveil_panel_unpublish(shsurf);
++
+ 	wl_list_for_each(seat, &shsurf->shell->compositor->seat_list, link) {
+ 		struct shell_seat *shseat = get_shell_seat(seat);
+ 		/* activate() controls the focused surface activation and
+@@ -2163,6 +2424,20 @@
+ 	bool was_fullscreen;
+ 	bool was_maximized;
+ 
++	/* Synveil panel: keep the published window list current.
++	 * Publication starts at first commit (when the window
++	 * actually appears); a surface that gains a parent is a
++	 * dialog, not a window, and leaves the list. */
++	if (shsurf->synveil_id != 0 &&
++	    weston_desktop_surface_get_parent(desktop_surface))
++		synveil_panel_unpublish(shsurf);
++	else if (shsurf->synveil_id == 0)
++		synveil_panel_publish(shsurf);
++	if (shsurf->synveil_id != 0) {
++		synveil_panel_broadcast_properties(shsurf);
++		synveil_panel_broadcast_state(shsurf);
++	}
++
+ 	if (!weston_surface_has_content(surface) &&
+ 	    weston_surface_is_unmapping(surface) &&
+ 	    shsurf->state.fullscreen) {
+@@ -3531,6 +3806,16 @@
+ 		ws = get_current_workspace(shell);
+ 		animate_focus_change(shell, ws, get_default_view(old_es), get_default_view(es));
+ 	}
++
++	/* Synveil panel: activating a window dismisses the Start
++	 * menu, and the panel reflects the new focus state. */
++	if (shell->synveil_menu_open && shsurf->synveil_id != 0) {
++		shell->synveil_menu_open = false;
++		if (shell->synveil_panel_resource)
++			synveil_shell_panel_send_menu_dismiss(
++				shell->synveil_panel_resource);
++	}
++	synveil_panel_broadcast_state(shsurf);
+ }
+ 
+ static void
+@@ -4876,6 +5161,12 @@
+ 			     shell, bind_desktop_shell) == NULL)
+ 		return -1;
+ 
++	shell->synveil_next_id = 1;
++	if (wl_global_create(ec->wl_display,
++			     &synveil_shell_panel_interface, 1,
++			     shell, bind_synveil_panel) == NULL)
++		return -1;
++
+ 	weston_compositor_get_time(&shell->child.deathstamp);
+ 
+ 	shell->panel_position = WESTON_DESKTOP_SHELL_PANEL_POSITION_TOP;
+diff -ruN '--exclude=buildroot-build' a/desktop-shell/shell.h b/desktop-shell/shell.h
+--- a/desktop-shell/shell.h	2026-11-07 08:52:24.053938831 +0000
++++ b/desktop-shell/shell.h	2026-11-07 08:52:24.082742667 +0000
+@@ -130,6 +130,16 @@
+ 
+ 	int focus_count;
+ 
++	/* Synveil shell panel (ADR 0025): the id under which this
++	 * surface is published to the shell's own panel helper, or
++	 * 0 when unpublished (transient/child surfaces, surfaces
++	 * without a panel). The app id/title copies are the last
++	 * values sent, for change detection on commit. */
++	uint32_t synveil_id;
++	char *synveil_app_id;
++	char *synveil_title;
++	uint32_t synveil_state;
++
+ 	bool destroying;
+ 	struct wl_list link;	/** desktop_shell::shsurf_list */
+ };
+@@ -324,6 +334,14 @@
+ 
+ 	enum weston_desktop_shell_panel_position panel_position;
+ 
++	/* Synveil shell panel (ADR 0025): private window-list
++	 * protocol for the shell's own helper client. Only the
++	 * resource bound by child.client is authoritative; its
++	 * requests are honored and it alone receives events. */
++	struct wl_resource *synveil_panel_resource;
++	uint32_t synveil_next_id;
++	bool synveil_menu_open;
++
+ 	char *client;
+ 
+ 	struct timespec startup_time;
+diff -ruN '--exclude=buildroot-build' a/protocol/meson.build b/protocol/meson.build
+--- a/protocol/meson.build	2026-11-07 08:52:24.065361953 +0000
++++ b/protocol/meson.build	2026-11-07 08:52:24.098421225 +0000
+@@ -32,6 +32,7 @@
+ 	[ 'pointer-constraints', 'unstable', 'v1' ],
+ 	[ 'relative-pointer', 'unstable', 'v1' ],
+ 	[ 'single-pixel-buffer', 'staging', 'v1' ],
++	[ 'synveil-shell-panel', 'internal' ],
+ 	[ 'tablet', 'unstable', 'v2' ],
+ 	[ 'tearing-control', 'staging', 'v1' ],
+ 	[ 'text-cursor-position', 'internal' ],
+diff -ruN '--exclude=buildroot-build' a/protocol/synveil-shell-panel.xml b/protocol/synveil-shell-panel.xml
+--- a/protocol/synveil-shell-panel.xml	1970-01-01 00:00:00.000000000 +0000
++++ b/protocol/synveil-shell-panel.xml	2026-11-07 08:52:24.098721466 +0000
+@@ -0,0 +1,103 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<protocol name="synveil_shell_panel">
++
++  <copyright>
++    Copyright © 2026 Synveil contributors
++
++    Permission is hereby granted, free of charge, to any person
++    obtaining a copy of this software and associated documentation
++    files (the "Software"), to deal in the Software without
++    restriction, including without limitation the rights to use,
++    copy, modify, merge, publish, distribute, sublicense, and/or
++    sell copies of the Software, and to permit persons to whom the
++    Software is furnished to do so, subject to the following
++    conditions:
++
++    The above copyright notice and this permission notice (including
++    the next paragraph) shall be included in all copies or
++    substantial portions of the Software.
++
++    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
++    KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
++    WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
++    PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
++    COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
++    OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
++    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
++  </copyright>
++
++  <interface name="synveil_shell_panel" version="1">
++    <description summary="window list for the desktop shell's own panel">
++      Private protocol between the Weston desktop shell and its
++      own helper client (the panel). The shell publishes the
++      toplevel window list — additions, removals, title/app-id
++      changes and activation/minimize state — and the helper may
++      ask the shell to activate or minimize a published window
++      and reports its Start menu's open state so the shell can
++      dismiss the menu when an unrelated window is activated.
++
++      The compositor honors state-changing requests only from
++      the shell's own launched helper client; any other client
++      that binds the interface receives no events and its
++      requests are ignored. Window ids are shell-assigned,
++      unique for the lifetime of a window, and never reused
++      within a session.
++    </description>
++
++    <enum name="window_state">
++      <entry name="activated" value="1" summary="window has input focus"/>
++      <entry name="minimized" value="2" summary="window is in the minimized layer"/>
++    </enum>
++
++    <event name="window_added">
++      <description summary="a toplevel window appeared"/>
++      <arg name="id" type="uint"/>
++      <arg name="app_id" type="string"/>
++      <arg name="title" type="string"/>
++    </event>
++
++    <event name="window_removed">
++      <description summary="a toplevel window went away"/>
++      <arg name="id" type="uint"/>
++    </event>
++
++    <event name="window_properties_changed">
++      <description summary="a window's app id or title changed"/>
++      <arg name="id" type="uint"/>
++      <arg name="app_id" type="string"/>
++      <arg name="title" type="string"/>
++    </event>
++
++    <event name="window_state_changed">
++      <description summary="a window's state flags changed"/>
++      <arg name="id" type="uint"/>
++      <arg name="state" type="uint" enum="window_state"/>
++    </event>
++
++    <event name="menu_dismiss">
++      <description summary="close the Start menu">
++        Sent when the shell decides the menu must close because
++        an unrelated window was activated while it was open.
++      </description>
++    </event>
++
++    <request name="activate_window">
++      <description summary="activate (raise and focus) a window">
++        Also restores a minimized window, through the shell's
++        normal activation path.
++      </description>
++      <arg name="id" type="uint"/>
++    </request>
++
++    <request name="minimize_window">
++      <description summary="minimize a window"/>
++      <arg name="id" type="uint"/>
++    </request>
++
++    <request name="set_menu_open">
++      <description summary="report the Start menu's open state"/>
++      <arg name="open" type="uint"/>
++    </request>
++  </interface>
++</protocol>

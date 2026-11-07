@@ -38,6 +38,18 @@ PATCH_FILE = PATCH_DIR / "weston" / \
     "weston-15.0.1-subsurface-order-assert.patch"
 PATCHED_SOURCE = "libweston/surface-state.c"
 ASSERT_LINE = "weston_assert_true(comp, comp->view_list_needs_rebuild);"
+# Second carried patch (ADR 0025): the Synveil shell — a private
+# window-list protocol between the desktop shell and its panel
+# helper, a Start button and Start menu, and task buttons in the
+# panel client. Applied by the same global patch dir; verified
+# by tree markers below like the assert patch above.
+SHELL_PATCH_FILE = PATCH_DIR / "weston" / \
+    "weston-15.0.1-synveil-shell.patch"
+SHELL_PATCH_MARKERS = {
+    "protocol/synveil-shell-panel.xml": "synveil_shell_panel",
+    "desktop-shell/shell.c": "bind_synveil_panel",
+    "clients/desktop-shell.c": "panel_set_menu_open",
+}
 
 
 def weston_patch():
@@ -46,6 +58,38 @@ def weston_patch():
                          + str(PATCH_FILE.relative_to(ROOT)))
     return {"name": PATCH_FILE.name,
             "sha256": hashlib.sha256(PATCH_FILE.read_bytes()).hexdigest()}
+
+
+def weston_shell_patch():
+    if not SHELL_PATCH_FILE.is_file():
+        raise ValueError("carried Weston shell patch missing: "
+                         + str(SHELL_PATCH_FILE.relative_to(ROOT)))
+    return {"name": SHELL_PATCH_FILE.name,
+            "sha256": hashlib.sha256(
+                SHELL_PATCH_FILE.read_bytes()).hexdigest()}
+
+
+def check_synveil_shell_patch_tree(build_dir):
+    """Gate: the tree Buildroot is about to compile (or has
+    compiled) must carry the ADR 0025 shell patch. Returns the
+    marker files' sha256 map. Fails the build if any patched
+    file or its marker is missing."""
+    trees = sorted((build_dir / "build").glob("weston-15.0.1"))
+    if len(trees) != 1:
+        raise ValueError("expected exactly one extracted Weston "
+                         "tree, found " + str(len(trees)))
+    hashes = {}
+    for relative, marker in SHELL_PATCH_MARKERS.items():
+        path = trees[0] / relative
+        if not path.is_file():
+            raise ValueError("Synveil shell patch file missing "
+                             "from Weston tree: " + relative)
+        if marker not in path.read_text(errors="replace"):
+            raise ValueError("Synveil shell patch marker "
+                             f"{marker!r} missing from {relative}; "
+                             "the carried patch was not applied")
+        hashes[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return hashes
 
 
 def check_weston_patch_tree(build_dir):
@@ -289,15 +333,20 @@ def build(*, resume=False):
     env["LC_ALL"] = "C"
     run(base + ["BR2_DEFCONFIG=" + str(config), "defconfig"], env=env)
     check_configuration((build_dir / ".config").read_text(), ffi.TOOLCHAIN)
-    # A cached Weston tree predating the carried patch still holds
+    # A cached Weston tree predating a carried patch still holds
     # the unpatched source under valid stamps; Buildroot would not
     # re-extract it. Drop the package tree so the build re-extracts
     # the hash-verified tarball and applies the global patch dir.
+    # The same applies when the tree's sources are absent or the
+    # ADR 0025 shell patch markers are missing.
     weston_trees = sorted((build_dir / "build").glob("weston-15.0.1"))
     if weston_trees:
         source_file = weston_trees[0] / PATCHED_SOURCE
-        if source_file.is_file() and \
-                ASSERT_LINE in source_file.read_text():
+        shell_marker = weston_trees[0] / \
+            "protocol/synveil-shell-panel.xml"
+        if (source_file.is_file() and
+                ASSERT_LINE in source_file.read_text()) or \
+                not shell_marker.is_file():
             run(base + ["weston-dirclean"], env=env)
     # Deliberately invoke packages only, never `all`, `target-finalize`, or images.
     if resume and (build_dir / "host/bin" / (ffi.TARGET + "-gcc")).exists():
@@ -312,6 +361,7 @@ def build(*, resume=False):
             run(base + ["cairo-reconfigure"], env=env)
     run(base + ["-j4", "weston", "dejavu", "util-linux", "xkeyboard-config"], env=env)
     patched_sha256 = check_weston_patch_tree(build_dir)
+    shell_patch_hashes = check_synveil_shell_patch_tree(build_dir)
     target = build_dir / "target"
     required = ("usr/bin/weston", "usr/bin/weston-terminal", "usr/bin/weston-simple-shm",
                 "usr/libexec/weston-desktop-shell")
@@ -353,6 +403,9 @@ def build(*, resume=False):
                "weston_source_sha256": WESTON_SHA256,
                "weston_patch": {**patch, "patched_file": PATCHED_SOURCE,
                                 "patched_file_sha256": patched_sha256},
+               "weston_shell_patch": {**weston_shell_patch(),
+                                      "marker_files_sha256":
+                                      shell_patch_hashes},
                "native_sources": native_sources,
                "executables_sha256": hashes, "native_glibc_sha256": libc_hashes,
                "runtime_assets_sha256": asset_hash,
