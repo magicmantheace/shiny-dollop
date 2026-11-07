@@ -288,7 +288,15 @@ AB_COMMANDS = {
     # the probe has exited (its process_exited event must
     # have followed). Sleeps are sized against the 5 s
     # cadence with margin on both sides of each boundary.
-    "observe-history": "echo synveil-history-run; SYNVEIL_OBSERVE_HISTORY=1 /usr/sbin/veil-core --socket /var/tmp/o.sock & sleep 8; /usr/bin/synctl --socket /var/tmp/o.sock --json observe-history > /var/tmp/h0.json 2> /var/tmp/h0.err; sleep 12 & echo $! > /var/tmp/p.pid; sleep 8; /usr/bin/synctl --socket /var/tmp/o.sock --json observe-history > /var/tmp/h1.json 2> /var/tmp/h1.err; sleep 10; /usr/bin/synctl --socket /var/tmp/o.sock --json observe-history > /var/tmp/h2.json 2> /var/tmp/h2.err; sync",
+    # The line ends by killing the fixture core (job %1):
+    # unlike the --once observe fixture it serves three
+    # queries and would otherwise run forever, holding the
+    # terminal's pty open through its inherited stdio so the
+    # terminal window — and with it the session — can never
+    # close (observed in the gate's first runs: the shell
+    # exits, later keystrokes echo into a readerless pty,
+    # and the login never relocks).
+    "observe-history": "echo synveil-history-run; SYNVEIL_OBSERVE_HISTORY=1 /usr/sbin/veil-core --socket /var/tmp/o.sock & sleep 8; /usr/bin/synctl --socket /var/tmp/o.sock --json observe-history > /var/tmp/h0.json 2> /var/tmp/h0.err; sleep 12 & echo $! > /var/tmp/p.pid; sleep 8; /usr/bin/synctl --socket /var/tmp/o.sock --json observe-history > /var/tmp/h1.json 2> /var/tmp/h1.err; sleep 10; /usr/bin/synctl --socket /var/tmp/o.sock --json observe-history > /var/tmp/h2.json 2> /var/tmp/h2.err; sync; kill %1",
 }
 
 _AB_CHAR_KEYS = {c: c for c in "abcdefghijklmnopqrstuvwxyz0123456789"}
@@ -303,7 +311,7 @@ _AB_CHAR_KEYS.update({" ": "spc", "/": "slash", "-": "minus", ".": "dot",
                       # type — the command strings above remain
                       # constants.
                       "&": "shift+7", "=": "equal", "$": "shift+4",
-                      "!": "shift+1"})
+                      "!": "shift+1", "%": "shift+5"})
 
 
 def type_ab_command(socket_path: Path, command_id: str, *, timeout=30.0):
