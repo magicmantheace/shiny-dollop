@@ -34,6 +34,12 @@ pub fn sample() -> io::Result<Value> {
     // And for interval power: scan powercap zones before the
     // window so energy.power can be derived from two scans.
     let powercap_before = read_powercap(Path::new("/sys/class/powercap"));
+    // Per-process ticks and the aggregate CPU total before the
+    // window, for processes.utilization.
+    let process_ticks_before = scan_process_ticks(Path::new("/proc"));
+    let cpu_total_before = parse_cpu_stat(&stat_before)
+        .ok()
+        .map(|stat| stat.aggregate.total);
     let sample_started = Instant::now();
     thread::sleep(CPU_SAMPLE_INTERVAL);
     let stat = fs::read_to_string("/proc/stat")?;
@@ -45,6 +51,17 @@ pub fn sample() -> io::Result<Value> {
     snapshot["cpu"]["frequency"] = read_cpu_frequency(Path::new("/sys/devices/system/cpu"));
     snapshot["thermal"] = read_thermal_zones(Path::new("/sys/class/thermal"));
     snapshot["processes"] = read_processes(Path::new("/proc"));
+    let cpu_total_delta = cpu_total_before.and_then(|before_total| {
+        parse_cpu_stat(&stat)
+            .ok()
+            .and_then(|after| after.aggregate.total.checked_sub(before_total))
+    });
+    snapshot["processes"]["utilization"] = process_utilization(
+        process_ticks_before.as_ref(),
+        &snapshot["processes"],
+        cpu_total_delta,
+        sample_window_ms,
+    );
     let powercap_after = read_powercap(Path::new("/sys/class/powercap"));
     let mut energy = powercap_json(&powercap_after);
     if let Some(power) = energy_interval_power(&powercap_before, &powercap_after, sample_window_ms)
@@ -1075,6 +1092,159 @@ fn read_processes(root: &Path) -> Value {
         "unavailable_processes": unavailable_processes,
         "omitted_processes": omitted_processes,
         "scan_truncated": scan_truncated,
+    })
+}
+
+/// The identity and cumulative busy ticks of one process at
+/// one instant: enough to attribute CPU time across a window
+/// without keeping the full snapshot record.
+struct ProcessTicks {
+    pid: u32,
+    start_time_ticks: u64,
+    busy_ticks: u64,
+}
+
+/// Scan /proc for per-process cumulative ticks, mirroring
+/// the snapshot's enumeration discipline (same scan cap,
+/// PID-sorted, duplicate PIDs are a hard failure) but without
+/// its record cap: attribution needs the whole process set
+/// as the lookup side. Returns None on any structural
+/// failure; individual unreadable stats are skipped (the
+/// process is simply not attributable).
+fn scan_process_ticks(root: &Path) -> Option<(Vec<ProcessTicks>, bool)> {
+    let entries = fs::read_dir(root).ok()?;
+    let mut candidates = Vec::new();
+    let mut scan_truncated = false;
+    for (scanned_entries, entry) in entries.enumerate() {
+        if scanned_entries == MAX_PROCESS_SCAN_ENTRIES {
+            scan_truncated = true;
+            break;
+        }
+        let entry = entry.ok()?;
+        if let Some(pid) = process_directory_id(&entry.file_name()) {
+            candidates.push((pid, entry.path()));
+        }
+    }
+    candidates.sort_unstable_by_key(|(pid, _)| *pid);
+    if candidates.windows(2).any(|pair| pair[0].0 == pair[1].0) {
+        return None;
+    }
+    let mut ticks = Vec::with_capacity(candidates.len());
+    for (pid, directory) in candidates {
+        let tick = read_process_stat(&directory.join("stat"), pid)
+            .ok()
+            .and_then(|record| {
+                let start = record.get("start_time_ticks")?.as_u64()?;
+                let user = record.get("user_ticks")?.as_u64()?;
+                let system = record.get("system_ticks")?.as_u64()?;
+                Some(ProcessTicks {
+                    pid,
+                    start_time_ticks: start,
+                    busy_ticks: user.checked_add(system)?,
+                })
+            });
+        if let Some(tick) = tick {
+            ticks.push(tick);
+        }
+    }
+    Some((ticks, scan_truncated))
+}
+
+/// Per-process CPU attribution over the observe window,
+/// nested in the process snapshot as `processes.utilization`.
+/// For each record in the (after) snapshot, the process is
+/// rated when the before-scan holds the same PID *and* the
+/// same start_time_ticks (a reused PID is a different
+/// process and is withheld), with non-decreasing busy ticks.
+/// busy_basis_points is the process's tick delta over the
+/// aggregate /proc/stat total tick delta — the same
+/// denominator and rounding as cpu.utilization's aggregate —
+/// so a process using one full core of a two-core machine
+/// reads 5000, and the rated processes sum to at most the
+/// aggregate busy figure. Processes born inside the window
+/// are counted unavailable, never estimated from a partial
+/// life.
+fn process_utilization(
+    before: Option<&(Vec<ProcessTicks>, bool)>,
+    snapshot: &Value,
+    total_delta: Option<u64>,
+    window_ms: u64,
+) -> Value {
+    let records = snapshot["records"].as_array().cloned().unwrap_or_default();
+    let omitted = snapshot["omitted_processes"].as_u64().unwrap_or(0);
+    let snapshot_truncated = snapshot["scan_truncated"].as_bool().unwrap_or(false);
+    let unavailable_object = |unavailable: u64| {
+        json!({
+            "status": "unavailable",
+            "sample_window_ms": window_ms,
+            "records": [],
+            "unavailable_processes": unavailable,
+            "omitted_processes": omitted,
+        })
+    };
+    let Some((before_ticks, before_truncated)) = before else {
+        return unavailable_object(records.len() as u64);
+    };
+    let Some(total) = total_delta.filter(|total| *total > 0) else {
+        return unavailable_object(records.len() as u64);
+    };
+    if window_ms == 0 {
+        return unavailable_object(records.len() as u64);
+    }
+    let before_by_identity: std::collections::HashMap<(u32, u64), u64> = before_ticks
+        .iter()
+        .map(|ticks| ((ticks.pid, ticks.start_time_ticks), ticks.busy_ticks))
+        .collect();
+    let mut rated = Vec::new();
+    let mut unavailable = 0u64;
+    for record in &records {
+        let identity = (
+            record["pid"]
+                .as_u64()
+                .and_then(|pid| u32::try_from(pid).ok()),
+            record["start_time_ticks"].as_u64(),
+        );
+        let delta = match identity {
+            (Some(pid), Some(start)) => {
+                before_by_identity
+                    .get(&(pid, start))
+                    .and_then(|prior_busy| {
+                        let user = record["user_ticks"].as_u64()?;
+                        let system = record["system_ticks"].as_u64()?;
+                        user.checked_add(system)?.checked_sub(*prior_busy)
+                    })
+            }
+            _ => None,
+        };
+        match delta {
+            Some(delta) => {
+                let basis_points =
+                    ((u128::from(delta) * 10_000) + u128::from(total / 2)) / u128::from(total);
+                rated.push(json!({
+                    "pid": record["pid"],
+                    "start_time_ticks": record["start_time_ticks"],
+                    "busy_basis_points": u64::try_from(basis_points)
+                        .unwrap_or(u64::MAX),
+                }));
+            }
+            None => unavailable += 1,
+        }
+    }
+    let status = if omitted > 0 || snapshot_truncated || *before_truncated {
+        "truncated"
+    } else if rated.is_empty() {
+        "unavailable"
+    } else if unavailable > 0 {
+        "partial"
+    } else {
+        "ready"
+    };
+    json!({
+        "status": status,
+        "sample_window_ms": window_ms,
+        "records": rated,
+        "unavailable_processes": unavailable,
+        "omitted_processes": omitted,
     })
 }
 
@@ -2131,6 +2301,114 @@ mod tests {
         assert_eq!(parsed["status"], "truncated");
         assert_eq!(parsed["interfaces"].as_array().unwrap().len(), 32);
         assert_eq!(parsed["omitted_interfaces"], 2);
+    }
+
+    fn process_record(pid: u64, start: u64, user: u64, system: u64) -> Value {
+        json!({
+            "pid": pid, "parent_pid": 1, "process_group_id": pid,
+            "session_id": pid, "state": "R", "user_ticks": user,
+            "system_ticks": system, "start_time_ticks": start,
+            "virtual_memory_bytes": 4096, "resident_pages": 1,
+            "thread_count": 1, "nice": 0
+        })
+    }
+
+    fn process_snapshot(records: Vec<Value>) -> Value {
+        json!({
+            "status": "ready", "records": records,
+            "unavailable_processes": 0, "omitted_processes": 0,
+            "scan_truncated": false
+        })
+    }
+
+    #[test]
+    fn process_utilization_attributes_busy_basis_points() {
+        // pid 7 burned 30 ticks of a 1000-tick aggregate delta
+        // -> 300 bp; pid 9 burned none.
+        let before = vec![
+            ProcessTicks {
+                pid: 7,
+                start_time_ticks: 100,
+                busy_ticks: 50,
+            },
+            ProcessTicks {
+                pid: 9,
+                start_time_ticks: 200,
+                busy_ticks: 10,
+            },
+        ];
+        let snapshot = process_snapshot(vec![
+            process_record(7, 100, 70, 10),
+            process_record(9, 200, 10, 0),
+        ]);
+        let parsed = process_utilization(Some(&(before, false)), &snapshot, Some(1000), 101);
+        assert_eq!(parsed["status"], "ready");
+        assert_eq!(parsed["records"][0]["pid"], 7);
+        assert_eq!(parsed["records"][0]["busy_basis_points"], 300);
+        assert_eq!(parsed["records"][1]["busy_basis_points"], 0);
+        assert_eq!(parsed["unavailable_processes"], 0);
+    }
+
+    #[test]
+    fn process_utilization_withholds_reuse_and_newborns() {
+        let before = vec![ProcessTicks {
+            pid: 7,
+            start_time_ticks: 100,
+            busy_ticks: 50,
+        }];
+        // pid 7 reused (different start); pid 8 born mid-window.
+        let snapshot = process_snapshot(vec![
+            process_record(7, 999, 5, 5),
+            process_record(8, 300, 5, 5),
+        ]);
+        let parsed = process_utilization(Some(&(before, false)), &snapshot, Some(1000), 101);
+        assert_eq!(parsed["status"], "unavailable");
+        assert!(parsed["records"].as_array().unwrap().is_empty());
+        assert_eq!(parsed["unavailable_processes"], 2);
+        // One rated + one withheld -> partial.
+        let snapshot = process_snapshot(vec![
+            process_record(7, 100, 60, 0),
+            process_record(8, 300, 5, 5),
+        ]);
+        let before = vec![ProcessTicks {
+            pid: 7,
+            start_time_ticks: 100,
+            busy_ticks: 50,
+        }];
+        let parsed = process_utilization(Some(&(before, false)), &snapshot, Some(1000), 101);
+        assert_eq!(parsed["status"], "partial");
+        assert_eq!(parsed["records"][0]["busy_basis_points"], 100);
+        assert_eq!(parsed["unavailable_processes"], 1);
+    }
+
+    #[test]
+    fn process_utilization_degrades_without_a_denominator() {
+        let before = vec![ProcessTicks {
+            pid: 7,
+            start_time_ticks: 100,
+            busy_ticks: 50,
+        }];
+        let snapshot = process_snapshot(vec![process_record(7, 100, 60, 0)]);
+        let before_pair = (before, false);
+        for (before_arg, total, window) in [
+            (None, Some(1000), 101),
+            (Some(&before_pair), None, 101),
+            (Some(&before_pair), Some(0), 101),
+            (Some(&before_pair), Some(1000), 0),
+        ] {
+            let parsed = process_utilization(before_arg, &snapshot, total, window);
+            assert_eq!(parsed["status"], "unavailable");
+            assert_eq!(parsed["unavailable_processes"], 1);
+        }
+        // Truncation on either side carries through.
+        let mut truncated_snapshot = snapshot.clone();
+        truncated_snapshot["omitted_processes"] = json!(2);
+        let parsed = process_utilization(Some(&before_pair), &truncated_snapshot, Some(1000), 101);
+        assert_eq!(parsed["status"], "truncated");
+        assert_eq!(parsed["omitted_processes"], 2);
+        let before_truncated = (before_pair.0, true);
+        let parsed = process_utilization(Some(&before_truncated), &snapshot, Some(1000), 101);
+        assert_eq!(parsed["status"], "truncated");
     }
 
     fn net_rows(raw: &str) -> Vec<NetRow> {

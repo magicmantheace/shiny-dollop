@@ -295,6 +295,80 @@ fn validate_observe_result(result: &Value) -> io::Result<()> {
         }
     }
 
+    // processes.utilization is an optional nested object
+    // (absent on older cores); when present it must agree
+    // with the snapshot it was derived from.
+    if let Some(utilization) = result
+        .get("processes")
+        .and_then(|processes| processes.get("utilization"))
+    {
+        let processes = result.get("processes").ok_or_else(invalid)?;
+        let records = utilization
+            .get("records")
+            .and_then(Value::as_array)
+            .ok_or_else(invalid)?;
+        if records.len() > 128 {
+            return Err(invalid());
+        }
+        let window = utilization
+            .get("sample_window_ms")
+            .and_then(Value::as_u64)
+            .ok_or_else(invalid)?;
+        let unavailable = utilization
+            .get("unavailable_processes")
+            .and_then(Value::as_u64)
+            .ok_or_else(invalid)?;
+        let omitted = utilization
+            .get("omitted_processes")
+            .and_then(Value::as_u64)
+            .ok_or_else(invalid)?;
+        // The producer mirrors the snapshot's omission count;
+        // anything else means the objects disagree.
+        if omitted
+            != processes
+                .get("omitted_processes")
+                .and_then(Value::as_u64)
+                .ok_or_else(invalid)?
+        {
+            return Err(invalid());
+        }
+        let snapshot_truncated = processes
+            .get("scan_truncated")
+            .and_then(Value::as_bool)
+            .ok_or_else(invalid)?;
+        match utilization.get("status").and_then(Value::as_str) {
+            Some("ready") if window > 0 && !records.is_empty() && unavailable == 0 => {}
+            Some("partial") if window > 0 && !records.is_empty() && unavailable > 0 => {}
+            Some("truncated") if omitted > 0 || snapshot_truncated => {}
+            Some("unavailable") if records.is_empty() => {}
+            _ => return Err(invalid()),
+        }
+        let mut previous_pid = None;
+        for record in records {
+            let pid = record
+                .get("pid")
+                .and_then(Value::as_u64)
+                .filter(|pid| *pid > 0)
+                .ok_or_else(invalid)?;
+            if previous_pid.is_some_and(|previous| pid <= previous) {
+                return Err(invalid());
+            }
+            previous_pid = Some(pid);
+            if record
+                .get("start_time_ticks")
+                .and_then(Value::as_u64)
+                .is_none()
+                || record
+                    .get("busy_basis_points")
+                    .and_then(Value::as_u64)
+                    .filter(|points| *points <= 10_000)
+                    .is_none()
+            {
+                return Err(invalid());
+            }
+        }
+    }
+
     // disk.throughput is an optional object (absent when the
     // disk source itself is unavailable, and on older cores);
     // when present it must be internally consistent.
@@ -542,6 +616,73 @@ mod tests {
             }}, "processes": processes.clone()}),
         ] {
             assert!(validate_observe_result(&invalid).is_err());
+        }
+    }
+
+    #[test]
+    fn observe_validation_checks_process_utilization_when_present() {
+        let record = json!({
+            "pid": 7, "parent_pid": 1, "process_group_id": 7,
+            "session_id": 7, "state": "R", "user_ticks": 10,
+            "system_ticks": 2, "start_time_ticks": 100,
+            "virtual_memory_bytes": 8192, "resident_pages": 2,
+            "thread_count": 1, "nice": 0
+        });
+        let response = |utilization: Value| {
+            json!({
+                "schema": "synveil.observe/v1",
+                "cpu": {"utilization": {"status": "unavailable"}},
+                "processes": {
+                    "status": "ready", "records": [record.clone()],
+                    "unavailable_processes": 0,
+                    "omitted_processes": 0, "scan_truncated": false,
+                    "utilization": utilization,
+                },
+            })
+        };
+        let rated = json!({
+            "pid": 7, "start_time_ticks": 100,
+            "busy_basis_points": 300
+        });
+        for valid in [
+            json!({"status": "ready", "sample_window_ms": 101,
+                   "records": [rated.clone()],
+                   "unavailable_processes": 0,
+                   "omitted_processes": 0}),
+            json!({"status": "unavailable", "sample_window_ms": 101,
+                   "records": [], "unavailable_processes": 1,
+                   "omitted_processes": 0}),
+        ] {
+            assert!(validate_observe_result(&response(valid)).is_ok());
+        }
+        for invalid in [
+            // basis points above the whole machine
+            json!({"status": "ready", "sample_window_ms": 101,
+                   "records": [{"pid": 7, "start_time_ticks": 100,
+                                "busy_basis_points": 10001}],
+                   "unavailable_processes": 0,
+                   "omitted_processes": 0}),
+            // omission count disagreeing with the snapshot
+            json!({"status": "ready", "sample_window_ms": 101,
+                   "records": [rated.clone()],
+                   "unavailable_processes": 0,
+                   "omitted_processes": 1}),
+            // truncated with no truncation anywhere
+            json!({"status": "truncated", "sample_window_ms": 101,
+                   "records": [rated.clone()],
+                   "unavailable_processes": 0,
+                   "omitted_processes": 0}),
+            // unsorted PIDs
+            json!({"status": "ready", "sample_window_ms": 101,
+                   "records": [
+                       {"pid": 9, "start_time_ticks": 1,
+                        "busy_basis_points": 0},
+                       {"pid": 7, "start_time_ticks": 1,
+                        "busy_basis_points": 0}],
+                   "unavailable_processes": 0,
+                   "omitted_processes": 0}),
+        ] {
+            assert!(validate_observe_result(&response(invalid)).is_err());
         }
     }
 
