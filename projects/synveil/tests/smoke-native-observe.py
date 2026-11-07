@@ -546,6 +546,48 @@ def check_observe(doc, err_bytes: bytes) -> list[str]:
                             failures.append(
                                 f"network.bandwidth {key} "
                                 f"invalid: {value!r}")
+    energy = doc.get("energy")
+    if not isinstance(energy, dict):
+        failures.append("energy object missing")
+    else:
+        power = energy.get("power")
+        if power is None:
+            # Legitimate only when the powercap source could
+            # not be scanned at all (this guest has no
+            # powercap sysfs, so the bare unavailable form is
+            # the expected shape here).
+            if energy.get("status") not in ("unavailable",
+                                            "invalid"):
+                failures.append(
+                    "energy.power absent but energy.status is "
+                    f"{energy.get('status')!r}")
+        elif not isinstance(power, dict):
+            failures.append("energy.power is not an object")
+        else:
+            pw_status = power.get("status")
+            if pw_status not in ("ready", "partial",
+                                 "truncated", "unavailable"):
+                failures.append(
+                    f"energy.power.status is {pw_status!r}")
+            zones = power.get("zones")
+            if not isinstance(zones, list):
+                failures.append("energy.power.zones invalid")
+            else:
+                for zone in zones:
+                    rate = zone.get("avg_power_uw") \
+                        if isinstance(zone, dict) else None
+                    if not isinstance(rate, int) \
+                            or isinstance(rate, bool) or rate < 0:
+                        failures.append(
+                            f"energy.power avg_power_uw "
+                            f"invalid: {rate!r}")
+            if pw_status in ("ready", "partial"):
+                window = power.get("sample_window_ms")
+                if not isinstance(window, int) or window < 100 \
+                        or not zones:
+                    failures.append(
+                        "energy.power rated without a window "
+                        "or zones")
     return failures
 
 
