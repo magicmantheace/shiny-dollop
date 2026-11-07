@@ -410,6 +410,56 @@ mod tests {
     }
 
     #[test]
+    fn v2_export_of_a_boundary_journal_pins_the_v1_tail_anchor() {
+        // Regression (found by the 2026-11-06 native acceptance):
+        // a journal whose chained segment follows v1 records must
+        // export a receipt anchored at the v1 tail's link hash.
+        // Before the checker fix this exported anchor null, which
+        // verified as null == null and pinned nothing.
+        let (root, _v1_source, _v1_output) = fixture();
+        let source = root.join("boundary-journal");
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&source)
+            .unwrap();
+        let mut prev: [u8; 64] = super::super::audit::GENESIS_DIGEST;
+        for _ in 0..2 {
+            let line =
+                super::super::audit::record("request", json!({"private": "secret"})).to_string();
+            prev = crate::sha512::sha512(line.as_bytes());
+            writeln!(file, "{line}").unwrap();
+        }
+        let boundary = crate::sha256::hex(&prev);
+        for _ in 0..2 {
+            let (line, digest) = super::super::audit::chain_record(
+                &super::super::audit::record("request", json!({"private": "secret"})),
+                &prev,
+            )
+            .unwrap();
+            writeln!(file, "{line}").unwrap();
+            prev = digest;
+        }
+        drop(file);
+        let output = root.join("copies").join("boundary-snapshot");
+        let report = export(&source, &output).unwrap();
+        assert_eq!(report["chain"]["anchor"], boundary);
+        assert_eq!(report["chain"]["chained_records"], 2);
+        assert_eq!(report["chain"]["records"], 4);
+        verify_receipt(&output, &report).unwrap();
+        // A receipt claiming the genesis anchor for this segment
+        // is refused: the boundary is what the receipt must pin.
+        let mut wrong = report.clone();
+        wrong["chain"]["anchor"] = json!(crate::sha256::hex(&super::super::audit::GENESIS_DIGEST));
+        assert_eq!(
+            verify_receipt(&output, &wrong).unwrap_err().kind(),
+            io::ErrorKind::InvalidData
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn receipt_verification_refuses_mutation_wrong_anchor_and_truncation() {
         let (root, source, output, _head) = chained_fixture();
         let report = export(&source, &output).unwrap();

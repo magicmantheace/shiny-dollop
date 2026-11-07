@@ -95,12 +95,19 @@ pub(crate) fn inspect_bytes(bytes: &[u8]) -> io::Result<Value> {
                 value["prev_digest"].as_str().ok_or_else(invalid)?,
             )
             .ok_or_else(invalid)?;
+            // The anchor is the first chained record's prev_digest
+            // whether or not v1 records precede it: with a v1
+            // prefix, `link` is already set (and the comparison
+            // below verifies the boundary), but the anchor must
+            // still be reported — an export receipt pins it, and
+            // reporting null would leave the boundary unpinned.
+            if chained == 0 {
+                anchor = Some(value["prev_digest"].as_str().unwrap().to_owned());
+            }
             if let Some(expected) = link {
                 if prev != expected {
                     return Err(invalid());
                 }
-            } else {
-                anchor = Some(value["prev_digest"].as_str().unwrap().to_owned());
             }
             let mut unsigned = value.clone();
             unsigned.as_object_mut().unwrap().remove("record_digest");
@@ -308,6 +315,15 @@ mod tests {
         let report = inspect_bytes(bytes.as_bytes()).unwrap();
         assert_eq!(report["records"], 2);
         assert_eq!(report["chain"]["chained_records"], 1);
+        // The anchor is the boundary digest (the v1 line's link
+        // hash), not null: an export receipt pins exactly this
+        // value, so a v1 prefix must not leave it unreported.
+        // (Regression: the 2026-11-06 native acceptance journal —
+        // v1 seed records followed by guest v2 records — reported
+        // anchor null while the boundary itself verified.)
+        assert_eq!(report["chain"]["anchor"], crate::sha256::hex(&prev));
+        let v2_value = super::super::audit_json::decode(v2.as_bytes()).unwrap();
+        assert_eq!(report["chain"]["tail"], v2_value["record_digest"]);
         // The same v2 record anchored anywhere else is refused.
         let (orphan, _digest) =
             super::super::audit::chain_record(&record(), &super::super::audit::GENESIS_DIGEST)
