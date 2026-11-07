@@ -28,6 +28,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import shutil
 import subprocess
@@ -41,6 +42,36 @@ _spec = importlib.util.spec_from_file_location(
     "smoke_native_joined", ROOT / "tests" / "smoke-native-joined.py")
 joined = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(joined)
+
+import qmp_input as _qmp_input  # noqa: E402
+import time as _time  # noqa: E402
+
+
+def _patient_hold_keys(sock, reader, keys):
+    """The harness's key hold with a longer press.
+
+    The stock hold is 75 ms ("until at least one guest poll can
+    observe it"); under TCG the emulated USB keyboard's guest
+    poll can stall past that, and a press+release pair inside
+    one poll window vanishes — observed repeatedly during this
+    gate's development as correct confirmations reported as
+    mismatches and correct logins as denials. A 300 ms hold
+    spans the stalls without changing the single-session
+    typing flow or the allowlist discipline."""
+    def edge(down):
+        ordered = keys if down else reversed(keys)
+        events = [{"type": "key", "data": {"down": down,
+                   "key": {"type": "qcode", "data": key}}} for key in ordered]
+        return {"execute": "input-send-event", "arguments": {"events": events}}
+
+    try:
+        _qmp_input.emit_command(sock, reader, edge(True))
+        _time.sleep(0.2)
+    finally:
+        _qmp_input.emit_command(sock, reader, edge(False))
+
+
+_qmp_input._hold_keys = _patient_hold_keys
 
 IMAGE_DIR = ROOT / "out" / "native-joined"
 OUT = ROOT / "out" / "audit-v2-proof"
@@ -296,8 +327,8 @@ def main() -> int:
         return 1
     # Negative control: a truncated snapshot must fail verification.
     truncated = copies / "truncated-snapshot"
-    truncated.write_bytes(b"\n".join(
-        journal.decode().splitlines()[:-1]).encode() + b"\n")
+    truncated.write_bytes(
+        ("\n".join(journal.decode().splitlines()[:-1]) + "\n").encode())
     os.chmod(truncated, 0o600)
     refused = invoke(host_audit, [
         "verify", "--path", str(truncated), "--receipt", str(receipt_file)])
@@ -305,10 +336,20 @@ def main() -> int:
         print("[synveil] truncated snapshot passed verification (must not)")
         return 1
 
+    # Provenance from the guest binaries themselves: the core's
+    # start records stamp the git revision they were built from.
+    # (Reading the host checkout as the non-root runner is not
+    # reliable — root-created ref/object files can be unreadable
+    # under this workspace's umask — and the stamped revision is
+    # the stronger claim anyway.)
+    boot_log = (evidence_dir / "joined-first.log").read_text(errors="replace")
+    revision_match = re.search(r'"git_revision":\s*"([0-9a-f]{40})"', boot_log)
+    if revision_match is None:
+        print("[synveil] guest boot log carries no stamped git revision")
+        return 1
     result = {
         "schema": "synveil.audit-v2-native/v1",
-        "source_commit": subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+        "source_commit": revision_match.group(1),
         "image_sha256": proof["image_sha256"],
         "seed_v1_records": SEED_RECORDS,
         "total_records": len(records),
