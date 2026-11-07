@@ -236,24 +236,30 @@ def login(boot, secret, timeout=420, since=0):
     else:
         save_failure_frame(boot, "login-scanout")
         return False
-    try:
-        type_test_secret(boot.qmp, secret, timeout=18)
-    except (QMPError, OSError, ValueError):
-        return False
-    if not boot.wait("SYNVEIL_GRAPHICAL_AUTH_ACTIVE", 60, since=anchor):
-        # The first type may have raced the greeter's input focus;
-        # the prompt is certainly up now (LOGIN_READY was seen in
-        # this boot cycle), so type the secret once more.
+    # Typing is slow under emulation (a 200 ms key hold plus a
+    # fresh QMP handshake per key puts 32 characters near 15 s),
+    # so the per-type budget must sit well above that; an earlier
+    # 18 s budget could expire mid-type, and the exception path
+    # then failed the login silently with no retry and no trace
+    # (observed 2026-11-07: S6b's boot reached LOGIN_READY and
+    # produced neither AUTH_ACTIVE nor AUTH_DENIED). Retry the
+    # whole type up to three times — a mistimed or interrupted
+    # type leaves the prompt ready for another attempt — and log
+    # every failure so the cause is on record.
+    for attempt in range(3):
         try:
-            type_test_secret(boot.qmp, secret, timeout=18)
-        except (QMPError, OSError, ValueError):
-            save_failure_frame(boot, "login-auth")
-            return False
-        if not boot.wait("SYNVEIL_GRAPHICAL_AUTH_ACTIVE", 60, since=anchor):
-            save_failure_frame(boot, "login-auth")
-            return False
-    time.sleep(5)  # let the tile dashboard present before key input
-    return True
+            type_test_secret(boot.qmp, secret, timeout=45)
+        except (QMPError, OSError, ValueError) as error:
+            print(f"[synveil-ab] login type attempt {attempt + 1} "
+                  f"failed: {error!r}", flush=True)
+            continue
+        if boot.wait("SYNVEIL_GRAPHICAL_AUTH_ACTIVE", 60, since=anchor):
+            time.sleep(5)  # let the tile dashboard present
+            return True
+        print(f"[synveil-ab] login type attempt {attempt + 1}: "
+              "no AUTH_ACTIVE", flush=True)
+    save_failure_frame(boot, "login-auth")
+    return False
 
 
 def desktop_color_proof(boot, version, timeout=120):
@@ -508,7 +514,7 @@ def terminal_command(boot, command_id, wait_marker=None, timeout=300):
         save_failure_frame(boot, f"cmd-{command_id}-focus")
         return False
     try:
-        type_ab_command(boot.qmp, command_id, timeout=30)
+        type_ab_command(boot.qmp, command_id, timeout=60)
     except (QMPError, OSError, ValueError):
         save_failure_frame(boot, f"cmd-{command_id}-input")
         return False
@@ -728,9 +734,9 @@ def main():
             enrolled = boot.wait("SYNVEIL_ENROLL_READY", 240)
             if enrolled:
                 try:
-                    type_test_secret(boot.qmp, secret, timeout=18)
+                    type_test_secret(boot.qmp, secret, timeout=45)
                     if boot.wait("SYNVEIL_ENROLL_CONFIRM_READY", 60):
-                        type_test_secret(boot.qmp, secret, timeout=18)
+                        type_test_secret(boot.qmp, secret, timeout=45)
                     enrolled = boot.wait("SYNVEIL_ENROLL_COMPLETED", 120)
                 except (QMPError, OSError, ValueError):
                     enrolled = False
@@ -923,7 +929,7 @@ def main():
                     boot.wait("SYNVEIL_AB_STAGE_COPYING", 300), boot.quit()))
                 cutter.start()
                 try:
-                    type_ab_command(boot.qmp, "stage", timeout=30)
+                    type_ab_command(boot.qmp, "stage", timeout=45)
                 except (QMPError, OSError, ValueError):
                     pass
                 cutter.join(timeout=360)
