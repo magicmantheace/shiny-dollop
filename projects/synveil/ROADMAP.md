@@ -336,8 +336,13 @@ anchoring and physical power-loss testing remain open.
     readings. Per-logical-CPU busy-time attribution over the same sample window
     is bounded and explicit about unavailable intervals. Exact-revision host and
     native QEMU validation passed at
-    [23f3233](docs/validation/native-23f3233/README.md). Per-process attribution
-    and historical aggregation are not implemented.
+    [23f3233](docs/validation/native-23f3233/README.md). Per-process
+    attribution (`processes.utilization`, PID+start-time identity over
+    the observe window; reuse and newborns withheld) is implemented
+    with host tests and passed native QEMU validation on the joined
+    guest at `36e4285` (see
+    `docs/validation/observe-attribution-36e4285/`); historical
+    aggregation is not implemented.
 - [ ] memory/pressure metrics
   - Read-only MemTotal/MemAvailable and bounded Linux PSI CPU, memory, and I/O
     stall snapshots implemented. Host validation passed with the producer

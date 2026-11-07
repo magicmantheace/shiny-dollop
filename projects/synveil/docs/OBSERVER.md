@@ -63,6 +63,17 @@ AI recommendations or operating-system policy changes.
   the following fields and is not returned; it need not be valid UTF-8. If the
   full response would exceed the 64 KiB protocol frame, the core removes
   highest-PID records and increments `omitted_processes` until it fits.
+- `processes.utilization`: per-process CPU attribution over the same
+  ≥100 ms window as `cpu.utilization`. For each snapshot record, the
+  process's user+system tick delta is expressed in basis points of the
+  aggregate `/proc/stat` total tick delta (same denominator and rounding
+  as the aggregate busy figure, so the rated processes sum to at most
+  that figure plus rounding). Identity is PID plus `start_time_ticks`:
+  a reused PID is a different process and is withheld, as are processes
+  born inside the window and any tick decrease; withheld processes are
+  counted in `unavailable_processes`, never estimated. `synctl`
+  validates the object when present, including agreement with the
+  snapshot's `omitted_processes` and `scan_truncated`.
 
 The core validates required fields, finite nonnegative numeric values,
 CPU and memory consistency and runnable/total bounds. Bad or unavailable
@@ -96,10 +107,11 @@ positive hierarchical readings remain host-fixture evidence. See the
 
 ## Deliberately not claimed
 
-Per-process interval utilization, lifecycle events, instantaneous power,
-resource history and long-term aggregation are separate roadmap items. The
-process snapshot does not retain state between requests or infer process
-purpose, and the energy snapshot does not derive power from counter changes.
+Lifecycle events, resource history and long-term aggregation are
+separate roadmap items. The process snapshot does not retain state
+between requests or infer process purpose. (Per-process interval
+utilization and interval power, once listed here, are implemented:
+see `processes.utilization` above and the Energy section below.)
 
 ## Linux pressure stall information (PSI)
 

@@ -1376,3 +1376,27 @@ bandwidth, and PSI were re-verified ready in the same
 capture. Evidence: `docs/validation/observe-power-95ede21/`.
 No positive in-guest power reading and no physical hardware
 validation are claimed.
+
+## Observer per-process attribution (Phase 3) — native validation (2026-11-07)
+
+`processes.utilization` (per-process busy basis points over
+the observe window, implemented at `b946269`) was validated
+natively with the extended observe gate
+(`tests/smoke-native-observe.py`, marker
+`SYNVEIL_OBSERVE_QEMU_PASS`) on the joined image sha256
+`c136d431e5349249b502fa4d1492e94665d069553fe633942aab3325d3ad3566`
+(guest binaries stamp `36e4285`). The joined baseline smoke
+passed on the same image. In the captured guest response
+all 97 snapshot processes were rated `ready` over a 101 ms
+window; the rated basis points sum to 2223 against the same
+response's aggregate busy figure of 3704, the expected
+relationship (the aggregate also counts unattributed kernel
+time). Host unit tests cover the exact attribution math,
+PID-reuse and newborn withholding, and degradation paths
+(veil-core 176 lib tests, synctl 8, including the client's
+cross-checks against the snapshot's omission count and
+truncation flags). PSI, disk throughput, and network
+bandwidth were re-verified ready in the same capture.
+Evidence: `docs/validation/observe-attribution-36e4285/`.
+No lifecycle tracking, history, or physical hardware
+validation is claimed.
