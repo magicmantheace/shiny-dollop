@@ -120,8 +120,15 @@ standard chrome.
 
 ## Out of scope / recorded gaps
 
-- No Start menu or task buttons: stock `desktop-shell.so` has
-  neither. A custom shell is a separate owner decision (ADR 0024).
+- Start menu and task buttons: stock `desktop-shell.so` has
+  neither; the owner authorized the custom shell on 2026-11-06
+  (ADR 0025) and it shipped as a carried patch on the pinned
+  shell — bottom panel with a Start button, a Start menu
+  listing the apps the image carries, and real task buttons
+  (activate/minimize). The menu offers no session actions: the
+  session machinery exposes no logout/lock to offer. Accepted
+  in QEMU 2026-11-07; see
+  `docs/validation/shell-d526e55/README.md`.
 - No compositor-level slide for window map/minimize in stock
   Weston; `zoom`/`fade` springs are the available motion.
 - Chromium and weston-terminal interiors are unchanged.

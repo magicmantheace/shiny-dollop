@@ -1250,3 +1250,38 @@ ROADMAP.md. The export ran with packaged tooling on the host
 against the guest-written journal, not inside the guest.
 QEMU evidence only — no physical hardware is claimed. See
 [retained evidence](validation/audit-v2-7431121/README.md).
+
+## Custom shell (S4) — QEMU acceptance (2026-11-07)
+
+The S4 custom shell (ADR 0025; owner-authorized 2026-11-06) is
+accepted in QEMU. The pinned Weston desktop shell is patched in
+place through the carried-patch mechanism — same module, no
+weston.ini, Buildroot-config, session-startup, or
+authentication changes — and the joined image built from it
+(sha256
+`a80e3266948066fb4c2b98c9c8e8843d5f34dd7f2b8cbb9bb6c5696c70fba737`)
+passed the dedicated shell acceptance
+(`tests/smoke-native-shell.py`, `SYNVEIL_SHELL_QEMU_PASS`):
+the new bottom panel renders in the design tokens, the demo
+window's task button minimizes and restores it and reflects
+its active state, the Start menu opens with the image's app
+items and its Terminal item launches a real terminal window,
+the Start button toggles the menu, and the session relocks.
+On the plain joined image the menu lists Terminal and Demo
+window; Files and Updates entries follow the project's
+existing enablement markers and are exercised on the A/B
+generations by the regression proofs below. The full
+regression set passed on this image set: the joined
+enrollment/login/Weston smoke
+(`SYNVEIL_NATIVE_JOINED_QEMU_ENROLL_LOGIN_WESTON_PASS`), the
+durable-audit gate (`SYNVEIL_AUDIT_V2_NATIVE_PASS`), the A/B
+update round trip (`SYNVEIL_AB_QEMU_PROOF_PASS`, all nine
+scenarios), and the browser/files proof
+(`SYNVEIL_BROWSER_QEMU_PROOF_PASSED`). The browser run first
+exposed a harness defect — its terminal-focus wrapper's
+per-attempt budget equalled the A/B helper's GUI-free settle,
+so GUI-free sessions could never focus — fixed tests-only
+(commit `e86b6b7`) with the root cause recorded in the
+evidence README; no guest code changed for it. QEMU evidence
+only — no physical hardware is claimed. See
+[retained evidence](validation/shell-d526e55/README.md).
