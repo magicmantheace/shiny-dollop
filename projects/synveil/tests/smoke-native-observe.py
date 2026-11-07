@@ -28,6 +28,17 @@ image:
   kernel is built with CONFIG_PSI=y, so the ready path — not
   just the unavailable path — is exercised natively).
 
+The gate also covers the observer history slice (ADR 0026):
+in the same session it runs the fixed `observe-history`
+harness command, which starts a second fixture core with the
+lifecycle sampler enabled by policy, snapshots the event
+ring, starts a known `sleep 12` probe process (recording its
+pid), snapshots again while the probe is alive, and once
+more after it exits. The host requires the probe's
+`process_started` event in the second snapshot and its
+`process_exited` event — same pid, same start_time_ticks,
+later sequence — in the third.
+
 Boot/enroll flakes under TCG retry the whole boot on a fresh
 image copy (the audit-v2 smoke's pattern); the assertions never
 retry. QEMU evidence only; no physical hardware is claimed.
@@ -319,6 +330,33 @@ def boot_and_observe(work: Path, secret: str, out: Path) -> bool:
                     # /proc; under TCG give it generous wall time
                     # before ending the session.
                     time.sleep(20)
+                    phase = "history"
+                    try:
+                        w, h, data = patient_frame(
+                            qmp, frame_dir, 3, timeout=30.0)
+                        tx, ty = weston_smoke.terminal_point(w, h, data)
+                        if tx is None:
+                            note("terminal not found for history")
+                            return False
+                        weston_smoke.pointer(qmp, w, h, tx, ty,
+                                             button=True)
+                        weston_smoke.pointer(qmp, w, h, tx, ty,
+                                             button=False)
+                        time.sleep(0.5)
+                        # The line is ~560 characters at the
+                        # patient 200 ms hold — minutes of
+                        # typing — hence the long timeout.
+                        type_ab_command(qmp, "observe-history",
+                                        timeout=300)
+                    except Exception as exc:  # noqa: BLE001
+                        note(f"history capture failed: {exc}")
+                        return False
+                    note("history command typed; sampler running")
+                    # The line takes ~35 s of guest time: three
+                    # ring snapshots around a 12 s probe process
+                    # against the sampler's 5 s cadence, plus
+                    # synctl runs under TCG.
+                    time.sleep(55)
                     phase = "closing"
                     for _ in range(10):
                         try:
@@ -629,6 +667,99 @@ def check_observe(doc, err_bytes: bytes) -> list[str]:
     return failures
 
 
+def check_history(docs: dict, errs: dict,
+                  probe_pid: int | None) -> tuple[list[str], dict]:
+    """Assert the ADR 0026 lifecycle proof: the sampler was
+    enabled, and the known probe process produced a started
+    event (visible while it was alive) and an exited event
+    (visible after it exited), same identity, in order."""
+    failures: list[str] = []
+    info: dict = {"probe_pid": probe_pid}
+    for name in ("h0", "h1", "h2"):
+        if errs.get(name, b"").strip():
+            failures.append(
+                f"synctl wrote to stderr for {name} "
+                "(client refused the history response): "
+                + errs[name].decode(errors="replace")[:200])
+        doc = docs.get(name)
+        if not isinstance(doc, dict):
+            failures.append(f"{name} history capture missing")
+            continue
+        if doc.get("ok") is not True:
+            failures.append(f"{name} response envelope is not ok")
+            continue
+        result = doc.get("result")
+        if not isinstance(result, dict):
+            failures.append(f"{name} result is not a JSON object")
+            continue
+        if result.get("schema") != "synveil.observe-history/v1":
+            failures.append(f"{name} schema is {result.get('schema')!r}")
+        sampler = result.get("sampler") or {}
+        if sampler.get("enabled") is not True:
+            failures.append(f"{name} sampler is not enabled")
+        if sampler.get("cadence_ms") != 5000:
+            failures.append(
+                f"{name} cadence_ms is {sampler.get('cadence_ms')!r}")
+        if sampler.get("ring_capacity") != 1024:
+            failures.append(
+                f"{name} ring_capacity is "
+                f"{sampler.get('ring_capacity')!r}")
+        for event in result.get("events") or []:
+            if not isinstance(event, dict) \
+                    or event.get("schema") != "synveil.observe-event/v1":
+                failures.append(f"{name} carries a non-event record")
+                break
+    if failures:
+        return failures, info
+    if probe_pid is None or probe_pid <= 0:
+        return failures + ["probe pid was not recorded"], info
+
+    def find(doc, kind):
+        result = doc.get("result") or {}
+        for event in result.get("events") or []:
+            process = ((event.get("fields") or {}).get("process")
+                       or {})
+            if event.get("event") == kind \
+                    and process.get("pid") == probe_pid:
+                return event
+        return None
+
+    started = find(docs["h1"], "process_started")
+    if started is None:
+        failures.append(
+            "no process_started event for the probe in h1")
+        return failures, info
+    started_process = (started.get("fields") or {}).get("process") or {}
+    info["started_sequence"] = started.get("sequence")
+    info["probe_start_time_ticks"] = started_process.get(
+        "start_time_ticks")
+    # The ring retains the started event in the later snapshot.
+    if find(docs["h2"], "process_started") is None:
+        failures.append("started event not retained in h2")
+    exited = find(docs["h2"], "process_exited")
+    if exited is None:
+        failures.append(
+            "no process_exited event for the probe in h2")
+        return failures, info
+    exited_process = (exited.get("fields") or {}).get("process") or {}
+    info["exited_sequence"] = exited.get("sequence")
+    if exited_process.get("start_time_ticks") \
+            != started_process.get("start_time_ticks"):
+        failures.append(
+            "exited event start_time_ticks does not match the "
+            "started event (identity mismatch)")
+    if not isinstance(exited.get("sequence"), int) \
+            or not isinstance(started.get("sequence"), int) \
+            or exited["sequence"] <= started["sequence"]:
+        failures.append("exited event does not follow the started event")
+    for key in ("user_ticks", "system_ticks"):
+        value = exited_process.get(key)
+        if not isinstance(value, int) or isinstance(value, bool) \
+                or value < 0:
+            failures.append(f"exited event {key} invalid: {value!r}")
+    return failures, info
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=OUT)
@@ -651,6 +782,7 @@ def main() -> int:
     err_bytes = b""
     attempts = 0
     failures: list[str] = []
+    history_info: dict = {}
     for attempt in range(1, 4):
         attempts = attempt
         with tempfile.TemporaryDirectory(
@@ -691,6 +823,46 @@ def main() -> int:
             shutil.copyfile(raw, out / "observe.json")
             (out / "observe.err").write_bytes(err_bytes)
             failures = check_observe(doc, err_bytes)
+            # History slice (ADR 0026): the same boot ran the
+            # observe-history harness line; read its captures
+            # back and assert the probe's lifecycle events.
+            history_docs: dict = {}
+            history_errs: dict = {}
+            history_broken = False
+            for name in ("h0", "h1", "h2"):
+                raw_h = work / f"{name}.json"
+                if dump_state_file(
+                        state, [f"tmp/{name}.json"], raw_h) is None:
+                    failures.append(
+                        f"{name}.json not found in state partition")
+                    history_broken = True
+                    break
+                err_h = work / f"{name}.err"
+                dump_state_file(state, [f"tmp/{name}.err"], err_h)
+                history_errs[name] = (
+                    err_h.read_bytes() if err_h.exists() else b"")
+                shutil.copyfile(raw_h, out / f"{name}.json")
+                (out / f"{name}.err").write_bytes(history_errs[name])
+                try:
+                    history_docs[name] = json.loads(raw_h.read_bytes())
+                except (ValueError, UnicodeDecodeError) as exc:
+                    failures.append(f"{name}.json does not parse: {exc}")
+                    history_broken = True
+                    break
+            if not history_broken:
+                probe_raw = work / "p.pid"
+                probe_pid = None
+                if dump_state_file(
+                        state, ["tmp/p.pid"], probe_raw) is not None:
+                    shutil.copyfile(probe_raw, out / "p.pid")
+                    try:
+                        probe_pid = int(
+                            probe_raw.read_text().strip())
+                    except ValueError:
+                        probe_pid = None
+                history_failures, history_info = check_history(
+                    history_docs, history_errs, probe_pid)
+                failures += history_failures
             break
     if doc is None and not failures:
         failures = ["no boot attempt produced an observe capture"]
@@ -705,6 +877,7 @@ def main() -> int:
         "pressure_status": {
             label: (pressure.get(label) or {}).get("status")
             for label in ("cpu", "memory", "io")},
+        "history": history_info,
         "failures": failures,
     }
     (out / "result.json").write_text(

@@ -276,6 +276,19 @@ AB_COMMANDS = {
     # the state partition: persistent and world-writable, while
     # /home is not on a persistent partition on the joined image.
     "observe": "echo synveil-observe-run; /usr/sbin/veil-core --socket /var/tmp/observe.sock --once & sleep 2; /usr/bin/synctl --socket /var/tmp/observe.sock --json observe > /var/tmp/observe.json 2> /var/tmp/observe.err; sync",
+    # Observer history proof (Phase 3, ADR 0026): same fixture
+    # pattern, but the fixture core runs with the history
+    # sampler enabled by policy (SYNVEIL_OBSERVE_HISTORY=1)
+    # and keeps serving (no --once: three history queries
+    # over ~30 s). The line snapshots the ring, starts a
+    # known `sleep 12` probe process and records its pid,
+    # snapshots again while the probe is alive (a sampler
+    # tick at the 5 s cadence must have emitted its
+    # process_started event), then snapshots once more after
+    # the probe has exited (its process_exited event must
+    # have followed). Sleeps are sized against the 5 s
+    # cadence with margin on both sides of each boundary.
+    "observe-history": "echo synveil-history-run; SYNVEIL_OBSERVE_HISTORY=1 /usr/sbin/veil-core --socket /var/tmp/o.sock & sleep 8; /usr/bin/synctl --socket /var/tmp/o.sock --json observe-history > /var/tmp/h0.json 2> /var/tmp/h0.err; sleep 12 & echo $! > /var/tmp/p.pid; sleep 8; /usr/bin/synctl --socket /var/tmp/o.sock --json observe-history > /var/tmp/h1.json 2> /var/tmp/h1.err; sleep 10; /usr/bin/synctl --socket /var/tmp/o.sock --json observe-history > /var/tmp/h2.json 2> /var/tmp/h2.err; sync",
 }
 
 _AB_CHAR_KEYS = {c: c for c in "abcdefghijklmnopqrstuvwxyz0123456789"}
@@ -283,11 +296,14 @@ _AB_CHAR_KEYS.update({c: "shift+" + c.lower()
                       for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"})
 _AB_CHAR_KEYS.update({" ": "spc", "/": "slash", "-": "minus", ".": "dot",
                       "_": "shift+minus", ">": "shift+dot", ";": "semicolon",
-                      # Only for the observer fixture line below:
-                      # backgrounding its one-shot core. The map
-                      # never widens what a caller can type — the
-                      # command strings above remain constants.
-                      "&": "shift+7"})
+                      # Only for the observer fixture lines below:
+                      # backgrounding their cores, the sampler's
+                      # policy variable, and the probe's $! pid.
+                      # The map never widens what a caller can
+                      # type — the command strings above remain
+                      # constants.
+                      "&": "shift+7", "=": "equal", "$": "shift+4",
+                      "!": "shift+1"})
 
 
 def type_ab_command(socket_path: Path, command_id: str, *, timeout=30.0):
