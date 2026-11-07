@@ -1,11 +1,16 @@
 """Catalog-stage verification (Blender headless): re-import a finished
 GLB cold and prove what it contains — armature bones, populated vertex
 groups, named animation actions — then render preview frames (rest pose
-+ the hop apex) as deformation evidence.
++ the showcase clip's apex) as deformation evidence.
+
+With ``--static`` (the prop path) the GLB is expected to have NO
+armature: the verifier proves that instead (bones/groups/actions all
+empty) and renders a three-quarter beauty plus a front view.
 
 Usage:
   blender -b --python render_verify.py -- --input final.glb \
-      --rest-png rest.png --action-png hop.png --report verify.json
+      --rest-png rest.png --action-png hop.png --report verify.json \
+      [--template biped] [--action wave] [--static]
 """
 
 import argparse
@@ -29,7 +34,12 @@ def parse_args():
     p.add_argument("--rest-png", required=True)
     p.add_argument("--action-png", required=True)
     p.add_argument("--report", required=True)
-    p.add_argument("--action", default="hop")
+    p.add_argument("--template", default="winged-creature")
+    p.add_argument("--action", default=None,
+                   help="clip to render at apex; default: the "
+                        "template's showcase clip")
+    p.add_argument("--static", action="store_true",
+                   help="prop mode: expect and prove an unrigged GLB")
     return p.parse_args(argv)
 
 
@@ -77,6 +87,13 @@ def ground_z(mesh):
     return float(zs[::37, 2].min())
 
 
+def aim_camera(scene, pos, target=(0, 0, 0.95)):
+    cam = scene.camera
+    cam.location = pos
+    direction = Vector(target) - cam.location
+    cam.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
+
+
 def main():
     args = parse_args()
     bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -84,10 +101,15 @@ def main():
     scene = setup_render()
     arm = next((o for o in scene.objects if o.type == "ARMATURE"), None)
     mesh = next((o for o in scene.objects if o.type == "MESH"), None)
-    if arm is None or mesh is None:
-        raise RuntimeError("GLB lacks an armature or a mesh")
+    if mesh is None:
+        raise RuntimeError("GLB lacks a mesh")
+    if args.static and arm is not None:
+        raise RuntimeError("static asset unexpectedly contains an "
+                           "armature")
+    if not args.static and arm is None:
+        raise RuntimeError("GLB lacks an armature")
 
-    bones = [b.name for b in arm.data.bones]
+    bones = [b.name for b in arm.data.bones] if arm else []
     weighted = 0
     for v in mesh.data.vertices:
         if any(g.weight > 0.01 for g in v.groups):
@@ -101,17 +123,10 @@ def main():
     scene.render.filepath = args.rest_png
     bpy.ops.render.render(write_still=True)
 
-    # Action render at the recipe's apex frame. Blender's glTF importer
-    # renames imported actions to "<clip>_<armature>", so resolve by
-    # exact name first, then by prefix.
-    samples = pose_mod.sample(args.action, fps=24)
-    apex_frame = max(samples, key=lambda s: s[1]["root_y"])[0]
-    action = bpy.data.actions.get(args.action)
-    if action is None:
-        action = next((a for a in bpy.data.actions
-                       if a.name.startswith(args.action + "_")), None)
     report = {
         "input": args.input,
+        "template": args.template,
+        "rigged": not args.static,
         "verts": len(mesh.data.vertices),
         "faces": len(mesh.data.polygons),
         "bones": bones,
@@ -120,6 +135,32 @@ def main():
         "actions": actions,
         "rest_ground_z": round(rest_ground, 3),
     }
+    if args.static:
+        # Second beauty angle: straight-on front.
+        aim_camera(scene, (0, -4, 1.0))
+        scene.render.filepath = args.action_png
+        bpy.ops.render.render(write_still=True)
+        with open(args.report, "w") as fh:
+            json.dump(report, fh, indent=1)
+        print("VERIFY_JSON " + json.dumps(report))
+        print("VERIFY_OK")
+        return
+
+    # Action render at the recipe's apex frame — the frame of maximum
+    # total channel deviation from rest (for the hop that is the
+    # root-lift peak; for the wave, the fullest raise). Blender's glTF
+    # importer renames imported actions to "<clip>_<armature>", so
+    # resolve by exact name first, then by prefix.
+    clip = args.action or pose_mod.showcase_clip(args.template)
+    report["action_clip"] = clip
+    samples = pose_mod.sample_for(args.template, clip, fps=24)
+    apex_frame = max(
+        samples,
+        key=lambda s: sum(abs(v) for v in s[1].values()))[0]
+    action = bpy.data.actions.get(clip)
+    if action is None:
+        action = next((a for a in bpy.data.actions
+                       if a.name.startswith(clip + "_")), None)
     if action is not None:
         arm.animation_data_create()
         arm.animation_data.action = action

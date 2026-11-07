@@ -24,6 +24,38 @@ the distance-to-bone fallback remains as the labelled last resort.
 Ember Dragon re-rigged: heat weights, wingtip dominance 0.0 → 1.0;
 details in `docs/MUSE_HANDOFF.md`.**
 
+**P1 update (2026-11-06): quadruped + biped rig templates and the
+unrigged prop path are built and proven end-to-end on three new
+assets, all through the same pipeline: a baby **Triceratops**
+(quadruped template, 15 bones, `idle` + `bounce`), a **Snow Goblin**
+(biped template with ears, 13 bones, `idle` + `wave`), and a
+**Treasure Chest** (prop path — static GLB, no armature, catalogued
+as unrigged). All three shipped real bone-heat weights where rigged
+(coverage 1.0; feet/hands tip dominance 1.0). Two honest wrinkles,
+detailed in `docs/MUSE_HANDOFF.md`: the triceratops mesh came out
+of Hunyuan sideways and needed the pipeline's per-run `--rotate-z`
+facing correction, and the goblin's fused-fur ruff is partly
+arm-weighted, so poses well beyond the shipped wave drag fur.
+Catalogue records: `catalog/triceratops/`, `catalog/snow-goblin/`,
+`catalog/treasure-chest/` (GLBs in local `outputs/`, sha-pinned).**
+
+**P1.1 update (2026-11-06): the weight-distance veto is now part of
+the rig stage** (owner-flagged on the goblin's wave render: the body
+texture stretched with the raised arm). After bone heat, any
+non-trunk bone's weight on a vertex beyond its reach radius
+(0.85 × bone length, floored at 0.19 × mesh height; the root→head
+trunk chain is exempt) is zeroed and renormalized onto the surviving
+bones; `skin_policy.py` additionally gates the torso zone's arm
+weight share (≤ 0.25). The Snow Goblin was re-rigged from its saved
+textured mesh — no GPU stages re-ran: torso arm share 0.51 → 0.14,
+head-zone dominance 0.67 → 0.79, hands dominance 0.997, coverage
+still 1.0, and in the re-rendered wave the chest and ruff stay put.
+Residual honesty: a taut fur sheet still stretches in the armpit web
+at the wave's peak (the arm and torso are one fused fur mass — some
+web must stretch), and the 2.2 rad stress raise still sails the
+flank. The other P1 assets were not regenerated; their catalogue
+entries are byte-identical. Details in `docs/MUSE_HANDOFF.md`.**
+
 A fully local, no-API pipeline that builds game assets — creatures included —
 on the owner's own hardware:
 
@@ -66,5 +98,6 @@ cloud-generated reference Pip the owner already has.
 - **P0** — model bake-off on Pip + the winning creature pipeline end-to-end
   (image → rigged, animated .glb + catalog entry).
 - **P1** — more rig templates (quadruped, biped) + the unrigged prop path.
+  **Done 2026-11-06** (see the P1 status note above).
 - **P2** — a simple local UI over the catalog and pipeline.
 - **P3** — hand-off integrations (animation studio library, Godot projects).

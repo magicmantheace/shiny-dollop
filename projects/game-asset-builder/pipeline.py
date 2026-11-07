@@ -1,4 +1,4 @@
-"""Pipeline orchestrator: concept image -> catalogued, rigged .glb.
+"""Pipeline orchestrator: concept image -> catalogued .glb.
 
 Runs the stages from stages.py in order, with file-based hand-off in
 ``outputs/<slug>/``:
@@ -7,9 +7,15 @@ Runs the stages from stages.py in order, with file-based hand-off in
   mesh     subprocess on the owner's PC via gpu_bridge (own process
            there; exits before texture is dispatched)
   texture  subprocess on the owner's PC via gpu_bridge
-  rig      Blender headless subprocess (stages/rig/rig_blender.py)
+  rig      Blender headless subprocess (stages/rig/rig_blender.py) —
+           template chosen per run (winged-creature / quadruped /
+           biped)
   animate  Blender headless subprocess (stages/animate/animate_blender.py)
   catalog  in-process (stages/catalog/catalog.py)
+
+Prop runs (``unrigged=True``) replace rig+animate with the prop stage
+(stages/prop/prop_blender.py): a clean static GLB, catalogued with
+empty bones/actions and ``rigged: false`` provenance.
 
 Writes outputs/<slug>/run-manifest.json with per-stage timings and
 stats, and the catalog entry under catalog/<slug>/metadata.json.
@@ -40,6 +46,7 @@ def _load_module(name, relpath):
 
 cutout_mod = _load_module("gab_cutout", "stages/prep/cutout.py")
 catalog_mod = _load_module("gab_catalog", "stages/catalog/catalog.py")
+poses_mod = _load_module("gab_poses", "stages/animate/poses.py")
 
 
 def find_blender() -> str:
@@ -115,13 +122,26 @@ def _gpu_stage(runner, slug, stage_name, script_rel, script_args,
 
 def run_pipeline(concept_path: str, name: str, ears: bool = False,
                  arms: bool = True, target_verts: int = 50000,
-                 resume: bool = False) -> dict:
+                 resume: bool = False, template: str = "winged-creature",
+                 unrigged: bool = False, rotate_z: int = 0,
+                 prop_target_verts: int = 30000) -> dict:
+    """Run the pipeline on one concept image.
+
+    ``template`` selects the rig template (winged-creature, quadruped,
+    biped). ``unrigged=True`` runs the prop path instead: prep -> mesh
+    -> texture -> prop (clean static GLB) -> catalog, with no rig or
+    animate stage and a catalog entry that says so. ``rotate_z`` is
+    the recorded per-run facing correction for the rig stage (see
+    rig_blender.py); it is ignored for props.
+    """
     from gpu_bridge import BridgeRunner
 
     slug = catalog_mod.slugify(name)
     workdir = os.path.join(OUTPUTS_DIR, slug)
     os.makedirs(workdir, exist_ok=True)
     manifest = {"name": name, "slug": slug, "concept": concept_path,
+                "template": None if unrigged else template,
+                "unrigged": unrigged, "rotate_z": rotate_z,
                 "stages": {}}
     started = time.time()
 
@@ -173,6 +193,58 @@ def run_pipeline(concept_path: str, name: str, ears: bool = False,
     else:
         record("texture", {"resumed": True})
 
+    final_glb = os.path.join(workdir, f"{slug}.glb")
+    renders_dir = os.path.join(workdir, "renders")
+    os.makedirs(renders_dir, exist_ok=True)
+
+    if unrigged:
+        # 4-prop. clean static GLB — no rig, no animate ------------------
+        prop = _run_blender("stages/prop/prop_blender.py", [
+            "--input", textured_glb, "--output", final_glb,
+            "--report", os.path.join(workdir, "prop-report.json"),
+            "--target-verts", str(prop_target_verts)], "PROP_OK")
+        record("prop", prop)
+
+        # 5-prop. catalog: bones/actions honestly empty -----------------
+        entry = catalog_mod.build_entry(
+            name=name,
+            source_concept=os.path.basename(concept_path),
+            glb_path=final_glb,
+            counts={"verts": prop["prop_verts"],
+                    "faces": prop["prop_faces"],
+                    "raw_mesh_verts": prop["raw_verts"],
+                    "raw_mesh_faces": prop["raw_faces"]},
+            bones=[],
+            actions=[],
+            provenance={
+                "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+                "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+                "rigged": False,
+                "rig_template": None,
+                "weight_method": None,
+                "gpu_host": manifest["gpu_host"],
+                "mesh_stage": manifest["stages"].get("mesh", {}),
+                "texture_stage": manifest["stages"].get("texture", {}),
+            })
+        entry_path = catalog_mod.write_entry(CATALOG_DIR, entry)
+        record("catalog", {"entry": entry_path,
+                           "sha256": entry["sha256"]})
+
+        # 6-prop. verify: cold re-import proves the GLB is static -------
+        verify = _run_blender("stages/catalog/render_verify.py", [
+            "--input", final_glb,
+            "--rest-png", os.path.join(renders_dir, "beauty.png"),
+            "--action-png", os.path.join(renders_dir, "front.png"),
+            "--report", os.path.join(workdir, "verify-report.json"),
+            "--static"], "VERIFY_OK")
+        record("verify", verify)
+        manifest["seconds_total"] = round(time.time() - started, 2)
+        manifest["final_glb"] = final_glb
+        manifest["catalog_entry"] = entry_path
+        with open(os.path.join(workdir, "run-manifest.json"), "w") as fh:
+            json.dump(manifest, fh, indent=1)
+        return manifest
+
     # 4. rig ---------------------------------------------------------------
     rigged_glb = os.path.join(workdir, "rigged.glb")
     rig_report_path = os.path.join(workdir, "rig-report.json")
@@ -180,17 +252,19 @@ def run_pipeline(concept_path: str, name: str, ears: bool = False,
         "--input", textured_glb, "--output", rigged_glb,
         "--blend", os.path.join(workdir, "rigged.blend"),
         "--report", rig_report_path,
+        "--template", template,
+        "--rotate-z", str(rotate_z),
         "--ears", "1" if ears else "0",
         "--arms", "1" if arms else "0",
         "--target-verts", str(target_verts)], "RIG_OK")
     record("rig", rig)
 
     # 5. animate -----------------------------------------------------------
-    final_glb = os.path.join(workdir, f"{slug}.glb")
     animate_report_path = os.path.join(workdir, "animate-report.json")
     anim = _run_blender("stages/animate/animate_blender.py", [
         "--input", rigged_glb, "--output", final_glb,
-        "--report", animate_report_path], "ANIMATE_OK")
+        "--report", animate_report_path,
+        "--template", template], "ANIMATE_OK")
     record("animate", anim)
 
     # 6. catalog -----------------------------------------------------------
@@ -207,6 +281,7 @@ def run_pipeline(concept_path: str, name: str, ears: bool = False,
         provenance={
             "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
             "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+            "rigged": True,
             "rig_template": rig["template"],
             "weight_method": rig["weight_method"],
             "gpu_host": manifest["gpu_host"],
@@ -217,14 +292,13 @@ def run_pipeline(concept_path: str, name: str, ears: bool = False,
     record("catalog", {"entry": entry_path, "sha256": entry["sha256"]})
 
     # 7. verify: cold re-import + preview renders (catalog stage output)
-    renders_dir = os.path.join(workdir, "renders")
-    os.makedirs(renders_dir, exist_ok=True)
+    showcase = poses_mod.showcase_clip(template)
     verify = _run_blender("stages/catalog/render_verify.py", [
         "--input", final_glb,
         "--rest-png", os.path.join(renders_dir, "rest.png"),
-        "--action-png", os.path.join(renders_dir, "hop.png"),
-        "--report", os.path.join(workdir, "verify-report.json")],
-        "VERIFY_OK")
+        "--action-png", os.path.join(renders_dir, f"{showcase}.png"),
+        "--report", os.path.join(workdir, "verify-report.json"),
+        "--template", template], "VERIFY_OK")
     record("verify", verify)
 
     manifest["seconds_total"] = round(time.time() - started, 2)

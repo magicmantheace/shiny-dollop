@@ -1,0 +1,92 @@
+{
+ "entry_version": 1,
+ "name": "Snow Goblin",
+ "slug": "snow-goblin",
+ "source_concept": "media-generation-biped-snowgoblin-concept-0-7a45eb0e-b49c-4ecd-93c2-2db237069047.webp",
+ "asset_file": "snow-goblin.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "86c91cd654ac179595f284463eaf0825b6e645d234c740da6c8999f8e849c49b",
+ "bytes": 22196376,
+ "counts": {
+  "verts": 49080,
+  "faces": 98583,
+  "raw_mesh_verts": 854106,
+  "raw_mesh_faces": 1072406
+ },
+ "bones": [
+  "root",
+  "spine",
+  "head",
+  "ear.L",
+  "ear.R",
+  "arm.L",
+  "arm2.L",
+  "arm.R",
+  "arm2.R",
+  "leg.L",
+  "leg2.L",
+  "leg.R",
+  "leg2.R"
+ ],
+ "actions": [
+  "idle",
+  "wave"
+ ],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": true,
+  "rig_template": "biped",
+  "weight_method": "bone-heat (automatic weights); distance veto (factor 0.85, floor 0.19); distance rescue on 1485 verts",
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.0.0"
+  },
+  "mesh_stage": {
+   "runner": {
+    "name": "snow-goblin_shape",
+    "exit_code": 0,
+    "seconds": 296.37,
+    "baseline_vram_mib": 791,
+    "peak_vram_mib": 7280,
+    "peak_delta_mib": 6489,
+    "vram_after_exit_mib": 867,
+    "n_samples": 613
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 536095,
+    "faces": 1072416,
+    "load_s": 113.27,
+    "inference_s": 156.19,
+    "total_s": 269.57,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\snow-goblin\\shape.glb"
+   }
+  },
+  "texture_stage": {
+   "runner": {
+    "name": "snow-goblin_texture",
+    "exit_code": 0,
+    "seconds": 1479.43,
+    "baseline_vram_mib": 836,
+    "peak_vram_mib": 12010,
+    "peak_delta_mib": 11174,
+    "vram_after_exit_mib": 770,
+    "n_samples": 3102
+   },
+   "stats": {
+    "stage": "texture",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+    "verts": 854106,
+    "faces": 1072416,
+    "load_s": 103.38,
+    "texture_s": 1350.51,
+    "total_s": 1454.81,
+    "torch_peak_mib": 9960.9,
+    "output": "D:\\asset-forge-lab\\out\\gab\\snow-goblin\\textured.glb"
+   }
+  }
+ }
+}
