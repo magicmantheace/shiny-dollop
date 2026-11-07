@@ -466,6 +466,45 @@ def check_observe(doc, err_bytes: bytes) -> list[str]:
                 label=label)
             if problem:
                 failures.append(problem)
+    disk = doc.get("disk")
+    if not isinstance(disk, dict):
+        failures.append("disk object missing")
+    else:
+        if disk.get("status") not in ("ready", "truncated"):
+            failures.append(
+                f"disk.status is {disk.get('status')!r}")
+        throughput = disk.get("throughput")
+        if not isinstance(throughput, dict):
+            failures.append("disk.throughput missing")
+        else:
+            tp_status = throughput.get("status")
+            if tp_status not in ("ready", "partial", "truncated"):
+                failures.append(
+                    f"disk.throughput.status is {tp_status!r}")
+            window = throughput.get("sample_window_ms")
+            if not isinstance(window, int) or window < 100:
+                failures.append(
+                    f"disk.throughput.sample_window_ms "
+                    f"invalid: {window!r}")
+            devices = throughput.get("devices")
+            if not isinstance(devices, list) or not devices:
+                failures.append("disk.throughput.devices invalid")
+            else:
+                for device in devices:
+                    if not isinstance(device, dict) \
+                            or not device.get("name"):
+                        failures.append(
+                            "disk.throughput device lacks a name")
+                        continue
+                    for key in ("read_bytes_per_sec",
+                                "write_bytes_per_sec"):
+                        value = device.get(key)
+                        if not isinstance(value, int) \
+                                or isinstance(value, bool) \
+                                or value < 0:
+                            failures.append(
+                                f"disk.throughput {key} invalid: "
+                                f"{value!r}")
     return failures
 
 
