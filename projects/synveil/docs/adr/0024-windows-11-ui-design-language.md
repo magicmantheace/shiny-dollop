@@ -85,6 +85,11 @@ recorded gaps, not problems this ADR papers over.
    with a custom shell (a Start menu / taskbar shell is a separate
    future owner decision), any change to the boot chain or the
    updater, and any change to authentication mechanics.
+   *Amendment (2026-11-06): the owner made that future decision —
+   the custom shell is authorized by
+   [ADR 0025](0025-custom-shell-start-menu-taskbar.md), for the
+   shell only. The boot chain, updater, and authentication
+   exclusions above are unchanged.*
 
 No firmware variables are written by this work. No sandbox, TLS,
 or connection behaviour changes.
