@@ -403,7 +403,6 @@ def focus_terminal(boot, timeout=240):
     """
     deadline = time.monotonic() + timeout
     closed_cover = False
-    closed_gui = False
     while time.monotonic() < deadline:
         try:
             frame = next_frame(boot)
@@ -411,6 +410,23 @@ def focus_terminal(boot, timeout=240):
             time.sleep(0.5)
             continue
         width, height, data = frame
+        # The update GUI takes activation when it opens after login
+        # and covers the terminal; while it is up, typed commands
+        # are delivered to the GUI and silently discarded (observed
+        # 2026-11-06: S1's stage command never reached the terminal
+        # and the scenario waited out its full marker timeout,
+        # while the same command staged in under a minute once the
+        # GUI was closed and the terminal truly focused). A single
+        # close click is not reliable either — it can land while
+        # the window is still animating open — so the GUI is
+        # closed verifiably: click, re-examine the next frame, and
+        # click again until no GUI window is present. Only then is
+        # the terminal clicked.
+        rect = gui_window_rect(width, height, data)
+        if rect:
+            close_gui_window(boot, rect)
+            time.sleep(1.0)
+            continue
         try:
             tx, ty = weston_smoke.terminal_point(width, height, data)
         except RuntimeError:
@@ -420,14 +436,6 @@ def focus_terminal(boot, timeout=240):
             weston_smoke.pointer(boot.qmp, width, height, tx, ty, button=False)
             time.sleep(0.4)
             return True
-        if not closed_gui:
-            rect = gui_window_rect(width, height, data)
-            if rect:
-                close_gui_window(boot, rect)
-                closed_gui = True
-                time.sleep(1.0)
-                continue
-            closed_gui = True
         if not closed_cover:
             window = weston_smoke.original_window(width, height, data)
             if window:
