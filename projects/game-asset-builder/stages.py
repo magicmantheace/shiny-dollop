@@ -25,6 +25,9 @@ STAGES = (
           "Cutout -> untextured mesh. Candidate models: see docs/DESIGN.md."),
     Stage("texture", "model", "gpu", True,
           "Mesh + cutout -> textured mesh. A different model from mesh."),
+    Stage("segment", "model", "gpu", True,
+          "Textured mesh -> P3-SAM part labels on a 50k-face proxy "
+          "built in the rig frame (rigged runs only)."),
     Stage("rig", "tool", "cpu", True,
           "Blender headless: decimate, armature template, automatic weights."),
     Stage("animate", "tool", "cpu", True,

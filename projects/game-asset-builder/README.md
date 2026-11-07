@@ -56,11 +56,31 @@ web must stretch), and the 2.2 rad stress raise still sails the
 flank. The other P1 assets were not regenerated; their catalogue
 entries are byte-identical. Details in `docs/MUSE_HANDOFF.md`.**
 
+**P2 cleanup update (2026-11-06): three layers on the
+`game-asset-builder/p2-cleanup` branch (draft PR stacked on #38).**
+(1) A concept pose & separation spec (per body plan, in
+`docs/DESIGN.md`) plus a pre-flight fused-limb check that records
+a pass/warn in every rigged run's manifest — the to-spec giraffe
+concept passes; the original goblin concept warns. (2) The veto's
+reach is now geodesic-aware: max(Euclidean, surface) distance, so
+weights cannot leak across a fused web on a straight line.
+(3) A new **segment stage** (P3-SAM, chosen by bake-off over
+PartField on licence — `benchmarks/segmentation/scores.md`) labels
+the textured mesh's parts; the rig separates geometry at part
+boundaries and adds a label-aware veto on top of the geodesic
+one. Goblin re-proof: torso arm share 0.139 → **0.079**, head
+dominance 0.881, the 2.2 rad stress sail materially reduced
+(residual: the arm part's own web fin). Triceratops re-proof:
+feet/head dominance 1.0, belly share 0.200, two of four legs as
+their own parts (P3-SAM's known weakness). Ember Dragon and
+Treasure Chest untouched, byte-identical. Suite 79/79. Details in
+`docs/MUSE_HANDOFF.md`.**
+
 A fully local, no-API pipeline that builds game assets — creatures included —
 on the owner's own hardware:
 
 ```
-concept image → cutout → [mesh model] → [texture model] → rig → animate → catalogued .glb
+concept image → cutout → [mesh model] → [texture model] → [segment model] → rig → animate → catalogued .glb
 ```
 
 Mesh generation and texturing are **different local models**, each run as its
@@ -99,5 +119,9 @@ cloud-generated reference Pip the owner already has.
   (image → rigged, animated .glb + catalog entry).
 - **P1** — more rig templates (quadruped, biped) + the unrigged prop path.
   **Done 2026-11-06** (see the P1 status note above).
+- **P2 cleanup** — concept pose spec + preflight, geodesic weights,
+  part segmentation + separation + label-aware skinning.
+  **Done 2026-11-06** (see the P2 cleanup status note above;
+  branch `game-asset-builder/p2-cleanup`).
 - **P2** — a simple local UI over the catalog and pipeline.
 - **P3** — hand-off integrations (animation studio library, Godot projects).

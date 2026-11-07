@@ -7,6 +7,8 @@ Runs the stages from stages.py in order, with file-based hand-off in
   mesh     subprocess on the owner's PC via gpu_bridge (own process
            there; exits before texture is dispatched)
   texture  subprocess on the owner's PC via gpu_bridge
+  segment  P3-SAM on the owner's PC via gpu_bridge (rigged runs
+           only): proxy built on the VM, labels land in labels.npz
   rig      Blender headless subprocess (stages/rig/rig_blender.py) —
            template chosen per run (winged-creature / quadruped /
            biped)
@@ -34,6 +36,10 @@ OUTPUTS_DIR = os.path.join(PROJECT_DIR, "outputs")
 CATALOG_DIR = os.path.join(PROJECT_DIR, "catalog")
 LAB_VENV_PYTHON = r"D:\asset-forge-lab\venvs\hunyuan\Scripts\python.exe"
 LAB_REPO = r"D:\asset-forge-lab\repos\Hunyuan3D-2"
+P3SAM_VENV_PYTHON = r"D:\asset-forge-lab\venvs\p3sam\Scripts\python.exe"
+P3SAM_DEMO = r"D:\asset-forge-lab\repos\Hunyuan3D-Part\P3-SAM\demo"
+P3SAM_CKPT = (r"D:\asset-forge-lab\seg\p3sam_weights\p3sam"
+              r"\p3sam.safetensors")
 
 
 def _load_module(name, relpath):
@@ -45,8 +51,13 @@ def _load_module(name, relpath):
 
 
 cutout_mod = _load_module("gab_cutout", "stages/prep/cutout.py")
+preflight_mod = _load_module("gab_preflight", "stages/prep/preflight.py")
+segment_mod = _load_module("gab_segment", "stages/segment/segment.py")
 catalog_mod = _load_module("gab_catalog", "stages/catalog/catalog.py")
 poses_mod = _load_module("gab_poses", "stages/animate/poses.py")
+
+_TEMPLATE_BODY_PLAN = {"biped": "biped", "quadruped": "quadruped",
+                       "winged-creature": "winged"}
 
 
 def find_blender() -> str:
@@ -86,7 +97,8 @@ def _stage_json_from_log(runner, lab_rel_log):
 
 
 def _gpu_stage(runner, slug, stage_name, script_rel, script_args,
-               timeout_s, workdir):
+               timeout_s, workdir, python=LAB_VENV_PYTHON, cwd=LAB_REPO,
+               extra_env=None):
     """Dispatch one GPU stage to the PC lab; return (result, stage_stats).
 
     Raises if the stage exits non-zero or if VRAM is not released back
@@ -95,12 +107,15 @@ def _gpu_stage(runner, slug, stage_name, script_rel, script_args,
     script_local = os.path.join(PROJECT_DIR, script_rel)
     lab_script = f"scripts\\gab_{stage_name}.py"
     runner.stage_to_lab(script_local, lab_script)
+    env = {"HF_HOME": runner.lab_dir + r"\hf"}
+    if extra_env:
+        env.update(extra_env)
     spec = {
         "name": f"{slug}_{stage_name}",
-        "cmd": [LAB_VENV_PYTHON,
+        "cmd": [python,
                 runner.lab_dir + "\\" + lab_script] + script_args,
-        "cwd": LAB_REPO,
-        "env": {"HF_HOME": runner.lab_dir + r"\hf"},
+        "cwd": cwd,
+        "env": env,
         "log": runner.lab_dir + f"\\logs\\gab_{slug}_{stage_name}.log",
         "result": runner.lab_dir + f"\\out\\gab_{slug}_{stage_name}"
                                    "_result.json",
@@ -120,11 +135,49 @@ def _gpu_stage(runner, slug, stage_name, script_rel, script_args,
     return result, stats
 
 
+def _segment_stage(runner, slug, textured_glb, workdir, rotate_z):
+    """Layer 3 segmentation: proxy (VM Blender) -> P3-SAM (PC, own
+    venv/process) -> labels.npz in the rig frame. Returns the
+    labels path; per-stage detail is recorded by the caller from
+    the returned info dict."""
+    proxy_glb = os.path.join(workdir, "proxy.glb")
+    proxy = _run_blender("stages/segment/make_proxy.py", [
+        "--input", textured_glb, "--output", proxy_glb,
+        "--rotate-z", str(rotate_z)], "PROXY_OK")
+    lab_proxy = f"inputs\\{slug}-proxy.glb"
+    runner.stage_to_lab(proxy_glb, lab_proxy)
+    lab_out = f"out\\gab\\{slug}\\segment"
+    result, stats = _gpu_stage(
+        runner, slug, "segment", "stages/segment/p3sam_driver.py",
+        [runner.lab_dir + "\\" + lab_proxy,
+         runner.lab_dir + "\\" + lab_out,
+         P3SAM_CKPT, P3SAM_DEMO],
+        timeout_s=1800, workdir=workdir,
+        python=P3SAM_VENV_PYTHON, cwd=P3SAM_DEMO,
+        extra_env={"PYTHONUTF8": "1",
+                   "PYTORCH_CUDA_ALLOC_CONF":
+                       "expandable_segments:True"})
+    runner.fetch_from_lab(
+        lab_out + "\\auto_mask_mesh_final_face_ids.npy",
+        os.path.join(workdir, "face_ids.npy"))
+    runner.fetch_from_lab(
+        lab_out + "\\auto_mask_mesh_final.glb",
+        os.path.join(workdir, "segmented.glb"))
+    labels_npz = os.path.join(workdir, "labels.npz")
+    npz_stats = segment_mod.write_labels_npz(
+        proxy_glb, os.path.join(workdir, "face_ids.npy"), labels_npz,
+        transform=proxy.get("transform"))
+    info = {"runner": result, "stats": stats, "proxy": proxy,
+            "labels": npz_stats}
+    return labels_npz, info
+
+
 def run_pipeline(concept_path: str, name: str, ears: bool = False,
                  arms: bool = True, target_verts: int = 50000,
                  resume: bool = False, template: str = "winged-creature",
                  unrigged: bool = False, rotate_z: int = 0,
-                 prop_target_verts: int = 30000) -> dict:
+                 prop_target_verts: int = 30000,
+                 segment: bool = True) -> dict:
     """Run the pipeline on one concept image.
 
     ``template`` selects the rig template (winged-creature, quadruped,
@@ -158,6 +211,19 @@ def run_pipeline(concept_path: str, name: str, ears: bool = False,
     else:
         stats = {"resumed": True}
     record("prep", {"seconds": round(time.time() - t0, 2), **stats})
+
+    # 1b. pre-flight separation check (rigged runs only) ----------------
+    # Advisory, never fatal: a "warn" verdict means the concept fuses
+    # limbs the rig will struggle to separate (docs/DESIGN.md, concept
+    # pose & separation spec); it is recorded in the manifest so the
+    # decision to proceed is visible, not silent. Props have no rig
+    # to protect, so they skip it.
+    if not unrigged:
+        body_plan = _TEMPLATE_BODY_PLAN.get(template, "biped")
+        manifest["preflight"] = preflight_mod.analyze_concept(
+            concept_path, body_plan)
+        with open(os.path.join(workdir, "run-manifest.json"), "w") as fh:
+            json.dump(manifest, fh, indent=1)
 
     # 2+3. mesh + texture on the PC --------------------------------------
     runner = BridgeRunner()
@@ -245,10 +311,17 @@ def run_pipeline(concept_path: str, name: str, ears: bool = False,
             json.dump(manifest, fh, indent=1)
         return manifest
 
+    # 3b. segment: P3-SAM part labels (rigged runs only) ------------------
+    labels_npz = None
+    if segment:
+        labels_npz, seg_info = _segment_stage(
+            runner, slug, textured_glb, workdir, rotate_z)
+        record("segment", seg_info)
+
     # 4. rig ---------------------------------------------------------------
     rigged_glb = os.path.join(workdir, "rigged.glb")
     rig_report_path = os.path.join(workdir, "rig-report.json")
-    rig = _run_blender("stages/rig/rig_blender.py", [
+    rig_args = [
         "--input", textured_glb, "--output", rigged_glb,
         "--blend", os.path.join(workdir, "rigged.blend"),
         "--report", rig_report_path,
@@ -256,7 +329,10 @@ def run_pipeline(concept_path: str, name: str, ears: bool = False,
         "--rotate-z", str(rotate_z),
         "--ears", "1" if ears else "0",
         "--arms", "1" if arms else "0",
-        "--target-verts", str(target_verts)], "RIG_OK")
+        "--target-verts", str(target_verts)]
+    if labels_npz:
+        rig_args += ["--labels", labels_npz]
+    rig = _run_blender("stages/rig/rig_blender.py", rig_args, "RIG_OK")
     record("rig", rig)
 
     # 5. animate -----------------------------------------------------------
@@ -284,6 +360,8 @@ def run_pipeline(concept_path: str, name: str, ears: bool = False,
             "rigged": True,
             "rig_template": rig["template"],
             "weight_method": rig["weight_method"],
+            "segmentation": rig.get("segmentation"),
+            "label_map": (rig.get("weight_veto") or {}).get("label_map"),
             "gpu_host": manifest["gpu_host"],
             "mesh_stage": manifest["stages"].get("mesh", {}),
             "texture_stage": manifest["stages"].get("texture", {}),
