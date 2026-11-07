@@ -505,6 +505,47 @@ def check_observe(doc, err_bytes: bytes) -> list[str]:
                             failures.append(
                                 f"disk.throughput {key} invalid: "
                                 f"{value!r}")
+    network = doc.get("network")
+    if not isinstance(network, dict):
+        failures.append("network object missing")
+    else:
+        if network.get("status") not in ("ready", "truncated"):
+            failures.append(
+                f"network.status is {network.get('status')!r}")
+        bandwidth = network.get("bandwidth")
+        if not isinstance(bandwidth, dict):
+            failures.append("network.bandwidth missing")
+        else:
+            bw_status = bandwidth.get("status")
+            if bw_status not in ("ready", "partial", "truncated"):
+                failures.append(
+                    f"network.bandwidth.status is {bw_status!r}")
+            window = bandwidth.get("sample_window_ms")
+            if not isinstance(window, int) or window < 100:
+                failures.append(
+                    f"network.bandwidth.sample_window_ms "
+                    f"invalid: {window!r}")
+            interfaces = bandwidth.get("interfaces")
+            if not isinstance(interfaces, list) or not interfaces:
+                failures.append("network.bandwidth.interfaces "
+                                "invalid")
+            else:
+                for interface in interfaces:
+                    if not isinstance(interface, dict) \
+                            or not interface.get("name"):
+                        failures.append(
+                            "network.bandwidth interface lacks "
+                            "a name")
+                        continue
+                    for key in ("rx_bytes_per_sec",
+                                "tx_bytes_per_sec"):
+                        value = interface.get(key)
+                        if not isinstance(value, int) \
+                                or isinstance(value, bool) \
+                                or value < 0:
+                            failures.append(
+                                f"network.bandwidth {key} "
+                                f"invalid: {value!r}")
     return failures
 
 
