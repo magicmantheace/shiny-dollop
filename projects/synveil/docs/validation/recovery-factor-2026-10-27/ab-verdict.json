@@ -1,0 +1,24 @@
+{
+  "schema": "synveil.recovery-factor-ab-smoke/v1",
+  "source_commit": "06e5a7bcc4b8698a4e0b22f5b59ac306854078b9",
+  "disk_sha256": "0a995cca6718bb7b67793c268acd23c6dc80afcc93ac45f2ffcd5f5119bb5965",
+  "cases": {
+    "provision": true,
+    "enroll": true,
+    "probe-placed": true,
+    "reset-denied": true,
+    "data-after-denied": true,
+    "reset-ok": true,
+    "data-after-reset": true,
+    "rotate": true,
+    "data-after-rotate": true,
+    "t11-data-identical": true,
+    "record-generation-3": true,
+    "audit-events": true,
+    "audit-no-secrets": true
+  },
+  "data_partition_sha256": "77c3999816e9ebc1d3ff9845dcfc787dd736eedf4f088cb52a5efadb251d2c4a",
+  "data_probe_sha256": "eb3e42f2f96df3ebe322208fe79e4ddcfd0f818caf3460fc1e2a94684486b61d",
+  "factors_redacted": true,
+  "physical_hardware_tested": false
+}

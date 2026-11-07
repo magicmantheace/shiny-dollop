@@ -1,0 +1,176 @@
+#!/bin/sh
+# SPDX-License-Identifier: MPL-2.0
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+export PATH
+umask 022
+
+# BEGIN SERIAL_GUARD: marker-only, sourced from immutable initramfs.
+# An authenticated-preview build must NOT open a root serial shell when the
+# graphical login or its prerequisites fail. The only exception is an
+# intentionally staged developer-only recovery marker in the same initramfs.
+serial_locked() {
+    if [ -e /etc/synveil/auth-desktop ] || [ -L /etc/synveil/auth-desktop ]; then
+        if [ -f /etc/synveil/developer-serial-recovery ] &&
+           [ ! -L /etc/synveil/developer-serial-recovery ]; then
+            return 1
+        fi
+        return 0
+    fi
+    return 1
+}
+# END SERIAL_GUARD
+
+serial_lock_forever() {
+    echo SYNVEIL_SERIAL_RECOVERY_LOCKED
+    while :; do sleep 3600; done
+}
+
+boot_failure_recovery() {
+    if serial_locked; then serial_lock_forever; fi
+    echo "[synveil-init] developer serial recovery shell"
+    exec /bin/sh
+}
+
+mkdir -p /dev /proc /sys /run /tmp
+mount -t devtmpfs devtmpfs /dev 2>/dev/null || true
+# Graphical terminal clients (weston-terminal) need a pty slave; without
+# devpts the slave path does not exist and the terminal dies at startup.
+mkdir -p /dev/pts
+mount -t devpts -o nosuid,noexec,mode=0620 devpts /dev/pts 2>/dev/null || true
+
+exec </dev/console >/dev/console 2>&1
+
+echo "[synveil-init] starting bootstrap userspace"
+
+mount -t proc proc /proc || {
+    echo "[synveil-init] failed to mount /proc"
+    boot_failure_recovery
+}
+mount -t sysfs sysfs /sys || {
+    echo "[synveil-init] failed to mount /sys"
+    boot_failure_recovery
+}
+mount -t tmpfs -o mode=0755,nosuid,nodev tmpfs /run || true
+mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp || true
+
+hostname synveil 2>/dev/null || true
+
+# BEGIN READ_ONLY_RECOVERY
+# Explicit boot argument selects unauthenticated, bounded diagnostics only.
+# This branch MUST run before state mount, networking, core, seat and display.
+# Neither success nor failure ever opens an interactive root serial shell.
+if grep -qw 'synveil.recovery=status' /proc/cmdline 2>/dev/null; then
+    if [ -x /usr/libexec/synveil/recovery-status ]; then
+        /usr/libexec/synveil/recovery-status ||
+            echo SYNVEIL_RECOVERY_DIAGNOSTICS_UNAVAILABLE
+    else
+        echo SYNVEIL_RECOVERY_DIAGNOSTICS_UNAVAILABLE
+    fi
+    serial_lock_forever
+fi
+# END READ_ONLY_RECOVERY
+
+# Opt-in QEMU state storage is independent from the bootstrap recovery shell.
+if [ -x /usr/libexec/synveil/mount-state ]; then
+    /usr/libexec/synveil/mount-state || echo SYNVEIL_STATE_UNAVAILABLE
+fi
+
+# BEGIN PASSWORD_RESET
+# Explicit boot argument selects the ADR 0010 tier-4 password reset:
+# the recovery program verifies the enrolled recovery factor against
+# its installation-bound record before accepting any input, and only
+# an explicitly confirmed reset replaces the password record. This
+# branch runs after the state mount (the verifier and the anchor
+# need it) and before core, seat, networking and display. Neither
+# success nor failure ever opens an interactive root serial shell:
+# the console locks unconditionally when the program exits.
+if grep -qw 'synveil.recovery=reset' /proc/cmdline 2>/dev/null; then
+    if [ -x /usr/sbin/veil-recovery ]; then
+        /usr/sbin/veil-recovery
+    else
+        echo SYNVEIL_RECOVERY_RESET_UNAVAILABLE
+    fi
+    serial_lock_forever
+fi
+# END PASSWORD_RESET
+
+# BEGIN AUTHENTICATED_MAINTENANCE
+# Explicit boot argument selects ADR 0010 tier-2 maintenance: local
+# text-mode authentication through the ADR 0009 verifier (never the
+# graphical seat broker), then enumerated bounded actions only. This
+# branch runs after the state mount (the verifier needs it) and
+# before core, seat, networking and display. Neither success nor
+# failure ever opens an interactive root serial shell: the console
+# locks unconditionally when the maintenance program exits.
+if grep -qw 'synveil.recovery=maint' /proc/cmdline 2>/dev/null; then
+    if [ -x /usr/sbin/veil-recovery ]; then
+        /usr/sbin/veil-recovery
+    else
+        echo SYNVEIL_RECOVERY_MAINT_UNAVAILABLE
+    fi
+    serial_lock_forever
+fi
+# END AUTHENTICATED_MAINTENANCE
+
+if [ -x /usr/libexec/synveil/start-core ]; then
+    /usr/libexec/synveil/start-core || {
+        echo "[synveil-init] core startup failed; continuing to recovery"
+        echo SYNVEIL_CORE_UNAVAILABLE
+    }
+fi
+
+# Experimental root-owned seat broker: separate from read-only core IPC.
+# It does not authorize the developer menu's unauthenticated terminal.
+if [ -x /usr/libexec/synveil/start-seat ] && [ -d /run/synveil ]; then
+    /usr/libexec/synveil/start-seat &
+fi
+
+if [ -x /usr/libexec/synveil/configure-network ]; then
+    /usr/libexec/synveil/configure-network || echo SYNVEIL_NETWORK_UNAVAILABLE
+fi
+
+if [ -x /usr/bin/synveil-display ]; then
+    # The build normalizes initramfs owners to root. Set the disposable
+    # account's writable home only at boot; no shell runs as root via GUI.
+    if [ -d /home/synveil ]; then
+        chown 1000:1000 /home/synveil && chmod 0700 /home/synveil
+    fi
+    /usr/bin/synveil-display --demo || echo SYNVEIL_DISPLAY_UNAVAILABLE
+fi
+if [ -x /usr/bin/synveil-input ]; then
+    /usr/bin/synveil-input --probe || echo SYNVEIL_INPUT_UNAVAILABLE
+fi
+if [ -x /usr/bin/synveil-vt ]; then
+    /usr/bin/synveil-vt --probe || echo SYNVEIL_VT_UNAVAILABLE
+fi
+# The read-only menu is optional and never owns the serial recovery shell.
+# Failed graphics input cannot prevent the machine from reaching a console.
+if [ -f /etc/synveil/desktop-autostart ] &&
+   [ -x /usr/libexec/synveil/start-desktop ]; then
+    /usr/libexec/synveil/start-desktop &
+fi
+
+echo
+echo "Synveil bootstrap"
+echo "Linux: $(uname -r)"
+echo "Machine: $(uname -m)"
+echo "SYNVEIL_BOOT_OK"
+echo
+
+if grep -qw 'synveil.autopoweroff=1' /proc/cmdline 2>/dev/null; then
+    echo "[synveil-init] autopoweroff requested"
+    poweroff -f
+fi
+
+if serial_locked; then
+    serial_lock_forever
+fi
+if [ -f /etc/synveil/auth-desktop ]; then
+    echo SYNVEIL_SERIAL_RECOVERY_DEVELOPER
+fi
+echo "Recovery/bootstrap shell (DEVELOPER VM ONLY). Type 'poweroff -f' to stop."
+if command -v setsid >/dev/null 2>&1 && command -v cttyhack >/dev/null 2>&1; then
+    exec setsid cttyhack /bin/sh
+fi
+exec /bin/sh

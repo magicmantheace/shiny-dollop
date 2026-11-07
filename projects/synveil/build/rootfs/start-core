@@ -1,0 +1,47 @@
+#!/bin/sh
+# SPDX-License-Identifier: MPL-2.0
+# Start the bounded Rust supervisor; recovery never depends on the service.
+core=/usr/sbin/veil-core
+ctl=/usr/bin/synctl
+socket=/run/synveil/veil-core.sock
+
+# Only enable the journal if /var really is the separate ext4 volume.
+# Missing state storage retains console-only logging and recovery.
+if grep -q ' /var ext4 ' /proc/mounts 2>/dev/null && [ -d /var/log/synveil ]; then
+    export SYNVEIL_AUDIT_PATH=/var/log/synveil/core-audit.jsonl
+fi
+
+if [ ! -x "$core" ] || [ ! -x "$ctl" ]; then
+    echo "[synveil-init] native binaries unavailable; recovery remains available"
+    echo SYNVEIL_CORE_UNAVAILABLE
+    exit 0
+fi
+if ! command -v timeout >/dev/null 2>&1; then
+    echo "[synveil-init] bounded startup checks unavailable; recovery remains available"
+    echo SYNVEIL_CORE_UNAVAILABLE
+    exit 0
+fi
+
+"$core" --supervise --socket "$socket" &
+core_pid=$!
+attempt=0
+while [ "$attempt" -lt 5 ]; do
+    if ! kill -0 "$core_pid" 2>/dev/null; then
+        wait "$core_pid" 2>/dev/null || true
+        echo "[synveil-init] core exited during startup; recovery remains available"
+        echo SYNVEIL_CORE_UNAVAILABLE
+        exit 0
+    fi
+    if timeout -s KILL 1 "$ctl" --socket "$socket" --json status && kill -0 "$core_pid" 2>/dev/null; then
+        echo SYNVEIL_CORE_READY
+        exit 0
+    fi
+    attempt=$((attempt + 1))
+    sleep 0.1
+done
+
+kill -KILL "$core_pid" 2>/dev/null || true
+wait "$core_pid" 2>/dev/null || true
+echo "[synveil-init] core readiness failed; recovery remains available"
+echo SYNVEIL_CORE_UNAVAILABLE
+exit 0
