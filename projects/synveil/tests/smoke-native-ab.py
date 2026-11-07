@@ -229,13 +229,22 @@ def login(boot, secret, timeout=420, since=0):
     if not boot.wait("SYNVEIL_LOGIN_READY", timeout, since=anchor):
         save_failure_frame(boot, "login-ready")
         return False
-    for _ in range(10):
+    # The serial LOGIN_READY marker can precede the greeter's
+    # first presented frame by a wide margin under emulation —
+    # the scanout is still blank, and capture_test_scanout
+    # rightly rejects blank frames. A fixed ten tries (~23 s)
+    # lost that race outright on loaded runs (2026-11-07: S6b
+    # failed twice with neither AUTH_ACTIVE nor AUTH_DENIED in
+    # the log and no failure frame, because the frame save hits
+    # the same blank scanout). Wait patiently for a real frame.
+    scanout_deadline = time.monotonic() + 180
+    while True:
         if capture_test_scanout(boot.qmp, boot.dir / "scanout.ppm", timeout=2):
             break
+        if time.monotonic() >= scanout_deadline:
+            save_failure_frame(boot, "login-scanout")
+            return False
         time.sleep(0.3)
-    else:
-        save_failure_frame(boot, "login-scanout")
-        return False
     # Typing is slow under emulation (a 200 ms key hold plus a
     # fresh QMP handshake per key puts 32 characters near 15 s),
     # so the per-type budget must sit well above that; an earlier
@@ -300,8 +309,13 @@ def save_failure_frame(boot, tag):
         with ppm.open("wb") as handle:
             handle.write(f"P6\n{width} {height}\n255\n".encode())
             handle.write(bytes(data))
-    except Exception:
-        pass
+    except Exception as error:
+        # A blank or unreadable scanout is itself diagnostic (it
+        # is exactly what a too-early login attempt hits), so the
+        # failure to save must leave a trace in the smoke log
+        # instead of vanishing.
+        print(f"[synveil-ab] failure frame {boot.name}-{tag} "
+              f"unavailable: {error!r}", flush=True)
 
 
 def next_frame(boot):
