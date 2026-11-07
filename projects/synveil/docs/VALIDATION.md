@@ -1400,3 +1400,27 @@ bandwidth were re-verified ready in the same capture.
 Evidence: `docs/validation/observe-attribution-36e4285/`.
 No lifecycle tracking, history, or physical hardware
 validation is claimed.
+
+## Observer history — process lifecycle (Phase 3, ADR 0026) — native validation (2026-11-07)
+
+The lifecycle sampler and the read-only `observe-history`
+request (implemented at `bb422ea`) were validated natively
+with the extended observe gate
+(`tests/smoke-native-observe.py`, marker
+`SYNVEIL_OBSERVE_QEMU_PASS`) on the joined image sha256
+`f3a4f36f5e3181c8b2f0d021714f1bb3a4764021d2cecbaa4740501798547af3`.
+The joined baseline smoke passed on the same image. In the
+guest, with the sampler enabled by policy
+(`SYNVEIL_OBSERVE_HISTORY=1`), a known `sleep 12` probe
+process (pid 219) produced a `process_started` event
+(sequence 1, start_time_ticks 25201) visible in the snapshot
+taken while it was alive, and a `process_exited` event
+(sequence 3, same start_time_ticks, final cumulative
+counters) in the snapshot after it exited; the observe
+response in the same boot re-verified with pressure cpu /
+memory / io all `ready`. Host tests cover the diff, ring,
+trim, and dispatch semantics (veil-core 186 lib tests,
+synctl 10; full veil-core + synctl suites 213 passed).
+Evidence: `docs/validation/observe-history-bb422ea/`. No
+aggregation or storage slice and no physical hardware
+validation are claimed.

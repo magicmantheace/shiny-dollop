@@ -363,8 +363,19 @@ anchoring and physical power-loss testing remain open.
     successful response above the producer's 128-record cap. Exact-revision
     host and native QEMU validation of the corrected, energy-composed
     implementation passed at
-    [316f745](docs/validation/native-316f745/README.md). Lifecycle event/delta
-    tracking remains open. The earlier load schema passed QEMU at
+    [316f745](docs/validation/native-316f745/README.md). Lifecycle event
+    tracking is implemented for the sampler path: an in-core sampler
+    (off by default, policy-enabled; ADR 0026) diffs full process
+    snapshots at a 5 s cadence and emits `process_started` /
+    `process_exited` events (exits carry the final observed cumulative
+    counters) into a bounded 1024-event in-memory ring served by the
+    read-only `observe-history` request; processes that start and exit
+    between samples are missed by construction. Host tests and native
+    QEMU validation passed on the joined guest at `bb422ea` (a known
+    probe process's started and exited events asserted in order; see
+    [lifecycle evidence](docs/validation/observe-history-bb422ea/README.md)).
+    Historical aggregation (1-minute buckets) and any durable storage
+    remain open. The earlier load schema passed QEMU at
     [255101d](docs/validation/native-255101d/README.md).
 - [ ] disk/I/O metrics
   - Raw, per-device read/write counts, 512-byte sector counters, in-flight I/O,

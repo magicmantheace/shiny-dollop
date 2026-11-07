@@ -1,0 +1,2231 @@
+{
+  "schema": "synveil.core/v1",
+  "id": "synctl-213",
+  "ok": true,
+  "result": {
+    "cpu": {
+      "frequency": {
+        "logical_cpus": [],
+        "omitted_logical_cpus": 0,
+        "status": "unavailable",
+        "unavailable_logical_cpus": 2
+      },
+      "idle_ticks": 18503,
+      "logical_count": 2,
+      "total_ticks": 21727,
+      "utilization": {
+        "busy_basis_points": 4333,
+        "logical_cpus": [
+          {
+            "busy_basis_points": 4286,
+            "id": 0,
+            "status": "ready"
+          },
+          {
+            "busy_basis_points": 3333,
+            "id": 1,
+            "status": "ready"
+          }
+        ],
+        "omitted_logical_cpus": 0,
+        "sample_window_ms": 102,
+        "status": "ready"
+      }
+    },
+    "disk": {
+      "devices": [
+        {
+          "busy_milliseconds": 0,
+          "io_in_progress": 0,
+          "major": 7,
+          "minor": 0,
+          "name": "loop0",
+          "reads_completed": 0,
+          "sectors_read_512b": 0,
+          "sectors_written_512b": 0,
+          "weighted_busy_milliseconds": 0,
+          "writes_completed": 0
+        },
+        {
+          "busy_milliseconds": 0,
+          "io_in_progress": 0,
+          "major": 7,
+          "minor": 1,
+          "name": "loop1",
+          "reads_completed": 0,
+          "sectors_read_512b": 0,
+          "sectors_written_512b": 0,
+          "weighted_busy_milliseconds": 0,
+          "writes_completed": 0
+        },
+        {
+          "busy_milliseconds": 0,
+          "io_in_progress": 0,
+          "major": 7,
+          "minor": 2,
+          "name": "loop2",
+          "reads_completed": 0,
+          "sectors_read_512b": 0,
+          "sectors_written_512b": 0,
+          "weighted_busy_milliseconds": 0,
+          "writes_completed": 0
+        },
+        {
+          "busy_milliseconds": 0,
+          "io_in_progress": 0,
+          "major": 7,
+          "minor": 3,
+          "name": "loop3",
+          "reads_completed": 0,
+          "sectors_read_512b": 0,
+          "sectors_written_512b": 0,
+          "weighted_busy_milliseconds": 0,
+          "writes_completed": 0
+        },
+        {
+          "busy_milliseconds": 0,
+          "io_in_progress": 0,
+          "major": 7,
+          "minor": 4,
+          "name": "loop4",
+          "reads_completed": 0,
+          "sectors_read_512b": 0,
+          "sectors_written_512b": 0,
+          "weighted_busy_milliseconds": 0,
+          "writes_completed": 0
+        },
+        {
+          "busy_milliseconds": 0,
+          "io_in_progress": 0,
+          "major": 7,
+          "minor": 5,
+          "name": "loop5",
+          "reads_completed": 0,
+          "sectors_read_512b": 0,
+          "sectors_written_512b": 0,
+          "weighted_busy_milliseconds": 0,
+          "writes_completed": 0
+        },
+        {
+          "busy_milliseconds": 0,
+          "io_in_progress": 0,
+          "major": 7,
+          "minor": 6,
+          "name": "loop6",
+          "reads_completed": 0,
+          "sectors_read_512b": 0,
+          "sectors_written_512b": 0,
+          "weighted_busy_milliseconds": 0,
+          "writes_completed": 0
+        },
+        {
+          "busy_milliseconds": 0,
+          "io_in_progress": 0,
+          "major": 7,
+          "minor": 7,
+          "name": "loop7",
+          "reads_completed": 0,
+          "sectors_read_512b": 0,
+          "sectors_written_512b": 0,
+          "weighted_busy_milliseconds": 0,
+          "writes_completed": 0
+        },
+        {
+          "busy_milliseconds": 980,
+          "io_in_progress": 0,
+          "major": 253,
+          "minor": 0,
+          "name": "vda",
+          "reads_completed": 118,
+          "sectors_read_512b": 3842,
+          "sectors_written_512b": 848,
+          "weighted_busy_milliseconds": 1733,
+          "writes_completed": 45
+        },
+        {
+          "busy_milliseconds": 58,
+          "io_in_progress": 0,
+          "major": 253,
+          "minor": 1,
+          "name": "vda1",
+          "reads_completed": 28,
+          "sectors_read_512b": 1264,
+          "sectors_written_512b": 0,
+          "weighted_busy_milliseconds": 56,
+          "writes_completed": 0
+        },
+        {
+          "busy_milliseconds": 725,
+          "io_in_progress": 0,
+          "major": 253,
+          "minor": 2,
+          "name": "vda2",
+          "reads_completed": 38,
+          "sectors_read_512b": 1194,
+          "sectors_written_512b": 848,
+          "weighted_busy_milliseconds": 861,
+          "writes_completed": 45
+        }
+      ],
+      "omitted_devices": 0,
+      "status": "ready",
+      "throughput": {
+        "devices": [
+          {
+            "name": "loop0",
+            "read_bytes_per_sec": 0,
+            "write_bytes_per_sec": 0
+          },
+          {
+            "name": "loop1",
+            "read_bytes_per_sec": 0,
+            "write_bytes_per_sec": 0
+          },
+          {
+            "name": "loop2",
+            "read_bytes_per_sec": 0,
+            "write_bytes_per_sec": 0
+          },
+          {
+            "name": "loop3",
+            "read_bytes_per_sec": 0,
+            "write_bytes_per_sec": 0
+          },
+          {
+            "name": "loop4",
+            "read_bytes_per_sec": 0,
+            "write_bytes_per_sec": 0
+          },
+          {
+            "name": "loop5",
+            "read_bytes_per_sec": 0,
+            "write_bytes_per_sec": 0
+          },
+          {
+            "name": "loop6",
+            "read_bytes_per_sec": 0,
+            "write_bytes_per_sec": 0
+          },
+          {
+            "name": "loop7",
+            "read_bytes_per_sec": 0,
+            "write_bytes_per_sec": 0
+          },
+          {
+            "name": "vda",
+            "read_bytes_per_sec": 0,
+            "write_bytes_per_sec": 0
+          },
+          {
+            "name": "vda1",
+            "read_bytes_per_sec": 0,
+            "write_bytes_per_sec": 0
+          },
+          {
+            "name": "vda2",
+            "read_bytes_per_sec": 0,
+            "write_bytes_per_sec": 0
+          }
+        ],
+        "omitted_devices": 0,
+        "sample_window_ms": 102,
+        "status": "ready",
+        "unavailable_devices": 0
+      }
+    },
+    "energy": {
+      "status": "unavailable",
+      "zones": []
+    },
+    "load": {
+      "average_15m": 0.04,
+      "average_1m": 0.35,
+      "average_5m": 0.12,
+      "runnable": 1,
+      "total_threads": 98
+    },
+    "memory": {
+      "available_bytes": 545374208,
+      "total_bytes": 744820736
+    },
+    "network": {
+      "bandwidth": {
+        "interfaces": [
+          {
+            "name": "lo",
+            "rx_bytes_per_sec": 0,
+            "tx_bytes_per_sec": 0
+          },
+          {
+            "name": "sit0",
+            "rx_bytes_per_sec": 0,
+            "tx_bytes_per_sec": 0
+          }
+        ],
+        "omitted_interfaces": 0,
+        "sample_window_ms": 102,
+        "status": "ready",
+        "unavailable_interfaces": 0
+      },
+      "interfaces": [
+        {
+          "name": "lo",
+          "rx_bytes": 0,
+          "rx_dropped": 0,
+          "rx_errors": 0,
+          "rx_packets": 0,
+          "tx_bytes": 0,
+          "tx_dropped": 0,
+          "tx_errors": 0,
+          "tx_packets": 0
+        },
+        {
+          "name": "sit0",
+          "rx_bytes": 0,
+          "rx_dropped": 0,
+          "rx_errors": 0,
+          "rx_packets": 0,
+          "tx_bytes": 0,
+          "tx_dropped": 0,
+          "tx_errors": 0,
+          "tx_packets": 0
+        }
+      ],
+      "omitted_interfaces": 0,
+      "status": "ready"
+    },
+    "pressure": {
+      "cpu": {
+        "full": {
+          "avg10_pct": 0.0,
+          "avg300_pct": 0.0,
+          "avg60_pct": 0.0,
+          "total_stall_us": 0
+        },
+        "some": {
+          "avg10_pct": 0.25,
+          "avg300_pct": 0.75,
+          "avg60_pct": 1.64,
+          "total_stall_us": 3485140
+        },
+        "status": "ready"
+      },
+      "io": {
+        "full": {
+          "avg10_pct": 0.1,
+          "avg300_pct": 0.04,
+          "avg60_pct": 0.11,
+          "total_stall_us": 294160
+        },
+        "some": {
+          "avg10_pct": 0.11,
+          "avg300_pct": 0.08,
+          "avg60_pct": 0.21,
+          "total_stall_us": 478978
+        },
+        "status": "ready"
+      },
+      "memory": {
+        "full": {
+          "avg10_pct": 0.0,
+          "avg300_pct": 0.0,
+          "avg60_pct": 0.0,
+          "total_stall_us": 0
+        },
+        "some": {
+          "avg10_pct": 0.0,
+          "avg300_pct": 0.0,
+          "avg60_pct": 0.0,
+          "total_stall_us": 0
+        },
+        "status": "ready"
+      }
+    },
+    "processes": {
+      "omitted_processes": 0,
+      "records": [
+        {
+          "nice": 0,
+          "parent_pid": 0,
+          "pid": 1,
+          "process_group_id": 0,
+          "resident_pages": 430,
+          "session_id": 0,
+          "start_time_ticks": 48,
+          "state": "S",
+          "system_ticks": 203,
+          "thread_count": 1,
+          "user_ticks": 5,
+          "virtual_memory_bytes": 2707456
+        },
+        {
+          "nice": 0,
+          "parent_pid": 0,
+          "pid": 2,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 49,
+          "state": "S",
+          "system_ticks": 4,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 3,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 60,
+          "state": "S",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 4,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 60,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 5,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 60,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 6,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 60,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 7,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 60,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 8,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 60,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 9,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 60,
+          "state": "I",
+          "system_ticks": 82,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 10,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 61,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 11,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 61,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 12,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 61,
+          "state": "I",
+          "system_ticks": 71,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 13,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 61,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 14,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 61,
+          "state": "S",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 15,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 62,
+          "state": "I",
+          "system_ticks": 21,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 16,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 62,
+          "state": "S",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 17,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 62,
+          "state": "S",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 18,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 62,
+          "state": "S",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 19,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 63,
+          "state": "S",
+          "system_ticks": 1,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 20,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 63,
+          "state": "S",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 21,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 63,
+          "state": "S",
+          "system_ticks": 1,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 22,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 63,
+          "state": "S",
+          "system_ticks": 6,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 23,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 63,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 24,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 63,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 25,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 74,
+          "state": "S",
+          "system_ticks": 4,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 26,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 77,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 27,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 77,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 28,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 77,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 29,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 79,
+          "state": "S",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 30,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 84,
+          "state": "S",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 31,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 84,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 32,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 84,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 33,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 84,
+          "state": "S",
+          "system_ticks": 4,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 34,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 84,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 35,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 89,
+          "state": "S",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 36,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 91,
+          "state": "I",
+          "system_ticks": 55,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 37,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 104,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 38,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 104,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 39,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 105,
+          "state": "I",
+          "system_ticks": 350,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 40,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 156,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 41,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 163,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 42,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 163,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 43,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 163,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 44,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 164,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 45,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 168,
+          "state": "S",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 46,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 169,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 47,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 188,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 48,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 225,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 49,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 225,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 50,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 225,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 51,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 228,
+          "state": "S",
+          "system_ticks": 1,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 52,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 228,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 53,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 228,
+          "state": "S",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 54,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 228,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 55,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 229,
+          "state": "S",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 56,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 229,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 57,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 229,
+          "state": "S",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 58,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 229,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 59,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 229,
+          "state": "S",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 60,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 229,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 61,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 229,
+          "state": "S",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 62,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 229,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 63,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 230,
+          "state": "I",
+          "system_ticks": 27,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 64,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 230,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 65,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 230,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 66,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 230,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 67,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 231,
+          "state": "I",
+          "system_ticks": 4,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 68,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 231,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 69,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 231,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 70,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 237,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 71,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 238,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 72,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 248,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 73,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 249,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 74,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 251,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 75,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 265,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 77,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 294,
+          "state": "I",
+          "system_ticks": 2,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 2,
+          "pid": 91,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 591,
+          "state": "S",
+          "system_ticks": 3,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 92,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 591,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 1,
+          "pid": 134,
+          "process_group_id": 0,
+          "resident_pages": 372,
+          "session_id": 0,
+          "start_time_ticks": 625,
+          "state": "S",
+          "system_ticks": 3,
+          "thread_count": 1,
+          "user_ticks": 4,
+          "virtual_memory_bytes": 2105344
+        },
+        {
+          "nice": 0,
+          "parent_pid": 134,
+          "pid": 139,
+          "process_group_id": 0,
+          "resident_pages": 336,
+          "session_id": 0,
+          "start_time_ticks": 640,
+          "state": "S",
+          "system_ticks": 3,
+          "thread_count": 1,
+          "user_ticks": 5,
+          "virtual_memory_bytes": 2105344
+        },
+        {
+          "nice": -20,
+          "parent_pid": 2,
+          "pid": 144,
+          "process_group_id": 0,
+          "resident_pages": 0,
+          "session_id": 0,
+          "start_time_ticks": 648,
+          "state": "I",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 0
+        },
+        {
+          "nice": 0,
+          "parent_pid": 1,
+          "pid": 148,
+          "process_group_id": 0,
+          "resident_pages": 430,
+          "session_id": 0,
+          "start_time_ticks": 668,
+          "state": "S",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 2707456
+        },
+        {
+          "nice": 0,
+          "parent_pid": 148,
+          "pid": 150,
+          "process_group_id": 0,
+          "resident_pages": 272,
+          "session_id": 0,
+          "start_time_ticks": 669,
+          "state": "S",
+          "system_ticks": 43,
+          "thread_count": 1,
+          "user_ticks": 242,
+          "virtual_memory_bytes": 1699840
+        },
+        {
+          "nice": 0,
+          "parent_pid": 1,
+          "pid": 155,
+          "process_group_id": 0,
+          "resident_pages": 430,
+          "session_id": 0,
+          "start_time_ticks": 688,
+          "state": "S",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 2707456
+        },
+        {
+          "nice": 0,
+          "parent_pid": 155,
+          "pid": 159,
+          "process_group_id": 0,
+          "resident_pages": 1241,
+          "session_id": 0,
+          "start_time_ticks": 689,
+          "state": "S",
+          "system_ticks": 286,
+          "thread_count": 1,
+          "user_ticks": 271,
+          "virtual_memory_bytes": 5541888
+        },
+        {
+          "nice": 0,
+          "parent_pid": 1,
+          "pid": 161,
+          "process_group_id": 0,
+          "resident_pages": 366,
+          "session_id": 0,
+          "start_time_ticks": 690,
+          "state": "S",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 2707456
+        },
+        {
+          "nice": 0,
+          "parent_pid": 150,
+          "pid": 163,
+          "process_group_id": 0,
+          "resident_pages": 146,
+          "session_id": 0,
+          "start_time_ticks": 5754,
+          "state": "S",
+          "system_ticks": 1,
+          "thread_count": 1,
+          "user_ticks": 0,
+          "virtual_memory_bytes": 1085440
+        },
+        {
+          "nice": 0,
+          "parent_pid": 1,
+          "pid": 166,
+          "process_group_id": 166,
+          "resident_pages": 583,
+          "session_id": 166,
+          "start_time_ticks": 5766,
+          "state": "S",
+          "system_ticks": 21,
+          "thread_count": 1,
+          "user_ticks": 23,
+          "virtual_memory_bytes": 3928064
+        },
+        {
+          "nice": 0,
+          "parent_pid": 1,
+          "pid": 187,
+          "process_group_id": 0,
+          "resident_pages": 456,
+          "session_id": 0,
+          "start_time_ticks": 5909,
+          "state": "S",
+          "system_ticks": 1,
+          "thread_count": 1,
+          "user_ticks": 4,
+          "virtual_memory_bytes": 2686976
+        },
+        {
+          "nice": 0,
+          "parent_pid": 163,
+          "pid": 189,
+          "process_group_id": 189,
+          "resident_pages": 462,
+          "session_id": 189,
+          "start_time_ticks": 5920,
+          "state": "S",
+          "system_ticks": 3,
+          "thread_count": 1,
+          "user_ticks": 2,
+          "virtual_memory_bytes": 2707456
+        },
+        {
+          "nice": 0,
+          "parent_pid": 189,
+          "pid": 193,
+          "process_group_id": 189,
+          "resident_pages": 4856,
+          "session_id": 189,
+          "start_time_ticks": 5925,
+          "state": "S",
+          "system_ticks": 87,
+          "thread_count": 1,
+          "user_ticks": 356,
+          "virtual_memory_bytes": 30396416
+        },
+        {
+          "nice": 0,
+          "parent_pid": 189,
+          "pid": 198,
+          "process_group_id": 189,
+          "resident_pages": 3217,
+          "session_id": 189,
+          "start_time_ticks": 5969,
+          "state": "S",
+          "system_ticks": 41,
+          "thread_count": 1,
+          "user_ticks": 553,
+          "virtual_memory_bytes": 15917056
+        },
+        {
+          "nice": 0,
+          "parent_pid": 189,
+          "pid": 199,
+          "process_group_id": 189,
+          "resident_pages": 536,
+          "session_id": 189,
+          "start_time_ticks": 5969,
+          "state": "S",
+          "system_ticks": 3,
+          "thread_count": 1,
+          "user_ticks": 12,
+          "virtual_memory_bytes": 3190784
+        },
+        {
+          "nice": 0,
+          "parent_pid": 193,
+          "pid": 201,
+          "process_group_id": 201,
+          "resident_pages": 2094,
+          "session_id": 201,
+          "start_time_ticks": 5969,
+          "state": "S",
+          "system_ticks": 11,
+          "thread_count": 1,
+          "user_ticks": 55,
+          "virtual_memory_bytes": 10866688
+        },
+        {
+          "nice": 0,
+          "parent_pid": 193,
+          "pid": 202,
+          "process_group_id": 202,
+          "resident_pages": 2035,
+          "session_id": 202,
+          "start_time_ticks": 5971,
+          "state": "S",
+          "system_ticks": 9,
+          "thread_count": 1,
+          "user_ticks": 61,
+          "virtual_memory_bytes": 10391552
+        },
+        {
+          "nice": 0,
+          "parent_pid": 198,
+          "pid": 210,
+          "process_group_id": 210,
+          "resident_pages": 430,
+          "session_id": 210,
+          "start_time_ticks": 6097,
+          "state": "S",
+          "system_ticks": 9,
+          "thread_count": 1,
+          "user_ticks": 2,
+          "virtual_memory_bytes": 2707456
+        },
+        {
+          "nice": 0,
+          "parent_pid": 210,
+          "pid": 211,
+          "process_group_id": 211,
+          "resident_pages": 368,
+          "session_id": 210,
+          "start_time_ticks": 10989,
+          "state": "R",
+          "system_ticks": 4,
+          "thread_count": 1,
+          "user_ticks": 7,
+          "virtual_memory_bytes": 2375680
+        },
+        {
+          "nice": 0,
+          "parent_pid": 210,
+          "pid": 213,
+          "process_group_id": 213,
+          "resident_pages": 212,
+          "session_id": 210,
+          "start_time_ticks": 11191,
+          "state": "S",
+          "system_ticks": 0,
+          "thread_count": 1,
+          "user_ticks": 2,
+          "virtual_memory_bytes": 1519616
+        }
+      ],
+      "scan_truncated": false,
+      "status": "ready",
+      "unavailable_processes": 0,
+      "utilization": {
+        "omitted_processes": 0,
+        "records": [
+          {
+            "busy_basis_points": 0,
+            "pid": 1,
+            "start_time_ticks": 48
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 2,
+            "start_time_ticks": 49
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 3,
+            "start_time_ticks": 60
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 4,
+            "start_time_ticks": 60
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 5,
+            "start_time_ticks": 60
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 6,
+            "start_time_ticks": 60
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 7,
+            "start_time_ticks": 60
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 8,
+            "start_time_ticks": 60
+          },
+          {
+            "busy_basis_points": 333,
+            "pid": 9,
+            "start_time_ticks": 60
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 10,
+            "start_time_ticks": 61
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 11,
+            "start_time_ticks": 61
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 12,
+            "start_time_ticks": 61
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 13,
+            "start_time_ticks": 61
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 14,
+            "start_time_ticks": 61
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 15,
+            "start_time_ticks": 62
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 16,
+            "start_time_ticks": 62
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 17,
+            "start_time_ticks": 62
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 18,
+            "start_time_ticks": 62
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 19,
+            "start_time_ticks": 63
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 20,
+            "start_time_ticks": 63
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 21,
+            "start_time_ticks": 63
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 22,
+            "start_time_ticks": 63
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 23,
+            "start_time_ticks": 63
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 24,
+            "start_time_ticks": 63
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 25,
+            "start_time_ticks": 74
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 26,
+            "start_time_ticks": 77
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 27,
+            "start_time_ticks": 77
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 28,
+            "start_time_ticks": 77
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 29,
+            "start_time_ticks": 79
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 30,
+            "start_time_ticks": 84
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 31,
+            "start_time_ticks": 84
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 32,
+            "start_time_ticks": 84
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 33,
+            "start_time_ticks": 84
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 34,
+            "start_time_ticks": 84
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 35,
+            "start_time_ticks": 89
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 36,
+            "start_time_ticks": 91
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 37,
+            "start_time_ticks": 104
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 38,
+            "start_time_ticks": 104
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 39,
+            "start_time_ticks": 105
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 40,
+            "start_time_ticks": 156
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 41,
+            "start_time_ticks": 163
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 42,
+            "start_time_ticks": 163
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 43,
+            "start_time_ticks": 163
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 44,
+            "start_time_ticks": 164
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 45,
+            "start_time_ticks": 168
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 46,
+            "start_time_ticks": 169
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 47,
+            "start_time_ticks": 188
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 48,
+            "start_time_ticks": 225
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 49,
+            "start_time_ticks": 225
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 50,
+            "start_time_ticks": 225
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 51,
+            "start_time_ticks": 228
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 52,
+            "start_time_ticks": 228
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 53,
+            "start_time_ticks": 228
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 54,
+            "start_time_ticks": 228
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 55,
+            "start_time_ticks": 229
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 56,
+            "start_time_ticks": 229
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 57,
+            "start_time_ticks": 229
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 58,
+            "start_time_ticks": 229
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 59,
+            "start_time_ticks": 229
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 60,
+            "start_time_ticks": 229
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 61,
+            "start_time_ticks": 229
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 62,
+            "start_time_ticks": 229
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 63,
+            "start_time_ticks": 230
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 64,
+            "start_time_ticks": 230
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 65,
+            "start_time_ticks": 230
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 66,
+            "start_time_ticks": 230
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 67,
+            "start_time_ticks": 231
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 68,
+            "start_time_ticks": 231
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 69,
+            "start_time_ticks": 231
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 70,
+            "start_time_ticks": 237
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 71,
+            "start_time_ticks": 238
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 72,
+            "start_time_ticks": 248
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 73,
+            "start_time_ticks": 249
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 74,
+            "start_time_ticks": 251
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 75,
+            "start_time_ticks": 265
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 77,
+            "start_time_ticks": 294
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 91,
+            "start_time_ticks": 591
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 92,
+            "start_time_ticks": 591
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 134,
+            "start_time_ticks": 625
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 139,
+            "start_time_ticks": 640
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 144,
+            "start_time_ticks": 648
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 148,
+            "start_time_ticks": 668
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 150,
+            "start_time_ticks": 669
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 155,
+            "start_time_ticks": 688
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 159,
+            "start_time_ticks": 689
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 161,
+            "start_time_ticks": 690
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 163,
+            "start_time_ticks": 5754
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 166,
+            "start_time_ticks": 5766
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 187,
+            "start_time_ticks": 5909
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 189,
+            "start_time_ticks": 5920
+          },
+          {
+            "busy_basis_points": 333,
+            "pid": 193,
+            "start_time_ticks": 5925
+          },
+          {
+            "busy_basis_points": 1000,
+            "pid": 198,
+            "start_time_ticks": 5969
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 199,
+            "start_time_ticks": 5969
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 201,
+            "start_time_ticks": 5969
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 202,
+            "start_time_ticks": 5971
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 210,
+            "start_time_ticks": 6097
+          },
+          {
+            "busy_basis_points": 667,
+            "pid": 211,
+            "start_time_ticks": 10989
+          },
+          {
+            "busy_basis_points": 0,
+            "pid": 213,
+            "start_time_ticks": 11191
+          }
+        ],
+        "sample_window_ms": 102,
+        "status": "ready",
+        "unavailable_processes": 0
+      }
+    },
+    "schema": "synveil.observe/v1",
+    "thermal": {
+      "omitted_zones": 0,
+      "status": "unavailable",
+      "unavailable_zones": 0,
+      "zones": []
+    },
+    "uptime_seconds": 112.1
+  }
+}

@@ -107,11 +107,14 @@ positive hierarchical readings remain host-fixture evidence. See the
 
 ## Deliberately not claimed
 
-Lifecycle events, resource history and long-term aggregation are
-separate roadmap items. The process snapshot does not retain state
-between requests or infer process purpose. (Per-process interval
-utilization and interval power, once listed here, are implemented:
-see `processes.utilization` above and the Energy section below.)
+Resource history and long-term aggregation are separate roadmap
+items. The process snapshot does not retain state between requests
+or infer process purpose. (Per-process interval utilization and
+interval power, once listed here, are implemented: see
+`processes.utilization` above and the Energy section below.
+Process lifecycle events are also implemented — as the separate
+sampler-fed `observe-history` ring, not as snapshot state: see
+the History section below.)
 
 ## Linux pressure stall information (PSI)
 
@@ -228,3 +231,51 @@ unavailable and `power` coherently absent — see
 [evidence](validation/observe-power-95ede21/README.md). A
 positive in-guest power reading awaits hardware (or an
 emulation) that exposes RAPL zones.
+
+## History — process lifecycle events (ADR 0026)
+
+The `observe-history` request (separate from `observe`,
+schema `synveil.observe-history/v1`) serves process lifecycle
+events produced by a sampler inside veil-core. The sampler is
+**off by default** (owner amendment to the accepted history
+design): it runs only when the `SYNVEIL_OBSERVE_HISTORY`
+policy variable is present in the core's environment. When it
+runs, every 5 s it diffs consecutive full process snapshots
+by (pid, start_time) identity and appends normalized records
+(schema `synveil.observe-event/v1`) to a bounded in-memory
+ring of 1024 events:
+
+- `process_started` — pid, parent pid, start time, and the
+  cumulative user/system counters at first observation.
+- `process_exited` — the same identity with the **last
+  observed** cumulative counters, so an exit preserves the
+  process's final accounted CPU.
+
+Events are telemetry only: they never enter the hash-chained
+audit journal, nothing is written to disk, and a core restart
+clears the ring. Processes that start and exit between
+samples are missed by construction (documented; no eBPF or
+netlink collector, per ADR 0026). The response's `sampler`
+block reports the enabled state, cadence, ring capacity,
+retained/dropped counts; because one response cannot carry
+the whole ring within the protocol's 64 KiB wire limit, it
+carries the newest events that fit and counts the omitted
+older ones in `response_omitted_events`. A disabled sampler
+is a reported state, not an error: the response carries
+`enabled: false` and an empty ring.
+
+Host proof: unit tests over fixture snapshot pairs (baseline
+silence, start/exit identity and final counters, pid-reuse
+ordering, ring bound with drop counting, malformed records)
+plus dispatch and response-trim tests; `synctl` validates the
+history envelope client-side. Native QEMU validation on
+2026-11-07: the observe gate starts a known `sleep 12` probe
+between samples and requires its `process_started` event in
+the alive snapshot and its `process_exited` event (same
+identity, later sequence) after it exits — see
+[evidence](validation/observe-history-bb422ea/README.md)
+(`SYNVEIL_OBSERVE_QEMU_PASS`, probe pid 219, started
+sequence 1, exited sequence 3). Aggregation (1-minute
+buckets) and any durable storage are later slices of
+`docs/OBSERVER_HISTORY_DESIGN.md`, not part of this section's
+claims.
