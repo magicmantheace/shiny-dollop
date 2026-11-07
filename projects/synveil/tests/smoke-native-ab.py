@@ -431,6 +431,8 @@ def focus_terminal(boot, timeout=240):
     """
     deadline = time.monotonic() + timeout
     closed_cover = False
+    gui_seen = False
+    gui_absent_since = None
     while time.monotonic() < deadline:
         try:
             frame = next_frame(boot)
@@ -444,16 +446,29 @@ def focus_terminal(boot, timeout=240):
         # 2026-11-06: S1's stage command never reached the terminal
         # and the scenario waited out its full marker timeout,
         # while the same command staged in under a minute once the
-        # GUI was closed and the terminal truly focused). A single
-        # close click is not reliable either — it can land while
-        # the window is still animating open — so the GUI is
-        # closed verifiably: click, re-examine the next frame, and
-        # click again until no GUI window is present. Only then is
-        # the terminal clicked.
+        # GUI was closed and the terminal truly focused). Two
+        # races make a naive close unreliable: the GUI launches a
+        # few seconds into the session, so an early frame without
+        # it proves nothing; and while it animates open its title
+        # run is too short to locate, so it cannot be closed yet
+        # either. The loop therefore waits for the GUI to appear,
+        # closes it verifiably (click, re-examine, click again
+        # until a frame shows it gone — weston-session launches it
+        # exactly once per session), and only clicks the terminal
+        # after a continuous GUI-free settle: 20 s if the GUI was
+        # never seen, 3 s once a seen GUI has been closed.
         rect = gui_window_rect(width, height, data)
         if rect:
+            gui_seen = True
+            gui_absent_since = None
             close_gui_window(boot, rect)
             time.sleep(1.0)
+            continue
+        if gui_absent_since is None:
+            gui_absent_since = time.monotonic()
+        settle = 3 if gui_seen else 20
+        if time.monotonic() - gui_absent_since < settle:
+            time.sleep(0.5)
             continue
         try:
             tx, ty = weston_smoke.terminal_point(width, height, data)
