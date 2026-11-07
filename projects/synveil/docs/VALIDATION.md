@@ -1327,3 +1327,28 @@ checks) accepted the response. Evidence:
 `docs/validation/observe-disk-e532ad9/`. No controlled-load
 accuracy calibration and no physical hardware validation
 are claimed.
+
+## Observer network bandwidth (Phase 3) — native validation (2026-11-07)
+
+`network.bandwidth` (per-interface rx/tx bytes-per-second
+over the observe window, implemented at `8c5696a`) was
+validated natively with the extended observe gate
+(`tests/smoke-native-observe.py`, marker
+`SYNVEIL_OBSERVE_QEMU_PASS`) on the joined image sha256
+`a159468398cfdc3e60e3c8cee4c86bf096976497449377db2b81dbc6d0a04164`
+(guest binaries stamp `1761759`). The joined baseline smoke
+passed on the same image. In the captured guest response
+the network object and its bandwidth object both reported
+`ready`: both guest interfaces (lo, sit0) were rated over a
+101 ms window with zero unavailable and zero omitted; the
+rates were 0 because the guest was idle during the window —
+the gate asserts shape and coherence, and the arithmetic,
+churn/counter-reset withholding, and edge cases are
+covered by host unit tests (veil-core 170 lib tests,
+synctl 6). Disk throughput and PSI statuses were
+re-verified ready in the same capture, and the packaged
+synctl's validation (extended with bandwidth consistency
+checks) accepted the response. Evidence:
+`docs/validation/observe-network-1761759/`. No
+controlled-load accuracy calibration and no physical
+hardware validation are claimed.

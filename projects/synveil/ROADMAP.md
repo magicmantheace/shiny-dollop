@@ -376,8 +376,13 @@ anchoring and physical power-loss testing remain open.
 - [ ] network metrics
   - Strict, bounded `/proc/net/dev` counters now report per-interface RX/TX
     bytes, packets, errors, and drops through read-only `synctl observe`.
-    Missing procfs data is explicitly unavailable; instantaneous bandwidth,
-    connection inventory, network traffic inspection and history remain open.
+    Missing procfs data is explicitly unavailable. Instantaneous
+    bandwidth (`network.bandwidth`, per-interface bytes/sec over the
+    observe window; churn and counter resets withheld, never invented)
+    is implemented with host tests and passed native QEMU validation
+    on the joined guest at `1761759` (see
+    `docs/validation/observe-network-1761759/`); connection inventory,
+    network traffic inspection and history remain open.
 - [ ] thermal/power interface where available
   - Bounded read-only Linux thermal-zone temperatures are implemented with
     explicit unavailable/invalid states. Exact-revision host and native QEMU

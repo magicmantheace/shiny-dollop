@@ -161,3 +161,30 @@ the sample window, so the captured rates are honestly
 zero) — see
 [evidence](validation/observe-disk-e532ad9/README.md).
 Persistent history remains a separate open roadmap item.
+
+## Network
+
+The `network` object reports raw cumulative per-interface
+counters from `/proc/net/dev` (RX/TX bytes, packets, errors,
+drops). No interface is opened, configured, or mutated, and
+interfaces are never summed; a VPN or virtual NIC stays a
+separate row.
+
+`network.bandwidth` adds interval rates over the same
+≥100 ms window: per interface, integer `rx_bytes_per_sec` /
+`tx_bytes_per_sec` (byte delta × 1000 / window, floored),
+with the same rating rules as disk throughput — an
+interface is rated only when present in both samples with
+non-decreasing byte counters; churn and resets are counted
+in `unavailable_interfaces`. Statuses mirror
+`disk.throughput` (`ready` / `partial` / `truncated` /
+`unavailable`, plus `invalid` when the first sample is
+malformed), and `synctl` validates the object when present.
+
+Host tests cover the arithmetic and edge cases. Native QEMU
+validation passed 2026-11-07 on the joined guest (both
+guest interfaces rated `ready`; idle window, honestly zero
+rates) — see
+[evidence](validation/observe-network-1761759/README.md).
+Connection inventory, traffic inspection, and history
+remain separate open roadmap items.
