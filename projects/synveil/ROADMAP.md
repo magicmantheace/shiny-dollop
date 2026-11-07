@@ -393,7 +393,14 @@ anchoring and physical power-loss testing remain open.
     native QEMU validation passed at
     [bca81e5](docs/validation/native-bca81e5/README.md); QEMU exercised the
     unavailable-zone path, while host fixtures cover the hierarchical scan.
-    Interval power measurements are not implemented.
+    Interval power measurements (`energy.power`, per-zone average
+    microwatts over the observe window with single-wrap accounting;
+    absent whenever either scan cannot run) are implemented with
+    host tests and passed native QEMU validation on the joined
+    guest at `95ede21` (see `docs/validation/observe-power-95ede21/`);
+    QEMU again exercised the unavailable path — the rating path is
+    host-proven, and a positive in-guest reading awaits powercap
+    zones existing under test.
 - [ ] event normalization
 - [ ] ephemeral telemetry storage
 - [ ] historical aggregation

@@ -1352,3 +1352,27 @@ checks) accepted the response. Evidence:
 `docs/validation/observe-network-1761759/`. No
 controlled-load accuracy calibration and no physical
 hardware validation are claimed.
+
+## Observer interval power (Phase 3) — native validation (2026-11-07)
+
+`energy.power` (per-zone average microwatts over the
+observe window, implemented at `8abe685`) was validated
+natively with the extended observe gate
+(`tests/smoke-native-observe.py`, marker
+`SYNVEIL_OBSERVE_QEMU_PASS`) on the joined image sha256
+`4d51e418ad85b69ec89de80f6659c2f4f051f7e6411f1eafb25cdee68727d48a`
+(guest binaries stamp `95ede21`). The joined baseline smoke
+passed on the same image. The QEMU guest exposes no
+powercap sysfs, so the captured response carries the bare
+unavailable energy object with `energy.power` coherently
+absent — the gate asserts exactly that contract. The rating
+path (exact microwatt math including single-wrap accounting
+at an unchanged wrap range, withholding for vanished zones
+and changed ranges) is covered by host unit tests
+(veil-core 173 lib tests, synctl 7); the powercap reader
+refactor behind it is byte-identical in its JSON projection
+under the pre-existing tests. Disk throughput, network
+bandwidth, and PSI were re-verified ready in the same
+capture. Evidence: `docs/validation/observe-power-95ede21/`.
+No positive in-guest power reading and no physical hardware
+validation are claimed.

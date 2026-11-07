@@ -188,3 +188,31 @@ rates) — see
 [evidence](validation/observe-network-1761759/README.md).
 Connection inventory, traffic inspection, and history
 remain separate open roadmap items.
+
+## Energy and interval power
+
+The `energy` object reports cumulative per-zone powercap
+counters (`energy_uj` with its `max_energy_range_uj` wrap
+range) from a bounded hierarchical scan of
+`/sys/class/powercap`.
+
+`energy.power` adds interval power over the same ≥100 ms
+window: per zone, `avg_power_uw` = energy delta × 1000 /
+window (µJ/s = µW, floored). A counter decrease with an
+unchanged wrap range is accounted as exactly one wrap. A
+zone is rated only when present in both scans with an
+unchanged wrap range; anything else is counted in
+`unavailable_zones`. When either scan cannot run (the
+powercap root is missing or the data is malformed), the
+response carries no `power` object at all — the same
+absence contract as `disk.throughput`. `synctl` validates
+the object when present.
+
+The rating arithmetic is host-proven (constructed scans and
+fixture trees, including the wrap case). Native QEMU
+validation on 2026-11-07 exercised the absence path only —
+the guest exposes no powercap sysfs, so `energy` is bare
+unavailable and `power` coherently absent — see
+[evidence](validation/observe-power-95ede21/README.md). A
+positive in-guest power reading awaits hardware (or an
+emulation) that exposes RAPL zones.
