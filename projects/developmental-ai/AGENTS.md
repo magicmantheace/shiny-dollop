@@ -1,3 +1,120 @@
+# Widened window abstention recovery: widened acting-window abstention trigger class for silent/split newest-four states — 2026-11-07 (PARTIALLY DEMONSTRATED)
+
+Optional `developmental_ai/widened_window_abstention_recovery.py`
+(identical to the graded preceding-pair candidate in acting
+model, extended signal, archive, concordance definition, joint
+recovery test, recovery model, the full three-leg authority
+condition, the minority branch in full, leg P >= 0.70, and the
+full and retained-partial abstention classes with leg R on
+partials; the SINGLE changed element is a widened abstention
+trigger class: newest4_opposed_count <= 1 AND
+acting_opposed_count >= 3 over the last 8 events, behind leg P
+plus carried authority, leg R never gating widened triggers,
+support threshold null, new decision-record fields
+newest4_opposed_count / widened_armed / widened_threshold 3)
+was evaluated under the protocol frozen BEFORE implementation
+at `benchmarks/widened_window_abstention_recovery_protocol.json` on
+NEW cohorts 452003/452021/452027 and 453001/453017/453041, both
+now INSPECTED — never re-tune against them. **Graded Partially
+demonstrated under the protocol's own definitions (PRIMARY
+criterion 11 and criterion 7 PASS on both cohorts, but criteria
+1 and 4 FAIL on the development cohort; the Failed clause does
+not trigger — no criterion among 11/9/6/5/1–4 FAILs on the
+additional cohort and criterion 7 PASSes both; NOT a Regression
+— pooled onset harm 145/79 below recent8 233/217, control
+successes 124 = 124 / 89 vs 93, k=32 successes 60 vs the
+recent8 − 4 lines of 56 / 60, the additional figure AT its line
+not below it, suite + transfer pass).** Per-criterion,
+development / additional, PRIMARY criterion 11 first, then
+co-graded guards 9, 6, 5, 1, 4: C11 conjunction PASS/PASS
+(stationary side PASS in full on both; B1 side PASS on both),
+C9 B1 engagement PASS/PASS (TAKEN 3/6 dev — 2 full + 1 widened,
+the widened firing seed 452021 k=2 opposed 1 / preceding 0 /
+newest4 1 / acting 3 / purity 0.857, a split configuration leg R
+could not retain, lifting dev from the preceding-pair-rule's
+2/6 to the floor exactly; B1 harm 48 = guard 48 and < recent8
+86; TAKEN 6/6 add — 4 full, 1 retained partial, 1 widened, the
+widened firing seed 453017 k=4 opposed 0 / preceding 1 /
+newest4 1 / acting 3 / purity 0.824, a silent newest pair at
+the checkpoint the design arithmetic expected to be empty;
+preceding-pair-rule took 5/6 there; B1 harm 0 vs guard 55 /
+recent8 61; B1 successes 0 vs recent8 10 / 35 and guard 0 / 25
+stated in full on both), C6 stationary PASS/PASS (dev 0/240
+abstentions, 124 = 124 successes, 116 = 116 harm — exact
+recent8 parity for the second consecutive cycle, zero
+widened-armed control states; add 16/240, successes 89 vs 93
+required >= 87, harm 135 vs 147 — the sole control abstention
+the carried FULL firing seed 453041 k=2 purity 0.811, candidate
+control line identical to the decisive preceding-pair method's;
+ZERO widened stationary firings on either cohort against the
+pre-registered ~0.8 raw / ~0.5 adjusted expectation per
+cohort), C5 release PASS/PASS (abstentions 0/144 and abstained
+branch 0/9 BOTH — no late widened firing on either cohort, dev
+via an exercised leg-P release at return-A k=32 seed 452021
+purity 0.618; successes 60 = 60 dev, 60 vs 64 add; add
+non-recent8 1/9 — one carried minority routing at return-A
+k=32 seed 453017 scoring 0/16, at the allowance exactly, and
+the source of the add k=32 figure sitting exactly on the
+recent8 − 4 line), C1 B2 protection FAIL/PASS (dev (a)
+minority TAKEN 6/6 PASS, (b) 0/6 B1 and 0/6 return-A PASS,
+(d) successes 54 PASS, but (c) FAIL on both comparisons — harm
+42 vs guard 30 and ceiling 36.6: at FULL engagement the harm is
+the minority model's own per-state harm 5–9, at seed 452027
+worse than recent8 at both checkpoints; add PASS narrowly —
+minority 5/6, harm 43 vs guard 57 and ceiling 43.2 by 0.2,
+successes 53; across both cohorts B2 harm sits at/above the
+frozen ceiling), C4 return-A harm FAIL/PASS (dev 55 vs guard
+86 PASS but ceiling 51.6 FAIL by 3.4 — regular recovery TAKEN
+3/6, the three non-engaged recent8 states carry 44 of 55 harm,
+candidate identical to every carried baseline method at
+return-A onset there; add 36 vs guard 46 ceiling 50.4 PASS,
+recovery 6/6), C2 return-A successes PASS/PASS (41 vs frozen_A
+66; 60 vs 70 — cumulative 64/62 successes at 32/34 harm beats
+the candidate on BOTH axes on BOTH cohorts for the eighth
+consecutive graded cohort pair, frozen_A also beats it on both
+axes on both in this cycle), C3 pooled onset harm PASS/PASS
+(145 vs guard 164, 6/6 cells <= recent8; 79 vs guard 158, 6/6
+— stated in full: decisive preceding-pair method ABOVE the
+candidate on both, 161 / 95, so the widened class's net onset
+effect was harm-reducing), C7 full accounting PASS/PASS
+(replay 72/72 per cohort, widened fields complete,
+support_threshold null everywhere, gate / newest4 /
+widened_armed recomputable everywhere, widened-rule == branch
+everywhere, acquisition 0). **The widened class realized
+exactly one taken B1 firing per cohort against its frozen
+expectation of ~0.08 raw / ~0.12 adjusted per cohort, so the
+grading cap's condition (>= 1 widened B1 firing in at least
+one cohort) is met on both and does not bind; what blocks
+Demonstrated is the two development failures outside the
+abstention branch. This is the first PRIMARY pass on both
+cohorts in this abstention line.** Full unit suite (1294) and
+historical transfer benchmark passed in the evaluation and
+grading stages; no CI claimed for the evaluation or grading
+commits (UNVERIFIED). See
+`docs/WIDENED_WINDOW_ABSTENTION_RECOVERY.md`. Keep the learner
+optional and unpromoted, default controller unchanged, no
+merge, no AthenZ/Synveil integration, D1–D10/V2A/V2B
+unchanged. Next limitation selected: P1 second-switch (B2)
+onset harm at FULL minority engagement — engagement is no
+longer the binding B2 term (minority TAKEN 6/6 dev, 5/6 add;
+earlier B2 failures were concentrated at non-engaged states),
+yet B2 pooled onset harm sits at/above the frozen ceiling on
+both cohorts (42 vs ceiling 36.6 / guard 30 dev FAIL; 43 vs
+ceiling 43.2 add PASS by 0.2) and the dev harm is the minority
+model's own per-state harm at engaged states; whether an
+evidence-derived condition on the minority branch itself (its
+model, arming, or joint test) can bring B2 harm to <= guard
+AND <= 0.60 x recent8 on both cohorts while holding engagement,
+selectivity, the criterion 11 profile, and k=32 release, on
+NEW cohorts under a NEW protocol. Recorded but not selected:
+C4's dev failure is the return-A ceiling at non-engaged states
+(candidate identical to every carried baseline method there);
+cumulative's return-A dominance is now eight consecutive
+cohort pairs and frozen_A also dominates this cycle; add k=32
+successes sit exactly on the recent8 − 4 line; B1 pooled
+successes are 0 on both cohorts (the abstention branch's full
+productivity cost).
+
 # Preceding pair partial abstention recovery: preceding-pair corroboration leg on partial abstention triggers — 2026-11-06 (FAILED / REGRESSION at checkpoint 32)
 
 Optional `developmental_ai/preceding_pair_partial_abstention_recovery.py`

@@ -1122,6 +1122,60 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 7 — Widened window abstention recovery: widened acting-window abstention trigger class for silent/split newest-four states (PARTIALLY DEMONSTRATED)
+
+Optional `WidenedWindowAbstentionRecoveryMemory` is identical to the
+graded preceding-pair candidate in acting model, extended signal,
+retained archive, archive concordance, joint recovery test, recovery
+model, the full three-leg authority condition, the minority branch in
+full, leg P ≥ 0.70, and the full and retained-partial abstention
+classes with leg R on partials; the SINGLE changed element is a
+widened abstention trigger class — `newest4_opposed_count <= 1` AND
+`acting_opposed_count >= 3` over the last 8 events, behind leg P plus
+carried authority, leg R never gating widened triggers, support
+threshold still null — under a protocol frozen before implementation
+(new cohorts 452003-family / 453001-family, now INSPECTED). **Graded
+Partially demonstrated under the protocol's own definitions
+(PRIMARY criterion 11 and criterion 7 PASS on both cohorts, but
+criteria 1 and 4 FAIL on the development cohort; NOT Failed — no
+criterion among 11/9/6/5/1–4 FAILs on the additional cohort — and
+NOT a Regression: pooled onset harm 145/79 well below recent8's
+233/217, control successes 124 = 124 and 89 vs 93, k=32 successes
+60 vs the recent8 − 4 lines of 56 and 60 — the additional figure AT
+its line, not below it).** The widened class worked beyond its own
+pre-registered expectation (~0.08 raw / ~0.12 adjusted B1 firings
+per cohort, effectively checkpoint-2 only, stationary survival the
+priced risk): it realized exactly ONE taken B1 firing per cohort —
+development at k=2 on a split configuration leg R could not retain
+(seed 452021, purity 0.857), lifting development's B1 engagement
+from the preceding-pair rule's 2/6 to the floor at 3/6; additional
+at k=4 on a silent newest pair (seed 452017, purity 0.824), the
+checkpoint the design arithmetic expected to be empty — and ZERO
+widened stationary firings on either cohort. PRIMARY criterion 11
+therefore PASSes on both cohorts, the first PRIMARY pass on both in
+this abstention line: B1 harm 48 = guard 48 and < recent8 86
+development, 0 vs guard 55 / recent8 61 additional (B1 successes 0
+on both cohorts vs recent8's 10/35, stated in full); criterion 6
+PASSes both (development at exact recent8 parity 124/116/0 for the
+second consecutive cycle; additional 89/135/16, the sole control
+abstention the carried FULL firing, identical to the decisive
+baseline method there); criterion 5 PASSes both (abstentions 0/144,
+abstained branch 0/9 on both — no late widened firing); criteria 2,
+3 and 7 PASS on both. The remaining failures are outside the
+abstention branch: criterion 1 FAILs development at FULL minority
+engagement (TAKEN 6/6, yet B2 harm 42 vs guard 30 and ceiling 36.6 —
+the minority model's own per-state harm; additional PASSes by 0.2
+on its ceiling, 43 vs 43.2), and criterion 4 FAILs development on
+the carried return-A ceiling (55 vs 51.6; non-engaged states carry
+44 of 55 harm; candidate identical to every carried baseline method
+at return-A onset there), both PASSing additional. Cumulative beats
+the candidate at return-A on both axes on both cohorts for the
+eighth consecutive graded cohort pair, and frozen_A does so in this
+cycle too. Learner acquisition actions zero; external TRAIN actor
+harm published in full in the report. Optional only, no promotion,
+no merge.
+[Full graded report](docs/WIDENED_WINDOW_ABSTENTION_RECOVERY.md).
+
 ### November 6 — Preceding pair partial abstention recovery: preceding-pair corroboration leg on partial abstention triggers (FAILED / REGRESSION at checkpoint 32)
 
 Optional `PrecedingPairPartialAbstentionRecoveryMemory` is identical to the
