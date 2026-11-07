@@ -14,8 +14,8 @@ ruling is Adam's (2026-11-04) — lives in [`docs/DESIGN.md`](docs/DESIGN.md).
 | Slice | State |
 |---|---|
 | **S0 — Data pipeline proof** | **Complete 2026-11-04.** 113,393-star table built from live catalogs; cargo tests 22/22; Godot `--verify` all-pass (see `docs/TEST_PLAN.md`). The ~1M-star AT-HYG option was measured (52 MB table, 739 ms load). |
-| **S1 — Sim core (headless)** | **Complete 2026-11-04** (awaiting Nyx firsthand verification). Deterministic Rust core in `sim/`: one civilization surveys → claims → colonizes from Sol under fuel-range rules, monthly economy settlement, canonical save/load. Sim tests 19/19; a scripted 25-year campaign reaches 99 surveyed / 13 colonized systems; 100 game-years tick in ~0.8 s on this VM. Offline progression is **ruled by Adam (2026-11-04): full catch-up** — the galaxy lives while the game is closed; S2 implements it in save/load (see `docs/MUSE_HANDOFF.md`). |
-| S2 — Playable colonizer | Not started |
+| **S1 — Sim core (headless)** | **Complete 2026-11-04.** Deterministic Rust core in `sim/`: one civilization surveys → claims → colonizes from Sol under fuel-range rules, monthly economy settlement, canonical save/load. Sim tests 19/19; a scripted 25-year campaign reaches 99 surveyed / 13 colonized systems; 100 game-years tick in ~0.8 s on this VM. Offline progression is **ruled by Adam (2026-11-04): full catch-up** — the galaxy lives while the game is closed; S2 implements it in save/load (see `docs/MUSE_HANDOFF.md`). |
+| **S2 — Playable colonizer** | **Built + VM-verified 2026-11-06; owner-PC play session pending** (the slice's own verification gate per DESIGN §10). Godot game frontend over the core via the `sim-bridge` process bridge: main menu, HUD, system/ships panels, the survey → claim → colonize loop, real-time-with-pause clock, save/load with **full catch-up + a "while you were away" review modal**. Bridge tests 16/16; Godot `--verify` and `--verify-s2` all-pass (see `docs/TEST_PLAN.md`). A Windows test package (`sim-bridge.exe` + project) was assembled for Adam's PC; the .exe is build-verified only — never executed on Windows yet. |
 | S3–S5 — AI races, trade/diplomacy, war/victory | Not started |
 
 Implemented ≠ shipped: nothing here is merged; this branch is a draft for
@@ -33,10 +33,21 @@ claims are made from VM runs (see `docs/TEST_PLAN.md`).
   canonical save/load, a scripted policy, and the `sim-cli` demo
   binary. No wall clock and no external RNG anywhere in the crate —
   all randomness derives from the campaign seed.
-- `viewer/` — Godot 4 project: renders the star table in 3D with
-  spectral-class colours, orbit/fly camera, go-to-Sol, click picking
-  with an info panel (name, spectral class, distance from Sol, real
-  planets), and a headless `--verify` mode.
+- `bridge/` — the S2 process bridge (crate `mwcs-bridge`, binary
+  `sim-bridge`): wraps the core for the frontend — envelope save
+  files with a trusted saved-at timestamp, a JSON file-based command
+  protocol (new / load / exec / view / inspect / list_saves), and the
+  full-catch-up load (advance by elapsed whole days, report what
+  happened). It is the one wall-clock-aware component; the core
+  stays wall-clock-free. Cross-compiles to Windows
+  (`x86_64-pc-windows-gnu`).
+- `viewer/` — Godot 4 project: the S2 game frontend (the S0 star-map
+  viewer grown in place). Renders the star table in 3D with
+  spectral-class colours, orbit/fly camera, go-to-Sol, click picking;
+  adds the main menu, HUD, system and ships panels with orders,
+  state markers (surveyed / claimed / colonized), a ship range
+  highlight, the event log, the catch-up review modal, and headless
+  `--verify` (S0) and `--verify-s2` (full-loop) modes.
 - `data/` — build outputs. `stars.bin` is a regenerable artifact
   (git-ignored); the manifest and `SOURCES.md` are committed.
 - `docs/` — `DESIGN.md` (the spec), `TEST_PLAN.md`, `MUSE_HANDOFF.md`.
@@ -52,6 +63,7 @@ cd ..
 # 2. Run the tests
 cd pipeline && cargo test
 cd ../sim && cargo test
+cd ../bridge && cargo test
 
 # 2b. Run a headless scripted campaign (25 game-years from Sol)
 cd sim && cargo run --release --bin sim-cli -- --years 25
@@ -60,6 +72,11 @@ cd sim && cargo run --release --bin sim-cli -- --years 25
 #    viewer finds ../data/stars.bin relative to the project by default,
 #    or pass --data=<absolute path>)
 godot --headless --path viewer -- --verify
+
+# 4. Verify the S2 game loop headlessly (needs the bridge built:
+#    cd bridge && cargo build --release)
+godot --headless --path viewer -- --verify-s2 \
+  --bridge=$PWD/bridge/target/release/sim-bridge
 ```
 
 ## Data sources & license

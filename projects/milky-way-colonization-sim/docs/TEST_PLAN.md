@@ -1,8 +1,119 @@
 # TEST_PLAN — Milky Way Colonization Simulator
 
-What was actually run, with results. Last updated 2026-11-04 (S1).
+What was actually run, with results. Last updated 2026-11-06 (S2).
 Nothing in this file is aspirational: every claim below was executed
-on this VM during the S0/S1 builds.
+on this VM during the S0/S1/S2 builds.
+
+## S2 — bridge + Godot game frontend
+
+All runs below were executed on this VM on 2026-11-06 against the
+final committed code, and re-run firsthand by the coordinator after
+each pass (exit codes recorded).
+
+### Bridge tests (Rust, `bridge/`)
+
+```
+cd bridge
+cargo test --release
+```
+
+Result: **16 passed, 0 failed** (7 unit + 9 integration in
+`bridge/tests/s2.rs`), exit 0.
+
+- Unit: hand-rolled JSON round trip / nesting / string escapes /
+  malformed-input rejection; envelope write→read round trip (payload
+  byte-identical, header fields preserved), bad magic and truncated
+  files rejected; atomic replace on rewrite.
+- Integration (real sim core, synthetic galaxy), headline first:
+  - **Catch-up equivalence:** campaign A advanced 400 days; its save
+    reloaded with a +400-day clock offset produces a core state hash
+    **identical** to the uninterrupted 400-day run, catch-up day
+    count exactly 400.
+  - **Catch-up event coverage:** over a 3,650-day catch-up with an
+    active scripted policy, the catch-up event list covers the whole
+    period — non-empty, every event day inside the window, ends
+    within the final month.
+  - **Whole-days floor:** +36 h of clock elapsed advances exactly
+    1 day; +23 h advances 0 and does not rewrite the save (the
+    unplayed partial day is not eaten).
+  - **Refusal surfacing:** an illegal command (claim an unsurveyed
+    system) returns the core's error, leaves credits/systems
+    untouched, the save still loads, and a subsequent legal command
+    succeeds.
+  - **Full loop at bridge level:** new → survey → claim → colonize →
+    build a second surveyor → refuel arrives over ~600 days, ending
+    with 2 colonized systems and a second founded-event.
+  - **Session continuity:** the frontend's exec cadence — 30
+    one-day exec calls vs one exec of 30 days — ends in identical
+    core state hashes (saved-at refresh changes nothing).
+  - **list_saves:** reports name/day/saved-at for valid saves and
+    counts a corrupted file as skipped instead of failing.
+  - **Bad inputs:** nonexistent save, unknown op, unknown command —
+    all return structured `ok:false` responses, no panics.
+- Regressions re-checked in the same pass: pipeline **22/22**,
+  sim **19/19** (both exit 0).
+
+### Windows cross-build (build-verified only)
+
+```
+cd bridge
+cargo build --release --target x86_64-pc-windows-gnu
+```
+
+Produces `sim-bridge.exe`, confirmed by `file` as a PE32+ x86-64
+Windows executable. **It has never been executed** — there is no
+Windows or Wine on this VM. Its first real run is Adam's test
+session. (The Linux binary runs the full test suite above.)
+
+### Godot — S0 verify on the game build (regression)
+
+```
+godot --headless --path viewer -- --verify
+```
+
+Exit 0; the five S0 lines all pass unchanged (star count 113,393,
+Sol at origin, TRAPPIST-1's 7 planets, pick-Sol). Load ~100–400 ms
+and 70.5 MB static memory on this VM across runs (headless dummy
+renderer — load/memory only, no rendering claims).
+
+### Godot — S2 verify (the full loop through the real bridge)
+
+```
+godot --headless --path viewer -- --verify-s2 \
+  --bridge=<abs path>/bridge/target/release/sim-bridge
+```
+
+Exit 0. Output after the S0 lines (verbatim, coordinator's run):
+
+```
+S2_VERIFY_PASS new day=0 colonized=1 ships=2
+S2_VERIFY_PASS target index=64549 name=Proxima Centauri dist_ly=4.2262
+S2_VERIFY_PASS dispatch_surveyor ship=1 to=64549
+S2_VERIFY_PASS advance_survey surveyed=2
+S2_VERIFY_PASS claim_and_dispatch_colony ship=2 to=64549
+S2_VERIFY_PASS advance_colonize colonized=2 colony_founded_event=true
+S2_VERIFY_PASS load_catchup days=30 day=600->630
+S2_VERIFY_PASS all
+```
+
+This drives the game's own `BridgeClient` and the production bridge
+binary end to end: new campaign (seed 42) → surveyor dispatched to
+the nearest star to Sol (Proxima Centauri, 4.2262 ly — also proving
+the table-index ↔ star-id mapping on real data) → survey completes →
+claim → colony ship dispatched → colony founded (event present) →
+save reloaded with a 30-day elapsed override → catch-up reports
+exactly 30 days and the day counter moves exactly +30.
+`--verify-s2` without `--bridge=` prints `S2_VERIFY_FAIL bridge not
+specified` and exits 1. A plain headless boot (`--quit-after 30`)
+exits 0 with the menu up and no script errors.
+
+Additionally during the build (not committed): a temporary UI smoke
+harness drove the real UI handlers — new campaign, panel population,
+ship selection + range mesh, order buttons, event log, save, menu,
+load with a 5-day override, catch-up modal, Begin → still Paused —
+and passed; the harness was removed before the final verification
+runs. Interactive rendering and mouse feel are **not** covered by
+any of this (see §5).
 
 ## S1 — sim core (Rust, `sim/`)
 
@@ -233,10 +344,19 @@ backed; the Codeberg media endpoint serves the real content.
 
 - **FPS / frame pacing on Adam's RTX 3060** — the VM's headless
   dummy renderer says nothing about rendering performance. No FPS
-  claim is made anywhere in S0.
+  claim is made anywhere in S0–S2.
 - Interactive feel: orbit/fly controls, click picking with a real
   mouse, point-size appearance under the Vulkan renderer.
 - Windows build/export of the viewer.
+- **S2 additions:** the game has only run headless on this VM.
+  Unverified until Adam's PC session: the S2 UI interactively
+  (menus, panels, buttons, catch-up modal with a real display and
+  mouse); `sim-bridge.exe` executing under Windows 11 at all
+  (build-verified only, §S2 above); real-clock catch-up over an
+  actual overnight absence (the mechanism is test-proven via clock
+  injection and the debug elapsed-days override, not by waiting);
+  an exported game build (S2 ships as a Godot project + bridge exe
+  by design).
 - The pipeline's download path on a cold cache was exercised for the
   catalog fetches themselves (files in `pipeline/cache/` came from
   live downloads this session); `--offline` rebuilds from cache are

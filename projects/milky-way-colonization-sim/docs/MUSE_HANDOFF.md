@@ -1,9 +1,127 @@
 # MUSE_HANDOFF — Milky Way Colonization Simulator
 
-State as of **2026-11-04**, end of slice S1. Branch
-`milky-way-colonization-sim/foundation` (extends the S0 commits;
-not pushed by the S1 builder — Nyx verifies and pushes to draft
-PR #29).
+State as of **2026-11-06**, end of slice S2 (built and VM-verified;
+Adam's owner-PC play session is the slice's remaining gate).
+Branch `milky-way-colonization-sim/foundation`, tracked by draft
+PR #29 (never auto-merge).
+
+## What S2 delivered
+
+**Authorization.** Adam, 2026-11-06: "Queue up the colony sim game
+again" and "Have the production work on it until it's in a testable
+state for me." That is the S2 go-ahead this slice ran under.
+
+**Architecture — process bridge, not GDExtension.** The frontend
+talks to the core through a new crate, **`bridge/`** (binary
+`sim-bridge`): the Godot project spawns it per call with a JSON
+request/response file pair. Why: DESIGN §9 mentions a
+GDExtension/C-ABI binding only inside the engine-choice comparison;
+the §11.5 ruling fixed "Rust core + Godot 4 frontend", and project
+AGENTS rule 8 is mechanism-agnostic (frontend reads core data,
+sends commands). The process bridge keeps `sim/` completely
+untouched (the S1 wall-clock-free grep invariant still holds), is
+the one designated wall-clock-aware component, adds zero
+third-party dependencies, and cross-compiles to Windows cleanly.
+GDExtension remains possible later without core changes. **Flag
+for Adam:** if you wanted the in-process binding specifically,
+say so — the swap is frontend-side only.
+
+- **Envelope saves (`.mwsb`):** `MWSB` magic + version +
+  `saved_at_unix` (the trustworthy timestamp the 2026-11-04
+  offline-progression ruling requires) + game day + the untouched
+  core `save_bytes()` payload. Atomic writes (tmp + rename);
+  `saved_at` refreshes on every bridge write, but a load whose
+  elapsed time floors to 0 days does **not** rewrite the file (a
+  partial unplayed day is never eaten).
+- **Catch-up on load:** elapsed whole days =
+  `floor((now − saved_at) / 86400)` (a request may inject `now` or
+  an explicit elapsed override — the frontend exposes the override
+  as a debug field for testing); the core advances by the full
+  amount, **no cap** (the ruling). The response carries the
+  catch-up block: days, monthly settlements crossed, before/after
+  snapshots, and the core's own events for exactly the catch-up
+  window — the review surface's data.
+- **Protocol ops:** `new`, `load`, `exec` (command list applied in
+  order, stops at first failure, per-command results, events since
+  a cursor, persists either way), `view` (full UI state incl. the
+  core state hash), `inspect` (one system: catalog facts with
+  derived flags, profile with per-planet source labels, colony,
+  ships present), `list_saves` (header-only scan, corrupt files
+  counted as skipped). Commands mirror the core API 1:1 (advance,
+  survey, dispatch, claim, found, build, refuel, specialize).
+  Core refusals travel back as structured errors and change
+  nothing.
+
+**Frontend (`viewer/` grown in place into the game).** Main menu
+(new campaign with seed + save name; load list from the saves
+directory; debug elapsed-days field), HUD (date, credits, counts,
+total population/fuel), the speed ladder per §2 (Paused, 1× =
+1 day/real-day, 1 day/hour, 1 day/min, 1 day/sec, 10 days/sec;
+sessions always start Paused), throttled real-time clock (bridge
+call at most every 0.25 s, whole days only — proven by test to be
+state-identical to batched advance), system panel driven by
+`inspect` (facts with "(derived)" markers, planets labelled
+real/generated, colony block incl. construction queue), ships
+panel, order buttons with core refusals surfaced in the message
+line, state markers on the map (surveyed pale / claimed gold /
+colonized green), a magenta direct-range highlight for the
+selected ship, an event log (last 300), auto-pause on colony
+abandonment and ship stranding, and the **catch-up review modal**:
+days passed, settlements, before→after deltas, and the full event
+list for the away period (or "the galaxy ticked quietly") —
+unwatched time never lands silently.
+
+**Scope notes (deferred, not dropped).**
+
+- *Ship designer UI:* DESIGN §5.3's designer needs custom
+  engine/tank designs; the S1 core ships fixed designs and has no
+  design-registration API. S2 exposes the two fixed designs
+  (build buttons, costs from the core). A design API is a core
+  addition for a later slice.
+- *Range overlay:* §7.2's reachable-set overlay is graph-based
+  (multi-hop over the refuel network). S2 ships the honest
+  direct-leg version (stars within range of the selected ship's
+  system, limited by fuel aboard). The graph version slots into
+  the same layer later.
+
+**Test state (all run 2026-11-06 on this VM, coordinator re-ran
+each firsthand; detail in `docs/TEST_PLAN.md`).**
+
+- `bridge`: `cargo test --release` **16/16** — incl. the headline
+  catch-up equivalence test (save at T, load at T+400d ⇒ state
+  hash identical to an uninterrupted 400-day run), catch-up event
+  coverage over 10 years, whole-days flooring, refusal atomicity,
+  exec-cadence equivalence.
+- `sim` **19/19** and `pipeline` **22/22** — unchanged, re-run.
+- Godot `--verify` (S0) all-pass, exit 0; `--verify-s2` all-pass,
+  exit 0 — the full loop through the real bridge to Proxima
+  Centauri plus a +30-day catch-up load.
+- Windows: `sim-bridge.exe` cross-builds (PE32+ x86-64, confirmed
+  by `file`); a full `new`+`inspect` cycle against the real
+  113k-star table takes ~0.17 s on this VM, so the per-call
+  process model is not a latency problem at these call rates.
+
+**Owner test package.** Assembled outside the repo (release
+artifacts are never committed): Godot project + Windows
+`sim-bridge.exe` + star table + `README-TEST.md` with exact
+click-by-click instructions, including the debug elapsed-days
+load for testing catch-up without waiting. Location recorded in
+the goal workspace (`mwcs-s2-test/` + `.zip`).
+
+**S2 gotchas.**
+
+- GDScript cannot define a method named `call` (it collides with
+  `Object.call()` and Godot 4.7 treats it as a hard error) — the
+  bridge client entry point is `call_bridge()`.
+- Godot 4.7 project-scope `@onready` initialization inside if/else
+  branches does not run reliably; build UI nodes unconditionally
+  and toggle visibility.
+- The star table's record index equals the core's star id
+  (asserted in tests and cross-checked at runtime in the panel);
+  frontend code relies on it openly rather than hiding a mapping.
+- The VM lacked mingw initially; the windows-gnu cross-build now
+  works (gcc 13-win32). The `.exe` remains **build-verified
+  only** — never executed on Windows.
 
 ## What S1 delivered
 
@@ -166,6 +284,13 @@ only advances when a driver calls `advance()`; its determinism
 makes the policy implementable without a redesign. Implementation
 belongs to S2, when save/load is wired into the frontend:
 
+**Update 2026-11-06: implemented in S2** — the bridge envelope
+carries the trusted saved-at timestamp, load applies the full
+uncapped catch-up, and the frontend's review modal presents the
+period's events and deltas before the player takes control (see
+"What S2 delivered" above). The bullets below are the original
+implementation contract, kept for the record:
+
 - Saves need a trustworthy saved-at timestamp; on load, the S2
   driver advances the core by the elapsed whole days before handing
   control to the player.
@@ -181,11 +306,14 @@ belongs to S2, when save/load is wired into the frontend:
 
 - FPS and rendering feel on Adam's RTX 3060 (no FPS claims made).
 - Interactive picking/orbit with a real mouse; Windows export.
-- Offline progression is settled (full catch-up, above); S2 implements it when wiring save/load into the frontend. S2 itself still needs Adam's go-ahead.
+- **S2's own gate (DESIGN §10): Adam playing a real session on his
+  PC** — the interactive UI, the Windows `sim-bridge.exe` executing
+  at all, and a real overnight catch-up are unverified until then.
+  The S2 test package is built and waiting on that session.
 
 ## Next slice
 
-**S2 — Playable colonizer**, only on Adam's go-ahead: Godot
-frontend over this core (map UI, system panel, colonization loop
-from Sol, save/load in the frontend). Save/load implements the
-full-catch-up offline-progression ruling (above).
+**S3 — AI races**, only on Adam's go-ahead after his S2 play
+session: 8–15 AI civilizations expanding under the same rules with
+weaker information, contact and border friction (§6), feeding the
+same event log / catch-up review surface S2 built.
