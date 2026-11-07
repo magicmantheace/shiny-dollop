@@ -25,6 +25,10 @@ const MAX_POWERCAP_SCAN_ENTRIES: usize = 4096;
 pub fn sample() -> io::Result<Value> {
     let meminfo = fs::read_to_string("/proc/meminfo")?;
     let stat_before = fs::read_to_string("/proc/stat")?;
+    // Read before the utilization window so disk throughput is
+    // measured over the same interval; a missing source here
+    // only degrades the throughput object, never the snapshot.
+    let diskstats_before = fs::read_to_string("/proc/diskstats");
     let sample_started = Instant::now();
     thread::sleep(CPU_SAMPLE_INTERVAL);
     let stat = fs::read_to_string("/proc/stat")?;
@@ -40,7 +44,37 @@ pub fn sample() -> io::Result<Value> {
     // Disk counters are optional on restricted procfs mounts; an unavailable
     // source must not prevent CPU/memory health from being reported.
     snapshot["disk"] = match fs::read_to_string("/proc/diskstats") {
-        Ok(raw) => parse_diskstats(&raw)?,
+        Ok(raw) => {
+            let mut disk = parse_diskstats(&raw)?;
+            // Interval throughput over the utilization window.
+            // Only the throughput object degrades (unavailable /
+            // invalid) when the first sample is missing or
+            // malformed; the cumulative snapshot keeps its own
+            // strict behaviour above.
+            disk["throughput"] = match &diskstats_before {
+                Ok(before_raw) => match parse_disk_rows(before_raw) {
+                    Ok((before_rows, _)) => {
+                        let (after_rows, omitted) = parse_disk_rows(&raw)?;
+                        disk_throughput(&before_rows, &after_rows, omitted, sample_window_ms)
+                    }
+                    Err(_) => json!({
+                        "status": "invalid",
+                        "sample_window_ms": sample_window_ms,
+                        "devices": [],
+                        "unavailable_devices": 0,
+                        "omitted_devices": 0,
+                    }),
+                },
+                Err(_) => json!({
+                    "status": "unavailable",
+                    "sample_window_ms": sample_window_ms,
+                    "devices": [],
+                    "unavailable_devices": 0,
+                    "omitted_devices": 0,
+                }),
+            };
+            disk
+        }
         Err(_) => json!({"status": "unavailable", "devices": []}),
     };
     snapshot["network"] = match fs::read_to_string("/proc/net/dev") {
@@ -992,8 +1026,18 @@ fn read_pressure(path: &str, require_full: bool) -> Value {
 /// throughput. Return one record per device without summing partitions and
 /// physical drives (which would double-count I/O). Sector units are Linux
 /// 512-byte sectors regardless of the device's hardware sector size.
-fn parse_diskstats(input: &str) -> io::Result<Value> {
-    const MAX_DEVICES: usize = 128;
+const MAX_DISK_DEVICES: usize = 128;
+
+/// One validated /proc/diskstats row: the eleven kernel counters
+/// after major/minor/name, in file order.
+struct DiskRow {
+    name: String,
+    major: u32,
+    minor: u32,
+    values: Vec<u64>,
+}
+
+fn parse_disk_rows(input: &str) -> io::Result<(Vec<DiskRow>, u64)> {
     let mut devices = Vec::new();
     let mut omitted = 0u64;
     for line in input.lines().filter(|line| !line.trim().is_empty()) {
@@ -1026,30 +1070,107 @@ fn parse_diskstats(input: &str) -> io::Result<Value> {
                     .map_err(|_| invalid_data("invalid diskstats counter"))
             })
             .collect::<io::Result<Vec<_>>>()?;
-        if devices.len() == MAX_DEVICES {
+        if devices.len() == MAX_DISK_DEVICES {
             omitted = omitted
                 .checked_add(1)
                 .ok_or_else(|| invalid_data("diskstats device overflow"))?;
             continue;
         }
-        devices.push(json!({
-            "name": name,
-            "major": major,
-            "minor": minor,
-            "reads_completed": values[0],
-            "sectors_read_512b": values[2],
-            "writes_completed": values[4],
-            "sectors_written_512b": values[6],
-            "io_in_progress": values[8],
-            "busy_milliseconds": values[9],
-            "weighted_busy_milliseconds": values[10],
-        }));
+        devices.push(DiskRow {
+            name: name.to_owned(),
+            major,
+            minor,
+            values,
+        });
     }
+    Ok((devices, omitted))
+}
+
+fn parse_diskstats(input: &str) -> io::Result<Value> {
+    let (rows, omitted) = parse_disk_rows(input)?;
+    let devices = rows
+        .iter()
+        .map(|row| {
+            json!({
+                "name": row.name,
+                "major": row.major,
+                "minor": row.minor,
+                "reads_completed": row.values[0],
+                "sectors_read_512b": row.values[2],
+                "writes_completed": row.values[4],
+                "sectors_written_512b": row.values[6],
+                "io_in_progress": row.values[8],
+                "busy_milliseconds": row.values[9],
+                "weighted_busy_milliseconds": row.values[10],
+            })
+        })
+        .collect::<Vec<_>>();
     Ok(json!({
         "status": if omitted == 0 { "ready" } else { "truncated" },
         "devices": devices,
         "omitted_devices": omitted,
     }))
+}
+
+/// Interval read/write rates between two diskstats samples over
+/// the observe window — the disk counterpart of cpu.utilization.
+/// A device is rated only when it appears in both samples with
+/// non-decreasing sector counters; anything else (appeared,
+/// vanished, reset) is counted as unavailable rather than
+/// assigned an invented rate. Devices are never summed, so a
+/// partition and its whole device stay separate rows, exactly
+/// as in the cumulative snapshot. Rates are integer bytes per
+/// second: sector delta * 512 * 1000 / window, floored.
+fn disk_throughput(
+    before: &[DiskRow],
+    after: &[DiskRow],
+    omitted_devices: u64,
+    window_ms: u64,
+) -> Value {
+    let mut rated = Vec::new();
+    let mut unavailable = 0u64;
+    if window_ms > 0 {
+        let before_by_name: std::collections::HashMap<&str, &DiskRow> =
+            before.iter().map(|row| (row.name.as_str(), row)).collect();
+        for row in after {
+            let prior = before_by_name.get(row.name.as_str());
+            let rate = prior.and_then(|prior| {
+                let read_delta = row.values[2].checked_sub(prior.values[2])?;
+                let write_delta = row.values[6].checked_sub(prior.values[6])?;
+                let per_sec = |delta: u64| -> u64 {
+                    let scaled = u128::from(delta) * 512 * 1000 / u128::from(window_ms);
+                    u64::try_from(scaled).unwrap_or(u64::MAX)
+                };
+                Some(json!({
+                    "name": row.name,
+                    "read_bytes_per_sec": per_sec(read_delta),
+                    "write_bytes_per_sec": per_sec(write_delta),
+                }))
+            });
+            match rate {
+                Some(rate) => rated.push(rate),
+                None => unavailable += 1,
+            }
+        }
+    } else {
+        unavailable = after.len() as u64;
+    }
+    let status = if omitted_devices > 0 {
+        "truncated"
+    } else if rated.is_empty() {
+        "unavailable"
+    } else if unavailable > 0 {
+        "partial"
+    } else {
+        "ready"
+    };
+    json!({
+        "status": status,
+        "sample_window_ms": window_ms,
+        "devices": rated,
+        "unavailable_devices": unavailable,
+        "omitted_devices": omitted_devices,
+    })
 }
 
 /// Cumulative Linux interface counters from /proc/net/dev. These are NOT
@@ -1525,6 +1646,72 @@ mod tests {
         assert_eq!(parsed["status"], "truncated");
         assert_eq!(parsed["devices"].as_array().unwrap().len(), 128);
         assert_eq!(parsed["omitted_devices"], 2);
+    }
+
+    fn disk_rows(raw: &str) -> Vec<DiskRow> {
+        parse_disk_rows(raw).unwrap().0
+    }
+
+    #[test]
+    fn disk_throughput_computes_exact_rates_over_the_window() {
+        // sda: +2048 sectors read, +1024 written over 100 ms
+        // -> 2048*512*10 = 10485760 B/s read, half that written.
+        let before = disk_rows(
+            "8 0 sda 10 0 1024 2 12 0 2048 4 0 6 9\n\
+             8 16 sdb 0 0 0 0 0 0 0 0 0 0 0\n",
+        );
+        let after = disk_rows(
+            "8 0 sda 20 0 3072 4 24 0 3072 8 0 12 18\n\
+             8 16 sdb 0 0 0 0 0 0 0 0 0 0 0\n",
+        );
+        let parsed = disk_throughput(&before, &after, 0, 100);
+        assert_eq!(parsed["status"], "ready");
+        assert_eq!(parsed["sample_window_ms"], 100);
+        assert_eq!(parsed["devices"][0]["name"], "sda");
+        assert_eq!(parsed["devices"][0]["read_bytes_per_sec"], 10485760);
+        assert_eq!(parsed["devices"][0]["write_bytes_per_sec"], 5242880);
+        assert_eq!(parsed["devices"][1]["read_bytes_per_sec"], 0);
+        assert_eq!(parsed["unavailable_devices"], 0);
+        assert_eq!(parsed["omitted_devices"], 0);
+    }
+
+    #[test]
+    fn disk_throughput_withholds_rates_for_churn_and_decreases() {
+        let before = disk_rows(
+            "8 0 sda 10 0 1024 2 12 0 2048 4 0 6 9\n\
+             8 16 sdb 5 0 512 1 5 0 512 1 0 2 3\n",
+        );
+        // sda reset (counters decreased); sdb gone; sdc is new.
+        let after = disk_rows(
+            "8 0 sda 1 0 16 0 1 0 16 0 0 1 1\n\
+             8 32 sdc 5 0 512 1 5 0 512 1 0 2 3\n",
+        );
+        let parsed = disk_throughput(&before, &after, 0, 250);
+        assert_eq!(parsed["status"], "unavailable");
+        assert!(parsed["devices"].as_array().unwrap().is_empty());
+        assert_eq!(parsed["unavailable_devices"], 2);
+        // One healthy device among the churn -> partial.
+        let after = disk_rows(
+            "8 0 sda 1 0 16 0 1 0 16 0 0 1 1\n\
+             8 16 sdb 6 0 1024 2 6 0 1024 2 0 4 6\n",
+        );
+        let parsed = disk_throughput(&before, &after, 0, 250);
+        assert_eq!(parsed["status"], "partial");
+        assert_eq!(parsed["devices"].as_array().unwrap().len(), 1);
+        assert_eq!(parsed["devices"][0]["name"], "sdb");
+        assert_eq!(parsed["unavailable_devices"], 1);
+    }
+
+    #[test]
+    fn disk_throughput_zero_window_and_truncation() {
+        let rows = disk_rows("8 0 sda 10 0 1024 2 12 0 2048 4 0 6 9\n");
+        let parsed = disk_throughput(&rows, &rows, 0, 0);
+        assert_eq!(parsed["status"], "unavailable");
+        assert_eq!(parsed["unavailable_devices"], 1);
+        let parsed = disk_throughput(&rows, &rows, 3, 100);
+        assert_eq!(parsed["status"], "truncated");
+        assert_eq!(parsed["omitted_devices"], 3);
+        assert_eq!(parsed["devices"][0]["read_bytes_per_sec"], 0);
     }
 
     const PSI_SOME: &str = "some avg10=0.25 avg60=1.50 avg300=2.00 total=987654\n";

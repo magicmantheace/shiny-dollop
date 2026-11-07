@@ -294,6 +294,57 @@ fn validate_observe_result(result: &Value) -> io::Result<()> {
             return Err(invalid());
         }
     }
+
+    // disk.throughput is an optional object (absent when the
+    // disk source itself is unavailable, and on older cores);
+    // when present it must be internally consistent.
+    if let Some(throughput) = result.get("disk").and_then(|disk| disk.get("throughput")) {
+        let devices = throughput
+            .get("devices")
+            .and_then(Value::as_array)
+            .ok_or_else(invalid)?;
+        if devices.len() > 128 {
+            return Err(invalid());
+        }
+        let window = throughput
+            .get("sample_window_ms")
+            .and_then(Value::as_u64)
+            .ok_or_else(invalid)?;
+        let unavailable = throughput
+            .get("unavailable_devices")
+            .and_then(Value::as_u64)
+            .ok_or_else(invalid)?;
+        let omitted = throughput
+            .get("omitted_devices")
+            .and_then(Value::as_u64)
+            .ok_or_else(invalid)?;
+        match throughput.get("status").and_then(Value::as_str) {
+            Some("ready") if window > 0 && !devices.is_empty() && unavailable == 0 => {}
+            Some("partial") if window > 0 && !devices.is_empty() && unavailable > 0 => {}
+            Some("truncated") if omitted > 0 => {}
+            Some("unavailable") if devices.is_empty() => {}
+            Some("invalid") if devices.is_empty() => {}
+            _ => return Err(invalid()),
+        }
+        for device in devices {
+            if device
+                .get("name")
+                .and_then(Value::as_str)
+                .filter(|name| !name.is_empty())
+                .is_none()
+                || device
+                    .get("read_bytes_per_sec")
+                    .and_then(Value::as_u64)
+                    .is_none()
+                || device
+                    .get("write_bytes_per_sec")
+                    .and_then(Value::as_u64)
+                    .is_none()
+            {
+                return Err(invalid());
+            }
+        }
+    }
     Ok(())
 }
 
@@ -386,6 +437,94 @@ mod tests {
             }}, "processes": processes.clone()}),
         ] {
             assert!(validate_observe_result(&invalid).is_err());
+        }
+    }
+
+    #[test]
+    fn observe_validation_checks_disk_throughput_when_present() {
+        let processes = json!({
+            "status": "ready",
+            "records": [{
+                "pid": 7, "parent_pid": 1, "process_group_id": 7,
+                "session_id": 7, "state": "R", "user_ticks": 10,
+                "system_ticks": 2, "start_time_ticks": 100,
+                "virtual_memory_bytes": 8192, "resident_pages": 2,
+                "thread_count": 1, "nice": 0
+            }],
+            "unavailable_processes": 0, "omitted_processes": 0,
+            "scan_truncated": false
+        });
+        let response = |disk: Value| {
+            json!({
+                "schema": "synveil.observe/v1",
+                "cpu": {"utilization": {"status": "unavailable"}},
+                "processes": processes.clone(),
+                "disk": disk,
+            })
+        };
+        let device = json!({
+            "name": "sda", "read_bytes_per_sec": 1024,
+            "write_bytes_per_sec": 0
+        });
+        // Absent throughput (older cores / no disk object detail)
+        // stays acceptable.
+        assert!(
+            validate_observe_result(&response(json!({"status": "unavailable", "devices": []})))
+                .is_ok()
+        );
+        for valid in [
+            json!({"status": "ready", "sample_window_ms": 101,
+                   "devices": [device.clone()],
+                   "unavailable_devices": 0, "omitted_devices": 0}),
+            json!({"status": "partial", "sample_window_ms": 101,
+                   "devices": [device.clone()],
+                   "unavailable_devices": 2, "omitted_devices": 0}),
+            json!({"status": "truncated", "sample_window_ms": 101,
+                   "devices": [device.clone()],
+                   "unavailable_devices": 0, "omitted_devices": 3}),
+            json!({"status": "unavailable", "sample_window_ms": 0,
+                   "devices": [],
+                   "unavailable_devices": 4, "omitted_devices": 0}),
+        ] {
+            let disk = json!({"status": "ready", "devices": [],
+                              "throughput": valid});
+            assert!(validate_observe_result(&response(disk)).is_ok());
+        }
+        for invalid in [
+            // ready with unavailable devices is contradictory
+            json!({"status": "ready", "sample_window_ms": 101,
+                   "devices": [device.clone()],
+                   "unavailable_devices": 1, "omitted_devices": 0}),
+            // zero window cannot carry rates
+            json!({"status": "ready", "sample_window_ms": 0,
+                   "devices": [device.clone()],
+                   "unavailable_devices": 0, "omitted_devices": 0}),
+            // truncated without omissions
+            json!({"status": "truncated", "sample_window_ms": 101,
+                   "devices": [device.clone()],
+                   "unavailable_devices": 0, "omitted_devices": 0}),
+            // unavailable with rated devices
+            json!({"status": "unavailable", "sample_window_ms": 101,
+                   "devices": [device.clone()],
+                   "unavailable_devices": 0, "omitted_devices": 0}),
+            // negative / missing rates
+            json!({"status": "ready", "sample_window_ms": 101,
+                   "devices": [{"name": "sda",
+                                "read_bytes_per_sec": -1,
+                                "write_bytes_per_sec": 0}],
+                   "unavailable_devices": 0, "omitted_devices": 0}),
+            json!({"status": "ready", "sample_window_ms": 101,
+                   "devices": [{"name": "sda",
+                                "write_bytes_per_sec": 0}],
+                   "unavailable_devices": 0, "omitted_devices": 0}),
+            // unknown status
+            json!({"status": "guessed", "sample_window_ms": 101,
+                   "devices": [],
+                   "unavailable_devices": 0, "omitted_devices": 0}),
+        ] {
+            let disk = json!({"status": "ready", "devices": [],
+                              "throughput": invalid});
+            assert!(validate_observe_result(&response(disk)).is_err());
         }
     }
 
