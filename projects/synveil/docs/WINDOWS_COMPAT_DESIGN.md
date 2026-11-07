@@ -1,12 +1,14 @@
-# Windows compatibility (Wine) — design & feasibility proposal
+# Windows compatibility (Wine) — design & feasibility
 
-Status: **Proposal (2026-11-07). Not accepted.** Owner
+Status: **Accepted (2026-11-07).** Owner
 direction (2026-11-06): "If you run out of things you can
 try getting the windows game compatibility built in." This
-document is the design + feasibility pass for that lane.
+document is the design + feasibility pass for that lane,
+accepted by the owner on 2026-11-07 with the answers
+recorded under "Owner answers" below; the first proof
+slice it scopes is authorized by that acceptance.
 No ADR or doc in the project records a prior compatibility
-decision; nothing here conflicts with one, and nothing
-here is implemented or authorizes code. All work would be
+decision; nothing here conflicts with one. All work is
 userspace payload through the existing image mechanisms —
 no frozen-zone (ADR 0023) changes are needed for the
 scoped first slice, and none are proposed.
@@ -125,7 +127,7 @@ checkable rather than assumed).
   installer/storage roadmap. This is an open question
   below, not something this lane should invent alone.
 
-## First proof slice (if accepted)
+## First proof slice (authorized by the acceptance)
 
 1. `tools/distro_wine.py --build` seals the wine64 payload
    (manifest records whether `winewayland.drv` is present;
@@ -149,15 +151,23 @@ Estimated size: the wine64 closure is expected in the
 150–350 MB class sealed; the stage + weave + gate work is
 comparable to the browser proof pass.
 
-## Open questions for the owner
+## Owner answers (2026-11-07)
 
-1. Accept the distro-staging route for Wine (vs holding
-   out for a from-source build)?
-2. Accept the GDI-first scope — bundled/classic Win32
-   programs first, Direct3D only after a Mesa/Vulkan
-   payload decision?
-3. Where should prefixes live once persistence exists —
-   tied to the storage roadmap, or a dedicated data area
-   designed with this lane?
-4. Is a Start-menu presence wanted at all in the first
-   product slice, or terminal-launched only?
+The questions this proposal posed, and the owner's
+answers, verbatim in substance:
+
+1. **Distro-staging route: accepted.** Wine is staged from
+   the pinned Debian snapshot exactly like Chromium, not
+   built from source.
+2. **GDI-first scope: accepted.** Bundled/classic Win32
+   programs first; Direct3D only after a separate
+   Mesa/Vulkan payload decision, which this acceptance
+   does not make.
+3. **Prefix storage: tied to the storage roadmap.** Proof
+   prefixes live on tmpfs and vanish at shutdown; a real
+   prefix store is designed with the parked
+   installer/storage roadmap, not invented by this lane.
+4. **Start-menu presence: later, marker-gated.** No
+   Start-menu entry in the proof slice; a marker-gated
+   entry following the Files/Updates pattern belongs to a
+   later product slice.

@@ -1,12 +1,12 @@
-# Observer history & lifecycle — design proposal
+# Observer history & lifecycle — design
 
-Status: **Proposal (2026-11-07). Not accepted.** This
-document records a design for the remaining Phase 3
-observer items so the owner can accept, amend, or reject
-it. Nothing in it is implemented, and it authorizes no
-code. Architecture documents describe accepted direction;
-this one is explicitly a proposal, kept separate from
-`docs/OBSERVER.md` until accepted.
+Status: **Accepted (2026-11-07)** — see
+[ADR 0026](adr/0026-observer-history-lifecycle.md) for the
+decision record and the owner's answers to the questions
+below. This document records the accepted design for the
+remaining Phase 3 observer items. The first slice
+(lifecycle events) is authorized by the acceptance;
+storage/aggregation follow as their own slices.
 
 ## Context
 
@@ -30,7 +30,10 @@ memory lives and who owns the sampling cadence.
 
 **A sampler inside veil-core, off by default.** The core
 already supervises the system and owns the audit journal.
-A bounded sampler thread would, when enabled by policy:
+A bounded sampler thread, when enabled by policy (owner
+amendment, 2026-11-07: the sampler stays **off by default
+until a consumer exists** — acceptance of this design does
+not switch it on):
 
 1. Take an observe snapshot at a fixed cadence
    (proposal: 5 s) using the same producer code — no new
@@ -70,23 +73,23 @@ A bounded sampler thread would, when enabled by policy:
 - No policy, evaluator, or optimization consumer; this is
   observation only, per the Phase 3 scope.
 
-## Open questions for the owner
+## Owner answers (2026-11-07)
 
-1. **Sampling ownership**: sampler inside veil-core as
-   proposed, or a separate unprivileged helper process the
-   core supervises (more isolation, more moving parts)?
-2. **Cadence and bounds**: is 5 s / 1024 events / 1 min
-   buckets the right starting envelope, and should the
-   sampler be on by default once accepted?
-3. **Exposure**: a separate `observe-history` request as
-   proposed, or a `history` section inside the existing
-   observe response (simpler client, bigger frames)?
-4. **Aggregation set**: are 1 min mean/max buckets for the
-   four windowed metrics the right first aggregation, or
-   is a specific consumer (evaluator, UI) already in mind
-   that dictates the shape?
+The questions this proposal posed, and the owner's
+answers, verbatim in substance:
 
-## First slice if accepted
+1. **Sampling ownership**: sampler inside veil-core, as
+   proposed.
+2. **Cadence and bounds**: 5 s cadence, 1024-event ring,
+   1 min buckets accepted — with the amendment that the
+   sampler is **off by default until a consumer exists**.
+3. **Exposure**: a separate read-only `observe-history`
+   request, as proposed.
+4. **Aggregation set**: 1 min mean/max buckets for the
+   four windowed metrics (utilization, throughput,
+   bandwidth, power), as proposed.
+
+## First slice (authorized by the acceptance)
 
 Lifecycle events only: the sampler + process diff + ring,
 served read-only, host-tested with fixture snapshot pairs

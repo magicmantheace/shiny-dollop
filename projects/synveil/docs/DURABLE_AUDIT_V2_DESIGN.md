@@ -339,3 +339,12 @@ the audit-v2 rollout is complete as designed. The remaining
 gaps are the ones already named in ROADMAP.md (automatic
 retention, installed disk-full policy, power-loss durability
 validation).
+
+**Owner decision (2026-11-07): LEAVE AS-IS.** The owner
+reviewed this rollout check and decided that the A/B
+control-record `history` vector stays exactly as it is: it
+will not be chained, re-formatted, or migrated. No
+frozen-zone change is authorized, and none will be made.
+The audit-v2 rollout is therefore **closed**: the core
+journal is the only audit journal, it writes chained v2
+records, and that is the accepted end state.
