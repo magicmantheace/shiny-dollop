@@ -1302,3 +1302,28 @@ unavailable path); synctl's own validation accepted the
 response (empty stderr). QEMU evidence only — no physical
 hardware is claimed. See
 [retained evidence](validation/observe-psi-d526e55/README.md).
+
+## Observer disk throughput (Phase 3) — native validation (2026-11-07)
+
+`disk.throughput` (per-device read/write bytes-per-second
+over the observe window, implemented at `97debb8`) was
+validated natively with the extended observe gate
+(`tests/smoke-native-observe.py`, marker
+`SYNVEIL_OBSERVE_QEMU_PASS`) on the joined image sha256
+`1a6abd0a60460ca1c0d61ab49dfda5fd43ce48f48f8fe1312e742f2f3502151e`
+(guest binaries stamp `e532ad9`). The joined baseline smoke
+passed on the same image first. In the captured guest
+response the cumulative disk object and the throughput
+object both reported `ready`: all 11 devices (loop0–loop7,
+vda, vda1, vda2) were rated over a 101 ms window with zero
+unavailable and zero omitted; the rates were 0 because the
+guest was idle during the window — the gate asserts shape
+and coherence, and the rate arithmetic, churn/counter-reset
+withholding, and edge cases are covered by host unit tests
+(veil-core 167 lib tests, synctl 5). PSI statuses were
+re-verified ready in the same capture, and the packaged
+synctl's validation (extended with throughput consistency
+checks) accepted the response. Evidence:
+`docs/validation/observe-disk-e532ad9/`. No controlled-load
+accuracy calibration and no physical hardware validation
+are claimed.

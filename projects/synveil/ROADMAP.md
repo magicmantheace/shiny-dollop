@@ -366,8 +366,13 @@ anchoring and physical power-loss testing remain open.
     and cumulative busy time are exposed read-only by `synctl observe`.
     The strict parser rejects malformed counters and bounds device output.
     Partition and whole-device counters are never summed. Missing procfs
-    diskstats is explicitly unavailable, not estimated or fabricated;
-    interval-based throughput and persistent history remain open.
+    diskstats is explicitly unavailable, not estimated or fabricated.
+    Interval-based throughput (`disk.throughput`, per-device bytes/sec
+    over the observe window; churn and counter resets withheld, never
+    invented) is implemented with host tests and passed native QEMU
+    validation on the joined guest at `e532ad9` (see
+    `docs/validation/observe-disk-e532ad9/`); persistent history
+    remains open.
 - [ ] network metrics
   - Strict, bounded `/proc/net/dev` counters now report per-interface RX/TX
     bytes, packets, errors, and drops through read-only `synctl observe`.

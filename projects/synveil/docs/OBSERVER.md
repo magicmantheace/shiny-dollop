@@ -124,3 +124,40 @@ accepting it (empty synctl stderr). The system core's socket
 is root-only, so the gate exercised the compiled code through
 a user-level fixture core against the real guest /proc — see
 [retained evidence](validation/observe-psi-d526e55/README.md).
+
+## Disk I/O
+
+The `disk` object reports raw cumulative per-device counters
+from `/proc/diskstats` (reads/writes completed, 512-byte
+sector counters, in-flight I/O, busy time). A strict parser
+rejects malformed counters and bounds the device list;
+whole devices and partitions are separate rows and are never
+summed.
+
+`disk.throughput` adds interval rates over the same
+≥100 ms window used for CPU utilization: the observer reads
+diskstats before and after the window and reports, per
+device, integer `read_bytes_per_sec` / `write_bytes_per_sec`
+(sector delta × 512 × 1000 / window, floored), with
+`sample_window_ms`. A device is rated only when it appears
+in both samples with non-decreasing sector counters; a
+device that appeared, vanished, or reset inside the window
+is counted in `unavailable_devices` instead of being
+assigned an invented rate. Status is `ready` when every
+device was rated, `partial` when some were not,
+`truncated` when the device cap dropped rows, and
+`unavailable` when nothing could be rated (including a
+zero-length window). A missing or malformed first sample
+degrades only the throughput object (`unavailable` /
+`invalid`); the cumulative snapshot keeps its own strict
+behaviour. `synctl` validates the object for internal
+consistency when present.
+
+Host tests cover the rate arithmetic, churn/decrease
+withholding, and the zero-window and truncation cases.
+Native QEMU validation passed 2026-11-07 on the joined
+guest (all 11 devices rated `ready`; the guest was idle in
+the sample window, so the captured rates are honestly
+zero) — see
+[evidence](validation/observe-disk-e532ad9/README.md).
+Persistent history remains a separate open roadmap item.
