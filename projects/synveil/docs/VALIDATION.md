@@ -1223,3 +1223,30 @@ contains `SYNVEIL_OBSERVE_OK` after requiring the energy object. See
 unavailable-zone result; positive and partial readings remain host-fixture
 evidence. Instantaneous power, power-limit control, and physical-hardware
 validation remain open.
+
+## Durable audit record format v2 — native acceptance
+
+The hash-chained `synveil.audit/v2` core journal (slices 1–2 at
+host level) passed native QEMU acceptance at exact revision
+`743112180f5b37a35da8d6fe7db699231c87b01d` on 2026-11-06–07,
+satisfying ADR 0023 Decision 3 for this payload change: the
+joined acceptance passed end to end on the same image
+(`SYNVEIL_NATIVE_JOINED_QEMU_ENROLL_LOGIN_WESTON_PASS`), the
+A/B update round trip passed on generations built from this
+revision (`SYNVEIL_AB_QEMU_PROOF_PASS`), and the dedicated
+audit gate (`tests/smoke-native-audit-v2.py`,
+`SYNVEIL_AUDIT_V2_NATIVE_PASS`) proved the in-guest core
+journal chains from a seeded v1 tail across the v1→v2
+boundary, the packaged checker accepts it with the boundary
+as anchor, and a packaged export receipt verifies on the host
+while a truncated snapshot is refused. The gate also caught
+and fixed two defects (writer record loss under startup lock
+contention; unreported boundary anchor), each with host
+regression tests; the full `veil-core` suite passes at 164
+library tests plus the integration targets. The format is
+accepted; remaining gaps (automatic retention, installed
+disk-full policy, power-loss durability) are named in
+ROADMAP.md. The export ran with packaged tooling on the host
+against the guest-written journal, not inside the guest.
+QEMU evidence only — no physical hardware is claimed. See
+[retained evidence](validation/audit-v2-7431121/README.md).

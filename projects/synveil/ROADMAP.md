@@ -209,8 +209,13 @@ deleting history. Guest rollover passed at
 [f973531](docs/validation/native-f973531/README.md). Extended archive retention
 and disk-full policy remain open. Tamper evidence for the core journal was
 implemented at host level on 2026-11-06 (hash-chained v2 records,
-`docs/DURABLE_AUDIT_V2_DESIGN.md`); its native acceptance is still
-pending under ADR 0023 Decision 3. Offline read-only `veil-audit check` structural
+`docs/DURABLE_AUDIT_V2_DESIGN.md`), and its native acceptance
+under ADR 0023 Decision 3 passed at `7431121` (2026-11-06–07)
+([audit v2 evidence](docs/validation/audit-v2-7431121/README.md)):
+the format is accepted. The item stays unchecked for the
+remaining named gaps: (3) automatic retention beyond the single
+archive slot, (4) an installed disk-full policy, and
+(5) power-loss durability validation. Offline read-only `veil-audit check` structural
 inspection is implemented with a bounded schema/count report; it does not
 authenticate records or prove completeness. Its exact-revision native guest
 validation passed at [262d275](docs/validation/native-262d275/README.md).

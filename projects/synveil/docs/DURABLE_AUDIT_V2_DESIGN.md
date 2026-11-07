@@ -268,3 +268,39 @@ The tooling slice is implemented in `audit_export.rs` and the
   (native QEMU acceptance per ADR 0023 Decision 3) remains
   open, so the format is still **not accepted** and must not be
   described as accepted until that pass lands.
+
+## Implementation amendment — 2026-11-06 (slice 3: native acceptance; format ACCEPTED)
+
+Slice 3 landed at source `7431121` with evidence in
+`docs/validation/audit-v2-7431121/`
+(`SYNVEIL_AUDIT_V2_NATIVE_PASS`; joined acceptance on the same
+image also passed). A seeded v1 journal (3 records) on the
+joined image's state partition gained 10 guest-written chained
+v2 records across two QEMU boots; the first v2 record chains
+from the v1 tail by line hash, the packaged `veil-audit check`
+accepts the journal with the boundary as its anchor, a packaged
+export receipt pins anchor + head + position, and host +
+packaged `verify --receipt` accept the export while a truncated
+snapshot is refused. The v2 format is therefore **accepted**.
+
+Two defects found by the native gate and fixed on the way:
+
+- **Writer record loss under lock contention** (`1d8a29a`):
+  the non-blocking directory lock dropped records when the
+  supervisor and its core appended concurrently at startup.
+  The writer now waits out contention for a bounded 10 s;
+  inspection/retention remain fail-fast.
+- **Boundary anchor unreported** (`e4ec83f`): the checker
+  reported `anchor: null` for journals whose chained segment
+  follows v1 records, so their export receipts pinned null and
+  anchored nothing. The anchor is now the first chained
+  record's `prev_digest` in all cases, with regression tests
+  at inspection and export level.
+
+The export in this gate ran with the packaged tooling on the
+host against the guest-written journal, not inside the guest;
+that scope is stated in the evidence record. Remaining gaps
+are unchanged from the slice plan and named in ROADMAP.md:
+automatic retention beyond the single archive slot, an
+installed disk-full policy, and power-loss durability
+validation.

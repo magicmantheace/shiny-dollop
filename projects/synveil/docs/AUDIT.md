@@ -205,12 +205,22 @@ Host evidence: the full `veil-core` suite (162 library tests plus
 the integration targets) passes with receipt generation,
 verification, and tamper tests (mutated record, wrong anchor,
 truncated export) and a CLI test over a genuine chained journal.
+Slice 3 (native acceptance) landed 2026-11-06–07 at source
+`7431121`: an image carrying the v2 writer passed the joined
+QEMU acceptance and the A/B update round trip, and a seeded
+v1 journal on its state partition gained guest-written chained
+v2 records across the v1→v2 boundary, verified end to end with
+the packaged checker and an export receipt
+([evidence](validation/audit-v2-7431121/README.md)). The v2
+format is therefore **accepted**. The native gate also produced
+two fixes, both with host regression tests: the writer no longer
+drops records under startup lock contention (bounded 10 s wait,
+`1d8a29a`), and the checker/export now report and pin the real
+chain anchor for v1-boundary journals (`e4ec83f`).
 Not yet done: the A/B agents' separate journals still write v1;
-and no image carrying the v2 writer has been through the joined
-QEMU acceptance + update round trip, which ADR 0023 Decision 3
-requires before the format is called accepted — the Phase 2
-roadmap item stays open.
-Cryptographic integrity, retention/rotation and power-loss testing remain open.
+automatic retention beyond the single archive slot, an installed
+disk-full policy, and power-loss durability validation remain
+open (named in ROADMAP.md).
 
 The native builder audits the new `veil-audit` ELF and link inputs alongside
 core, CLI, enrollment and seat binaries. Rootfs packaging requires its hash-bound
