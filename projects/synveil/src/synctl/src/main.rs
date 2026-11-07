@@ -398,6 +398,58 @@ fn validate_observe_result(result: &Value) -> io::Result<()> {
             }
         }
     }
+
+    // energy.power is an optional object (absent when the
+    // powercap source could not be scanned at all, and on
+    // older cores); when present it must be consistent.
+    if let Some(power) = result.get("energy").and_then(|energy| energy.get("power")) {
+        let zones = power
+            .get("zones")
+            .and_then(Value::as_array)
+            .ok_or_else(invalid)?;
+        if zones.len() > 256 {
+            return Err(invalid());
+        }
+        let window = power
+            .get("sample_window_ms")
+            .and_then(Value::as_u64)
+            .ok_or_else(invalid)?;
+        let unavailable = power
+            .get("unavailable_zones")
+            .and_then(Value::as_u64)
+            .ok_or_else(invalid)?;
+        let omitted = power
+            .get("omitted_zones")
+            .and_then(Value::as_u64)
+            .ok_or_else(invalid)?;
+        let scan_truncated = power
+            .get("scan_truncated")
+            .and_then(Value::as_bool)
+            .ok_or_else(invalid)?;
+        match power.get("status").and_then(Value::as_str) {
+            Some("ready") if window > 0 && !zones.is_empty() && unavailable == 0 => {}
+            Some("partial") if window > 0 && !zones.is_empty() && unavailable > 0 => {}
+            Some("truncated") if omitted > 0 || scan_truncated => {}
+            Some("unavailable") if zones.is_empty() => {}
+            _ => return Err(invalid()),
+        }
+        for zone in zones {
+            if zone
+                .get("id")
+                .and_then(Value::as_str)
+                .filter(|id| !id.is_empty())
+                .is_none()
+                || zone
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .filter(|name| !name.is_empty())
+                    .is_none()
+                || zone.get("avg_power_uw").and_then(Value::as_u64).is_none()
+            {
+                return Err(invalid());
+            }
+        }
+    }
     Ok(())
 }
 
@@ -652,6 +704,76 @@ mod tests {
             let network = json!({"status": "ready", "interfaces": [],
                                  "bandwidth": invalid});
             assert!(validate_observe_result(&response(network)).is_err());
+        }
+    }
+
+    #[test]
+    fn observe_validation_checks_energy_power_when_present() {
+        let processes = json!({
+            "status": "ready",
+            "records": [{
+                "pid": 7, "parent_pid": 1, "process_group_id": 7,
+                "session_id": 7, "state": "R", "user_ticks": 10,
+                "system_ticks": 2, "start_time_ticks": 100,
+                "virtual_memory_bytes": 8192, "resident_pages": 2,
+                "thread_count": 1, "nice": 0
+            }],
+            "unavailable_processes": 0, "omitted_processes": 0,
+            "scan_truncated": false
+        });
+        let response = |energy: Value| {
+            json!({
+                "schema": "synveil.observe/v1",
+                "cpu": {"utilization": {"status": "unavailable"}},
+                "processes": processes.clone(),
+                "energy": energy,
+            })
+        };
+        let zone = json!({
+            "id": "intel-rapl:0", "name": "package-0",
+            "avg_power_uw": 10000
+        });
+        // No power object (unscannable source / older core).
+        assert!(
+            validate_observe_result(&response(json!({"status": "unavailable", "zones": []})))
+                .is_ok()
+        );
+        for valid in [
+            json!({"status": "ready", "sample_window_ms": 101,
+                   "zones": [zone.clone()], "unavailable_zones": 0,
+                   "omitted_zones": 0, "scan_truncated": false}),
+            json!({"status": "unavailable", "sample_window_ms": 101,
+                   "zones": [], "unavailable_zones": 0,
+                   "omitted_zones": 0, "scan_truncated": false}),
+            json!({"status": "truncated", "sample_window_ms": 101,
+                   "zones": [zone.clone()], "unavailable_zones": 0,
+                   "omitted_zones": 0, "scan_truncated": true}),
+        ] {
+            let energy = json!({"status": "ready", "zones": [],
+                                "power": valid});
+            assert!(validate_observe_result(&response(energy)).is_ok());
+        }
+        for invalid in [
+            // truncated with no truncation evidence
+            json!({"status": "truncated", "sample_window_ms": 101,
+                   "zones": [zone.clone()], "unavailable_zones": 0,
+                   "omitted_zones": 0, "scan_truncated": false}),
+            // ready over a zero window
+            json!({"status": "ready", "sample_window_ms": 0,
+                   "zones": [zone.clone()], "unavailable_zones": 0,
+                   "omitted_zones": 0, "scan_truncated": false}),
+            // invalid is a snapshot status, never a power status
+            json!({"status": "invalid", "sample_window_ms": 101,
+                   "zones": [], "unavailable_zones": 0,
+                   "omitted_zones": 0, "scan_truncated": false}),
+            // missing scan_truncated field
+            json!({"status": "ready", "sample_window_ms": 101,
+                   "zones": [zone.clone()], "unavailable_zones": 0,
+                   "omitted_zones": 0}),
+        ] {
+            let energy = json!({"status": "ready", "zones": [],
+                                "power": invalid});
+            assert!(validate_observe_result(&response(energy)).is_err());
         }
     }
 

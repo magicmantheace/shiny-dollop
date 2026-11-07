@@ -31,6 +31,9 @@ pub fn sample() -> io::Result<Value> {
     let diskstats_before = fs::read_to_string("/proc/diskstats");
     // Same arrangement for network bandwidth.
     let netdev_before = fs::read_to_string("/proc/net/dev");
+    // And for interval power: scan powercap zones before the
+    // window so energy.power can be derived from two scans.
+    let powercap_before = read_powercap(Path::new("/sys/class/powercap"));
     let sample_started = Instant::now();
     thread::sleep(CPU_SAMPLE_INTERVAL);
     let stat = fs::read_to_string("/proc/stat")?;
@@ -42,7 +45,13 @@ pub fn sample() -> io::Result<Value> {
     snapshot["cpu"]["frequency"] = read_cpu_frequency(Path::new("/sys/devices/system/cpu"));
     snapshot["thermal"] = read_thermal_zones(Path::new("/sys/class/thermal"));
     snapshot["processes"] = read_processes(Path::new("/proc"));
-    snapshot["energy"] = read_powercap_zones(Path::new("/sys/class/powercap"));
+    let powercap_after = read_powercap(Path::new("/sys/class/powercap"));
+    let mut energy = powercap_json(&powercap_after);
+    if let Some(power) = energy_interval_power(&powercap_before, &powercap_after, sample_window_ms)
+    {
+        energy["power"] = power;
+    }
+    snapshot["energy"] = energy;
     // Disk counters are optional on restricted procfs mounts; an unavailable
     // source must not prevent CPU/memory health from being reported.
     snapshot["disk"] = match fs::read_to_string("/proc/diskstats") {
@@ -414,12 +423,34 @@ fn read_powercap_zone(path: &Path) -> io::Result<Option<(String, u64, u64)>> {
     Ok(Some((name, energy_uj, max_energy_range_uj)))
 }
 
-/// Read cumulative Linux powercap energy counters. These values can wrap and
-/// are not an instantaneous power measurement or a policy control surface.
-fn read_powercap_zones(root: &Path) -> Value {
+/// One successfully read powercap zone counter pair.
+struct PowercapZoneSample {
+    id: String,
+    name: String,
+    energy_uj: u64,
+    max_energy_range_uj: u64,
+}
+
+/// The outcome of one powercap scan, kept separate from its
+/// JSON form so interval power can be computed from two scans
+/// without re-deriving counters from display data.
+enum PowercapRead {
+    /// The powercap sysfs root itself could not be listed.
+    RootUnavailable,
+    /// Malformed data was encountered; nothing is trustworthy.
+    Invalid,
+    Scanned {
+        zones: Vec<PowercapZoneSample>,
+        unavailable_zones: u64,
+        omitted_zones: u64,
+        scan_truncated: bool,
+    },
+}
+
+fn read_powercap(root: &Path) -> PowercapRead {
     match fs::read_dir(root) {
         Ok(_) => {}
-        Err(_) => return json!({"status": "unavailable", "zones": []}),
+        Err(_) => return PowercapRead::RootUnavailable,
     }
 
     let mut zones = Vec::<(String, Vec<u32>, String, PathBuf)>::new();
@@ -434,7 +465,7 @@ fn read_powercap_zones(root: &Path) -> Value {
     'directories: while let Some(directory) = pending.pop_front() {
         let entries = match fs::read_dir(&directory) {
             Ok(entries) => entries,
-            Err(_) => return json!({"status": "invalid", "zones": []}),
+            Err(_) => return PowercapRead::Invalid,
         };
         for entry in entries {
             if scanned_entries == MAX_POWERCAP_SCAN_ENTRIES {
@@ -444,7 +475,7 @@ fn read_powercap_zones(root: &Path) -> Value {
             scanned_entries += 1;
             let entry = match entry {
                 Ok(entry) => entry,
-                Err(_) => return json!({"status": "invalid", "zones": []}),
+                Err(_) => return PowercapRead::Invalid,
             };
             let name = entry.file_name();
             let zone_id = powercap_zone_id(&name);
@@ -479,54 +510,182 @@ fn read_powercap_zones(root: &Path) -> Value {
         }
     }
     zones.sort_unstable_by(|left, right| left.0.cmp(&right.0).then_with(|| left.1.cmp(&right.1)));
-    let omitted_zones = zones.len().saturating_sub(MAX_POWERCAP_ZONES);
+    let omitted_zones = zones.len().saturating_sub(MAX_POWERCAP_ZONES) as u64;
     zones.truncate(MAX_POWERCAP_ZONES);
-    if zones.is_empty() {
-        return json!({
-            "status": if scan_truncated { "truncated" } else { "unavailable" },
-            "zones": [],
-            "unavailable_zones": 0,
-            "omitted_zones": 0,
-            "scan_truncated": scan_truncated,
-        });
-    }
 
     let mut observed = Vec::with_capacity(zones.len());
-    let mut unavailable_zones = 0usize;
+    let mut unavailable_zones = 0u64;
     for (_, _, id, path) in zones {
         match read_powercap_zone(&path) {
-            Ok(Some((name, energy_uj, max_energy_range_uj))) => observed.push(json!({
-                "id": id,
-                "name": name,
-                "energy_uj": energy_uj,
-                "max_energy_range_uj": max_energy_range_uj,
-            })),
+            Ok(Some((name, energy_uj, max_energy_range_uj))) => observed.push(PowercapZoneSample {
+                id,
+                name,
+                energy_uj,
+                max_energy_range_uj,
+            }),
             Ok(None) => unavailable_zones += 1,
-            Err(_) => return json!({"status": "invalid", "zones": []}),
+            Err(_) => return PowercapRead::Invalid,
         }
     }
-    if observed.is_empty() {
-        return json!({
-            "status": if scan_truncated { "truncated" } else { "unavailable" },
-            "zones": [],
-            "unavailable_zones": unavailable_zones,
-            "omitted_zones": omitted_zones,
-            "scan_truncated": scan_truncated,
-        });
+    PowercapRead::Scanned {
+        zones: observed,
+        unavailable_zones,
+        omitted_zones,
+        scan_truncated,
     }
-    json!({
-        "status": if omitted_zones > 0 || scan_truncated {
+}
+
+/// The observe JSON for one powercap scan. The counted empty
+/// form covers both "no zones discovered" and "zones found
+/// but none readable" exactly as the original reader did.
+fn powercap_json(read: &PowercapRead) -> Value {
+    match read {
+        PowercapRead::RootUnavailable => {
+            json!({"status": "unavailable", "zones": []})
+        }
+        PowercapRead::Invalid => json!({"status": "invalid", "zones": []}),
+        PowercapRead::Scanned {
+            zones,
+            unavailable_zones,
+            omitted_zones,
+            scan_truncated,
+        } => {
+            if zones.is_empty() {
+                return json!({
+                    "status": if *scan_truncated { "truncated" } else { "unavailable" },
+                    "zones": [],
+                    "unavailable_zones": unavailable_zones,
+                    "omitted_zones": omitted_zones,
+                    "scan_truncated": scan_truncated,
+                });
+            }
+            let zone_json = zones
+                .iter()
+                .map(|zone| {
+                    json!({
+                        "id": zone.id,
+                        "name": zone.name,
+                        "energy_uj": zone.energy_uj,
+                        "max_energy_range_uj": zone.max_energy_range_uj,
+                    })
+                })
+                .collect::<Vec<_>>();
+            json!({
+                "status": if *omitted_zones > 0 || *scan_truncated {
+                    "truncated"
+                } else if *unavailable_zones > 0 {
+                    "partial"
+                } else {
+                    "ready"
+                },
+                "zones": zone_json,
+                "unavailable_zones": unavailable_zones,
+                "omitted_zones": omitted_zones,
+                "scan_truncated": scan_truncated,
+            })
+        }
+    }
+}
+
+/// Read cumulative Linux powercap energy counters. These values can wrap and
+/// are not an instantaneous power measurement or a policy control surface.
+/// Production code uses `read_powercap` + `powercap_json` (it
+/// needs the scan itself for interval power); this projection
+/// entry point is retained for the test suite.
+#[cfg(test)]
+fn read_powercap_zones(root: &Path) -> Value {
+    powercap_json(&read_powercap(root))
+}
+
+/// Average interval power per zone between two powercap
+/// scans over the observe window: energy delta / window, in
+/// microwatts. RAPL-style counters wrap at their
+/// max_energy_range_uj; a decrease with an unchanged range
+/// is accounted as exactly one wrap (over a >=100 ms window
+/// the range spans far more energy than can accumulate
+/// twice). A zone is rated only when present in both scans
+/// with an unchanged wrap range; anything else is counted
+/// unavailable. Returns None when either scan could not run
+/// (root unavailable / invalid), in which case the response
+/// carries no power object at all — mirroring how disk
+/// throughput is absent when its source is missing.
+fn energy_interval_power(
+    before: &PowercapRead,
+    after: &PowercapRead,
+    window_ms: u64,
+) -> Option<Value> {
+    let (
+        PowercapRead::Scanned {
+            zones: before_zones,
+            omitted_zones: before_omitted,
+            scan_truncated: before_truncated,
+            ..
+        },
+        PowercapRead::Scanned {
+            zones: after_zones,
+            omitted_zones: after_omitted,
+            scan_truncated: after_truncated,
+            ..
+        },
+    ) = (before, after)
+    else {
+        return None;
+    };
+    let mut rated = Vec::new();
+    let mut unavailable = 0u64;
+    if window_ms > 0 {
+        let before_by_id: std::collections::HashMap<&str, &PowercapZoneSample> = before_zones
+            .iter()
+            .map(|zone| (zone.id.as_str(), zone))
+            .collect();
+        for zone in after_zones {
+            let delta = before_by_id.get(zone.id.as_str()).and_then(|prior| {
+                if prior.max_energy_range_uj != zone.max_energy_range_uj {
+                    return None;
+                }
+                if zone.energy_uj >= prior.energy_uj {
+                    Some(zone.energy_uj - prior.energy_uj)
+                } else {
+                    // Single wrap at the shared range; both
+                    // counters are <= range (the reader
+                    // enforces it), so this cannot underflow.
+                    Some(zone.max_energy_range_uj - prior.energy_uj + zone.energy_uj)
+                }
+            });
+            match delta {
+                Some(delta) => {
+                    let scaled = u128::from(delta) * 1000 / u128::from(window_ms);
+                    rated.push(json!({
+                        "id": zone.id,
+                        "name": zone.name,
+                        "avg_power_uw": u64::try_from(scaled)
+                            .unwrap_or(u64::MAX),
+                    }));
+                }
+                None => unavailable += 1,
+            }
+        }
+    } else {
+        unavailable = after_zones.len() as u64;
+    }
+    let status =
+        if *before_omitted > 0 || *before_truncated || *after_omitted > 0 || *after_truncated {
             "truncated"
-        } else if unavailable_zones > 0 {
+        } else if rated.is_empty() {
+            "unavailable"
+        } else if unavailable > 0 {
             "partial"
         } else {
             "ready"
-        },
-        "zones": observed,
-        "unavailable_zones": unavailable_zones,
-        "omitted_zones": omitted_zones,
-        "scan_truncated": scan_truncated,
-    })
+        };
+    Some(json!({
+        "status": status,
+        "sample_window_ms": window_ms,
+        "zones": rated,
+        "unavailable_zones": unavailable,
+        "omitted_zones": after_omitted,
+        "scan_truncated": *before_truncated || *after_truncated,
+    }))
 }
 
 fn invalid_data(message: &'static str) -> io::Error {
@@ -1724,6 +1883,79 @@ mod tests {
         fs::write(directory.join("energy_uj"), "1001\n").unwrap();
         fs::write(directory.join("max_energy_range_uj"), "1000\n").unwrap();
         assert_eq!(read_powercap_zones(&root)["status"], "invalid");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    fn scanned_zone(id: &str, energy_uj: u64, range: u64) -> PowercapRead {
+        PowercapRead::Scanned {
+            zones: vec![PowercapZoneSample {
+                id: id.to_owned(),
+                name: "package-0".to_owned(),
+                energy_uj,
+                max_energy_range_uj: range,
+            }],
+            unavailable_zones: 0,
+            omitted_zones: 0,
+            scan_truncated: false,
+        }
+    }
+
+    #[test]
+    fn interval_power_computes_average_microwatts_and_wraps() {
+        // +2500 uJ over 250 ms -> 10000 uW.
+        let before = scanned_zone("intel-rapl:0", 1_000, 1_000_000);
+        let after = scanned_zone("intel-rapl:0", 3_500, 1_000_000);
+        let power = energy_interval_power(&before, &after, 250).unwrap();
+        assert_eq!(power["status"], "ready");
+        assert_eq!(power["zones"][0]["avg_power_uw"], 10_000);
+        // Wrapped once: (1000 - 900) + 50 = 150 uJ over 100 ms.
+        let before = scanned_zone("intel-rapl:0", 900, 1_000);
+        let after = scanned_zone("intel-rapl:0", 50, 1_000);
+        let power = energy_interval_power(&before, &after, 100).unwrap();
+        assert_eq!(power["zones"][0]["avg_power_uw"], 1_500);
+    }
+
+    #[test]
+    fn interval_power_withholds_unmatched_zones_and_ranges() {
+        let before = scanned_zone("intel-rapl:0", 1_000, 1_000_000);
+        // Zone vanished in the second scan.
+        let after = PowercapRead::Scanned {
+            zones: vec![],
+            unavailable_zones: 1,
+            omitted_zones: 0,
+            scan_truncated: false,
+        };
+        let power = energy_interval_power(&before, &after, 100).unwrap();
+        assert_eq!(power["status"], "unavailable");
+        assert!(power["zones"].as_array().unwrap().is_empty());
+        // Wrap range changed between scans: no invented delta.
+        let after = scanned_zone("intel-rapl:0", 2_000, 2_000_000);
+        let power = energy_interval_power(&before, &after, 100).unwrap();
+        assert_eq!(power["status"], "unavailable");
+        assert_eq!(power["unavailable_zones"], 1);
+        // Zero window rates nothing.
+        let power = energy_interval_power(&before, &before, 0).unwrap();
+        assert_eq!(power["status"], "unavailable");
+        // Either scan not runnable -> no power object at all.
+        assert!(energy_interval_power(&PowercapRead::RootUnavailable, &before, 100).is_none());
+        assert!(energy_interval_power(&before, &PowercapRead::Invalid, 100).is_none());
+    }
+
+    #[test]
+    fn interval_power_from_real_scans_of_a_fixture_tree() {
+        let root = frequency_fixture();
+        let directory = root.join("intel-rapl:0");
+        fs::create_dir(&directory).unwrap();
+        fs::write(directory.join("name"), "package-0\n").unwrap();
+        fs::write(directory.join("energy_uj"), "2000\n").unwrap();
+        fs::write(directory.join("max_energy_range_uj"), "100000\n").unwrap();
+        let before = read_powercap(&root);
+        fs::write(directory.join("energy_uj"), "4500\n").unwrap();
+        let after = read_powercap(&root);
+        let power = energy_interval_power(&before, &after, 100).unwrap();
+        assert_eq!(power["status"], "ready");
+        assert_eq!(power["zones"][0]["id"], "intel-rapl:0");
+        assert_eq!(power["zones"][0]["avg_power_uw"], 25_000);
         fs::remove_dir_all(root).unwrap();
     }
 
