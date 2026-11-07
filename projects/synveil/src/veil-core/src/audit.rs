@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
-use serde_json::{Value, json};
-use std::ffi::{CString, c_char};
+use serde_json::{json, Value};
+use std::ffi::{c_char, CString};
 use std::fs::{self, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::os::unix::ffi::OsStrExt;
@@ -161,6 +161,32 @@ pub(crate) fn directory_lock(path: &Path, write: bool) -> io::Result<Option<fs::
     Ok(Some(lock))
 }
 
+/// The writer's lock acquisition: retry contention for a bounded
+/// window instead of dropping the record. At native startup the
+/// supervisor and its supervised core append concurrently, and a
+/// critical section includes file + directory fsyncs, which on
+/// slow storage can outlast an instant try by orders of
+/// magnitude; the 2026-11-06 QEMU acceptance boot lost a startup
+/// record to exactly this (`persistent write failed: Resource
+/// temporarily unavailable`). The lock is taken before any write,
+/// so waiting is safe: a contended attempt has written nothing.
+/// Only WouldBlock waits; every other error fails immediately,
+/// and inspection/retention keep the fail-fast `directory_lock`.
+fn directory_lock_writer(path: &Path) -> io::Result<Option<fs::File>> {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    loop {
+        match directory_lock(path, true) {
+            Err(error)
+                if error.kind() == io::ErrorKind::WouldBlock
+                    && std::time::Instant::now() < deadline =>
+            {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            result => return result,
+        }
+    }
+}
+
 fn archive_path(path: &Path) -> io::Result<PathBuf> {
     let mut name = path.file_name().ok_or_else(unsafe_journal)?.to_os_string();
     name.push(".1");
@@ -261,11 +287,17 @@ pub(crate) fn digest_from_hex(text: &str) -> Option<[u8; 64]> {
 /// for a v1 record — SHA-512 of the raw line bytes.
 pub(crate) fn link_hash_of_line(line: &[u8]) -> io::Result<[u8; 64]> {
     let value = super::audit_json::decode(line).map_err(|_| {
-        io::Error::new(io::ErrorKind::InvalidData, "audit journal line is not valid JSON")
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            "audit journal line is not valid JSON",
+        )
     })?;
     if let Some(text) = value["record_digest"].as_str() {
         return digest_from_hex(text).ok_or_else(|| {
-            io::Error::new(io::ErrorKind::InvalidData, "audit record_digest is malformed")
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "audit record_digest is malformed",
+            )
         });
     }
     Ok(crate::sha512::sha512(line))
@@ -317,7 +349,10 @@ pub(crate) fn chain_record(record: &Value, prev: &[u8; 64]) -> io::Result<(Strin
     let mut value = record.clone();
     {
         let object = value.as_object_mut().ok_or_else(|| {
-            io::Error::new(io::ErrorKind::InvalidInput, "audit record must be an object")
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "audit record must be an object",
+            )
         })?;
         object.insert("schema".to_owned(), json!(AUDIT_SCHEMA_V2));
         object.insert("prev_digest".to_owned(), json!(crate::sha256::hex(prev)));
@@ -326,10 +361,10 @@ pub(crate) fn chain_record(record: &Value, prev: &[u8; 64]) -> io::Result<(Strin
     let mut input = prev.to_vec();
     input.extend_from_slice(canonical.as_bytes());
     let digest = crate::sha512::sha512(&input);
-    value
-        .as_object_mut()
-        .unwrap()
-        .insert("record_digest".to_owned(), json!(crate::sha256::hex(&digest)));
+    value.as_object_mut().unwrap().insert(
+        "record_digest".to_owned(),
+        json!(crate::sha256::hex(&digest)),
+    );
     Ok((value.to_string(), digest))
 }
 
@@ -385,7 +420,7 @@ fn append_prepared_with_io(
     if !directory.file_type().is_dir() || directory.mode() & 0o022 != 0 {
         return Err(unsafe_journal());
     }
-    let _lock = directory_lock(path, true)?;
+    let _lock = directory_lock_writer(path)?;
     // Refuse existing suspicious objects, then validate the opened inode.
     match fs::symlink_metadata(path) {
         Ok(meta) if !meta.file_type().is_file() => return Err(unsafe_journal()),
@@ -501,6 +536,30 @@ mod tests {
             report["chain"]["tail"],
             lines[2]["record_digest"].as_str().unwrap()
         );
+    }
+
+    #[test]
+    fn chained_append_waits_out_a_slow_lock_holder() {
+        // Regression test for the native-startup record loss:
+        // a competing writer holding the journal lock for ~1.5 s
+        // must delay the append, not drop the record.
+        let dir = test_dir("chain-lock-wait");
+        let journal = dir.join("journal");
+        let held = directory_lock(&journal, true).unwrap().unwrap();
+        let release = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(1500));
+            assert_eq!(unsafe { flock(held.as_raw_fd(), 8) }, 0);
+            held
+        });
+        let started = std::time::Instant::now();
+        append_chained(&journal, &record("patient", json!({}))).unwrap();
+        assert!(started.elapsed() >= std::time::Duration::from_millis(1500));
+        release.join().unwrap();
+        let lines = journal_lines(&journal);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0]["event"], "patient");
+        assert!(super::super::audit_check::inspect(&journal).is_ok());
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
@@ -1321,13 +1380,12 @@ mod tests {
         };
         let root = PathBuf::from(root);
         assert_eq!(root.parent().unwrap(), std::env::temp_dir());
-        assert!(
-            root.file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .starts_with("synveil-audit-process-crash-")
-        );
+        assert!(root
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("synveil-audit-process-crash-"));
         let metadata = fs::symlink_metadata(&root).unwrap();
         assert!(metadata.is_dir());
         assert_eq!(metadata.mode() & 0o777, 0o700);
@@ -1557,13 +1615,11 @@ mod tests {
         fs::set_permissions(&lock, fs::Permissions::from_mode(0o644)).unwrap();
         assert!(append_record(&journal, "blocked").is_err());
         fs::remove_file(&lock).unwrap();
-        assert!(
-            std::process::Command::new("mkfifo")
-                .arg(&lock)
-                .status()
-                .unwrap()
-                .success()
-        );
+        assert!(std::process::Command::new("mkfifo")
+            .arg(&lock)
+            .status()
+            .unwrap()
+            .success());
         assert!(append_record(&journal, "blocked").is_err());
         assert_eq!(fs::read(&journal).unwrap(), b"original\n");
         assert_eq!(fs::read(&target).unwrap(), b"private target");
