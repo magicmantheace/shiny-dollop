@@ -21,6 +21,7 @@ mod audit_json;
 pub mod audit_retention;
 pub mod credential;
 pub mod ed25519;
+pub mod history;
 pub mod observer;
 pub mod recovery;
 pub mod seat;
@@ -36,6 +37,7 @@ pub fn dispatch(request: Request) -> Response {
     match request.method.as_str() {
         "status" => status(request),
         "observe" => observe(request),
+        "observe-history" => observe_history(request),
         _ => Response::failure(
             request.id,
             ProtocolError::new(
@@ -47,6 +49,10 @@ pub fn dispatch(request: Request) -> Response {
 }
 
 pub fn serve_path(path: &Path, max_connections: Option<usize>) -> io::Result<()> {
+    // ADR 0026: the lifecycle sampler lives inside the core
+    // and every serve mode funnels through here. It starts
+    // only when policy enables it and is off by default.
+    history::start_sampler_if_enabled();
     prepare_socket_path(path)?;
     let listener = UnixListener::bind(path)?;
     fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
@@ -159,6 +165,79 @@ fn fit_observe_response(response: &mut Response) -> Result<(), ProtocolError> {
                 };
                 processes.insert("omitted_processes".to_owned(), json!(omitted));
                 processes.insert("status".to_owned(), json!("truncated"));
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+/// Read-only lifecycle history (ADR 0026). The sampler is
+/// off by default; a disabled sampler is a state this
+/// response reports, not a request failure.
+fn observe_history(request: Request) -> Response {
+    if request
+        .params
+        .as_object()
+        .is_some_and(|parameters| !parameters.is_empty())
+    {
+        return Response::failure(
+            request.id,
+            ProtocolError::new(
+                ErrorCode::InvalidParameters,
+                "observe-history does not accept parameters",
+            ),
+        );
+    }
+    let mut response = Response::success(
+        request.id,
+        history::global().response(history::sampler_enabled()),
+    );
+    if fit_history_response(&mut response).is_err() {
+        return Response::failure(
+            response.id,
+            ProtocolError::new(
+                ErrorCode::InternalFailure,
+                "lifecycle history exceeds protocol response limit",
+            ),
+        );
+    }
+    response
+}
+
+/// The 1024-event ring can exceed the wire limit, so the
+/// response carries the newest events that fit: oldest
+/// events are dropped from the response (never from the
+/// ring) and the trim is counted in
+/// `sampler.response_omitted_events`. Events are
+/// sequence-ordered, so removing from the front preserves
+/// order and keeps the newest window.
+fn fit_history_response(response: &mut Response) -> Result<(), ProtocolError> {
+    loop {
+        match encode_line(response) {
+            Ok(_) => return Ok(()),
+            Err(error) if error.code == ErrorCode::MessageTooLarge => {
+                let Some(result) = response.result.as_mut() else {
+                    return Err(error);
+                };
+                let removed = match result.get_mut("events").and_then(Value::as_array_mut) {
+                    Some(events) if !events.is_empty() => {
+                        events.remove(0);
+                        true
+                    }
+                    _ => false,
+                };
+                if !removed {
+                    return Err(error);
+                }
+                let Some(omitted) = result
+                    .get_mut("sampler")
+                    .and_then(|sampler| sampler.get_mut("response_omitted_events"))
+                    .and_then(|value| value.as_u64())
+                    .and_then(|count| count.checked_add(1))
+                else {
+                    return Err(error);
+                };
+                result["sampler"]["response_omitted_events"] = json!(omitted);
             }
             Err(error) => return Err(error),
         }
@@ -395,6 +474,76 @@ mod tests {
         assert!(retained < 128);
         assert_eq!(retained + omitted, 128);
         assert_eq!(processes["status"], "truncated");
+    }
+
+    #[test]
+    fn observe_history_rejects_parameters() {
+        let response = dispatch(Request::new(
+            "history-bad",
+            "observe-history",
+            json!({"shell": true}),
+        ));
+        assert!(!response.ok);
+        assert_eq!(
+            response.error.expect("protocol error").code,
+            ErrorCode::InvalidParameters
+        );
+    }
+
+    #[test]
+    fn observe_history_reports_the_sampler_state() {
+        // The test environment does not set the policy
+        // variable, so the sampler reports disabled with an
+        // empty ring; the enabled path is covered by the
+        // history module's own tests and the QEMU gate.
+        let response = dispatch(Request::new("history-1", "observe-history", json!({})));
+        assert!(response.ok);
+        let result = response.result.expect("history result");
+        assert_eq!(result["schema"], "synveil.observe-history/v1");
+        assert_eq!(result["sampler"]["enabled"], history::sampler_enabled());
+        assert_eq!(result["sampler"]["ring_capacity"], 1024);
+        assert!(result["events"].is_array());
+    }
+
+    #[test]
+    fn observe_history_trims_oldest_events_to_fit_the_wire_limit() {
+        let events = (0..300u64)
+            .map(|sequence| {
+                json!({
+                    "schema": "synveil.observe-event/v1",
+                    "event": "process_started",
+                    "sequence": sequence,
+                    "fields": {"process": {"pid": sequence, "filler": "x".repeat(200)}},
+                })
+            })
+            .collect::<Vec<_>>();
+        let mut response = Response::success(
+            "history-trim",
+            json!({
+                "schema": "synveil.observe-history/v1",
+                "sampler": {
+                    "enabled": true,
+                    "cadence_ms": 5000,
+                    "ring_capacity": 1024,
+                    "retained_events": 300,
+                    "dropped_events": 0,
+                    "response_omitted_events": 0,
+                },
+                "events": events,
+            }),
+        );
+        fit_history_response(&mut response).unwrap();
+        let encoded = encode_line(&response).unwrap();
+        assert!(encoded.len() <= veil_protocol::MAX_MESSAGE_BYTES + 1);
+        let result = response.result.as_ref().unwrap();
+        let retained = result["events"].as_array().unwrap().len() as u64;
+        let omitted = result["sampler"]["response_omitted_events"]
+            .as_u64()
+            .unwrap();
+        assert!(retained < 300);
+        assert_eq!(retained + omitted, 300);
+        // The retained window is the newest events.
+        assert_eq!(result["events"][0]["sequence"], omitted);
     }
 
     #[test]

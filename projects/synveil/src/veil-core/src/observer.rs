@@ -1150,6 +1150,46 @@ fn scan_process_ticks(root: &Path) -> Option<(Vec<ProcessTicks>, bool)> {
     Some((ticks, scan_truncated))
 }
 
+/// Full process records for lifecycle diffing (ADR 0026): the
+/// same enumeration discipline as `scan_process_ticks` (same
+/// scan cap, PID-sorted, duplicate PIDs are a hard failure)
+/// but returning the complete stat records, with no snapshot
+/// record cap — lifecycle tracking needs the whole process
+/// set, and a capped window would manufacture false exit and
+/// start events at its boundary. Returns None on any
+/// structural failure; individual unreadable stats are
+/// skipped (the process vanished mid-scan or is unreadable,
+/// and the next scan settles it).
+pub fn process_records(root: &Path) -> Option<Vec<Value>> {
+    let entries = fs::read_dir(root).ok()?;
+    let mut candidates = Vec::new();
+    for (scanned_entries, entry) in entries.enumerate() {
+        if scanned_entries == MAX_PROCESS_SCAN_ENTRIES {
+            return None;
+        }
+        let entry = entry.ok()?;
+        if let Some(pid) = process_directory_id(&entry.file_name()) {
+            candidates.push((pid, entry.path()));
+        }
+    }
+    candidates.sort_unstable_by_key(|(pid, _)| *pid);
+    if candidates.windows(2).any(|pair| pair[0].0 == pair[1].0) {
+        return None;
+    }
+    let mut records = Vec::with_capacity(candidates.len());
+    for (pid, directory) in candidates {
+        if let Ok(record) = read_process_stat(&directory.join("stat"), pid) {
+            records.push(record);
+        }
+    }
+    Some(records)
+}
+
+/// The live process set, for the history sampler (ADR 0026).
+pub fn current_process_records() -> Option<Vec<Value>> {
+    process_records(Path::new("/proc"))
+}
+
 /// Per-process CPU attribution over the observe window,
 /// nested in the process snapshot as `processes.utilization`.
 /// For each record in the (after) snapshot, the process is

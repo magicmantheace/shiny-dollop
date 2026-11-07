@@ -62,7 +62,7 @@ fn run() -> Result<ExitCode, Box<dyn std::error::Error>> {
     }
 
     let command = command.unwrap_or_else(|| "status".to_owned());
-    if command != "status" && command != "observe" {
+    if command != "status" && command != "observe" && command != "observe-history" {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             format!("unknown command: {command}"),
@@ -88,6 +88,9 @@ fn run() -> Result<ExitCode, Box<dyn std::error::Error>> {
     validate_correlation(&response, &request.id)?;
     if command == "observe" && response.ok {
         validate_observe_result(response.result.as_ref().expect("validated response"))?;
+    }
+    if command == "observe-history" && response.ok {
+        validate_history_result(response.result.as_ref().expect("validated response"))?;
     }
 
     if json_output {
@@ -527,13 +530,96 @@ fn validate_observe_result(result: &Value) -> io::Result<()> {
     Ok(())
 }
 
+/// Client-side validation of an `observe-history` response
+/// (ADR 0026): the envelope family is shared with the audit
+/// records, so every event must carry the observe-event
+/// schema, a known lifecycle event name, a strictly
+/// increasing sequence, and a process identity with
+/// cumulative counters. The sampler object must account for
+/// every retained event: the events array plus the count
+/// the producer trimmed from this response equals the
+/// ring's retained count.
+fn validate_history_result(result: &Value) -> io::Result<()> {
+    let invalid = || {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            "invalid observe-history response",
+        )
+    };
+    if result.get("schema").and_then(Value::as_str) != Some("synveil.observe-history/v1") {
+        return Err(invalid());
+    }
+    let sampler = result.get("sampler").ok_or_else(invalid)?;
+    if sampler.get("enabled").and_then(Value::as_bool).is_none()
+        || sampler
+            .get("cadence_ms")
+            .and_then(Value::as_u64)
+            .is_none_or(|cadence| cadence == 0)
+        || sampler
+            .get("ring_capacity")
+            .and_then(Value::as_u64)
+            .is_none_or(|capacity| capacity == 0)
+        || sampler
+            .get("dropped_events")
+            .and_then(Value::as_u64)
+            .is_none()
+    {
+        return Err(invalid());
+    }
+    let retained = sampler
+        .get("retained_events")
+        .and_then(Value::as_u64)
+        .ok_or_else(invalid)?;
+    let omitted = sampler
+        .get("response_omitted_events")
+        .and_then(Value::as_u64)
+        .ok_or_else(invalid)?;
+    let events = result
+        .get("events")
+        .and_then(Value::as_array)
+        .ok_or_else(invalid)?;
+    if retained != events.len() as u64 + omitted {
+        return Err(invalid());
+    }
+    let mut previous_sequence: Option<u64> = None;
+    for event in events {
+        if event.get("schema").and_then(Value::as_str) != Some("synveil.observe-event/v1")
+            || !matches!(
+                event.get("event").and_then(Value::as_str),
+                Some("process_started" | "process_exited")
+            )
+        {
+            return Err(invalid());
+        }
+        let sequence = event
+            .get("sequence")
+            .and_then(Value::as_u64)
+            .ok_or_else(invalid)?;
+        if previous_sequence.is_some_and(|previous| sequence <= previous) {
+            return Err(invalid());
+        }
+        previous_sequence = Some(sequence);
+        let process = event
+            .get("fields")
+            .and_then(|fields| fields.get("process"))
+            .ok_or_else(invalid)?;
+        for key in ["pid", "start_time_ticks", "user_ticks", "system_ticks"] {
+            if process.get(key).and_then(Value::as_u64).is_none() {
+                return Err(invalid());
+            }
+        }
+    }
+    Ok(())
+}
+
 fn print_help() {
     println!(
-        "Usage: synctl [--socket PATH] [--json] [status|observe]\n\
+        "Usage: synctl [--socket PATH] [--json] [status|observe|observe-history]\n\
          \n\
          Commands:\n\
-           status    Query veil-core deterministic service status\n\
-           observe   Read bounded kernel resource and process counters"
+           status          Query veil-core deterministic service status\n\
+           observe         Read bounded kernel resource and process counters\n\
+           observe-history Read lifecycle events from the core's history sampler (ADR 0026)"
     );
 }
 
@@ -560,6 +646,103 @@ mod tests {
         );
         assert!(response_exit_code(&response) == ExitCode::FAILURE);
         assert!(validate_correlation(&response, "expected").is_ok());
+    }
+
+    #[test]
+    fn history_validation_accepts_a_well_formed_response() {
+        let valid = json!({
+            "schema": "synveil.observe-history/v1",
+            "sampler": {
+                "enabled": true,
+                "cadence_ms": 5000,
+                "ring_capacity": 1024,
+                "retained_events": 2,
+                "dropped_events": 0,
+                "response_omitted_events": 0,
+            },
+            "events": [
+                {
+                    "schema": "synveil.observe-event/v1",
+                    "event": "process_started",
+                    "sequence": 0,
+                    "fields": {"process": {
+                        "pid": 42, "start_time_ticks": 100,
+                        "user_ticks": 1, "system_ticks": 0}},
+                },
+                {
+                    "schema": "synveil.observe-event/v1",
+                    "event": "process_exited",
+                    "sequence": 1,
+                    "fields": {"process": {
+                        "pid": 42, "start_time_ticks": 100,
+                        "user_ticks": 3, "system_ticks": 1}},
+                },
+            ],
+        });
+        assert!(validate_history_result(&valid).is_ok());
+        // A disabled sampler with an empty ring is valid.
+        let disabled = json!({
+            "schema": "synveil.observe-history/v1",
+            "sampler": {
+                "enabled": false,
+                "cadence_ms": 5000,
+                "ring_capacity": 1024,
+                "retained_events": 0,
+                "dropped_events": 0,
+                "response_omitted_events": 0,
+            },
+            "events": [],
+        });
+        assert!(validate_history_result(&disabled).is_ok());
+    }
+
+    #[test]
+    fn history_validation_rejects_malformed_responses() {
+        let base = |events: Value, retained: u64, omitted: u64| {
+            json!({
+                "schema": "synveil.observe-history/v1",
+                "sampler": {
+                    "enabled": true,
+                    "cadence_ms": 5000,
+                    "ring_capacity": 1024,
+                    "retained_events": retained,
+                    "dropped_events": 0,
+                    "response_omitted_events": omitted,
+                },
+                "events": events,
+            })
+        };
+        let event = |sequence: u64, kind: &str| {
+            json!({
+                "schema": "synveil.observe-event/v1",
+                "event": kind,
+                "sequence": sequence,
+                "fields": {"process": {
+                    "pid": 42, "start_time_ticks": 100,
+                    "user_ticks": 1, "system_ticks": 0}},
+            })
+        };
+        // Retained count must account for the events carried.
+        assert!(
+            validate_history_result(&base(json!([event(0, "process_started")]), 2, 0)).is_err()
+        );
+        // Sequences must strictly increase.
+        assert!(
+            validate_history_result(&base(
+                json!([event(1, "process_started"), event(1, "process_exited")]),
+                2,
+                0
+            ))
+            .is_err()
+        );
+        // Unknown lifecycle event names are refused.
+        assert!(
+            validate_history_result(&base(json!([event(0, "process_vanished")]), 1, 0)).is_err()
+        );
+        // A wrong document schema is refused.
+        let mut wrong_schema = base(json!([]), 0, 0);
+        wrong_schema["schema"] = json!("synveil.observe/v1");
+        assert!(validate_history_result(&wrong_schema).is_err());
     }
 
     #[test]
