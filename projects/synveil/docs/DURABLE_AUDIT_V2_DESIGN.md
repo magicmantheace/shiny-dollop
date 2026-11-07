@@ -304,3 +304,38 @@ are unchanged from the slice plan and named in ROADMAP.md:
 automatic retention beyond the single archive slot, an
 installed disk-full policy, and power-loss durability
 validation.
+
+## Rollout check — the agents' journals (2026-11-07)
+
+The Phase 2 rollout item "chain the A/B agents' separate
+journals" was checked against the tree before any work, and
+the premise does not hold:
+
+- The system has exactly one persistent audit journal,
+  `/var/log/synveil/core-audit.jsonl`, written by veil-core
+  (supervisor and worker) through `audit::emit` →
+  `append_chained`; it has written chained v2 records since
+  slice 1 and was verified natively in slice 3.
+- No other service writes an audit journal. `veil-ab`,
+  `veil-seat`, and the recovery tools never call
+  `audit::emit` and keep no journal files; nothing in the
+  image's state partition or service layout names another
+  journal.
+- This document's earlier parenthetical — "the
+  `audit_json.rs` writer serves the A/B agents' separate
+  journals, which still write v1" — mislabels the module:
+  `audit_json.rs` is the strict JSON *decoder* the checker
+  and exporter use. There is no second audit writer.
+- The A/B agent's only append-only record is the `history`
+  vector inside its control records. Those are the updater's
+  own state — classed "untouched" by this design's adjacency
+  rules and inside ADR 0023's frozen update machinery — so
+  chaining or re-formatting them is not a journal migration;
+  it would be a frozen-zone change requiring the owner's
+  explicit authorization, and it is not made here.
+
+Rollout status: with the core journal chained and accepted,
+the audit-v2 rollout is complete as designed. The remaining
+gaps are the ones already named in ROADMAP.md (automatic
+retention, installed disk-full policy, power-loss durability
+validation).
