@@ -345,6 +345,59 @@ fn validate_observe_result(result: &Value) -> io::Result<()> {
             }
         }
     }
+
+    // network.bandwidth follows the same optional-object
+    // contract as disk.throughput, with interface naming.
+    if let Some(bandwidth) = result
+        .get("network")
+        .and_then(|network| network.get("bandwidth"))
+    {
+        let interfaces = bandwidth
+            .get("interfaces")
+            .and_then(Value::as_array)
+            .ok_or_else(invalid)?;
+        if interfaces.len() > 32 {
+            return Err(invalid());
+        }
+        let window = bandwidth
+            .get("sample_window_ms")
+            .and_then(Value::as_u64)
+            .ok_or_else(invalid)?;
+        let unavailable = bandwidth
+            .get("unavailable_interfaces")
+            .and_then(Value::as_u64)
+            .ok_or_else(invalid)?;
+        let omitted = bandwidth
+            .get("omitted_interfaces")
+            .and_then(Value::as_u64)
+            .ok_or_else(invalid)?;
+        match bandwidth.get("status").and_then(Value::as_str) {
+            Some("ready") if window > 0 && !interfaces.is_empty() && unavailable == 0 => {}
+            Some("partial") if window > 0 && !interfaces.is_empty() && unavailable > 0 => {}
+            Some("truncated") if omitted > 0 => {}
+            Some("unavailable") if interfaces.is_empty() => {}
+            Some("invalid") if interfaces.is_empty() => {}
+            _ => return Err(invalid()),
+        }
+        for interface in interfaces {
+            if interface
+                .get("name")
+                .and_then(Value::as_str)
+                .filter(|name| !name.is_empty())
+                .is_none()
+                || interface
+                    .get("rx_bytes_per_sec")
+                    .and_then(Value::as_u64)
+                    .is_none()
+                || interface
+                    .get("tx_bytes_per_sec")
+                    .and_then(Value::as_u64)
+                    .is_none()
+            {
+                return Err(invalid());
+            }
+        }
+    }
     Ok(())
 }
 
@@ -525,6 +578,80 @@ mod tests {
             let disk = json!({"status": "ready", "devices": [],
                               "throughput": invalid});
             assert!(validate_observe_result(&response(disk)).is_err());
+        }
+    }
+
+    #[test]
+    fn observe_validation_checks_network_bandwidth_when_present() {
+        let processes = json!({
+            "status": "ready",
+            "records": [{
+                "pid": 7, "parent_pid": 1, "process_group_id": 7,
+                "session_id": 7, "state": "R", "user_ticks": 10,
+                "system_ticks": 2, "start_time_ticks": 100,
+                "virtual_memory_bytes": 8192, "resident_pages": 2,
+                "thread_count": 1, "nice": 0
+            }],
+            "unavailable_processes": 0, "omitted_processes": 0,
+            "scan_truncated": false
+        });
+        let response = |network: Value| {
+            json!({
+                "schema": "synveil.observe/v1",
+                "cpu": {"utilization": {"status": "unavailable"}},
+                "processes": processes.clone(),
+                "network": network,
+            })
+        };
+        let iface = json!({
+            "name": "eth0", "rx_bytes_per_sec": 20000,
+            "tx_bytes_per_sec": 10000
+        });
+        assert!(
+            validate_observe_result(&response(
+                json!({"status": "unavailable", "interfaces": []})
+            ))
+            .is_ok()
+        );
+        for valid in [
+            json!({"status": "ready", "sample_window_ms": 101,
+                   "interfaces": [iface.clone()],
+                   "unavailable_interfaces": 0,
+                   "omitted_interfaces": 0}),
+            json!({"status": "partial", "sample_window_ms": 101,
+                   "interfaces": [iface.clone()],
+                   "unavailable_interfaces": 1,
+                   "omitted_interfaces": 0}),
+            json!({"status": "unavailable", "sample_window_ms": 0,
+                   "interfaces": [],
+                   "unavailable_interfaces": 2,
+                   "omitted_interfaces": 0}),
+        ] {
+            let network = json!({"status": "ready", "interfaces": [],
+                                 "bandwidth": valid});
+            assert!(validate_observe_result(&response(network)).is_ok());
+        }
+        for invalid in [
+            json!({"status": "partial", "sample_window_ms": 101,
+                   "interfaces": [iface.clone()],
+                   "unavailable_interfaces": 0,
+                   "omitted_interfaces": 0}),
+            json!({"status": "ready", "sample_window_ms": 101,
+                   "interfaces": [{"name": "eth0",
+                                   "rx_bytes_per_sec": 1.5,
+                                   "tx_bytes_per_sec": 0}],
+                   "unavailable_interfaces": 0,
+                   "omitted_interfaces": 0}),
+            json!({"status": "ready", "sample_window_ms": 101,
+                   "interfaces": [{"name": "",
+                                   "rx_bytes_per_sec": 0,
+                                   "tx_bytes_per_sec": 0}],
+                   "unavailable_interfaces": 0,
+                   "omitted_interfaces": 0}),
+        ] {
+            let network = json!({"status": "ready", "interfaces": [],
+                                 "bandwidth": invalid});
+            assert!(validate_observe_result(&response(network)).is_err());
         }
     }
 

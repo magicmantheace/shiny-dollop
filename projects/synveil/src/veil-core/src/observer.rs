@@ -29,6 +29,8 @@ pub fn sample() -> io::Result<Value> {
     // measured over the same interval; a missing source here
     // only degrades the throughput object, never the snapshot.
     let diskstats_before = fs::read_to_string("/proc/diskstats");
+    // Same arrangement for network bandwidth.
+    let netdev_before = fs::read_to_string("/proc/net/dev");
     let sample_started = Instant::now();
     thread::sleep(CPU_SAMPLE_INTERVAL);
     let stat = fs::read_to_string("/proc/stat")?;
@@ -78,7 +80,35 @@ pub fn sample() -> io::Result<Value> {
         Err(_) => json!({"status": "unavailable", "devices": []}),
     };
     snapshot["network"] = match fs::read_to_string("/proc/net/dev") {
-        Ok(raw) => parse_net_dev(&raw)?,
+        Ok(raw) => {
+            let mut network = parse_net_dev(&raw)?;
+            // Interval bandwidth over the utilization window;
+            // degrades independently exactly like disk
+            // throughput.
+            network["bandwidth"] = match &netdev_before {
+                Ok(before_raw) => match parse_net_rows(before_raw) {
+                    Ok((before_rows, _)) => {
+                        let (after_rows, omitted) = parse_net_rows(&raw)?;
+                        network_bandwidth(&before_rows, &after_rows, omitted, sample_window_ms)
+                    }
+                    Err(_) => json!({
+                        "status": "invalid",
+                        "sample_window_ms": sample_window_ms,
+                        "interfaces": [],
+                        "unavailable_interfaces": 0,
+                        "omitted_interfaces": 0,
+                    }),
+                },
+                Err(_) => json!({
+                    "status": "unavailable",
+                    "sample_window_ms": sample_window_ms,
+                    "interfaces": [],
+                    "unavailable_interfaces": 0,
+                    "omitted_interfaces": 0,
+                }),
+            };
+            network
+        }
         Err(_) => json!({"status": "unavailable", "interfaces": []}),
     };
     // PSI reports observed scheduler stalls, not CPU utilization. Keep
@@ -1173,11 +1203,16 @@ fn disk_throughput(
     })
 }
 
-/// Cumulative Linux interface counters from /proc/net/dev. These are NOT
-/// bandwidth or an instantaneous utilization percentage. No interface is
-/// opened, configured or mutated; a VPN or virtual NIC stays a separate row.
-fn parse_net_dev(input: &str) -> io::Result<Value> {
-    const MAX_INTERFACES: usize = 32;
+const MAX_NET_INTERFACES: usize = 32;
+
+/// One validated /proc/net/dev row: the sixteen kernel
+/// counters after the interface name, in file order.
+struct NetRow {
+    name: String,
+    counters: Vec<u64>,
+}
+
+fn parse_net_rows(input: &str) -> io::Result<(Vec<NetRow>, u64)> {
     let mut lines = input.lines();
     let first = lines
         .next()
@@ -1219,29 +1254,107 @@ fn parse_net_dev(input: &str) -> io::Result<Value> {
                     .map_err(|_| invalid_data("invalid netdev counter"))
             })
             .collect::<io::Result<Vec<_>>>()?;
-        if interfaces.len() == MAX_INTERFACES {
+        if interfaces.len() == MAX_NET_INTERFACES {
             omitted = omitted
                 .checked_add(1)
                 .ok_or_else(|| invalid_data("netdev interface overflow"))?;
             continue;
         }
-        interfaces.push(json!({
-            "name": name,
-            "rx_bytes": counters[0],
-            "rx_packets": counters[1],
-            "rx_errors": counters[2],
-            "rx_dropped": counters[3],
-            "tx_bytes": counters[8],
-            "tx_packets": counters[9],
-            "tx_errors": counters[10],
-            "tx_dropped": counters[11],
-        }));
+        interfaces.push(NetRow {
+            name: name.to_owned(),
+            counters,
+        });
     }
+    Ok((interfaces, omitted))
+}
+
+/// Cumulative Linux interface counters from /proc/net/dev. These are NOT
+/// bandwidth or an instantaneous utilization percentage. No interface is
+/// opened, configured or mutated; a VPN or virtual NIC stays a separate row.
+fn parse_net_dev(input: &str) -> io::Result<Value> {
+    let (rows, omitted) = parse_net_rows(input)?;
+    let interfaces = rows
+        .iter()
+        .map(|row| {
+            json!({
+                "name": row.name,
+                "rx_bytes": row.counters[0],
+                "rx_packets": row.counters[1],
+                "rx_errors": row.counters[2],
+                "rx_dropped": row.counters[3],
+                "tx_bytes": row.counters[8],
+                "tx_packets": row.counters[9],
+                "tx_errors": row.counters[10],
+                "tx_dropped": row.counters[11],
+            })
+        })
+        .collect::<Vec<_>>();
     Ok(json!({
         "status": if omitted == 0 { "ready" } else { "truncated" },
         "interfaces": interfaces,
         "omitted_interfaces": omitted,
     }))
+}
+
+/// Interval receive/transmit rates between two net/dev samples
+/// over the observe window — the network counterpart of
+/// disk.throughput. An interface is rated only when it
+/// appears in both samples with non-decreasing byte counters;
+/// churn and counter resets are counted unavailable rather
+/// than assigned invented rates. Interfaces are never summed
+/// (loopback, VPN and physical rows stay separate). Rates
+/// are integer bytes per second: byte delta * 1000 / window,
+/// floored.
+fn network_bandwidth(
+    before: &[NetRow],
+    after: &[NetRow],
+    omitted_interfaces: u64,
+    window_ms: u64,
+) -> Value {
+    let mut rated = Vec::new();
+    let mut unavailable = 0u64;
+    if window_ms > 0 {
+        let before_by_name: std::collections::HashMap<&str, &NetRow> =
+            before.iter().map(|row| (row.name.as_str(), row)).collect();
+        for row in after {
+            let prior = before_by_name.get(row.name.as_str());
+            let rate = prior.and_then(|prior| {
+                let rx_delta = row.counters[0].checked_sub(prior.counters[0])?;
+                let tx_delta = row.counters[8].checked_sub(prior.counters[8])?;
+                let per_sec = |delta: u64| -> u64 {
+                    let scaled = u128::from(delta) * 1000 / u128::from(window_ms);
+                    u64::try_from(scaled).unwrap_or(u64::MAX)
+                };
+                Some(json!({
+                    "name": row.name,
+                    "rx_bytes_per_sec": per_sec(rx_delta),
+                    "tx_bytes_per_sec": per_sec(tx_delta),
+                }))
+            });
+            match rate {
+                Some(rate) => rated.push(rate),
+                None => unavailable += 1,
+            }
+        }
+    } else {
+        unavailable = after.len() as u64;
+    }
+    let status = if omitted_interfaces > 0 {
+        "truncated"
+    } else if rated.is_empty() {
+        "unavailable"
+    } else if unavailable > 0 {
+        "partial"
+    } else {
+        "ready"
+    };
+    json!({
+        "status": status,
+        "sample_window_ms": window_ms,
+        "interfaces": rated,
+        "unavailable_interfaces": unavailable,
+        "omitted_interfaces": omitted_interfaces,
+    })
 }
 
 fn parse_sample(meminfo: &str, stat: &str, uptime: &str, loadavg: &str) -> io::Result<Value> {
@@ -1785,6 +1898,68 @@ mod tests {
         let parsed = parse_net_dev(&input).unwrap();
         assert_eq!(parsed["status"], "truncated");
         assert_eq!(parsed["interfaces"].as_array().unwrap().len(), 32);
+        assert_eq!(parsed["omitted_interfaces"], 2);
+    }
+
+    fn net_rows(raw: &str) -> Vec<NetRow> {
+        parse_net_rows(&format!("{NET_HEADER}{raw}")).unwrap().0
+    }
+
+    #[test]
+    fn network_bandwidth_computes_exact_rates_over_the_window() {
+        // eth0: +5000 rx bytes, +2500 tx bytes over 250 ms
+        // -> 20000 B/s rx, 10000 B/s tx.
+        let before = net_rows(
+            "eth0: 10000 10 0 0 0 0 0 0 5000 5 0 0 0 0 0 0\n\
+             lo: 100 2 0 0 0 0 0 0 100 2 0 0 0 0 0 0\n",
+        );
+        let after = net_rows(
+            "eth0: 15000 15 0 0 0 0 0 0 7500 8 0 0 0 0 0 0\n\
+             lo: 100 2 0 0 0 0 0 0 100 2 0 0 0 0 0 0\n",
+        );
+        let parsed = network_bandwidth(&before, &after, 0, 250);
+        assert_eq!(parsed["status"], "ready");
+        assert_eq!(parsed["sample_window_ms"], 250);
+        assert_eq!(parsed["interfaces"][0]["name"], "eth0");
+        assert_eq!(parsed["interfaces"][0]["rx_bytes_per_sec"], 20000);
+        assert_eq!(parsed["interfaces"][0]["tx_bytes_per_sec"], 10000);
+        assert_eq!(parsed["interfaces"][1]["rx_bytes_per_sec"], 0);
+        assert_eq!(parsed["unavailable_interfaces"], 0);
+    }
+
+    #[test]
+    fn network_bandwidth_withholds_rates_for_churn_and_decreases() {
+        let before = net_rows(
+            "eth0: 10000 10 0 0 0 0 0 0 5000 5 0 0 0 0 0 0\n\
+             wlan0: 2000 2 0 0 0 0 0 0 1000 1 0 0 0 0 0 0\n",
+        );
+        // eth0 counters decreased (reset); wlan0 gone; vpn0 new.
+        let after = net_rows(
+            "eth0: 10 1 0 0 0 0 0 0 5 1 0 0 0 0 0 0\n\
+             vpn0: 2000 2 0 0 0 0 0 0 1000 1 0 0 0 0 0 0\n",
+        );
+        let parsed = network_bandwidth(&before, &after, 0, 100);
+        assert_eq!(parsed["status"], "unavailable");
+        assert!(parsed["interfaces"].as_array().unwrap().is_empty());
+        assert_eq!(parsed["unavailable_interfaces"], 2);
+        let after = net_rows(
+            "eth0: 10 1 0 0 0 0 0 0 5 1 0 0 0 0 0 0\n\
+             wlan0: 3000 3 0 0 0 0 0 0 1500 2 0 0 0 0 0 0\n",
+        );
+        let parsed = network_bandwidth(&before, &after, 0, 100);
+        assert_eq!(parsed["status"], "partial");
+        assert_eq!(parsed["interfaces"][0]["name"], "wlan0");
+        assert_eq!(parsed["unavailable_interfaces"], 1);
+    }
+
+    #[test]
+    fn network_bandwidth_zero_window_and_truncation() {
+        let rows = net_rows("lo: 100 2 0 0 0 0 0 0 100 2 0 0 0 0 0 0\n");
+        let parsed = network_bandwidth(&rows, &rows, 0, 0);
+        assert_eq!(parsed["status"], "unavailable");
+        assert_eq!(parsed["unavailable_interfaces"], 1);
+        let parsed = network_bandwidth(&rows, &rows, 2, 100);
+        assert_eq!(parsed["status"], "truncated");
         assert_eq!(parsed["omitted_interfaces"], 2);
     }
 
