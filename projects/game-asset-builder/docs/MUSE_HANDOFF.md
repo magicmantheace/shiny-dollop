@@ -274,5 +274,60 @@ Next:
    adoption path for >15 min stages instead of the manual recovery
    used here.
 
+## P2 cleanup slice — BUILT AND PROVEN (2026-11-06, branch game-asset-builder/p2-cleanup, stacked on PR #38)
+
+Owner commissioned all three layers (time/GPU explicitly not a
+constraint). Full numbers in TEST_PLAN's P2 section; design notes
+in `skin_policy.py` / `rig_blender.py` docstrings.
+
+- **Layer 1 — pose spec + preflight.** Spec in DESIGN.md
+  (per body plan; quadrupeds get their own spec — standing
+  square, legs separated, belly clear — since A/T poses don't
+  fix them). `stages/prep/preflight.py` runs in the pipeline for
+  rigged runs and records a pass/warn in the manifest. To-spec
+  giraffe concept passes; the original goblin concept warns
+  (arm-daylight 0.009).
+- **Layer 2 — geodesic veto.** Veto reach = max(Euclidean,
+  graph-geodesic) (`stages/rig/geodesic.py`, Dijkstra over the
+  edge graph; ~2 s build at 50k verts). Geodesic alone REJECTED
+  by measurement (goblin gate failure at 0.268). Beyond-tail
+  exemption for distal flesh; both-ends exemption measured and
+  rejected (ruff). Side finding: the P1.1 belly guard zone had
+  never run on a quadruped and misfired on leg centrelines —
+  redrawn between the leg columns, threshold unchanged.
+- **Layer 3 — segmentation.** Bake-off
+  (`benchmarks/segmentation/scores.md`): P3-SAM adopted
+  (licence-clean in Canada; goblin CLEAN, triceratops ROUGH);
+  PartField better but NVIDIA-non-commercial — rejected for
+  adoption, research cross-check only; SAMesh not run per the
+  bake-off's gating. New `segment` stage between texture and
+  rig: VM proxy with the bake-off's exact recipe (recipe is
+  load-bearing — a rig-frame variant collapsed the triceratops
+  to one part), P3-SAM in its own PC venv/process (peak
+  9.8 GB, VRAM verified back to baseline), labels via nearest
+  face centroid under the recorded canonical transform,
+  geometry separation at part boundaries (split verts are the
+  seam caps), then label-aware skinning: plurality label→bone
+  map; only foreign-part dominants can be forbidden, and only
+  on non-boundary or beyond-reach pairs.
+- **Re-proofs** (saved textured meshes; priors preserved under
+  `outputs/<slug>/before-cleanup/`): goblin 9 parts, torso
+  share 0.139 → **0.079**, head 0.787 → 0.881, feet 0.831,
+  hands 0.778 (label-veto cost, disclosed), stress sail
+  materially reduced (front) / reduced (three-quarter) —
+  residual is the arm part's own web fin at 2.2 rad. Trike
+  5 parts (2 of 4 legs separate — P3-SAM's known weakness),
+  feet/head 1.0, belly 0.200. Dragon/Chest byte-identical.
+  Suite 79/79.
+
+Next:
+1. Owner decisions: merge PR #38, then this slice's PR (stacked
+   draft); the UI slice (old P2) and engine hand-offs (P3) are
+   still pending direction.
+2. Known follow-ups if wanted: P3-SAM leg re-prompting for
+   quadrupeds (interactive point-prompt mode exists upstream);
+   hands-dominance cost of fine arm labels (0.78) could be
+   revisited if a future asset's hands matter more.
+
 Boundaries: no cloud fallback exists or may be added; weights and outputs
 never enter git; GPU claims only from PC runs; merges are the owner's call.

@@ -33,7 +33,8 @@
 | 1 | mesh | GPU, own process | candidate mesh model (below) | cutout → untextured mesh |
 | 2 | texture | GPU, own process | candidate texture model (below) | mesh + cutout → textured mesh |
 | — | *unload checkpoint* | — | orchestrator verifies VRAM released | — |
-| 3 | rig | Blender (CPU) | armature templates + automatic weights | textured mesh → rigged mesh |
+| 2b | segment | GPU, own process | P3-SAM (Hunyuan3D-Part) — bake-off: `benchmarks/segmentation/scores.md` | textured mesh → per-face part labels (50k-face proxy in the rig frame) |
+| 3 | rig | Blender (CPU) | armature templates + automatic weights; mesh separated at part boundaries, label-aware geodesic veto | textured mesh + labels → rigged mesh |
 | 4 | animate | Blender (CPU) | procedural pose recipes (from Drabbit Pet) | rigged mesh → baked clips |
 | 5 | catalog | CPU | this project | .glb + preview renders + metadata + sha256 |
 
@@ -115,3 +116,104 @@ structural, not a promise.
 UI (P2), engine integrations (P3), text-to-image concept generation (the
 builder accepts a supplied or separately generated image), and any cloud
 fallback — there is none, by decision 1.
+
+## Concept pose & separation spec
+
+Added 2026-11-06 with the P2 cleanup slice. This is concept-art
+direction, decided before generation — not a rigging pose. It exists
+because of a measured failure, not a preference: the Snow Goblin's
+concept rests its arms in one fused fur mass with the torso, the mesh
+stage faithfully built that mass, and the skinning stage then had no
+boundary to respect — the shipped wave dragged the torso with the
+arm. Rig poses (A-pose, T-pose) are applied to a mesh that already
+exists; they cannot separate limbs the concept fused, and they say
+nothing useful about quadrupeds at all. Separation has to be in the
+silhouette the mesh is built from.
+
+The rule underneath every body plan below is the same: wherever two
+body parts will need different bones, the concept must show
+background — visible daylight — between them. If a rigger looking at
+the silhouette cannot draw the boundary, the automatic weights will
+not find it either.
+
+### Bipeds
+
+- A-pose stance: arms angled down and away from the body, not
+  hanging straight against it and not raised.
+- Visible daylight between each arm and the torso along the arm's
+  whole length, shoulder to hand. The shoulder join itself touches;
+  everything below it must not.
+- Legs separated, with daylight between them.
+- Nothing resting against the torso: no arm, hand, tail, prop, or
+  clothing mass lying on the body.
+- No crossed limbs. Hands clear of the hips, not overlapping the
+  pelvis silhouette.
+
+### Quadrupeds
+
+- Standing square, weight on all four legs; no sitting, crouching,
+  or lying poses.
+- Legs vertical and separated: daylight between the front pair,
+  between the rear pair, and between every leg and the belly. In a
+  three-quarter view the far-side legs must still read as their own
+  silhouettes, not as a widening of the near-side legs.
+- Belly clear of the ground — a low-slung body whose underside
+  nearly touches the floor fuses with the legs in the mesh.
+- Neck and head up, clear of the shoulders.
+- Tail hanging or held away from the body, touching neither the
+  legs nor the flank.
+
+### Winged creatures
+
+- Wings raised or folded clear of the arms and torso where the
+  design allows; a wing membrane that drapes over an arm fuses the
+  two exactly as fur does.
+- Arms, if the design has them, follow the biped rule: away from
+  the body, daylight along the whole arm.
+- Wing fingers and tail clear of the legs.
+
+### All body plans
+
+- Full body in frame, head to feet; nothing cropped.
+- Plain background, no scenery, no ground shadow mass under the
+  body.
+- No props touching the body.
+- No limb occluding another limb against the torso — a far arm
+  hidden directly behind the body is a fused arm for mesh purposes.
+
+### Canonical prompt blocks
+
+Paste-ready, with the subject description in front. The giraffe
+concept that the pre-flight check (stage 0,
+`stages/prep/preflight.py`) was calibrated against was generated
+with the quadruped block and is its worked example: four separated
+legs, belly clear, tail away from the legs.
+
+Biped:
+
+> Full-body character concept, standing in a relaxed A-pose on a
+> plain white background: arms angled away from the torso with
+> clear empty space between each arm and the body along the whole
+> arm, hands clear of the hips, legs slightly apart with empty
+> space between them, no crossed limbs, nothing touching or resting
+> against the torso, no props, whole body inside the frame.
+
+Quadruped:
+
+> Full-body animal concept, standing square on a plain white
+> background: all four legs straight, vertical, and clearly
+> separated, with empty space between the front legs, between the
+> back legs, and between the legs and the belly; belly well clear
+> of the ground; neck and head held up; tail hanging away from the
+> body, touching neither the legs nor the flank; no props, whole
+> body inside the frame.
+
+Winged:
+
+> Full-body winged character concept on a plain white background:
+> wings raised and folded clear of the arms and torso, each wing
+> separated from the body by visible empty space where the design
+> allows; arms angled away from the body with clear empty space
+> between each arm and the torso along the whole arm; legs slightly
+> apart; tail clear of the legs; no props, whole body inside the
+> frame.

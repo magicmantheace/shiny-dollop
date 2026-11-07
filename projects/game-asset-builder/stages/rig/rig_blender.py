@@ -59,6 +59,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
 from template import build_template, trunk_chain  # noqa: E402
 from skin_policy import (  # noqa: E402
     apply_veto, assess_heat, assess_zone_share)
+from geodesic import geodesic_distance_matrix  # noqa: E402
 
 
 def parse_args():
@@ -85,6 +86,25 @@ def parse_args():
     p.add_argument("--veto-floor", type=float, default=0.19,
                    help="weight-distance veto radius floor, as a "
                         "fraction of mesh height")
+    p.add_argument("--labels", default=None,
+                   help="part labels .npz from the segment stage "
+                        "(proxy verts/faces + per-face ids): faces "
+                        "inherit the nearest proxy face's label, the "
+                        "mesh is separated at label boundaries, and "
+                        "the veto becomes label-aware (Layer 3)")
+    p.add_argument("--label-secondary", type=float, default=0.10,
+                   help="a bone winning at least this share of a "
+                        "label's vertices (plurality vote on the "
+                        "pre-veto heat field) counts as a secondary "
+                        "owner of that label and stays allowed")
+    p.add_argument("--veto-metric", default="geodesic",
+                   choices=("euclidean", "geodesic"),
+                   help="distance the veto compares against the "
+                        "reach radius: 'geodesic' measures over the "
+                        "mesh surface (graph-geodesic, stages/rig/"
+                        "geodesic.py) so reach cannot leak across a "
+                        "fused web; 'euclidean' is the P1.1 "
+                        "straight-line behaviour")
     return p.parse_args(argv)
 
 
@@ -665,14 +685,261 @@ def _weight_matrix(obj, bone_names):
     return weights
 
 
-def apply_distance_veto(obj, arm, bones, dims, factor, floor_frac):
+def transfer_face_labels(obj, labels_path):
+    """Give every polygon the part label of the nearest proxy face.
+
+    The segment stage's labels are per-face of a decimated proxy
+    in the mesh's RAW frame (the bake-off's scored recipe); the
+    labels file carries the canonical transform, applied to the
+    proxy's face centroids here so the nearest-centroid match
+    happens in this stage's working frame — the transfer the
+    bake-off documented. P3-SAM emits light single-face
+    speckle; a face whose label differs from ALL its edge-neighbours
+    is an island and adopts the majority neighbour label (one pass).
+    Label -1 (P3-SAM's "no part") is preserved and never separated
+    or vetoed. Returns (face_labels, stats)."""
+    import numpy as np
+    from mathutils import kdtree
+    data = np.load(labels_path)
+    proxy_verts = data["verts"].astype(np.float64)
+    proxy_faces = data["faces"].astype(np.int64)
+    face_ids = data["face_ids"].astype(np.int64)
+    centroids = proxy_verts[proxy_faces].mean(axis=1)
+    if "transform_scale" in data:
+        # Canonical transform: scale + offset, then Z rotation —
+        # the same operations canonicalize/rotate_z performed on
+        # this stage's working mesh, in the same order.
+        centroids = (centroids * float(data["transform_scale"])
+                     + data["transform_offset"].astype(np.float64))
+        theta = math.radians(int(data["transform_rotate_z"]))
+        if theta:
+            c, s = math.cos(theta), math.sin(theta)
+            rot = np.array([[c, -s, 0.0], [s, c, 0.0],
+                            [0.0, 0.0, 1.0]])
+            centroids = centroids @ rot.T
+    kd = kdtree.KDTree(len(centroids))
+    for i, c in enumerate(centroids):
+        kd.insert(c, i)
+    kd.balance()
+    labels = []
+    for poly in obj.data.polygons:
+        _co, idx, _dist = kd.find(poly.center)
+        labels.append(int(face_ids[idx]))
+    # Face adjacency over shared edges, for the island pass.
+    edge_faces = {}
+    for fi, poly in enumerate(obj.data.polygons):
+        vs = list(poly.vertices)
+        for a, b in zip(vs, vs[1:] + vs[:1]):
+            edge_faces.setdefault((min(a, b), max(a, b)),
+                                  []).append(fi)
+    neighbours = [set() for _ in labels]
+    for faces in edge_faces.values():
+        for fi in faces:
+            neighbours[fi].update(f for f in faces if f != fi)
+    islands = 0
+    cleaned = list(labels)
+    for fi, label in enumerate(labels):
+        if label < 0 or not neighbours[fi]:
+            continue
+        nlabels = [labels[n] for n in neighbours[fi]]
+        if label not in nlabels:
+            cleaned[fi] = max(set(nlabels), key=nlabels.count)
+            islands += 1
+    parts = sorted({l for l in cleaned if l >= 0})
+    return cleaned, {"parts": len(parts),
+                     "proxy_faces": int(len(face_ids)),
+                     "islands_relabelled": islands}
+
+
+def separate_by_labels(obj, face_labels):
+    """Split fused shells at part boundaries, then rejoin.
+
+    Each label (except the largest, which stays as the remainder)
+    is separated into its own object; joining the objects back does
+    NOT weld coincident vertices, so every boundary vertex now
+    exists once per part — distinct geometry whose parts can move
+    independently under skinning. The seam "cap" is the coincident
+    duplicate vertices themselves: the surface renders closed at
+    rest and opens only where a pose actually pulls parts apart.
+    Labels ride through the operations in a face attribute, which
+    also yields the post-join face labels. Returns
+    (obj, face_labels_after, verts_added)."""
+    import collections
+    counts = collections.Counter(l for l in face_labels if l >= 0)
+    if len(counts) < 2:
+        return obj, face_labels, 0
+    if "gab_label" in obj.data.attributes:
+        obj.data.attributes.remove(obj.data.attributes["gab_label"])
+    attr = obj.data.attributes.new(name="gab_label", type="FLOAT",
+                                   domain="FACE")
+    for i, label in enumerate(face_labels):
+        attr.data[i].value = float(label)
+    base_name = obj.name
+    verts_before = len(obj.data.vertices)
+    keep = counts.most_common(1)[0][0]
+    for label in sorted(counts):
+        if label == keep:
+            continue
+        remainder = bpy.context.scene.objects.get(base_name)
+        if remainder is None:
+            break
+        obj = remainder
+        bpy.ops.object.select_all(action="DESELECT")
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        current = obj.data.attributes["gab_label"]
+        values = [int(round(d.value)) for d in current.data]
+        if label not in values:
+            continue
+        # Select through bmesh: the mesh's edit-mode selection state
+        # persists across mode switches (an earlier stage's
+        # select-all survives), so polygon .select flags written in
+        # object mode do NOT decide what separate() sees.
+        import bmesh
+        bpy.ops.object.mode_set(mode="EDIT")
+        bm = bmesh.from_edit_mesh(obj.data)
+        bm.faces.ensure_lookup_table()
+        for face in bm.faces:
+            face.select = values[face.index] == label
+        bmesh.update_edit_mesh(obj.data)
+        bpy.ops.mesh.separate(type="SELECTED")
+        bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.ops.object.select_all(action="DESELECT")
+    meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
+    for m in meshes:
+        m.select_set(True)
+    bpy.context.view_layer.objects.active = (
+        bpy.context.scene.objects.get(base_name) or meshes[0])
+    if len(meshes) > 1:
+        bpy.ops.object.join()
+    obj = bpy.context.view_layer.objects.active
+    attr = obj.data.attributes["gab_label"]
+    labels_after = [int(round(d.value)) for d in attr.data]
+    obj.data.attributes.remove(attr)
+    return obj, labels_after, len(obj.data.vertices) - verts_before
+
+
+def vertex_labels_from_faces(obj, face_labels):
+    """Per-vertex part label: the majority label of its polygons
+    (ties resolve to the first polygon's label; -1 when a vertex
+    somehow has no polygon)."""
+    import collections
+    per_vert = [[] for _ in obj.data.vertices]
+    for fi, poly in enumerate(obj.data.polygons):
+        for vi in poly.vertices:
+            per_vert[vi].append(face_labels[fi])
+    out = []
+    for labels in per_vert:
+        if not labels:
+            out.append(-1)
+        else:
+            out.append(collections.Counter(labels).most_common(1)[0][0])
+    return out
+
+
+def label_bone_map(weights, vert_labels, bone_names, bones,
+                   secondary_share=0.10):
+    """Map each part label to its dominant bone and allowed bones.
+
+    Ownership is read from the pre-veto heat field by PLURALITY:
+    every vertex votes for its strongest bone, and a label's
+    dominant bone is the one winning the most of the label's
+    vertices. (The first version summed weight mass instead, and
+    on the Snow Goblin it crowned arm.R dominant of the whole body
+    label — the fused right arm's concentrated mass outweighed the
+    torso's diffuse trunk mass — and its allowed set then forbade
+    the leg bones on the thighs, emptying two bones and getting
+    the heat rejected. Plurality follows the flesh, not the sums.)
+
+    Allowed for a label: its dominant bone, the dominant's parent
+    and children (joint blends), the trunk chain (never vetoed
+    anyway), and any bone winning at least ``secondary_share`` of
+    the label's vertices (a label can straddle a joint — ears
+    inside a head label, a forearm inside an arm label).
+
+    The veto itself is deliberately conservative (see
+    apply_distance_veto): the only bones ever FORBIDDEN for a label
+    are bones that are the dominant of a DIFFERENT label and are
+    not chain relatives of this label's dominant — "this flesh is
+    not that named part". Anything segmentation did not separate
+    (a fused arm inside a body label) stays the distance veto's
+    problem, not the label veto's. Returns
+    {label: {"dominant": name, "allowed": [names],
+             "forbidden": [names]}}."""
+    import numpy as np
+    W = np.asarray(weights, dtype=np.float64)
+    parent = {b.name: b.parent for b in bones}
+    children = {}
+    for b in bones:
+        if b.parent:
+            children.setdefault(b.parent, []).append(b.name)
+    trunk = trunk_chain(bones)
+    labels = sorted({l for l in vert_labels if l >= 0})
+    votes = (np.argmax(W, axis=1) if len(W)
+             else np.zeros(0, dtype=int))
+    share_by_label = {}
+    dominants = {}
+    for label in labels:
+        rows = [i for i, l in enumerate(vert_labels) if l == label]
+        counts = np.bincount(votes[rows], minlength=len(bone_names))
+        share_by_label[label] = counts / max(1, len(rows))
+        dominants[label] = bone_names[int(np.argmax(counts))]
+    out = {}
+    for label in labels:
+        dom = dominants[label]
+        chain = {dom}
+        if parent.get(dom):
+            chain.add(parent[dom])
+        chain.update(children.get(dom, []))
+        allowed = set(chain) | set(trunk)
+        foreign_dominants = {d for l2, d in dominants.items()
+                             if l2 != label}
+        for i, name in enumerate(bone_names):
+            if share_by_label[label][i] >= secondary_share \
+                    and name not in foreign_dominants:
+                allowed.add(name)
+        forbidden = []
+        for other, other_dom in dominants.items():
+            if other == label or other_dom in allowed:
+                continue
+            forbidden.append(other_dom)
+        out[int(label)] = {"dominant": dom,
+                           "allowed": sorted(allowed),
+                           "forbidden": sorted(set(forbidden))}
+    return out
+
+
+def apply_distance_veto(obj, arm, bones, dims, factor, floor_frac,
+                        metric="geodesic", vert_labels=None,
+                        label_secondary=0.10):
     """Restrain the heat weights in place with skin_policy's veto.
 
     Reach radius per bone = max(factor * bone length, floor_frac *
     mesh height), applied to every bone outside the root->head trunk
     chain. Writes the vetoed matrix back through apply_weight_matrix
     and returns the stats for the rig report (radii included, so a
-    future run can see exactly what reach each bone was allowed)."""
+    future run can see exactly what reach each bone was allowed).
+
+    ``metric`` chooses the distance the radius is compared against:
+    'euclidean' (P1.1: straight-line distance to the segment) or
+    'geodesic': the elementwise MAXIMUM of the Euclidean distance
+    and the graph-geodesic surface distance to the bone's own flesh
+    (stages/rig/geodesic.py) — a vertex keeps an appendage's weight
+    only if it is near the bone in space AND connected to it over
+    the surface. The union is deliberate, and measured: geodesic
+    alone REJECTED the Snow Goblin's heat (torso arm share 0.268 vs
+    the Euclidean veto's 0.139), because an arm's seed sleeve
+    legitimately spreads over the flank it hangs against — the
+    flank is surface-near the arm while being straight-line-far
+    from its segment, and the torso share lives exactly there.
+    Straight-line reach, conversely, leaks across a fused web:
+    flesh beyond a web is Euclidean-inside the radius while its
+    surface path runs around the web. Each metric vetoes the
+    other's blind spot; neither suffices alone. Rescue and
+    beyond-end eligibility keep using Euclidean segment geometry
+    in both modes (they answer "which bone is this orphan flesh
+    closest to / past the end of", not "how far does the surface
+    run")."""
     import numpy as np
     names, heads, tails = _bone_endpoints(arm)
     lengths = [float(np.linalg.norm(np.array(t) - np.array(hd)))
@@ -689,14 +956,94 @@ def apply_distance_veto(obj, arm, bones, dims, factor, floor_frac):
     distances = _segment_distances(heads, tails, verts)
     projection = _segment_projection(heads, tails, verts)
     beyond_end = (projection < 0.0) | (projection > 1.0)
+    beyond_tail = projection > 1.0
     weights = _weight_matrix(obj, names)
+    label_map = None
+    forbidden = None
+    if vert_labels is not None:
+        # Label-aware veto (Layer 3): the forbidden pairs are
+        # (vertex, bone) where the bone is the named owner of a
+        # DIFFERENT part — see label_bone_map for why the candidate
+        # set is kept that conservative. A candidate pair is only
+        # enforced under one of two conditions:
+        #   * the vertex lies beyond the bone's reach radius
+        #     (far flesh is never a blend), or
+        #   * the vertex is NOT on a label boundary — deep inside
+        #     its own part, its weight on a foreign part's bone is
+        #     bleed by definition, at any distance. This is the
+        #     case distance alone cannot see: flank fur hanging
+        #     beside a resting arm is within the arm's radius, so
+        #     every distance rule keeps its arm blend, and at a big
+        #     arm swing that fur sails with the arm. Boundary
+        #     vertices (a neighbour vertex carries another label)
+        #     keep within-radius blends — joints still need them,
+        #     and banning leg2 around the feet labels' border cost
+        #     the goblin's feet dominance 0.90 -> 0.69 in the
+        #     distance-blind version.
+        label_map = label_bone_map(weights, vert_labels, names, bones,
+                                   secondary_share=label_secondary)
+        boundary = np.zeros(len(vert_labels), dtype=bool)
+        edges = np.empty(len(obj.data.edges) * 2, dtype=np.int64)
+        obj.data.edges.foreach_get("vertices", edges)
+        edges = edges.reshape(-1, 2)
+        lab_arr = np.array(vert_labels)
+        diff = lab_arr[edges[:, 0]] != lab_arr[edges[:, 1]]
+        boundary[edges[diff, 0]] = True
+        boundary[edges[diff, 1]] = True
+        forbidden_arr = np.zeros((len(vert_labels), len(names)),
+                                 dtype=bool)
+        col = {name: i for i, name in enumerate(names)}
+        radii_arr = np.array(radii)
+        for vi, label in enumerate(vert_labels):
+            if label < 0 or int(label) not in label_map:
+                continue
+            for name in label_map[int(label)]["forbidden"]:
+                ci = col[name]
+                if distances[vi, ci] > radii_arr[ci] \
+                        or not boundary[vi]:
+                    forbidden_arr[vi, ci] = True
+        forbidden = forbidden_arr.tolist()
+    veto_distances = None
+    extra = {}
+    if metric == "geodesic":
+        # Loop triangles, not polygon vertices: the decimated mesh
+        # can carry ngons, and the graph needs true triangles.
+        obj.data.calc_loop_triangles()
+        faces = np.empty(len(obj.data.loop_triangles) * 3,
+                         dtype=np.int64)
+        obj.data.loop_triangles.foreach_get("vertices", faces)
+        faces = faces.reshape(-1, 3)
+        geo = geodesic_distance_matrix(verts, faces, heads, tails,
+                                       radii)
+        veto_distances = np.maximum(distances, geo)
+        held = weights > 0.0
+        radii_arr = np.array(radii)[None, :]
+        euclid_veto = held & (distances > radii_arr)
+        geo_veto = held & (geo > radii_arr)
+        col_mask = np.zeros(len(names), dtype=bool)
+        col_mask[veto_cols] = True
+        extra = {
+            "geodesic_only_vetoes": int(
+                (geo_veto & ~euclid_veto)[:, col_mask].sum()),
+            "euclidean_only_vetoes": int(
+                (euclid_veto & ~geo_veto)[:, col_mask].sum()),
+        }
     new_weights, stats = apply_veto(
         weights.tolist(), distances.tolist(), radii, veto_cols,
-        beyond_end=beyond_end.tolist())
+        beyond_end=beyond_end.tolist(),
+        veto_distances=(veto_distances.tolist()
+                        if veto_distances is not None else None),
+        beyond_tail=beyond_tail.tolist(),
+        forbidden=forbidden)
     apply_weight_matrix(obj, arm, names, np.array(new_weights))
     return {
         "factor": factor,
         "floor_frac": floor_frac,
+        "metric": metric,
+        "label_map": ({str(k): v for k, v in label_map.items()}
+                      if label_map else None),
+        "label_vetoed_entries": stats.get("label_vetoed_entries", 0),
+        **extra,
         "trunk_bones": [n for n in names if n in trunk],
         "vetoed_bones": [names[i] for i in veto_cols],
         "radius_by_bone": {n: round(r, 4)
@@ -718,9 +1065,18 @@ def _share_zone_defs(template, dims):
     if template == "quadruped":
         legs = ("leg.FL", "leg2.FL", "leg.FR", "leg2.FR",
                 "leg.HL", "leg2.HL", "leg.HR", "leg2.HR")
+        # The zone is the belly wall BETWEEN the leg columns, not the
+        # band the legs hang in: the first definition (z .10-.40,
+        # |x| < .25w) enclosed the leg centrelines themselves
+        # (|x| ~= .17w on the proof mesh), so it mostly measured
+        # legitimate upper-leg flesh and read 0.58 on a rig whose
+        # feet/head dominance was 1.0 — a gate misfire, found the
+        # first time the P1.1-era gate was exercised on a quadruped
+        # (P2). The strip below clears the leg columns and reads
+        # 0.204 on the same weights; the 0.25 threshold is unchanged.
         return {
-            "belly": (lambda x, y, z: z0 + 0.10 * h <= z <= z0 + 0.40 * h
-                      and abs(x) < 0.25 * w, legs, "leg"),
+            "belly": (lambda x, y, z: z0 + 0.28 * h <= z <= z0 + 0.45 * h
+                      and abs(x) < 0.15 * w, legs, "leg"),
         }
     if template == "biped":
         return {
@@ -772,6 +1128,20 @@ def main():
     cleanup = cleanup_geometry(obj)
     dims = world_bbox(obj)
 
+    # Layer 3: part labels -> geometry separation, before the
+    # armature exists, so bone heat diffuses within parts instead
+    # of across the fused webs the separation just cut.
+    seg_info = None
+    vert_labels = None
+    if args.labels:
+        face_labels, tstats = transfer_face_labels(obj, args.labels)
+        obj, face_labels, added = separate_by_labels(obj, face_labels)
+        vert_labels = vertex_labels_from_faces(obj, face_labels)
+        seg_info = {"model": "P3-SAM (Tencent Hunyuan3D-Part)",
+                    **tstats, "separated_verts_added": added,
+                    "labelled_verts": sum(1 for l in vert_labels
+                                          if l >= 0)}
+
     bones = build_template(args.template, ears=bool(args.ears),
                            arms=bool(args.arms))
     bone_names = [b.name for b in bones]
@@ -807,7 +1177,9 @@ def main():
         # masses; restrain appendage bones to their reach BEFORE the
         # policy measures anything, so the gate judges what ships.
         veto_stats = apply_distance_veto(
-            obj, arm, bones, dims, args.veto_factor, args.veto_floor)
+            obj, arm, bones, dims, args.veto_factor, args.veto_floor,
+            metric=args.veto_metric, vert_labels=vert_labels,
+            label_secondary=args.label_secondary)
         rescue_filled = veto_stats["rescued_verts"]
         # Rescue: any vert still carrying no meaningful weight (the
         # veto's nearest-bone rescue normally covers these) gets
@@ -846,9 +1218,14 @@ def main():
                 share, zone_label=zone_name,
                 group_label=share_defs[zone_name][2])
         if accepted and not reasons:
-            method = ("bone-heat (automatic weights); distance veto "
+            method = ("bone-heat (automatic weights); "
+                      f"{args.veto_metric} distance veto "
                       f"(factor {args.veto_factor}, "
                       f"floor {args.veto_floor})")
+            if veto_stats and veto_stats.get("label_map"):
+                method += ("; label-aware veto (P3-SAM parts, "
+                           f"{veto_stats['label_vetoed_entries']} "
+                           "entries vetoed by label)")
             if rescue_filled:
                 method += f"; distance rescue on {rescue_filled} verts"
         else:
@@ -894,6 +1271,7 @@ def main():
         },
         "weight_method": method,
         "bone_heat_checks": heat_checks,
+        "segmentation": seg_info,
         "weight_veto": veto_stats,
         "rescue_filled_verts": rescue_filled,
         "weight_metrics": metrics,
