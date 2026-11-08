@@ -14,10 +14,19 @@ small status line) is visible against the desktop, and clicks pass
 through the transparent parts. Platforms without colour-key support
 fall back to the plain dark window.
 
-Kill-switch semantics are preserved exactly: the floating window IS
-the visible indicator, and stopping it (the x control or the
-right-click menu) stops the supervisor AND the agent. There is no
-hidden background mode.
+Kill-switch semantics for the form this process owns: the floating
+window IS the visible indicator, and stopping it (the x control or
+the right-click menu) stops the supervisor AND the agent.
+
+Attach mode (v1.1): if a bridge core is already running — the
+headless boot form (supervisor.py --headless under the boot task) or
+any other healthy agent — this window ATTACHES display-only: it
+shows the same resolved state but owns no supervisor, and closing it
+leaves the bridge running (the menu says so: "Close avatar (bridge
+keeps running)"). The core's kill switches are its own (task
+controls / scripts/bridge-core.ps1 -Action stop). If something that
+is NOT a muse-pc-bridge agent answers on the configured port, the
+window refuses to start rather than fight over it.
 
 Usage:
   pythonw supervisor_gui.py [--config C:\\path\\config.json]
@@ -55,6 +64,68 @@ KEY = "#ff00ff"
 
 def _agent_dir() -> Path:
     return Path(__file__).resolve().parent
+
+
+# Supervisor states that mean a core may be mid-start/restart: worth
+# a short wait for the agent to answer before falling back to
+# starting a supervisor of our own (the logon/boot race).
+_CORE_TRANSIENT_STATES = {"starting", "restarting", "update_applied",
+                          "update_healthy", "running_after_rollback"}
+
+
+def fetch_agent_status(config_path: Path) -> dict | None:
+    """The agent's /v1/status body, or None when unreachable."""
+    try:
+        cfg = json.loads(config_path.read_text(encoding="utf-8"))
+        host = str(cfg.get("host", "127.0.0.1"))
+        port = int(cfg.get("port", 8765))
+        token = str(cfg.get("token", ""))
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return None
+    req = urllib.request.Request(
+        f"http://{host}:{port}/v1/status",
+        headers={"Authorization": f"Bearer {token}"})
+    try:
+        with urllib.request.urlopen(req, timeout=1.5) as resp:
+            if resp.status == 200:
+                return json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, OSError, json.JSONDecodeError):
+        return None
+    return None
+
+
+def is_bridge_agent(status: dict | None) -> bool:
+    return bool(status) and status.get("agent") == "muse-pc-bridge"
+
+
+def choose_gui_mode(config_path: Path, state_dir: Path, *,
+                    fetch=fetch_agent_status, attempts: int = 20,
+                    interval_s: float = 0.5,
+                    sleep=time.sleep) -> tuple[str, dict | None]:
+    """Decide how this window should run.
+
+    Returns ("attach", status) when a muse-pc-bridge agent already
+    answers, ("foreign", status) when something else answers on the
+    port, or ("own", None) when nothing answers and no core looks
+    mid-start — the historical behaviour of running our own
+    supervisor. While a core reports a transient supervisor state
+    (starting/restarting/updating), the probe retries briefly: at
+    logon the boot core may simply not be up yet.
+    """
+    status = fetch(config_path)
+    if status is not None:
+        return ("attach", status) if is_bridge_agent(status) \
+            else ("foreign", status)
+    sup = bridge_update._read_json(
+        state_dir / "supervisor-status.json") or {}
+    if sup.get("state") in _CORE_TRANSIENT_STATES:
+        for _ in range(attempts):
+            sleep(interval_s)
+            status = fetch(config_path)
+            if status is not None:
+                return ("attach", status) if is_bridge_agent(status) \
+                    else ("foreign", status)
+    return ("own", None)
 
 
 def _enable_dpi_awareness() -> None:
@@ -154,11 +225,14 @@ class GifPlayer:
 
 
 class AvatarWindow:
-    def __init__(self, supervisor: Supervisor, config_path: Path,
+    def __init__(self, supervisor: Supervisor | None, config_path: Path,
                  state_dir: Path):
         import tkinter as tk
         self.tk = tk
+        # supervisor is None in attach mode: a core elsewhere owns
+        # the agent and this window is display-only.
         self.supervisor = supervisor
+        self._attached = supervisor is None
         self.config_path = config_path
         self.state_dir = state_dir
         self._down_since: float | None = None
@@ -199,7 +273,12 @@ class AvatarWindow:
         self.close_label.bind("<Button-1>", lambda _e: self.stop())
 
         self.menu = tk.Menu(root, tearoff=0)
-        self.menu.add_command(label="Stop bridge", command=self.stop)
+        if self._attached:
+            self.menu.add_command(
+                label="Close avatar (bridge keeps running)",
+                command=self.stop)
+        else:
+            self.menu.add_command(label="Stop bridge", command=self.stop)
 
         for widget in (root, self.avatar_label, self.text_label):
             widget.bind("<ButtonPress-1>", self._drag_start)
@@ -230,35 +309,22 @@ class AvatarWindow:
             self.menu.grab_release()
 
     def stop(self) -> None:
-        """The kill switch: stop supervisor + agent, close the window."""
+        """Own form: the kill switch — stop supervisor + agent, close
+        the window. Attach mode: close the window only; the core
+        keeps running (the menu label says exactly that)."""
         if self._stopped:
             return
         self._stopped = True
         try:
-            self.supervisor.stop()
+            if self.supervisor is not None:
+                self.supervisor.stop()
         finally:
             self.root.destroy()
 
     # -- state polling ---------------------------------------------------------
 
     def _agent_status(self) -> dict | None:
-        try:
-            cfg = json.loads(self.config_path.read_text(encoding="utf-8"))
-            host = str(cfg.get("host", "127.0.0.1"))
-            port = int(cfg.get("port", 8765))
-            token = str(cfg.get("token", ""))
-        except (OSError, json.JSONDecodeError):
-            return None
-        req = urllib.request.Request(
-            f"http://{host}:{port}/v1/status",
-            headers={"Authorization": f"Bearer {token}"})
-        try:
-            with urllib.request.urlopen(req, timeout=1.5) as resp:
-                if resp.status == 200:
-                    return json.loads(resp.read().decode("utf-8"))
-        except (urllib.error.URLError, OSError, json.JSONDecodeError):
-            return None
-        return None
+        return fetch_agent_status(self.config_path)
 
     def _poll(self) -> None:
         if self._stopped:
@@ -291,18 +357,11 @@ class AvatarWindow:
         if view["state"] != self._current_state:
             self._current_state = view["state"]
             self._state_since = time.time()
-            # Publish the display state for other local apps (e.g. a
-            # desktop pet) to observe. Read-only, no token material,
-            # written beside the supervisor's own status file.
-            try:
-                bridge_update._write_json(
-                    self.state_dir / "display-state.json",
-                    {"state": view["state"], "art": art,
-                     "label": view["label"],
-                     "since": self._state_since,
-                     "updated_at": time.time()})
-            except OSError:
-                pass
+            # display-state.json (read by local apps such as a
+            # desktop pet) is published by the supervisor core since
+            # v1.1, in every form — this window only displays. That
+            # keeps the file fresh when no window is open (boot core)
+            # and identical when one is (either GUI form).
         if art != self._current_art:
             if self._current_art in self._players:
                 self._players[self._current_art].stop()
@@ -375,6 +434,21 @@ def main(argv: list[str] | None = None) -> int:
         state_dir = (args.config.resolve().parent / state_dir).resolve()
 
     _quiet_stdio(state_dir)
+    mode, found = choose_gui_mode(args.config, state_dir)
+    if mode == "foreign":
+        print(f"[supervisor-gui] Something that is not a muse-pc-bridge "
+              f"agent is answering on the configured address "
+              f"({found.get('agent')!r}); refusing to start. Free the "
+              f"port or fix the config.", file=sys.stderr)
+        return 2
+    if mode == "attach":
+        # A core (boot form or another supervisor) already owns the
+        # agent: display-only. Closing the window leaves it running.
+        print("[supervisor-gui] Attaching to the running bridge core; "
+              "this window is display-only.", flush=True)
+        window = AvatarWindow(None, args.config, state_dir)
+        window.run()
+        return 0
     supervisor = Supervisor(args.install_root, args.config, state_dir)
     thread = threading.Thread(target=supervisor.run, daemon=True,
                               name="bridge-supervisor")
