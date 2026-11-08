@@ -1,3 +1,136 @@
+# Inverted archive minority recovery: inverted full-archive fit for the minority branch's model — 2026-11-08 (FAILED / REGRESSION at checkpoint 32)
+
+Optional `developmental_ai/inverted_archive_minority_recovery.py`
+(identical to the graded widened-window candidate in acting
+model, extended signal, archive, concordance definition, joint
+recovery test, recovery model, the full three-leg authority
+condition, the minority branch's arming / concordance / joint
+records, leg P >= 0.70 on both recovery branches, and the full /
+retained-partial / widened abstention classes with leg R on
+partials and support threshold null; the SINGLE changed element
+is the minority branch's MODEL — a RelationOutcomeMemory fitted
+on ALL retained archive events with progress/damage labels
+swapped (neutral unchanged) in place of the minority set only;
+the minority set still computed in full and still driving
+arming, concordance/joint records, and every recorded minority
+field; new decision-record fields minority_model_archive_count /
+minority_model_inverted true) was evaluated under the protocol
+frozen BEFORE implementation at
+`benchmarks/inverted_archive_minority_recovery_protocol.json` on
+NEW cohorts 462003/462021/462039 and 463001/463017/463041, both
+now INSPECTED — never re-tune against them. **Graded Failed
+under the protocol's own definitions (PRIMARY criterion 12
+FAILs on BOTH cohorts — carried-profile side fails on both,
+release side fails on additional — so the Failed clause
+triggers on the additional cohort several times over) and a
+Regression under its checkpoint-32 clause (additional k=32
+successes 58 below the recent8 − 4 line of 60, the deficit
+exactly the two non-recent8 k=32 routings; the other Regression
+clauses do not trigger: pooled onset harm 115/90 well below
+recent8 229/250, the control-successes clause requires both
+cohorts and additional's deficit is −5 against development's
+−12, suite + transfer pass).** Per-criterion, development /
+additional, PRIMARY criterion 12 first, then co-graded guards
+1, 11, 9, 6, 5, 4: C12 conjunction FAIL/FAIL (B2 side PASS on
+both; carried-profile side FAIL on both; release side PASS dev,
+FAIL add), C1 B2 protection PASS/PASS — the changed element's
+own criterion: minority TAKEN 5/6 on both, selectivity 0/6 B1
+and 0/6 return-A both, harm 19 vs guard 28 and ceiling 39.6 dev
+(the guard gap that defeated the minority-set fit at full
+engagement on its cohorts, closed: +10 successes / −10 harm vs
+the decisive widened method ON THIS COHORT, whose B2 line is
+51/29) and 46 vs guard 74 and ceiling 54.0 add (per-state
+differences +2/−2, −2/+2, −2/+2, +1/−1, +1/−1 cancelling
+EXACTLY in the pooled aggregate, 50/46 both methods); the
+inverted model is NOT a null — first-frame choices differ from
+the decisive baseline's at 5/5 minority-fired B2 onset states
+on EACH cohort (cross-check verified at every minority-fired
+state, 11 dev / 13 add applicable: candidate == inverted model,
+widened == minority-set model), so the grading cap is met on
+both and does not bind; the pre-registered attenuation
+misranking is visible bounded (seed 463017 −2/+2 at both
+checkpoints, seed 462003 k=2 −1/+1), C11 carried profile
+FAIL/FAIL (dev both sides fail; add stationary side only), C9
+B1 engagement FAIL/PASS (dev TAKEN 2/6 — 1 full + 1 retained
+partial, the count one short; two partial states disarmed by
+leg R at preceding 0, two states triggerless, ZERO widened B1
+firings dev; harm 62 vs guard 72 / recent8 87 PASS both
+sub-comparisons; B1 successes 2 vs recent8 9 / guard 8; add
+TAKEN 5/6 — 2 full, 1 retained partial, 2 widened, both widened
+at seed 463041 — harm 16 vs guard 65 / recent8 81, successes 0
+vs 15/15; every B1 line identical to the widened method's on
+both cohorts), C6 stationary FAIL/FAIL — the only co-graded
+guard failing both cohorts (dev abstentions 48/240 vs the ≤32
+budget AND successes 85 vs recent8 97 required >= 91 FAIL,
+harm 107 vs 143 PASS; add abstentions 64/240 FAIL on volume
+alone, successes 71 vs 76 required >= 70 PASS by 1, harm 105
+vs 164 PASS; firings: dev 2 widened (seed 462003 k=2 purity
+0.865 / k=8 purity 0.806) + 1 partial (k=4, purity 0.825), add
+2 widened (463001 k=16 0.818, 463041 k=8 0.757) + 2 partial
+(463017 k=2 0.919, 463041 k=16 0.750), acting_opposed_count 3
+at every widened firing; the widened class's pre-registered
+stationary survival, absent on its own cohorts, materialized
+on both of these; control lines identical to the widened
+method's on both), C5 release PASS/FAIL (dev 0/144, 77 = 77,
+non-recent8 0/9, abstained 0/9; add 0/144 and abstained 0/9
+and successes 58 vs required >= 56 PASS but non-recent8 2/9
+FAIL — return-A minority seed 463001 0/16 identical under both
+minority models, the widened method took the same routing,
+and B2 minority seed 463017 scored 9/7 through the INVERTED
+model vs 10/6 for the widened method and recent8, the one k=32
+state where the inverted model itself is the worse scorer;
+the two routings are exactly the cohort's −6 k=32 deficit),
+C4 return-A harm PASS/PASS (34 vs guard 39 ceiling 45.6,
+regular recovery 5/6; 28 vs guard 37 ceiling 47.4, recovery
+6/6), C2 return-A successes PASS/PASS (62 vs frozen_A 64; 68
+vs 68 — stated in full: cumulative 64/32 and frozen_A 64/32
+beat the candidate 62/34 on BOTH axes on development, frozen_A
+exactly ties it on additional and cumulative 62/34 sits below,
+so the eight-pair both-axes dominance streak does NOT extend),
+C3 pooled onset harm PASS/PASS (115 vs guard 139, 6/6 cells;
+90 vs guard 176, 6/6 — decisive widened method 125 dev ABOVE
+candidate, 90 add EQUAL), C7 full accounting PASS/PASS (replay
+72/72 per cohort, all fields incl. minority_model_archive_count
+== archive_events_count and minority_model_inverted true
+everywhere, branch selection identical to the widened method
+72/72 per cohort, cross-check PASS at every minority-fired
+state, acquisition 0). **The conjunction PRIMARY grades the
+whole carried profile, so a demonstrated B2 model improvement
+inside a failing carried profile is a Failed experiment under
+this protocol: criterion 1 passes on both cohorts for the
+model change, and criteria 11/6 (both cohorts) and 5
+(additional) fail on carried classes and routings the model
+change does not touch — except the one additional B2 k=32
+routing the inverted model itself scored worse, recorded
+under C5.** Full unit suite (1351) and historical transfer
+benchmark passed in the implementation, evaluation, and
+grading stages; no CI claimed for the evaluation or grading
+commits (UNVERIFIED). See
+`docs/INVERTED_ARCHIVE_MINORITY_RECOVERY.md`. Keep the learner
+optional and unpromoted, default controller unchanged, no
+merge, no AthenZ/Synveil integration, D1–D10/V2A/V2B
+unchanged. Next limitation selected: P1 stationary selectivity
+of the carried abstention classes — criterion 6 fails on BOTH
+cohorts on abstention volume (48/240 dev, 64/240 add vs the
+≤32 budget; dev successes also fail at −12), with mixed-class
+firings (widened 2 + partial 1 dev; widened 2 + partial 2 add;
+widened purity 0.757–0.865, acting_opposed_count 3 at every
+widened firing); whether an evidence-derived condition on the
+abstention classes themselves can hold criterion 6's frozen
+margins on both cohorts while holding criterion 9's B1
+engagement, criterion 1's B2 protection as demonstrated here
+(inverted model carried), and checkpoint-32 release, on NEW
+cohorts under a NEW protocol. Recorded but not selected: the
+additional k=32 Regression's two routings (one carried
+identical under both models, one inverted-model-scored) — the
+selected protocol must carry checkpoint-32 release as a
+co-graded guard; development's B1 shortfall is one state with
+zero widened B1 firings on that cohort while its stationary
+arm fired twice there; the additional B2 pooled cancellation
+(inverted benefit pooled-demonstrated on development only,
+per-state on additional); cumulative/frozen_A return-A
+dominance holds on development only this cycle.
+
 # Widened window abstention recovery: widened acting-window abstention trigger class for silent/split newest-four states — 2026-11-07 (PARTIALLY DEMONSTRATED)
 
 Optional `developmental_ai/widened_window_abstention_recovery.py`

@@ -1122,6 +1122,69 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 8 — Inverted archive minority recovery: inverted full-archive fit for the minority branch's model (FAILED / REGRESSION at checkpoint 32)
+
+Optional `InvertedArchiveMinorityRecoveryMemory` is identical to the
+graded widened-window candidate in acting model, extended signal,
+retained archive, archive concordance, joint recovery test, recovery
+model, the full three-leg authority condition, the minority branch's
+arming / concordance / joint records, leg P ≥ 0.70 on both recovery
+branches, and the full / retained-partial / widened abstention classes
+with leg R on partials and support threshold null; the SINGLE changed
+element is the minority branch's MODEL — a `RelationOutcomeMemory`
+fitted on ALL retained archive events with progress/damage labels
+swapped (neutral unchanged), in place of a fit on the minority set
+only (the minority set still drives arming, concordance/joint
+records, and every recorded minority field; new decision-record
+fields `minority_model_archive_count` / `minority_model_inverted`) —
+under a protocol frozen before implementation (new cohorts
+462003-family / 463001-family, now INSPECTED). **Graded Failed under
+the protocol's own definitions (PRIMARY criterion 12 FAILs on BOTH
+cohorts — its carried-profile side fails on both and its release
+side fails on additional — triggering the Failed clause on the
+additional cohort several times over) and a Regression under its
+checkpoint-32 clause (additional k=32 successes 58 below the
+recent8 − 4 line of 60, the deficit exactly the two non-recent8
+k=32 routings; the other Regression clauses do not trigger: pooled
+onset harm 115/90 well below recent8's 229/250, the control clause
+requires both cohorts and additional's deficit is −5 against
+development's −12, suite + transfer pass).** Stated as prominently
+as the failure: the changed element worked on its own criterion —
+the inverted model is NOT a null (its first-frame choice differs
+from the minority-set model's at 5/5 minority-fired B2 onset states
+on EACH cohort, cross-check verified, so the grading cap is met on
+both and does not bind), and criterion 1 PASSes on BOTH cohorts: on
+development it closes the guard gap that defeated the minority-set
+fit at full engagement (B2 harm 19 vs guard 28 and ceiling 39.6;
++10 successes / −10 harm against the decisive widened method on the
+same cohort), and on additional it holds the guard and ceiling
+(46 vs 74 / 54.0) with its per-state differences (+2/−2, −2/+2,
+−2/+2, +1/−1, +1/−1) cancelling EXACTLY in the pooled aggregate
+(50/46 both methods). What failed is the carried profile the
+conjunction grades: criterion 11 FAILs both cohorts — criterion 6
+stationary selectivity FAILs BOTH (abstentions 48/240 development
+and 64/240 additional vs the ≤32 budget; development successes 85
+vs recent8's 97 also FAIL; the firings are 2 widened + 1 partial on
+development, all at seed 462003, and 2 widened + 2 partial on
+additional — the widened class's pre-registered stationary
+survival, absent on its own cohorts, materializing on both of
+these; every B1/control line identical to the decisive baseline
+method's) and criterion 9 FAILs development on engagement alone
+(TAKEN 2/6, zero widened B1 firings there; additional PASSes at
+5/6 with 2 widened firings) — and criterion 5 FAILs additional on
+the records sub-condition (non-recent8 branch in 2/9 k=32 states:
+one carried return-A minority routing identical under both models
+at 0/16, and one B2 minority routing scored 9/7 through the
+inverted model vs 10/6 for the widened method and recent8).
+Criteria 4, 2, 3 and 7 PASS on both cohorts; cumulative/frozen_A
+return-A dominance on both axes holds on development only this
+cycle (additional is a frozen_A tie), so the eight-pair streak does
+not extend. Next limitation selected: P1 stationary selectivity of
+the carried abstention classes. Learner acquisition actions zero;
+external TRAIN actor harm published in full in the report.
+Optional only, no promotion, no merge.
+[Full graded report](docs/INVERTED_ARCHIVE_MINORITY_RECOVERY.md).
+
 ### November 7 — Widened window abstention recovery: widened acting-window abstention trigger class for silent/split newest-four states (PARTIALLY DEMONSTRATED)
 
 Optional `WidenedWindowAbstentionRecoveryMemory` is identical to the
