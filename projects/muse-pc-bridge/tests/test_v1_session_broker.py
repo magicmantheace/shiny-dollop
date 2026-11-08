@@ -167,10 +167,15 @@ class HelperServerTests(BrokerFixture):
         status, _ = call("POST", helper.port, "/v1/exec",
                          {"command": "echo hi"})
         self.assertEqual(status, 404)
-        # A desktop route IS served (and honestly 501s off Windows).
+        # A desktop route IS served: on Windows the clipboard
+        # answers for real; off Windows it honestly 501s.
         status, obj = call("GET", helper.port, "/v1/clipboard")
-        self.assertEqual(status, 501)
-        self.assertTrue(obj.get("platform_limited"))
+        if bridge_agent.IS_WINDOWS:
+            self.assertEqual(status, 200)
+            self.assertIn("text", obj)
+        else:
+            self.assertEqual(status, 501)
+            self.assertTrue(obj.get("platform_limited"))
         status, obj = call("GET", helper.port, "/v1/processes")
         self.assertEqual(status, 200)
         self.assertEqual(obj["processes"], [])
