@@ -560,3 +560,50 @@ over the desktop wallpaper/taskbar: no backdrop box, no key
 colour, status line and ✕ floating over the desktop. The
 owner's desktop pet, running at the same time, kept polling the
 state file throughout.
+
+## 2026-11-08 — Codex PR #27 findings fixed (branch `codex-fixes/pc-bridge`)
+
+Codex reviewed the merged v1 PR (#27) and left four findings; the
+owner directed fixing all of them. Each was verified against the
+code first (all four real), reproduced by a regression test that
+failed pre-fix, then fixed minimally:
+
+1. **P1 — update staging path traversal** (`agent/bridge_update.py`):
+   `stage_update()` joined the caller-supplied `version` onto the
+   staging root and `rmtree()`d the result before any bundle
+   verification; an absolute or `..` version deleted an arbitrary
+   directory. Fix: `_validate_version()` requires a single safe
+   path component, plus a resolved-containment check, before
+   anything is removed.
+2. **P2 — client job polling skipped output**
+   (`client/bridge_client.py`): `job_wait()` advanced its offsets
+   to the stream totals (`stdout_bytes`), but one response carries
+   at most 256 KiB — a 600,000-byte job returned only 262,144
+   bytes. Fix: request an explicit slice size, advance offsets
+   only past bytes actually returned, and drain a finished job
+   before returning.
+3. **P1 — file/tree followed symlinks out of the root**
+   (`agent/bridge_agent.py`): the recursion applied no containment
+   check to descendants. Fix: each child is resolved and checked
+   against the file root; escapes are skipped (never listed or
+   followed), inside-root links still work — per AGENTS.md §10.
+4. **P1 — supervisor stop bypassed the audited shutdown**
+   (`agent/supervisor.py`, `agent/bridge_agent.py`): a normal stop
+   terminated the agent, so the audit log kept `server_start`
+   with no `server_stop`. Fix: the agent routes SIGTERM (POSIX)
+   and SIGBREAK (Windows) through the same shutdown path as
+   Ctrl+C, so `main()`'s finally writes `server_stop`; the
+   supervisor sends CTRL_BREAK_EVENT on Windows (child now spawns
+   in its own process group) and keeps forced termination as the
+   fallback after the grace timeout.
+
+**Verified (Muse's Linux VM, 2026-11-08):** full suite
+**88 tests, OK (1 skip)** — the skip is the pre-existing
+Windows-only real-capture test. The POSIX graceful-stop path is
+proven end-to-end with the real agent (direct SIGTERM and via
+`Supervisor._stop_child()`).
+
+**NOT verified:** the Windows CTRL_BREAK_EVENT graceful stop
+(needs the owner's PC), and no deployment was made — the
+production bridge on the PC still runs the pre-fix v1.0.0 build.
+Deploying this branch is a separate owner-directed step.

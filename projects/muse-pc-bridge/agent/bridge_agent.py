@@ -2275,6 +2275,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         target = self.core.resolve_in_root(root_name, rel)
         if not target.exists():
             return 404, {"error": f"no such path: {rel}"}, f"tree {rel} (missing)", {}
+        root_resolved = self.core.root_path(root_name).resolve()
         counter = {"n": 0, "truncated": False}
 
         def build(node: Path, depth: int) -> dict:
@@ -2289,6 +2290,17 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     if counter["n"] >= max_entries:
                         counter["truncated"] = True
                         break
+                    # Containment applies to every descendant, not
+                    # just the requested path: a symlink (or junction)
+                    # whose target escapes the file root is skipped —
+                    # never listed, never followed (AGENTS.md §10).
+                    try:
+                        resolved = child.resolve()
+                    except OSError:
+                        continue
+                    if resolved != root_resolved and \
+                            root_resolved not in resolved.parents:
+                        continue
                     children.append(build(child, depth + 1))
                 item["children"] = children
             elif is_dir:
@@ -2621,6 +2633,22 @@ def main(argv: list[str] | None = None) -> int:
         print("=" * 72, file=sys.stderr)
 
     server = create_server(cfg)
+    # Graceful stop on SIGTERM (POSIX) / SIGBREAK (Windows): the
+    # supervisor's normal stop terminates the child process, and
+    # without a handler that bypasses the finally block below — the
+    # audit log would hold server_start with no server_stop, against
+    # the AGENTS.md rule that server start/stop are always audited.
+    # Route those signals through the same shutdown path as Ctrl+C.
+    def _signal_shutdown(_signum, _frame):
+        threading.Thread(target=server.shutdown, daemon=True).start()
+
+    for _sig in (getattr(signal, "SIGTERM", None),
+                 getattr(signal, "SIGBREAK", None)):
+        if _sig is not None:
+            try:
+                signal.signal(_sig, _signal_shutdown)
+            except (ValueError, OSError):
+                pass
     host, port = server.server_address[0], server.server_address[1]
     print(f"[bridge] {AGENT_NAME} {VERSION} listening on http://{host}:{port} "
           f"(shell default: {default_shell()})")

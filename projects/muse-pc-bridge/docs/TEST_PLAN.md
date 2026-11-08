@@ -36,8 +36,8 @@ PC during install verification.
 | --- | --- |
 | `tests/test_v1_jobs.py` (14) | job submit returns immediately with a job id; result/output/exit code; incremental byte-offset reads (head + tail reconstruct the whole, no repeats); **first line visible via the API while the job is still running** (regression for the pipe-pump starvation below); cancel → killed; timeout → failed + timed_out + null exit code; job list; unknown job → 404; **job_finish audited with a 64-char stdout SHA-256**; detached process spawn/list/kill with log tails; PTY session echo round-trip; **pipe-pump regression: session output reaches the buffer while the shell is still alive** (pipe path forced, echo child — fails against the pre-fix pump); missing session → 400 |
 | `tests/test_v1_platform.py` (16) | PNG encoder structure (IHDR, filter-0 scanlines round-trip), BMP structure, BGRA→RGBA conversion; PNG round-trip at real capture size (1536x864, per-chunk CRC + pixel-exact decode) and the declared ctypes capture-signature table pinned with stand-in functions (regressions for the staging-found screenshot HTTP 500); the same signature pinning for the kernel32 process calls in `pid_alive` (OpenProcess/GetExitCodeProcess/CloseHandle) and for the clipboard path's user32/kernel32 calls (HGLOBAL round-trip, incl. GlobalAlloc's SIZE_T parameter); capabilities vs platform_limited in /v1/status; screenshot/input/clipboard/UIA → 501 off Windows; bad format → 400; empty input actions → 400; real-capture test is Windows-only (skipped on the VM) |
-| `tests/test_v1_lifecycle.py` (8) | update stage/apply/rollback file cycle; wrong SHA-256, version mismatch, and zip-slip bundles rejected; apply without pending → error; supervisor restarts a twice-crashing agent and reports it; a staged **unhealthy update is rolled back automatically** (file bytes restored); a healthy update stays applied |
-| `tests/test_v1_files.py` (9) | hash endpoint + ranged get; chunked upload round-trip through the client library; **resume after partial upload** (2 chunks sent, client resumes by id); hash mismatch at completion rejected with no file placed; wrong chunk size rejected; upload discard; tree/mkdir/move/delete incl. root protection; a second named root (and unknown root → 400); path escapes still confined; client `exec_run` |
+| `tests/test_v1_lifecycle.py` (13) | update stage/apply/rollback file cycle; wrong SHA-256, version mismatch, and zip-slip bundles rejected; apply without pending → error; **unsafe update versions rejected before any delete** (absolute path, `..` traversal, non-component — Codex PR #27 regressions, victim dirs verified intact); supervisor restarts a twice-crashing agent and reports it; a staged **unhealthy update is rolled back automatically** (file bytes restored); a healthy update stays applied; **graceful-stop audit regressions** (POSIX): the real agent writes `server_stop` to the audit log on SIGTERM, both directly and via `Supervisor._stop_child()` (Codex PR #27) |
+| `tests/test_v1_files.py` (12) | hash endpoint + ranged get; chunked upload round-trip through the client library; **resume after partial upload** (2 chunks sent, client resumes by id); hash mismatch at completion rejected with no file placed; wrong chunk size rejected; upload discard; tree/mkdir/move/delete incl. root protection; **tree never follows a symlink out of the root** (escapes skipped, inside-root links still followed — Codex PR #27 regression); a second named root (and unknown root → 400); path escapes still confined; client `exec_run`; **client `job_wait` drains output past one 256 KiB response slice** (600,000-byte job returns every byte, untruncated — Codex PR #27 regression) |
 | `tests/test_v1_hardening.py` (6) | audit rotation bounds the log and honors `audit_keep`; audit tail returns well-formed recent entries from the current file and clamps n; the rate-limit flow end-to-end (401 → 429 + `retry_after_s`, real token unaffected, blocked attempts still audited with `rate_limited: true`); update staging API (empty → staged; running agent untouched) |
 
 ### Avatar-display suites (added 2026-11-05)
@@ -195,6 +195,20 @@ PC during install verification.
   over the desktop wallpaper and taskbar — no backdrop box, no
   key colour visible — with the status line and ✕ rendered over
   the desktop. The pet (running concurrently) was unaffected.
+- 2026-11-08 (Codex PR #27 fixes, Muse's Linux VM, Python 3.12):
+  the four Codex findings on the merged v1 PR were each reproduced
+  by a new regression test that failed against the pre-fix code
+  (staging `rmtree` deleted the victim dir; tree leaked an
+  outside symlink's contents; `job_wait` returned 262,144 of
+  600,000 bytes; SIGTERM left only `server_start` in the audit
+  log), then fixed: version validation in `stage_update`, per-entry
+  containment in `/v1/file/tree`, offset accounting in the client's
+  `job_wait`, and a graceful SIGTERM/SIGBREAK shutdown path in the
+  agent + supervisor. **Full suite on the VM: 88 tests, OK
+  (1 skip)** — the skip is still the Windows-only real-capture
+  test. **Not verified:** the Windows graceful-stop path
+  (CTRL_BREAK_EVENT) and everything else Windows-side; nothing was
+  deployed to the owner's PC — the production bridge is untouched.
 
 ## What the tests cannot prove
 

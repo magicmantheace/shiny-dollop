@@ -48,6 +48,11 @@ from pathlib import Path
 
 CHUNK = 8 * 1024 * 1024
 
+# Per-response output slice requested while polling jobs. Matches the
+# agent's default max_output_bytes; job_wait asks for it explicitly so
+# it can tell exactly how many bytes each response carried.
+JOB_POLL_MAX_BYTES = 262144
+
 
 class BridgeError(Exception):
     pass
@@ -163,12 +168,28 @@ class Client:
         err_parts: list[str] = []
         deadline = None if timeout is None else time.time() + timeout
         while True:
-            snap = self.job_get(job_id, out_off, err_off)
-            out_parts.append(snap.get("stdout", ""))
-            err_parts.append(snap.get("stderr", ""))
-            out_off = snap["stdout_bytes"]
-            err_off = snap["stderr_bytes"]
-            if snap["state"] in ("done", "failed", "killed"):
+            snap = self.job_get(job_id, out_off, err_off,
+                                max_bytes=JOB_POLL_MAX_BYTES)
+            out_text = snap.get("stdout", "")
+            err_text = snap.get("stderr", "")
+            out_parts.append(out_text)
+            err_parts.append(err_text)
+            # Advance only past the bytes this response actually
+            # returned. stdout_bytes is the stream TOTAL: jumping
+            # straight to it skips everything past one response slice
+            # (256 KiB) whenever a job emits more than that between
+            # polls. (For a truncated stream the totals count bytes
+            # the agent has already discarded; the offsets then run
+            # ahead of the retained data, reads come back empty, and
+            # the terminal-drain check below ends the loop.)
+            out_off += min(JOB_POLL_MAX_BYTES,
+                           max(0, snap["stdout_bytes"] - out_off))
+            err_off += min(JOB_POLL_MAX_BYTES,
+                           max(0, snap["stderr_bytes"] - err_off))
+            terminal = snap["state"] in ("done", "failed", "killed")
+            drained = out_off >= snap["stdout_bytes"] and \
+                err_off >= snap["stderr_bytes"]
+            if terminal and (drained or (not out_text and not err_text)):
                 snap["stdout"] = "".join(out_parts)
                 snap["stderr"] = "".join(err_parts)
                 return snap
@@ -176,7 +197,8 @@ class Client:
                 raise BridgeError(
                     f"timed out waiting for job {job_id} "
                     f"(still {snap['state']} on the agent)")
-            time.sleep(poll_interval)
+            if not terminal:
+                time.sleep(poll_interval)
 
     def exec_run(self, command: str, shell: str | None = None,
                  timeout_s: float | None = None, cwd: str | None = None,

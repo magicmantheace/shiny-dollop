@@ -114,3 +114,14 @@ under Windows Python: 63 tests, OK (4 platform skips)**. The
 cutover completed the same morning: the live agent on the PC
 now runs **v1.0.0 in the supervised (service) form** — see
 `docs/MUSE_HANDOFF.md` for the full record.
+
+**Update (2026-11-08):** the four Codex review findings on the
+v1 PR (update-staging path traversal, file/tree symlink escape,
+client job-polling output loss, unaudited supervisor stop) are
+fixed on branch `codex-fixes/pc-bridge`, each with a regression
+test that failed pre-fix. **Verified on Muse's Linux VM:
+88 tests, OK (1 skip).** The Windows graceful-stop path
+(CTRL_BREAK_EVENT) is implemented but **not yet verified on the
+PC**, and this branch is **not deployed** — the production
+bridge still runs the pre-fix build. See the 2026-11-08 entry in
+`docs/MUSE_HANDOFF.md`.
