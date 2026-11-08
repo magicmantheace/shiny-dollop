@@ -1,6 +1,11 @@
 # Test plan — Small Business Website Generator
 
-**Current test status:** NOT RUN. This document defines future acceptance; no test results are implied.
+**Current test status:** RUN 2026-11-04 (Linux VM, Node 24) — **142/142 pass** across 16 files:
+`tests/backend/*` (107: themes determinism + injection-inertness, all five validator codes, export pipeline happy-path/blocking/dest-guards, preview stylesheet inlining, desktop launch contract — manifest entry point, renderer path, sandboxed preload — db CRUD + reopen, IPC contract shape, preload method list),
+`tests/renderer/*` (35: editor validation blocking bad email/URL/phone, pending-edit flush on unmount, in-flight autosave race, dynamic list add/remove, restaurant-vs-trades menu sections, theme switch → setTheme + preview re-render, preview iframe srcDoc/tab/viewport, export blocked-while-issues/clean-export/picker-cancel, dashboard wizard/delete/Escape),
+`tests/backend/acceptance.test.ts` (MVP walkthrough: restaurant site → fill profile → validate clean → export 6 files → internal links resolve → no third-party assets → byte-identical second export → missing name blocks export, nothing written).
+`npm run typecheck` clean (main + renderer), `npm run lint` clean, `npm run build` green, `npm run smoke` PASS — backend pipeline only; the script does not launch Electron (an earlier "real window under xvfb" description of it was wrong and has been corrected). A one-off manual `electron .` launch under xvfb was performed 2026-11-04 (window up, built renderer loaded, sandboxed preload active, no load errors); it is not part of the smoke script and involved no click-through.
+Windows click-through not executed here — marked pending, not passing.
 
 ## Required automated and integration scenarios
 

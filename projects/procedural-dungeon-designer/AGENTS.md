@@ -14,3 +14,19 @@ Root `AGENTS.md` overrides these instructions on conflict.
 8. Record commands actually run, observed results and unresolved platform limitations; do not claim Windows/AI/provider tests passed without executing them.
 9. Only update this project's status to MVP/verified after a genuine runnable demonstration. Maintain `docs/IMPLEMENTATION_STATUS.md` after substantive work.
 10. Leave project-specific code on a reviewable, unmerged PR. Do not modify shared root workflows or utilities without separate permission.
+
+## Implementation notes (MVP, 2026-10-23)
+
+- Stack: Electron + React + TypeScript strict + Vite, `node:sqlite`,
+  zod-validated IPC; app code in `app/`. The generator is a pure library in
+  `app/shared/` — it must stay free of `Math.random()`/`Date` and of any
+  Node/Electron imports so determinism holds everywhere.
+- Budget edit rule: placement edits that would exceed the budget are
+  BLOCKED with `BUDGET_EXCEEDED`; costs always come from the theme tables
+  in `app/shared/themes.ts` (original content only).
+- The sandboxed preload (`app/electron/preload/preload.ts`) must remain
+  self-contained at runtime: literal channel strings, type-only shared
+  imports. Guarded by `tests/backend/preload-hygiene.test.ts`.
+- Export contract: `formatVersion "1.0.0"` envelope documented in
+  `docs/IMPLEMENTATION_STATUS.md`; exports must stay byte-deterministic
+  (stable key-sorted stringify, no timestamps in the envelope).

@@ -1,6 +1,13 @@
 # Test plan — Household Inventory and Warranty Tracker
 
-**Current test status:** NOT RUN. This document defines future acceptance; no test results are implied.
+**Current test status:** RUN 2026-10-23 (Linux VM, Node 24) — **59/59 pass** across 10 files:
+`tests/engine/*` (warranty date math incl. leap-day 2024-02-29 accepted / 2023-02-29 rejected, today/tomorrow/yesterday boundaries, null end → 'none'),
+`tests/db/*` (CRUD round-trip, attachment sha256 integrity + missing-file tolerance + cascade file cleanup on item delete,
+backup export→import round-trip with byte-identical attachments, tamper rejection on sha256 mismatch / missing file / garbage zip / wrong manifest / zip-slip path),
+`tests/ui/*` (hermetic `window.inv` mocks: search/category filtering, expired-vs-expiring sections + empty state, form validation incl. dollars→cents, oversized-file warning + upload block),
+`tests/integration/acceptance.test.ts` (full MVP walkthrough: 2 items + receipt + maintenance event + warranty finder + backup round-trip into a fresh dir).
+`npm run typecheck` clean, `npm run lint` clean, `npm run build` green, `npm run smoke` PASS (real window, SMOKE_OK).
+Windows click-through not executed here — marked pending, not passing.
 
 ## Required automated and integration scenarios
 
