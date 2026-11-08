@@ -22,6 +22,16 @@ drives the shell with real pointer input and pixel evidence:
   same convention weston-session uses, ADR 0025);
 - a menu item click closes the menu and focuses the app's window;
   the Start button toggles the menu closed again;
+- the shell polish pass (icons, tray, slide): menu items and
+  task buttons carry the shell's drawn geometric app icons (no
+  letter tiles); the tray shows the network link state read
+  from the guest kernel — this boot attaches the QMP user-net
+  device, and the gate drops and restores its link through QMP
+  set_link, expecting the indicator to follow (accent arcs when
+  up, faint arcs with a danger slash when down); the update
+  slot stays hidden because the joined image runs no A/B agent
+  the shell could honestly read (the net slot sitting in the
+  unshifted position is the evidence);
 - the session still ends cleanly (both windows closed, graphical
   login relocks).
 
@@ -107,6 +117,38 @@ def is_accent(color):
     dimmer (observed (69,177,232)). Match the hue, not the value."""
     r, g, b = color
     return r < 120 and g > 130 and b > 180 and b - r > 90
+
+
+def is_blueish(color):
+    """The demo/window icon body hue (#1B4B8F family)."""
+    r, g, b = color
+    return b > 100 and b - r > 60
+
+
+def is_greenish(color):
+    """The terminal icon's prompt hue (#7EE787 family)."""
+    r, g, b = color
+    return g > 120 and g - r > 40 and b < 180
+
+
+def is_redish(color):
+    """The danger token hue (#E81123 family)."""
+    r, g, b = color
+    return r > 150 and r - g > 70 and r - b > 70
+
+
+def box_count(width, height, data, x0, x1, y0, y1, pred):
+    return sum(1 for y in range(y0, y1) for x in range(x0, x1)
+               if pred(px(data, width, x, y)))
+
+
+# Tray geometry on this image (panel_layout): the clock takes
+# 150 px at the right (minutes format), then a 4 px gap; the
+# update slot is 26 px only while the agent has answered (it
+# never does on the joined image), so the network slot's icon
+# (18 px at slot x + 4, strip y + 15) lands here.
+def tray_net_box(width, height):
+    return (width - 176, width - 158, height - 33, height - 15)
 
 
 def write_png(path, width, height, data):
@@ -218,6 +260,31 @@ def run_shell_steps(proof: ShellProof, notes: list[str]) -> list[str]:
     assert len(buttons) >= 2, f"task buttons: {buttons}"
     notes.append(f"{len(buttons)} task buttons on the strip: {buttons}")
 
+    # Polish: the first task button (the demo window, the
+    # session's first window) carries its drawn window icon —
+    # 16 px at button x + 8, strip y + 16; the first button
+    # starts at x=50 now that the stock fallback launcher is
+    # gone. Blue body pixels are the evidence.
+    blue = box_count(width, height, data, 58, 74,
+                     height - 32, height - 16, is_blueish)
+    assert blue >= 6, f"demo task icon blue pixels: {blue}"
+    notes.append(f"demo task button carries its icon ({blue} blue px)")
+
+    # Polish: tray network indicator, link up (this boot
+    # attaches the user-net device): accent arcs in the net
+    # icon box, and no accent in the box the icon would occupy
+    # if a phantom update slot had shifted it left — the
+    # update slot is hidden while no agent answers.
+    nx0, nx1, ny0, ny1 = tray_net_box(width, height)
+    accent = box_count(width, height, data, nx0, nx1, ny0, ny1,
+                       is_accent)
+    assert accent >= 12, f"tray net (up) accent pixels: {accent}"
+    shifted = box_count(width, height, data, nx0 - 26, nx1 - 26,
+                        ny0, ny1, is_accent)
+    assert shifted < 4, f"tray net shifted accent pixels: {shifted}"
+    notes.append(f"tray shows network link up ({accent} accent px); "
+                 "update slot hidden (no agent on this image)")
+
     # Activate the demo window by clicking it; its task button must
     # gain the accent underline. The demo is the session's first
     # window, so its button is the first span; the terminal starts
@@ -303,6 +370,31 @@ def run_shell_steps(proof: ShellProof, notes: list[str]) -> list[str]:
     n_items, menu_top = menu_items((width, height, data))
     notes.append(f"start menu open with {n_items} app items")
 
+    # Polish: every menu item carries a drawn icon, not the old
+    # accent letter tile. Per item (icon box: x 16..44, item
+    # top + 4 .. + 32): the box must hold real mark pixels (not
+    # card surface), and its centre must not be accent — the
+    # letter tile was a solid accent square, centre included.
+    # The two items this image ships get hue checks: Terminal's
+    # prompt green, Demo window's body blue.
+    for i in range(n_items):
+        iy0 = menu_top + 16 + i * MENU_ITEM_H
+        iy1 = iy0 + 28
+        marks = box_count(
+            width, height, data, 16, 44, iy0, iy1,
+            lambda c: not near(c, SURFACE, 10))
+        assert marks >= 25, f"menu item {i} icon pixels: {marks}"
+        centre = px(data, width, 30, (iy0 + iy1) // 2)
+        assert not is_accent(centre),             f"menu item {i} icon centre is accent (letter tile?): {centre}"
+    green = box_count(width, height, data, 16, 44,
+                      menu_top + 16, menu_top + 44, is_greenish)
+    assert green >= 4, f"terminal menu icon green pixels: {green}"
+    blue = box_count(width, height, data, 16, 44,
+                     menu_top + 56, menu_top + 84, is_blueish)
+    assert blue >= 10, f"demo menu icon blue pixels: {blue}"
+    notes.append("menu items carry drawn icons (terminal green, "
+                 "demo blue; no letter tiles)")
+
     # First item (Terminal): the click closes the menu and launches
     # a new terminal window — a third task button appears. (Apps
     # with a single-instance app id focus-or-launch instead; the
@@ -338,6 +430,38 @@ def run_shell_steps(proof: ShellProof, notes: list[str]) -> list[str]:
     toggle(True)
     toggle(False)
     notes.append("start button toggles the menu open and closed")
+
+    # Polish: the tray indicator follows a real link change.
+    # Drop the QMP user-net link: the guest kernel's carrier
+    # flag falls, and within the tray's 1 s poll the accent
+    # arcs must give way to the danger slash. Restore the link
+    # before returning so the session-close phase runs on the
+    # same footing as the rest of the gate.
+    weston_smoke.qmp_command(
+        proof.qmp, {"execute": "set_link",
+                    "arguments": {"id": "synveil_net", "up": False}})
+
+    def link_down(frame):
+        w, h, d = frame
+        x0, x1, y0, y1 = tray_net_box(w, h)
+        return (box_count(w, h, d, x0, x1, y0, y1, is_accent) < 4 and
+                box_count(w, h, d, x0, x1, y0, y1, is_redish) >= 4)
+
+    width, height, data = proof.frame_wait(link_down, 30,
+                                           save="06-tray-link-down.png")
+    notes.append("tray network indicator followed the QMP link drop "
+                 "(danger slash, accent gone)")
+    weston_smoke.qmp_command(
+        proof.qmp, {"execute": "set_link",
+                    "arguments": {"id": "synveil_net", "up": True}})
+
+    def link_up(frame):
+        w, h, d = frame
+        x0, x1, y0, y1 = tray_net_box(w, h)
+        return box_count(w, h, d, x0, x1, y0, y1, is_accent) >= 12
+
+    proof.frame_wait(link_up, 30)
+    notes.append("tray network indicator recovered with the link")
     return notes
 
 
@@ -347,7 +471,7 @@ def boot_and_drive(work: Path, secret: str, out: Path) -> tuple[bool, list[str]]
     qmp = Path(qmp_dir) / "monitor.sock"
     env = {k: v for k, v in os.environ.items() if not k.startswith("SYNVEIL_")}
     env.update(SYNVEIL_OUT_DIR=str(work), SYNVEIL_QEMU_VIDEO="1",
-               SYNVEIL_QEMU_DISPLAY="none", SYNVEIL_QEMU_NETWORK="0",
+               SYNVEIL_QEMU_DISPLAY="none", SYNVEIL_QEMU_NETWORK="1",
                SYNVEIL_QEMU_MEMORY="768M", SYNVEIL_QEMU_IMAGE_WRITABLE="1",
                SYNVEIL_QEMU_QMP_SOCKET=str(qmp))
     process = subprocess.Popen(
