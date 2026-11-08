@@ -39,6 +39,14 @@ more after it exits. The host requires the probe's
 `process_exited` event — same pid, same start_time_ticks,
 later sequence — in the third.
 
+The same snapshots also prove the aggregation slice of
+ADR 0026: every history response must carry a structurally
+valid `aggregates` object (60 s buckets, accounting that
+balances), and the final snapshot must hold all four
+aggregated metrics — cpu.busy, memory.used,
+disk.throughput.bps, net.throughput.bps — with in-range
+mean/max values folded from the sampler's own ticks.
+
 Boot/enroll flakes under TCG retry the whole boot on a fresh
 image copy (the audit-v2 smoke's pattern); the assertions never
 retry. QEMU evidence only; no physical hardware is claimed.
@@ -667,6 +675,125 @@ def check_observe(doc, err_bytes: bytes) -> list[str]:
     return failures
 
 
+AGGREGATE_UNITS = {
+    "cpu.busy": "basis_points",
+    "memory.used": "bytes",
+    "disk.throughput.bps": "bytes_per_second",
+    "net.throughput.bps": "bytes_per_second",
+}
+
+
+def _is_count(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) \
+        and value >= 0
+
+
+def check_aggregates_structure(result, label: str) -> str | None:
+    """The aggregates object (ADR 0026 aggregation slice) must
+    be present and internally consistent in every history
+    snapshot: 60 s buckets, known metric/unit pairs,
+    minute-aligned strictly increasing bucket starts, every
+    bucket carrying samples with mean <= max, and the bucket
+    accounting balancing exactly."""
+    aggregates = result.get("aggregates")
+    if not isinstance(aggregates, dict):
+        return f"{label} aggregates object missing"
+    if aggregates.get("bucket_ms") != 60_000:
+        return (f"{label} aggregates bucket_ms is "
+                f"{aggregates.get('bucket_ms')!r}")
+    for key in ("buckets_per_series", "retained_buckets",
+                "dropped_buckets", "omitted_series",
+                "response_omitted_buckets"):
+        if not _is_count(aggregates.get(key)):
+            return f"{label} aggregates {key} invalid"
+    if aggregates["buckets_per_series"] == 0:
+        return f"{label} aggregates buckets_per_series is zero"
+    series = aggregates.get("series")
+    if not isinstance(series, list):
+        return f"{label} aggregates series is not a list"
+    carried = 0
+    for entry in series:
+        if not isinstance(entry, dict):
+            return f"{label} aggregates series entry is not an object"
+        metric = entry.get("metric")
+        if AGGREGATE_UNITS.get(metric) != entry.get("unit"):
+            return (f"{label} aggregates metric/unit pair invalid: "
+                    f"{metric!r}/{entry.get('unit')!r}")
+        if not isinstance(entry.get("name"), str) \
+                or not entry["name"]:
+            return f"{label} aggregates series lacks a name"
+        buckets = entry.get("buckets")
+        if not isinstance(buckets, list) or not buckets:
+            return (f"{label} aggregates series {metric} has "
+                    "no buckets")
+        previous_start = None
+        for bucket in buckets:
+            if not isinstance(bucket, dict):
+                return f"{label} aggregates bucket is not an object"
+            start = bucket.get("start_unix_ms")
+            if not _is_count(start) or start % 60_000 != 0:
+                return (f"{label} aggregates bucket start "
+                        f"unaligned: {start!r}")
+            if previous_start is not None and start <= previous_start:
+                return (f"{label} aggregates bucket starts do "
+                        "not increase")
+            previous_start = start
+            if not _is_count(bucket.get("samples")) \
+                    or bucket["samples"] == 0:
+                return f"{label} aggregates bucket has no samples"
+            mean = bucket.get("mean")
+            maximum = bucket.get("max")
+            if not _is_count(mean) or not _is_count(maximum) \
+                    or mean > maximum:
+                return (f"{label} aggregates bucket mean/max "
+                        f"invalid: {mean!r}/{maximum!r}")
+            carried += 1
+    if carried + aggregates["response_omitted_buckets"] \
+            != aggregates["retained_buckets"]:
+        return (f"{label} aggregates accounting does not "
+                "balance")
+    return None
+
+
+def check_aggregates_content(doc) -> tuple[dict, list[str]]:
+    """The final snapshot must hold all four aggregated
+    metrics, folded from real sampler ticks in the guest:
+    cpu.busy within its basis-point range and memory.used
+    positive, plus at least one disk and one network
+    throughput series."""
+    failures: list[str] = []
+    result = doc.get("result") or {}
+    series = ((result.get("aggregates") or {}).get("series")) or []
+    by_metric: dict[str, list] = {}
+    for entry in series:
+        if isinstance(entry, dict):
+            by_metric.setdefault(entry.get("metric"), []).append(entry)
+    info = {"series": [
+        {"metric": entry.get("metric"), "name": entry.get("name"),
+         "buckets": len(entry.get("buckets") or []),
+         "latest_mean": (entry.get("buckets") or [{}])[-1].get("mean"),
+         "latest_max": (entry.get("buckets") or [{}])[-1].get("max")}
+        for entry in series if isinstance(entry, dict)]}
+    for metric in AGGREGATE_UNITS:
+        if metric not in by_metric:
+            failures.append(
+                f"h2 aggregates missing the {metric} series")
+    cpu = (by_metric.get("cpu.busy") or [{}])[0]
+    if cpu:
+        for bucket in cpu.get("buckets") or []:
+            if (bucket.get("max") or 0) > 10_000:
+                failures.append(
+                    "h2 cpu.busy bucket max above 10000 bp: "
+                    f"{bucket.get('max')!r}")
+                break
+    memory = (by_metric.get("memory.used") or [{}])[0]
+    if memory:
+        latest = (memory.get("buckets") or [{}])[-1]
+        if not _is_count(latest.get("max")) or latest["max"] == 0:
+            failures.append("h2 memory.used latest bucket max is zero")
+    return info, failures
+
+
 def check_history(docs: dict, errs: dict,
                   probe_pid: int | None) -> tuple[list[str], dict]:
     """Assert the ADR 0026 lifecycle proof: the sampler was
@@ -709,8 +836,15 @@ def check_history(docs: dict, errs: dict,
                     or event.get("schema") != "synveil.observe-event/v1":
                 failures.append(f"{name} carries a non-event record")
                 break
+        problem = check_aggregates_structure(result, name)
+        if problem:
+            failures.append(problem)
     if failures:
         return failures, info
+    aggregate_info, aggregate_failures = check_aggregates_content(
+        docs["h2"])
+    info["aggregates"] = aggregate_info
+    failures += aggregate_failures
     if probe_pid is None or probe_pid <= 0:
         return failures + ["probe pid was not recorded"], info
 
