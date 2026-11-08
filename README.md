@@ -9,6 +9,7 @@ This repository is a permanent, **multi-project** workspace. Its root is an inde
 | Universal PC Game Launcher | [`projects/universal-game-launcher/`](projects/universal-game-launcher/README.md) | Existing development; unmerged review branch/PR — do not overwrite |
 | GitHub Development Command Center | [`projects/github-development-command-center/`](projects/github-development-command-center/README.md) | PARKED — do not implement without new authorization |
 | AthenZ | [`projects/athenz/`](projects/athenz/README.md) | Imported copy of the standalone AthenZ repo (main `ff3b407`); unmerged review PR — do not overwrite |
+| Milky Way Colonization Simulator | [`projects/milky-way-colonization-sim/`](projects/milky-way-colonization-sim/README.md) | S0 data pipeline + viewer built on its foundation branch; unmerged, awaiting owner review — do not overwrite |
 | Drabbit Pet | [`projects/drabbit-pet/`](projects/drabbit-pet/README.md) | In development — P0/P1 (design + pet-brain core) built on a review branch; desktop/Android slices planned |
 | Muse PC Bridge | [`projects/muse-pc-bridge/`](projects/muse-pc-bridge/README.md) | v0 foundation on an unmerged branch; VM-tested only — not yet installed on the owner's PC |
 | Game Asset Builder | [`projects/game-asset-builder/`](projects/game-asset-builder/README.md) | Fully local, no-API game asset pipeline (owner-commissioned 2026-11-06); scaffold + model bake-off on its own branch/PR — do not overwrite |

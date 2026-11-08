@@ -1,0 +1,14 @@
+[package]
+name = "mwcs-pipeline"
+version = "0.1.0"
+edition = "2021"
+description = "Milky Way Colonization Simulator — catalog-to-game-table data pipeline (S0)"
+license = "CC-BY-SA-4.0"
+
+# Zero third-party dependencies by design (see ../REQUIREMENTS.md):
+# CSV parsing, SHA-256, downloads (curl) and gzip (system tool) are all
+# handled without crates so the pipeline builds anywhere cargo does.
+[dependencies]
+
+[profile.release]
+opt-level = 3
