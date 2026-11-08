@@ -1,0 +1,26 @@
+appId: com.magicmantheace.household-inventory
+productName: Household Inventory
+directories:
+  output: release
+files:
+  # Compiled app. The main process requires('zod') at runtime, so it ships.
+  # node:sqlite is provided by the Electron runtime.
+  - dist/**/*
+  - package.json
+  - node_modules/zod/**/*
+asar: true
+win:
+  target:
+    - target: zip
+      arch: [x64]
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-${version}-win-x64.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Household Inventory
+# NOTE: zip is the target buildable on Linux. NSIS needs Wine/Windows.
+# Code signing is intentionally not configured — no release without owner approval.

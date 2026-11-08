@@ -1,6 +1,6 @@
 # Volumetric Concrete Mix Calculator
 
-**Status:** PLANNED — project definition only; no working application is implemented by this intake commit.
+**Status:** MVP FUNCTIONAL — implementation complete and tested on Linux; Windows execution pending owner hardware.
 
 **Priority:** 3 of 17 in the approved intake queue.
 **Category:** Engineering support / Windows desktop
@@ -10,30 +10,45 @@
 
 Calculate calibrated volumetric-truck material needs, stock use, and estimated production yield without claiming unverified strength results.
 
-## First usable release (MVP)
+## MVP (implemented)
 
-Enter a calibrated mix and desired cubic metres and obtain reproducible cement, sand, stone, water and estimated remaining-stock quantities.
+Enter a calibrated mix and desired cubic metres → reproducible cement, sand, stone, water (+ admixture) quantities, gate settings, and estimated remaining stock.
 
-## Full intended capabilities
+- Versioned calibration profiles (materials, gate calibrations, mix designs) in local SQLite
+- Known-value calculation engine with typed units (m³/L/yd³, kg/t/lb)
+- Waste allowance, starting-stock deduction, low-stock and shortfall warnings
+- Truck capacity/payload inputs → **warnings only** (never compliance claims)
+- Theoretical vs measured yield comparison
+- Unit-aware CSV export; calibration envelope JSON export/import (v1.0.0, compatible with Concrete Operations Manager)
+- Electron + React + TypeScript desktop UI; portable Windows zip builds
 
-- Versioned mix/calibration profiles
-- Cement, sand, stone, water, and admixture quantities
-- Adjustable target volume and waste allowance
-- Onboard inventory and silo balance estimate
-- Payload and capacity warning inputs
-- Measured-versus-theoretical yield comparison
-- Unit-aware CSV and JSON exports
+## What the numbers are (and are not)
 
-## Proposed implementation direction
+- **Estimates.** Every quantity derives from operator-entered gate calibrations.
+- **Mix design IDs are nominal only** (e.g. `NOM-25`) — never verified structural performance claims.
+- **Truck warnings are estimates** against operator-entered limits — never legal payload or rated-capacity determinations.
+- Measurement sources are recorded per calibration and surfaced with results.
 
-Offline calculation engine with typed units and a simple desktop UI; portable JSON/CSV calibration exchange. Muse must confirm feasibility before committing to framework choices.
+## Run it
 
-## Dependencies and boundaries
+```bash
+cd projects/volumetric-concrete-calculator/app
+npm install
+npm test        # 54 tests
+npm run dev     # dev mode (needs display)
+```
 
-Export format usable by Concrete Operations Manager; applications must compile and run independently.
+See [docs/WINDOWS_INSTALL.md](docs/WINDOWS_INSTALL.md) for the Windows portable build.
 
-Do not assert structural concrete strength, code compliance, legal truck payload, or tested mix adequacy from estimates. Mark assumptions and measurement sources.
+## Documentation
 
-## Muse start point
+- [Product specification](docs/PRODUCT_SPEC.md)
+- [Test plan](docs/TEST_PLAN.md) (with recorded results)
+- [Implementation status](docs/IMPLEMENTATION_STATUS.md)
+- [Calibration exchange format (v1.0.0)](docs/CALIBRATION_EXCHANGE_FORMAT.md)
+- [Development handoff](docs/MUSE_HANDOFF.md)
+- [Project instructions](AGENTS.md)
 
-Read the repository-root `AGENTS.md`, then [this project's instructions](AGENTS.md) and [development handoff](docs/MUSE_HANDOFF.md). Implement the smallest working end-to-end milestone; document genuine test results. See [specification](docs/PRODUCT_SPEC.md), [test plan](docs/TEST_PLAN.md), and [status](docs/IMPLEMENTATION_STATUS.md).
+## Boundaries
+
+Standalone application. Exports calibration data in the versioned JSON envelope consumed by Concrete Operations Manager; the two applications compile and run independently with no shared code.

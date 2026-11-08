@@ -1,0 +1,254 @@
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: #221c2e;
+  color: #f2ecff;
+}
+
+.panel {
+  padding: 16px 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.panel-loading {
+  padding: 24px;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.panel-head h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.subtitle {
+  color: #bdb0d9;
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.mood {
+  text-align: center;
+  min-width: 64px;
+}
+.mood-emoji {
+  font-size: 30px;
+  display: block;
+}
+.mood-label {
+  font-size: 12px;
+  color: #bdb0d9;
+}
+
+.banner {
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13.5px;
+}
+.sick-banner {
+  background: #4a3a14;
+  color: #ffd97a;
+}
+.dead-banner {
+  background: #333a44;
+  color: #cfd8e3;
+}
+.error-banner {
+  background: #5a1f24;
+  color: #ffb3ab;
+}
+
+.needs {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  background: #2c2440;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.need-row {
+  display: grid;
+  grid-template-columns: 118px 1fr 30px;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.need-track {
+  height: 10px;
+  border-radius: 999px;
+  background: #171221;
+  overflow: hidden;
+}
+.need-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+.need-fill.good {
+  background: #6fce62;
+}
+.need-fill.low {
+  background: #e8b64c;
+}
+.need-fill.critical {
+  background: #e05252;
+}
+.need-value {
+  text-align: right;
+  color: #bdb0d9;
+}
+.mess-line {
+  font-size: 13px;
+  color: #bdb0d9;
+  margin-top: 2px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.actions button {
+  background: #4a3672;
+  color: #f2ecff;
+  border: 1px solid #6a529c;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.actions button:hover:not(:disabled) {
+  background: #59418a;
+}
+.actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.hint {
+  color: #bdb0d9;
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+
+.companion, .autocare {
+  background: #2c2440;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.companion h2, .autocare h2 {
+  font-size: 15px;
+  margin: 0;
+}
+.companion-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+}
+.companion-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #8f81b5;
+  flex: none;
+}
+.companion-dot.on {
+  background: #6fce62;
+}
+.companion-dot.error {
+  background: #e05252;
+}
+.companion-toggle, .autocare-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.companion-token {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.companion-token-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.companion-token-label {
+  color: #bdb0d9;
+  flex: none;
+}
+.companion-token-value {
+  background: #171221;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.companion-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.companion-buttons button {
+  background: #4a3672;
+  color: #f2ecff;
+  border: 1px solid #6a529c;
+  border-radius: 8px;
+  padding: 6px 11px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.companion-buttons button:hover:not(:disabled) {
+  background: #59418a;
+}
+.companion-buttons button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.feed h2 {
+  font-size: 15px;
+  margin: 0 0 6px;
+}
+.feed ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.feed li {
+  background: #2c2440;
+  border-radius: 6px;
+  padding: 5px 9px;
+}
+.feed-time {
+  color: #8f81b5;
+  margin-right: 6px;
+  font-variant-numeric: tabular-nums;
+}

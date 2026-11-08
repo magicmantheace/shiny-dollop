@@ -53,3 +53,23 @@ Read-only recommendations by default. No overclocking, driver patching, security
 3. Focused automated tests and relevant platform manual tests executed.
 4. Clear distinction between implemented, verified, planned and blocked features.
 5. Scoped pull request left unmerged for review.
+
+## Appendix — As-built MVP (2026-10-23, renderer / Worker B)
+
+What the intake spec asked for vs what the renderer actually implements. Backend (Electron main, preload, engine) was built in parallel by Worker A on the same branch; the contract below is the shared `app/shared/gpp-types.ts`.
+
+**Built (renderer):**
+- Per-game named profiles with create / edit / delete — spec item 1. Profiles list shows capability badges per change kind and an applied/not-applied badge derived from the journal (the contract has no separate applied flag; journal entries with no `rolledBackAt` are the source of truth).
+- Opt-in changes and automatic rollback — spec item 5. Preview modal lists every planned change (kind, target, from → to, reversible badge, unsupported reasons); Activate requires an explicit approval checkbox plus all-supported; unsupported changes block activation. Progress events stream during activation; failures show the error and the automatic-rollback notice.
+- Restore-all and failure diagnostics — spec item 7. Per-profile rollback and a global "Restore all changes" button, both with confirm dialogs and result reports (counts + journal entry ids + error lists).
+- Before/after resource comparison — spec item 6, minimal form. Snapshots are point-in-time CPU % / memory MB observations with a two-snapshot delta comparison. Every snapshot is labeled "approximate — point-in-time estimate, not a benchmark".
+- Safe power-plan presets where supported — spec item 3, minimal form. The editor takes a GUID with format validation and a "pick your own plan via `powercfg /list`" warning; supported/unsupported comes from backend capability probing, surfaced as badges.
+- Change journal view — every entry with before → after, applied-at, rolled-back-at.
+
+**Partially built / backend-dependent:**
+- Process and resource telemetry — spec item 2. Only point-in-time snapshots; no continuous telemetry, no charts.
+- Window/process identification — spec item 4. The editor takes a process name / exe path as text; nothing enumerates windows or processes.
+
+**Deferred (explicitly not in this milestone):** per-game auto-detection, telemetry charts, scheduled profiles.
+
+**Design decisions worth keeping:** the renderer never touches the OS directly — all twelve operations go through `window.gpp`; `{ error }` responses become thrown errors with the action name attached; a missing bridge produces one actionable message. Client-side validation (GUID shape, exe names/paths, priority allow-list) runs before any IPC call, and the backend re-validates independently.

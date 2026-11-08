@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Model weights and caches — never in git (one-time local downloads)
+models/
+*.safetensors
+*.ckpt
+*.pth
+*.bin
+hf-cache/
+.torch/
+
+# Working outputs (catalogued, owner-approved assets are committed explicitly)
+outputs/
+work/
+benchmarks/*/raw/
+benchmarks/*/renders/
+*.log

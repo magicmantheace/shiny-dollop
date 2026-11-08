@@ -1,0 +1,1 @@
+{"compilerOptions":{"lib":["ES2023","DOM"],"module":"CommonJS","moduleResolution":"node","noEmit":true,"types":["node"]},"extends":"./tsconfig.json","include":["tests/**/*"]}

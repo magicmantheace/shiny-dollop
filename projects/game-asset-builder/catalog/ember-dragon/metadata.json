@@ -1,0 +1,96 @@
+{
+ "entry_version": 1,
+ "name": "Ember Dragon",
+ "slug": "ember-dragon",
+ "source_concept": "media-generation-ember-dragon-concept-0-4fbea5a5-5e6a-4bac-8735-6168ae8e57eb.webp",
+ "asset_file": "ember-dragon.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "6b424784874b07a33ae813e14331af2f37c292f8ff9fbf50e66f1bfaecf4f7e2",
+ "bytes": 20638740,
+ "counts": {
+  "verts": 44707,
+  "faces": 89414,
+  "raw_mesh_verts": 657672,
+  "raw_mesh_faces": 847800
+ },
+ "bones": [
+  "root",
+  "spine",
+  "head",
+  "wing.L",
+  "wing2.L",
+  "wing.R",
+  "wing2.R",
+  "arm.L",
+  "arm.R",
+  "leg.L",
+  "leg.R",
+  "tail.1",
+  "tail.2",
+  "tail.3"
+ ],
+ "actions": [
+  "hop",
+  "idle"
+ ],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rig_template": "winged-creature",
+  "weight_method": "bone-heat (automatic weights); distance rescue on 6 verts",
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.0.0"
+  },
+  "mesh_stage": {
+   "runner": {
+    "name": "ember-dragon_shape",
+    "exit_code": 0,
+    "seconds": 334.03,
+    "baseline_vram_mib": 809,
+    "peak_vram_mib": 7233,
+    "peak_delta_mib": 6424,
+    "vram_after_exit_mib": 790,
+    "n_samples": 695,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"ember-dragon_shape\", \"exit_code\": 0, \"seconds\": 334.03, \"baseline_vram_mib\": 809, \"peak_vram_mib\": 7233, \"peak_delta_mib\": 6424, \"vram_after_exit_mib\": 790, \"n_samples\": 695}\r\n"
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 423908,
+    "faces": 847808,
+    "load_s": 128.36,
+    "inference_s": 155.55,
+    "total_s": 283.99,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\ember-dragon\\shape.glb"
+   }
+  },
+  "texture_stage": {
+   "runner": {
+    "name": "ember-dragon_texture",
+    "exit_code": 0,
+    "seconds": 909.42,
+    "baseline_vram_mib": 788,
+    "peak_vram_mib": 12043,
+    "peak_delta_mib": 11255,
+    "vram_after_exit_mib": 778,
+    "n_samples": 1900
+   },
+   "stats": {
+    "stage": "texture",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+    "verts": 657672,
+    "faces": 847808,
+    "load_s": 104.54,
+    "texture_s": 778.08,
+    "total_s": 883.7,
+    "torch_peak_mib": 9951.3,
+    "output": "D:\\asset-forge-lab\\out\\gab\\ember-dragon\\textured.glb"
+   },
+   "recovered": "local poller died on a transient bridge disconnect (http.client.RemoteDisconnected); job 108e618f9b53 kept running server-side and its outputs were adopted via gpu_bridge reattach + fetch"
+  },
+  "skinning_revision": "2026-11-06, branch game-asset-builder/skinning: rig stage gained geometry cleanup (manifold repair) + bone-endpoint snapping; the existing textured.glb was re-rigged with bone-heat weights on the build VM. GPU stages were not re-run; mesh/texture provenance above is from the original P0 run."
+ }
+}

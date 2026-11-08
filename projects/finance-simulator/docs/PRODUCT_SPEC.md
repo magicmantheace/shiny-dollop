@@ -53,3 +53,35 @@ No bank-account access by default; use synthetic fixtures only; calculations are
 3. Focused automated tests and relevant platform manual tests executed.
 4. Clear distinction between implemented, verified, planned and blocked features.
 5. Scoped pull request left unmerged for review.
+
+## Appendix A — As-built notes (MVP, 2026-10-23, Worker B UI + docs)
+
+### Engine rules (as implemented by Worker A in `app/engine/simulator.ts`; read, not written, by Worker B)
+
+- Money is integer cents everywhere; interest per month = `floor(balanceCents * aprPercent / 1200 + 0.5)` (round-half-up, monthly rate = APR/12).
+- Each simulated month, in order: (a) interest accrues on every open debt; (b) minimums are paid in input order, capped at the amount owed; (c) the extra pool (`extraPaymentCents` + minimums freed by debts paid off in *earlier* months) targets one debt at a time per the strategy.
+- Avalanche target: highest APR, ties broken by smallest balance. Snowball target: smallest balance, ties broken by highest APR.
+- `MonthlyPoint.totalPaidCents` is the amount paid **that month** (not cumulative); the renderer accumulates it for the schedule table. `monthsToPayoff` is `null` (and `neverPaysOff` true) when any debt is still open after `MAX_MONTHS = 1200` (100 years); `neverPaysOffDebts` lists debt **names**.
+- Validation limits (engine): debt name 1–100 chars; balance integer cents ≥ 0; APR 0–100; minimum ≥ 0.
+
+### UI validation limits (renderer, `app/renderer/src/lib/validation.ts`)
+
+- Debt form: name required; balance and minimum parsed from dollars to integer cents (rejects malformed input); APR numeric, 0–100 inclusive.
+- Income form: name required; amount parsed to cents; frequency must be one of monthly / biweekly / weekly / once.
+- Extra-payment input: blank means zero; otherwise must parse as dollars.
+- Monthly income conversion: monthly ×1, biweekly ×26/12, weekly ×52/12 (rounded to cents), one-time excluded with a visible note.
+
+### Contract notes (preload deviations vs. the original task brief)
+
+The UI codes against `app/electron/preload.ts` / `app/shared/api-types.ts` as read, not the brief. Deviations: `debts.remove`/`income.remove` (not `delete`); `simulate.run(extraPaymentCents: number)` takes a positional number; `monthsToPayoff: number | null`; per-debt fields are `debtId`, `payoffMonth: number | null`, `interestPaidCents`; monthly points carry no per-month interest; `neverPaysOffDebts` are names. Report CSV layout is per-debt per-month in cents: `strategy,debt,month,balance_cents,interest_cents,payment_cents` (authoritative in `app/electron/report.ts`).
+
+### Deferred items — explicit backlog (not in MVP)
+
+- **Mortgage-renewal cases** — renewal events, amortization schedules, rate-change modeling. Not started.
+- **Emergency-fund and savings goals** — goal tracking, target dates. Not started.
+- **Irregular-income calendar** — one-time income is recorded but excluded from monthly totals; no calendar view or irregular-cadence planning. Not started.
+- Recurring-expense modeling, scenario baselines/snapshots, import/export of app data (backup/restore). Not started.
+
+### Guardrails observed
+
+- Synthetic data only in tests and docs; no network calls in the renderer; disclaimer "Scenarios only — not financial advice." rendered permanently in the app header and footer.
