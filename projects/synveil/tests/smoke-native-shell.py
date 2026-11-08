@@ -262,8 +262,12 @@ def run_shell_steps(proof: ShellProof, notes: list[str]) -> list[str]:
     assert accent >= 20, f"start glyph accent pixels: {accent}"
     notes.append(f"start glyph present ({accent} accent pixels)")
 
+    # The demo window is the session's first window; the
+    # terminal starts a moment later. Wait for both task
+    # buttons rather than racing the second window's start.
+    width, height, data = proof.frame_wait(
+        lambda w, h, d: len(task_buttons(w, h, d)) >= 2, 30)
     buttons = task_buttons(width, height, data)
-    assert len(buttons) >= 2, f"task buttons: {buttons}"
     notes.append(f"{len(buttons)} task buttons on the strip: {buttons}")
 
     # Polish: the first task button (the demo window, the
