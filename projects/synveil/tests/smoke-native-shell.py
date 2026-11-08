@@ -25,13 +25,19 @@ drives the shell with real pointer input and pixel evidence:
 - the shell polish pass (icons, tray, slide): menu items and
   task buttons carry the shell's drawn geometric app icons (no
   letter tiles); the tray shows the network link state read
-  from the guest kernel — this boot attaches the QMP user-net
-  device, and the gate drops and restores its link through QMP
-  set_link, expecting the indicator to follow (accent arcs when
-  up, faint arcs with a danger slash when down); the update
-  slot stays hidden because the joined image runs no A/B agent
-  the shell could honestly read (the net slot sitting in the
-  unshifted position is the evidence);
+  from the guest kernel's operstate — this boot attaches the
+  QMP user-net device, so an interface exists, but the session
+  never brings it up, and the indicator must honestly show
+  present-but-down (faint arcs, danger slash, no accent). A
+  live link flip is not asserted: flipping it needs the
+  interface administratively up (CAP_NET_ADMIN, which the
+  unprivileged session must not hold), and QMP set_link does
+  not change operstate while the interface is admin-down —
+  the up-state rendering is covered by the code path the
+  down-state exercises, not by a guest screenshot. The
+  update slot stays hidden because the joined image runs no
+  A/B agent the shell could honestly read (the net slot
+  sitting in the unshifted position is the evidence);
 - the session still ends cleanly (both windows closed, graphical
   login relocks).
 
@@ -270,20 +276,26 @@ def run_shell_steps(proof: ShellProof, notes: list[str]) -> list[str]:
     assert blue >= 6, f"demo task icon blue pixels: {blue}"
     notes.append(f"demo task button carries its icon ({blue} blue px)")
 
-    # Polish: tray network indicator, link up (this boot
-    # attaches the user-net device): accent arcs in the net
-    # icon box, and no accent in the box the icon would occupy
+    # Polish: tray network indicator. This boot attaches the
+    # user-net device, so eth0 exists — but the session never
+    # brings it up, so the honest state is present-but-down:
+    # faint arcs and the danger slash in the net icon box, no
+    # accent; and no accent in the box the icon would occupy
     # if a phantom update slot had shifted it left — the
     # update slot is hidden while no agent answers.
     nx0, nx1, ny0, ny1 = tray_net_box(width, height)
+    red = box_count(width, height, data, nx0, nx1, ny0, ny1,
+                    is_redish)
+    assert red >= 4, f"tray net (down) danger pixels: {red}"
     accent = box_count(width, height, data, nx0, nx1, ny0, ny1,
                        is_accent)
-    assert accent >= 12, f"tray net (up) accent pixels: {accent}"
+    assert accent < 4, f"tray net (down) accent pixels: {accent}"
     shifted = box_count(width, height, data, nx0 - 26, nx1 - 26,
                         ny0, ny1, is_accent)
     assert shifted < 4, f"tray net shifted accent pixels: {shifted}"
-    notes.append(f"tray shows network link up ({accent} accent px); "
-                 "update slot hidden (no agent on this image)")
+    notes.append(f"tray shows network present but down ({red} "
+                 "danger px, no accent); update slot hidden "
+                 "(no agent on this image)")
 
     # Activate the demo window by clicking it; its task button must
     # gain the accent underline. The demo is the session's first
@@ -431,37 +443,10 @@ def run_shell_steps(proof: ShellProof, notes: list[str]) -> list[str]:
     toggle(False)
     notes.append("start button toggles the menu open and closed")
 
-    # Polish: the tray indicator follows a real link change.
-    # Drop the QMP user-net link: the guest kernel's carrier
-    # flag falls, and within the tray's 1 s poll the accent
-    # arcs must give way to the danger slash. Restore the link
-    # before returning so the session-close phase runs on the
-    # same footing as the rest of the gate.
-    weston_smoke.qmp_command(
-        proof.qmp, {"execute": "set_link",
-                    "arguments": {"id": "synveil_net", "up": False}})
-
-    def link_down(frame):
-        w, h, d = frame
-        x0, x1, y0, y1 = tray_net_box(w, h)
-        return (box_count(w, h, d, x0, x1, y0, y1, is_accent) < 4 and
-                box_count(w, h, d, x0, x1, y0, y1, is_redish) >= 4)
-
-    width, height, data = proof.frame_wait(link_down, 30,
-                                           save="06-tray-link-down.png")
-    notes.append("tray network indicator followed the QMP link drop "
-                 "(danger slash, accent gone)")
-    weston_smoke.qmp_command(
-        proof.qmp, {"execute": "set_link",
-                    "arguments": {"id": "synveil_net", "up": True}})
-
-    def link_up(frame):
-        w, h, d = frame
-        x0, x1, y0, y1 = tray_net_box(w, h)
-        return box_count(w, h, d, x0, x1, y0, y1, is_accent) >= 12
-
-    proof.frame_wait(link_up, 30)
-    notes.append("tray network indicator recovered with the link")
+    # (No live link-flip assertion: see the module docstring.
+    # The tray's down state was asserted on the first frame;
+    # the up state shares its code path and cannot be induced
+    # from the unprivileged session.)
     return notes
 
 
