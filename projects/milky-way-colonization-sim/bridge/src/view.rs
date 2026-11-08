@@ -1,10 +1,20 @@
 //! Serialization of Campaign + Galaxy into VIEW / EVENT / SNAPSHOT /
 //! INSPECT JSON, exactly per the S2 bridge spec.
+//!
+//! S3: the view is the **player's perspective**. Other
+//! civilizations exist in the campaign, but the frontend only ever
+//! sees what the player could know: the player's own ships, systems
+//! the player has surveyed (plus the player's own claims), events
+//! that involve the player or happen in player-surveyed space, and
+//! — for civilizations the player has met — the diplomacy picture
+//! of design §6.3. Aggregate galaxy totals (colonized/claimed by
+//! anyone) are public-scale facts and live in the `galaxy` block;
+//! they power the "While you were away" summary (§11.1).
 
 use mwcs_pipeline::table::{FLAG_MASS_DERIVED, FLAG_SOURCE_EXOPLANET_ARCHIVE, FLAG_TEMP_DERIVED};
 use mwcs_sim::{
     Campaign, Colony, EventKind, Galaxy, GameEvent, PlanetSource, Purpose, ShipKind, ShipState,
-    Specialization, SurveyState,
+    Specialization, SurveyState, PLAYER_CIV,
 };
 
 use crate::json::Value;
@@ -17,7 +27,7 @@ fn claimed_count(campaign: &Campaign) -> usize {
     campaign
         .systems()
         .values()
-        .filter(|s| s.claimed_by.is_some())
+        .filter(|s| s.claimed_by == Some(PLAYER_CIV))
         .count()
 }
 
@@ -70,6 +80,8 @@ pub fn event_kind_str(kind: EventKind) -> &'static str {
         EventKind::ColonyFounded => "colony_founded",
         EventKind::ColonyAbandoned => "colony_abandoned",
         EventKind::SpecializationSet => "specialization_set",
+        EventKind::FirstContact => "first_contact",
+        EventKind::ClaimContested => "claim_contested",
     }
 }
 
@@ -192,9 +204,12 @@ pub fn view_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
         })
         .collect();
 
+    // Player's ships only: foreign fleets are not the player's to
+    // see (their arrivals in player space surface as events).
     let ships: Vec<Value> = campaign
         .ships()
         .values()
+        .filter(|ship| ship.owner == PLAYER_CIV)
         .map(|ship| {
             let design = campaign.design(ship.design_idx);
             let (design_name, kind, tank_capacity, range_ly) = match design {
@@ -208,6 +223,7 @@ pub fn view_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
             };
             Value::obj(vec![
                 ("id", Value::from(ship.id)),
+                ("owner", Value::from(ship.owner)),
                 ("design_idx", Value::from(ship.design_idx)),
                 ("design_name", Value::from(design_name)),
                 ("kind", Value::from(kind)),
@@ -219,9 +235,15 @@ pub fn view_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
         })
         .collect();
 
+    // Systems the player knows: surveyed by the player, or held by
+    // the player. A system another civilization surveyed stays off
+    // the player's map until the player surveys it (§6.1).
     let systems: Vec<Value> = campaign
         .systems()
         .iter()
+        .filter(|(_, state)| {
+            state.surveyed_by.contains(&PLAYER_CIV) || state.claimed_by == Some(PLAYER_CIV)
+        })
         .map(|(id, state)| {
             Value::obj(vec![
                 ("id", Value::from(*id)),
@@ -241,10 +263,13 @@ pub fn view_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
                 ),
                 (
                     "survey",
-                    Value::from(match state.survey {
-                        SurveyState::Unknown => "unknown",
-                        SurveyState::Surveyed => "surveyed",
-                    }),
+                    Value::from(
+                        if state.surveyed_by.contains(&PLAYER_CIV) {
+                            "surveyed"
+                        } else {
+                            "unknown"
+                        },
+                    ),
                 ),
                 (
                     "claimed_by",
@@ -289,10 +314,152 @@ pub fn view_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
         ("ships", Value::Array(ships)),
         ("systems", Value::Array(systems)),
         ("events_total", Value::from(campaign.events().len())),
+        ("galaxy", galaxy_json(campaign)),
+        ("civilizations", civilizations_json(campaign, galaxy)),
+    ])
+}
+
+/// Galaxy-wide aggregate counts (all civilizations). These are the
+/// numbers the §11.1 "While you were away" review watches: the
+/// galaxy visibly moves while the player is gone.
+pub fn galaxy_json(campaign: &Campaign) -> Value {
+    Value::obj(vec![
+        ("surveyed", Value::from(campaign.total_surveyed_count())),
+        ("claimed", Value::from(campaign.total_claimed_count())),
+        ("colonized", Value::from(campaign.total_colonized_count())),
+        ("civilizations", Value::from(campaign.civs().len())),
+        ("contacts", Value::from(campaign.contacts().len())),
+        ("disputes", Value::from(campaign.disputes().len())),
+    ])
+}
+
+fn civ_name(campaign: &Campaign, civ_id: u32) -> Value {
+    match campaign.civ(civ_id) {
+        Some(civ) => Value::from(civ.name.clone()),
+        None => Value::Null,
+    }
+}
+
+/// The diplomacy roster (§6.3): the player, plus every civilization
+/// the player has made contact with, with the legible opinion
+/// breakdown in both directions and the open disputes between the
+/// pair. Uncontacted civilizations do not appear — the player does
+/// not know they exist.
+pub fn civilizations_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
+    let mut out: Vec<Value> = Vec::new();
+    if let Some(player) = campaign.civ(PLAYER_CIV) {
+        out.push(Value::obj(vec![
+            ("id", Value::from(PLAYER_CIV)),
+            ("name", Value::from(player.name.clone())),
+            ("archetype", Value::Null),
+            ("is_player", Value::Bool(true)),
+            ("home_system", Value::from(player.home_system)),
+            (
+                "home_name",
+                match star_name(galaxy, player.home_system) {
+                    Some(n) => Value::from(n),
+                    None => Value::Null,
+                },
+            ),
+            ("colonies", Value::from(campaign.colonies_of(PLAYER_CIV).len())),
+            ("surveyed", Value::from(campaign.surveyed_count())),
+            ("contacted_day", Value::Null),
+            ("opinion_of_player", Value::Null),
+            ("player_opinion", Value::Null),
+            ("disputes", Value::Array(vec![])),
+        ]));
+    }
+    for civ in campaign.civs() {
+        if civ.id == PLAYER_CIV {
+            continue;
+        }
+        let Some(contacted_day) = campaign.contacted_day(PLAYER_CIV, civ.id) else {
+            continue;
+        };
+        let theirs = campaign.relation(galaxy, civ.id, PLAYER_CIV);
+        let ours = campaign.relation(galaxy, PLAYER_CIV, civ.id);
+        let disputes: Vec<Value> = campaign
+            .disputes_between(PLAYER_CIV, civ.id)
+            .iter()
+            .map(|d| {
+                Value::obj(vec![
+                    ("system", Value::from(d.system)),
+                    (
+                        "system_name",
+                        match star_name(galaxy, d.system) {
+                            Some(n) => Value::from(n),
+                            None => Value::Null,
+                        },
+                    ),
+                    ("holder", Value::from(d.holder)),
+                    ("challenger", Value::from(d.challenger)),
+                    ("opened_day", Value::from(d.opened_day)),
+                    ("tension", num(campaign.dispute_tension(d))),
+                ])
+            })
+            .collect();
+        out.push(Value::obj(vec![
+            ("id", Value::from(civ.id)),
+            ("name", Value::from(civ.name.clone())),
+            (
+                "archetype",
+                match &civ.archetype {
+                    Some(a) => Value::from(a.clone()),
+                    None => Value::Null,
+                },
+            ),
+            ("is_player", Value::Bool(false)),
+            ("home_system", Value::from(civ.home_system)),
+            (
+                "home_name",
+                match star_name(galaxy, civ.home_system) {
+                    Some(n) => Value::from(n),
+                    None => Value::Null,
+                },
+            ),
+            (
+                "known_colonies",
+                Value::from(campaign.known_colonies_of(PLAYER_CIV, civ.id)),
+            ),
+            ("contacted_day", Value::from(contacted_day)),
+            (
+                "opinion_of_player",
+                opinion_json(theirs.opinion),
+            ),
+            ("player_opinion", opinion_json(ours.opinion)),
+            ("disputes", Value::Array(disputes)),
+        ]));
+    }
+    Value::Array(out)
+}
+
+fn opinion_json(opinion: mwcs_sim::OpinionBreakdown) -> Value {
+    Value::obj(vec![
+        ("total", num(opinion.total)),
+        ("disposition", num(opinion.disposition)),
+        ("disputes", num(opinion.disputes)),
+        ("border_friction", num(opinion.border_friction)),
     ])
 }
 
 pub fn event_json(galaxy: &Galaxy, event: &GameEvent) -> Value {
+    event_json_for(galaxy, event, None)
+}
+
+/// `event_json` with civilization names resolved against the
+/// campaign (the plain form leaves the name fields null).
+pub fn event_json_with_names(galaxy: &Galaxy, event: &GameEvent, campaign: &Campaign) -> Value {
+    event_json_for(galaxy, event, Some(campaign))
+}
+
+fn event_json_for(galaxy: &Galaxy, event: &GameEvent, campaign: Option<&Campaign>) -> Value {
+    let civ_field = |civ: Option<u32>| match (civ, campaign) {
+        (Some(id), Some(c)) => match c.civ(id) {
+            Some(found) => Value::from(found.name.clone()),
+            None => Value::Null,
+        },
+        _ => Value::Null,
+    };
     Value::obj(vec![
         ("day", Value::from(event.day)),
         ("kind", Value::from(event_kind_str(event.kind))),
@@ -317,7 +484,62 @@ pub fn event_json(galaxy: &Galaxy, event: &GameEvent) -> Value {
                 None => Value::Null,
             },
         ),
+        (
+            "civ",
+            match event.civ {
+                Some(id) => Value::from(id),
+                None => Value::Null,
+            },
+        ),
+        ("civ_name", civ_field(event.civ)),
+        (
+            "other_civ",
+            match event.other_civ {
+                Some(id) => Value::from(id),
+                None => Value::Null,
+            },
+        ),
+        ("other_civ_name", civ_field(event.other_civ)),
     ])
+}
+
+/// May the player see this event? (§6.1 fog of war, applied to the
+/// event stream.)
+///
+/// * The player's own events: always.
+/// * First contact and claim contests the player is a party to:
+///   always (they are the diplomacy record).
+/// * Another civilization's *presence* events — founding or losing
+///   a colony, claiming a system, completing a survey, arriving or
+///   stranding — at a system the player has surveyed: the player's
+///   charts can see something happened there.
+/// * Everything else (foreign builds, refuels, specializations,
+///   movements in uncharted space, diplomacy between strangers):
+///   hidden.
+pub fn event_visible_to_player(campaign: &Campaign, event: &GameEvent) -> bool {
+    match event.kind {
+        EventKind::CampaignStarted => event.civ == Some(PLAYER_CIV),
+        EventKind::FirstContact | EventKind::ClaimContested => {
+            event.civ == Some(PLAYER_CIV) || event.other_civ == Some(PLAYER_CIV)
+        }
+        _ => {
+            if event.civ == Some(PLAYER_CIV) || event.civ.is_none() {
+                return true;
+            }
+            match event.kind {
+                EventKind::ColonyFounded
+                | EventKind::ColonyAbandoned
+                | EventKind::SystemClaimed
+                | EventKind::SurveyCompleted
+                | EventKind::ShipArrived
+                | EventKind::ShipStranded => event
+                    .system
+                    .map(|s| campaign.surveyed_by(PLAYER_CIV, s))
+                    .unwrap_or(false),
+                _ => false,
+            }
+        }
+    }
 }
 
 pub fn events_since(campaign: &Campaign, galaxy: &Galaxy, cursor: u64) -> Vec<Value> {
@@ -327,7 +549,8 @@ pub fn events_since(campaign: &Campaign, galaxy: &Galaxy, cursor: u64) -> Vec<Va
     }
     campaign.events()[start..]
         .iter()
-        .map(|e| event_json(galaxy, e))
+        .filter(|e| event_visible_to_player(campaign, e))
+        .map(|e| event_json_for(galaxy, e, Some(campaign)))
         .collect()
 }
 
@@ -343,6 +566,17 @@ pub fn snapshot_json(campaign: &Campaign) -> Value {
         ("claimed", Value::from(claimed_count(campaign))),
         ("colonized", Value::from(campaign.colonized_count())),
         ("total_fuel_stock", num(campaign.total_fuel_stock())),
+        // §11.1: the "While you were away" review surfaces major AI
+        // developments — galaxy totals moving, first contacts made,
+        // disputes opened — alongside the player's own numbers.
+        ("galaxy_surveyed", Value::from(campaign.total_surveyed_count())),
+        ("galaxy_claimed", Value::from(campaign.total_claimed_count())),
+        (
+            "galaxy_colonized",
+            Value::from(campaign.total_colonized_count()),
+        ),
+        ("contacts", Value::from(campaign.contacts().len())),
+        ("disputes", Value::from(campaign.disputes().len())),
     ])
 }
 
@@ -375,8 +609,15 @@ pub fn inspect_json(campaign: &Campaign, galaxy: &Galaxy, system_id: u32) -> Res
         .collect();
 
     let state = campaign.system(system_id);
+    // Player's knowledge of this system (§6.1): an unsurveyed system
+    // shows its catalog data only — no profile, no claim, no colony,
+    // however much another civilization knows about it.
+    let player_surveyed = campaign.surveyed_by(PLAYER_CIV, system_id);
     let (survey_str, claimed_by, profile_json, colony) = match state {
         None => ("no_state", Value::Null, Value::Null, Value::Null),
+        Some(s) if !player_surveyed && s.claimed_by != Some(PLAYER_CIV) => {
+            ("unknown", Value::Null, Value::Null, Value::Null)
+        }
         Some(s) => {
             let profile = match &s.profile {
                 None => Value::Null,
@@ -411,9 +652,10 @@ pub fn inspect_json(campaign: &Campaign, galaxy: &Galaxy, system_id: u32) -> Res
                 }
             };
             (
-                match s.survey {
-                    SurveyState::Unknown => "unknown",
-                    SurveyState::Surveyed => "surveyed",
+                if player_surveyed {
+                    "surveyed"
+                } else {
+                    "unknown"
                 },
                 match s.claimed_by {
                     Some(c) => Value::from(c),
@@ -431,7 +673,7 @@ pub fn inspect_json(campaign: &Campaign, galaxy: &Galaxy, system_id: u32) -> Res
     let ships_present: Vec<Value> = campaign
         .ships()
         .values()
-        .filter(|ship| ship.state.current_system() == Some(system_id))
+        .filter(|ship| ship.owner == PLAYER_CIV && ship.state.current_system() == Some(system_id))
         .map(|ship| Value::from(ship.id))
         .collect();
 
