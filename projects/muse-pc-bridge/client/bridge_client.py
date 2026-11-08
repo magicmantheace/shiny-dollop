@@ -211,11 +211,29 @@ class Client:
     # ------------------------------------------------------------------
     # Detached processes
     # ------------------------------------------------------------------
-    def process_spawn(self, command: str, shell: str | None = None,
-                      cwd: str | None = None, env: dict | None = None) -> dict:
-        payload: dict = {"command": command}
-        if shell:
-            payload["shell"] = shell
+    def process_spawn(self, command: str | None = None,
+                      shell: str | None = None,
+                      cwd: str | None = None, env: dict | None = None,
+                      gui: bool = False, executable: str | None = None,
+                      args: list | None = None) -> dict:
+        """Spawn a detached process.
+
+        Default mode wraps ``command`` in a shell. With ``gui=True``
+        the agent spawns ``executable`` (plus ``args``) directly, so
+        the tracked pid is the GUI application itself — a shell
+        wrapper exits as soon as it hands off to a GUI exe, which
+        made shell-spawned GUI apps report dead instantly.
+        """
+        payload: dict = {}
+        if gui:
+            payload["gui"] = True
+            payload["executable"] = executable
+            if args:
+                payload["args"] = list(args)
+        else:
+            payload["command"] = command
+            if shell:
+                payload["shell"] = shell
         if cwd:
             payload["cwd"] = cwd
         if env:
@@ -477,6 +495,13 @@ def main(argv: list[str] | None = None) -> int:
                          default=None)
     p_spawn.add_argument("--cwd", default=None)
     p_spawn.add_argument("spawn_command", nargs=argparse.REMAINDER)
+    p_gui = sub.add_parser(
+        "spawn-gui",
+        help="launch a GUI app directly (tracked pid is the app itself)")
+    p_gui.add_argument("--cwd", default=None)
+    p_gui.add_argument("executable")
+    p_gui.add_argument("gui_args", nargs=argparse.REMAINDER,
+                       help="arguments for the executable")
     sub.add_parser("processes", help="list detached processes")
     p_proc = sub.add_parser("process", help="inspect a detached process")
     p_proc.add_argument("process_id")
@@ -557,6 +582,10 @@ def main(argv: list[str] | None = None) -> int:
             print_json(client.process_spawn(
                 " ".join(args.spawn_command), shell=args.shell,
                 cwd=args.cwd))
+        elif args.command == "spawn-gui":
+            print_json(client.process_spawn(
+                gui=True, executable=args.executable,
+                args=args.gui_args, cwd=args.cwd))
         elif args.command == "processes":
             print_json(client.processes_list())
         elif args.command == "process":

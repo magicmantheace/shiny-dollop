@@ -10,7 +10,9 @@ Tailscale IP, and exposes a JSON API:
   GET  /v1/jobs                       list recent jobs
   GET  /v1/jobs/{id}                  job state + incremental output
   POST /v1/jobs/{id}/cancel           terminate a running job
-  POST /v1/processes                  spawn a detached process
+  POST /v1/processes                  spawn a detached process (with
+                                      "gui": true + "executable"/"args":
+                                      launch a GUI app directly, no shell)
   GET  /v1/processes                  list tracked detached processes
   GET  /v1/processes/{id}             inspect one (+ log tails)
   POST /v1/processes/{id}/kill       terminate a detached process
@@ -83,7 +85,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 AGENT_NAME = "muse-pc-bridge"
 MAX_GET_BYTES = 16 * 1024 * 1024          # whole-file /v1/file/get limit
 MAX_RANGE_BYTES = 64 * 1024 * 1024        # per-call range-read limit
@@ -800,6 +802,11 @@ def validate_exec_payload(core: BridgeCore, payload: dict):
     else:
         cwd = str(agent_dir())
 
+    return argv, cwd, _merged_env(payload), timeout
+
+
+def _merged_env(payload: dict) -> dict:
+    """The process environment for a spawn: ours plus payload extras."""
     env = dict(os.environ)
     extra_env = payload.get("env")
     if extra_env is not None:
@@ -807,7 +814,7 @@ def validate_exec_payload(core: BridgeCore, payload: dict):
             raise ValueError("env must be an object of string values")
         for k, v in extra_env.items():
             env[str(k)] = str(v)
-    return argv, cwd, env, timeout
+    return env
 
 
 def submit_job(core: BridgeCore, payload: dict) -> Job:
@@ -843,7 +850,8 @@ class DetachedProcess:
                  command_summary: str, shell: str,
                  proc: subprocess.Popen | None = None,
                  started_wall: float | None = None,
-                 proc_id: str | None = None):
+                 proc_id: str | None = None,
+                 gui: bool = False):
         self.core = core
         self.id = proc_id or uuid.uuid4().hex[:12]
         self.pid = pid
@@ -851,6 +859,7 @@ class DetachedProcess:
         self.command_summary = command_summary
         self.shell = shell
         self.proc = proc
+        self.gui = gui
         self.started_wall = started_wall or time.time()
 
     @property
@@ -875,6 +884,7 @@ class DetachedProcess:
         return {
             "id": self.id, "pid": self.pid, "name": self.name,
             "command": self.command_summary, "shell": self.shell,
+            "gui": self.gui,
             "started_at": self.started_wall,
         }
 
@@ -884,7 +894,8 @@ class DetachedProcess:
                    command_summary=str(item.get("command", "")),
                    shell=str(item.get("shell", "")),
                    started_wall=float(item.get("started_at") or time.time()),
-                   proc_id=str(item["id"]))
+                   proc_id=str(item["id"]),
+                   gui=bool(item.get("gui", False)))
 
     def describe(self, tail_bytes: int = 0) -> dict:
         obj = {
@@ -893,6 +904,7 @@ class DetachedProcess:
             "name": self.name,
             "command": self.command_summary,
             "shell": self.shell,
+            "gui": self.gui,
             "alive": self.alive(),
             "exit_code": self.exit_code(),
             "started_at": datetime.fromtimestamp(
@@ -912,8 +924,49 @@ class DetachedProcess:
         return obj
 
 
+def _gui_launch_argv(payload: dict) -> tuple[list[str], str, str]:
+    """Validate a GUI-mode spawn payload; return (argv, cwd, summary).
+
+    GUI mode exists because the shell-wrapped spawn cannot track a
+    GUI application: the wrapper shell (powershell -Command "app")
+    returns as soon as it has handed off to the GUI exe, so the
+    registry marked the *wrapper* dead while the app kept running —
+    the defect the Milky Way Godot launches hit (2026-11-06), worked
+    around at the time with exec + Start-Process. GUI mode spawns
+    the executable directly, so the tracked pid IS the application.
+    A command string is deliberately not accepted here: it cannot
+    be split into argv safely.
+    """
+    exe = payload.get("executable")
+    if not isinstance(exe, str) or not exe.strip():
+        raise ValueError(
+            "gui spawn requires field 'executable' (path to the .exe)")
+    if not Path(exe).is_file():
+        raise ValueError(f"executable does not exist: {exe!r}")
+    args = payload.get("args") or []
+    if not isinstance(args, list) \
+            or not all(isinstance(a, str) for a in args):
+        raise ValueError("field 'args' must be a list of strings")
+    cwd = payload.get("cwd")
+    if cwd is not None:
+        if not isinstance(cwd, str) or not Path(cwd).is_dir():
+            raise ValueError(f"cwd does not exist: {cwd!r}")
+    else:
+        cwd = str(agent_dir())
+    argv = [exe, *args]
+    return argv, cwd, " ".join(argv)[:500]
+
+
 def spawn_detached(core: BridgeCore, payload: dict) -> DetachedProcess:
-    argv, cwd, env, _timeout = validate_exec_payload(core, payload)
+    gui = payload.get("gui") is True
+    if gui:
+        argv, cwd, summary = _gui_launch_argv(payload)
+        env = _merged_env(payload)
+        shell_name = ""
+    else:
+        argv, cwd, env, _timeout = validate_exec_payload(core, payload)
+        summary = str(payload.get("command", ""))[:500]
+        shell_name = str(payload.get("shell") or default_shell())
     name = str(payload.get("name") or "")
     proc_id = uuid.uuid4().hex[:12]
     log_dir = core.state_dir / "processes"
@@ -921,22 +974,41 @@ def spawn_detached(core: BridgeCore, payload: dict) -> DetachedProcess:
     out_fh = open(log_dir / f"{proc_id}.out.log", "ab")
     err_fh = open(log_dir / f"{proc_id}.err.log", "ab")
     kwargs: dict = {}
+    breakaway = False
     if IS_WINDOWS:
-        kwargs["creationflags"] = (
-            subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
+        flags = (subprocess.CREATE_NEW_PROCESS_GROUP
+                 | subprocess.DETACHED_PROCESS)
+        if gui:
+            # Best effort: keep the app out of any job object that
+            # dies with the agent (a Task Scheduler / supervisor
+            # chain can be one). Not every job permits breakaway —
+            # Popen then raises and we retry without the flag.
+            flags |= subprocess.CREATE_BREAKAWAY_FROM_JOB
+            breakaway = True
+        kwargs["creationflags"] = flags
     else:
         kwargs["start_new_session"] = True
     try:
-        proc = subprocess.Popen(argv, stdout=out_fh, stderr=err_fh,
-                                stdin=subprocess.DEVNULL, cwd=cwd, env=env,
-                                **kwargs)
+        try:
+            proc = subprocess.Popen(argv, stdout=out_fh, stderr=err_fh,
+                                    stdin=subprocess.DEVNULL, cwd=cwd,
+                                    env=env, **kwargs)
+        except OSError:
+            if not breakaway:
+                raise
+            kwargs["creationflags"] = (
+                subprocess.CREATE_NEW_PROCESS_GROUP
+                | subprocess.DETACHED_PROCESS)
+            proc = subprocess.Popen(argv, stdout=out_fh, stderr=err_fh,
+                                    stdin=subprocess.DEVNULL, cwd=cwd,
+                                    env=env, **kwargs)
     finally:
         out_fh.close()
         err_fh.close()
     record = DetachedProcess(core, pid=proc.pid, name=name,
-                             command_summary=str(payload.get("command", ""))[:500],
-                             shell=str(payload.get("shell") or default_shell()),
-                             proc=proc, proc_id=proc_id)
+                             command_summary=summary,
+                             shell=shell_name,
+                             proc=proc, proc_id=proc_id, gui=gui)
     with core._processes_lock:
         core.processes[record.id] = record
         core._save_processes()
