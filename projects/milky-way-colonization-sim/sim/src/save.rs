@@ -11,21 +11,30 @@
 //! (`MWSS`, version, payload length). Loading a save requires the
 //! same galaxy table (checked by catalog fingerprint + star count);
 //! the static catalog itself is not duplicated into the save.
+//!
+//! Format history: v1 was the S1/S2 single-civilization format. v2
+//! (S3) stores the civilization list with AI personalities, ship
+//! owners, per-civilization survey knowledge, contacts, and
+//! disputes. v1 saves are rejected with an explicit version error —
+//! S3 changed what a campaign *is*, and silently upgrading would
+//! invent AI state the old save never had.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use mwcs_pipeline::sha256::sha256_hex;
 
 use crate::catalog::Galaxy;
 use crate::profile::{PlanetProfile, PlanetSource, SystemProfile};
+use crate::race::Personality;
 use crate::rng::SeededRng;
 use crate::state::{
-    Campaign, Civilization, Colony, ConstructionProject, EventKind, GameEvent, Purpose, Ship,
-    ShipDesign, ShipKind, ShipState, SimError, SimResult, Specialization, SurveyState, SystemState,
+    Campaign, Civilization, Colony, ConstructionProject, Dispute, EventKind, GameEvent, Purpose,
+    Ship, ShipDesign, ShipKind, ShipState, SimError, SimResult, Specialization, SurveyState,
+    SystemState,
 };
 
 const SAVE_MAGIC: &[u8; 4] = b"MWSS";
-const SAVE_VERSION: u32 = 1;
+const SAVE_VERSION: u32 = 2;
 
 impl Campaign {
     pub fn canonical_bytes(&self) -> Vec<u8> {
@@ -35,10 +44,10 @@ impl Campaign {
         w.u64(self.seed);
         w.u64(self.day);
         w.u64(self.rng.state());
-        w.u32(self.civ.id);
-        w.string(&self.civ.name);
-        w.f64(self.civ.credits);
-        w.u32(self.civ.home_system);
+        w.u32(self.civs.len() as u32);
+        for civ in &self.civs {
+            write_civ(&mut w, civ);
+        }
 
         w.u32(self.designs.len() as u32);
         for design in &self.designs {
@@ -59,6 +68,7 @@ impl Campaign {
         w.u32(self.ships.len() as u32);
         for (id, ship) in &self.ships {
             w.u32(*id);
+            w.u32(ship.owner);
             w.u32(ship.design_idx);
             w.f64(ship.fuel);
             write_ship_state(&mut w, &ship.state);
@@ -70,6 +80,23 @@ impl Campaign {
             w.u8(event_kind_code(event.kind));
             w.option_u32(event.system);
             w.option_u32(event.ship);
+            w.option_u32(event.civ);
+            w.option_u32(event.other_civ);
+        }
+
+        w.u32(self.contacts.len() as u32);
+        for ((lo, hi), day) in &self.contacts {
+            w.u32(*lo);
+            w.u32(*hi);
+            w.u64(*day);
+        }
+
+        w.u32(self.disputes.len() as u32);
+        for dispute in &self.disputes {
+            w.u32(dispute.system);
+            w.u32(dispute.holder);
+            w.u32(dispute.challenger);
+            w.u64(dispute.opened_day);
         }
 
         w.u32(self.next_ship_id);
@@ -286,6 +313,8 @@ fn event_kind_code(kind: EventKind) -> u8 {
         EventKind::ColonyFounded => 9,
         EventKind::ColonyAbandoned => 10,
         EventKind::SpecializationSet => 11,
+        EventKind::FirstContact => 12,
+        EventKind::ClaimContested => 13,
     }
 }
 
@@ -303,6 +332,8 @@ fn event_kind_from(code: u8) -> SimResult<EventKind> {
         9 => Ok(EventKind::ColonyFounded),
         10 => Ok(EventKind::ColonyAbandoned),
         11 => Ok(EventKind::SpecializationSet),
+        12 => Ok(EventKind::FirstContact),
+        13 => Ok(EventKind::ClaimContested),
         other => Err(SimError::InvalidSave(format!("bad event kind {other}"))),
     }
 }
@@ -324,11 +355,79 @@ fn planet_source_from(code: u8) -> SimResult<PlanetSource> {
     }
 }
 
+fn write_civ(w: &mut Writer, civ: &Civilization) {
+    w.u32(civ.id);
+    w.string(&civ.name);
+    w.f64(civ.credits);
+    w.u32(civ.home_system);
+    match &civ.archetype {
+        None => w.u8(0),
+        Some(archetype) => {
+            w.u8(1);
+            w.string(archetype);
+        }
+    }
+    match &civ.personality {
+        None => w.u8(0),
+        Some(p) => {
+            w.u8(1);
+            w.f64(p.expansion);
+            w.f64(p.aggression);
+            w.f64(p.trade_affinity);
+            w.f64(p.xenophobia);
+            w.f64(p.honour);
+        }
+    }
+}
+
+fn read_civ(r: &mut Reader<'_>) -> SimResult<Civilization> {
+    let id = r.u32()?;
+    let name = r.string()?;
+    let credits = r.f64()?;
+    let home_system = r.u32()?;
+    let archetype = match r.u8()? {
+        0 => None,
+        1 => Some(r.string()?),
+        other => {
+            return Err(SimError::InvalidSave(format!(
+                "bad archetype tag {other}"
+            )))
+        }
+    };
+    let personality = match r.u8()? {
+        0 => None,
+        1 => Some(Personality {
+            expansion: r.f64()?,
+            aggression: r.f64()?,
+            trade_affinity: r.f64()?,
+            xenophobia: r.f64()?,
+            honour: r.f64()?,
+        }),
+        other => {
+            return Err(SimError::InvalidSave(format!(
+                "bad personality tag {other}"
+            )))
+        }
+    };
+    Ok(Civilization {
+        id,
+        name,
+        credits,
+        home_system,
+        archetype,
+        personality,
+    })
+}
+
 fn write_system(w: &mut Writer, state: &SystemState) {
     w.u8(match state.survey {
         SurveyState::Unknown => 0,
         SurveyState::Surveyed => 1,
     });
+    w.u32(state.surveyed_by.len() as u32);
+    for civ_id in &state.surveyed_by {
+        w.u32(*civ_id);
+    }
     match &state.profile {
         None => w.u8(0),
         Some(profile) => {
@@ -456,12 +555,11 @@ fn read_campaign(r: &mut Reader<'_>) -> SimResult<Campaign> {
     let seed = r.u64()?;
     let day = r.u64()?;
     let rng = SeededRng::from_state(r.u64()?);
-    let civ = Civilization {
-        id: r.u32()?,
-        name: r.string()?,
-        credits: r.f64()?,
-        home_system: r.u32()?,
-    };
+    let civ_count = r.u32()?;
+    let mut civs = Vec::with_capacity(civ_count as usize);
+    for _ in 0..civ_count {
+        civs.push(read_civ(r)?);
+    }
 
     let design_count = r.u32()?;
     let mut designs = Vec::with_capacity(design_count as usize);
@@ -491,6 +589,7 @@ fn read_campaign(r: &mut Reader<'_>) -> SimResult<Campaign> {
             id,
             Ship {
                 id,
+                owner: r.u32()?,
                 design_idx: r.u32()?,
                 fuel: r.f64()?,
                 state: read_ship_state(r)?,
@@ -506,6 +605,28 @@ fn read_campaign(r: &mut Reader<'_>) -> SimResult<Campaign> {
             kind: event_kind_from(r.u8()?)?,
             system: r.option_u32()?,
             ship: r.option_u32()?,
+            civ: r.option_u32()?,
+            other_civ: r.option_u32()?,
+        });
+    }
+
+    let contact_count = r.u32()?;
+    let mut contacts = BTreeMap::new();
+    for _ in 0..contact_count {
+        let lo = r.u32()?;
+        let hi = r.u32()?;
+        let day = r.u64()?;
+        contacts.insert((lo, hi), day);
+    }
+
+    let dispute_count = r.u32()?;
+    let mut disputes = Vec::with_capacity(dispute_count as usize);
+    for _ in 0..dispute_count {
+        disputes.push(Dispute {
+            system: r.u32()?,
+            holder: r.u32()?,
+            challenger: r.u32()?,
+            opened_day: r.u64()?,
         });
     }
 
@@ -515,11 +636,14 @@ fn read_campaign(r: &mut Reader<'_>) -> SimResult<Campaign> {
         seed,
         day,
         rng,
-        civ,
+        civs,
         designs,
         systems,
         ships,
         events,
+        contacts,
+        disputes,
+        neighbor_cache: BTreeMap::new(),
         next_ship_id: r.u32()?,
         next_project_id: r.u32()?,
     })
@@ -531,6 +655,11 @@ fn read_system(r: &mut Reader<'_>) -> SimResult<SystemState> {
         1 => SurveyState::Surveyed,
         other => return Err(SimError::InvalidSave(format!("bad survey state {other}"))),
     };
+    let surveyed_count = r.u32()?;
+    let mut surveyed_by = BTreeSet::new();
+    for _ in 0..surveyed_count {
+        surveyed_by.insert(r.u32()?);
+    }
     let profile = match r.u8()? {
         0 => None,
         1 => {
@@ -567,6 +696,7 @@ fn read_system(r: &mut Reader<'_>) -> SimResult<SystemState> {
     };
     Ok(SystemState {
         survey,
+        surveyed_by,
         profile,
         claimed_by,
         colony,

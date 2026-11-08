@@ -35,11 +35,29 @@ pub struct StaticStar {
     pub planets: Vec<StaticPlanet>,
 }
 
+/// Cell size of the spatial grid behind `Galaxy::stars_within`.
+/// Queries are supported for radii up to this size.
+pub const GRID_CELL_LY: f64 = 100.0;
+
+fn grid_key(pos: [f32; 3]) -> (i32, i32, i32) {
+    (
+        (pos[0] as f64 / GRID_CELL_LY).floor() as i32,
+        (pos[1] as f64 / GRID_CELL_LY).floor() as i32,
+        (pos[2] as f64 / GRID_CELL_LY).floor() as i32,
+    )
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Galaxy {
     stars: Vec<StaticStar>,
     by_id: BTreeMap<u32, usize>,
     fingerprint: String,
+    /// Uniform spatial grid over star indices (cell `GRID_CELL_LY`),
+    /// built once at construction. It exists so neighbourhood
+    /// queries are O(local density), not O(catalog): S3's AI
+    /// planning asks them constantly. Pure derived data — it cannot
+    /// change any result, only how fast it is reached.
+    grid: BTreeMap<(i32, i32, i32), Vec<usize>>,
 }
 
 impl Galaxy {
@@ -82,10 +100,15 @@ impl Galaxy {
             .map(|(idx, star)| (star.id, idx))
             .collect();
         let fingerprint = fingerprint_stars(&stars);
+        let mut grid: BTreeMap<(i32, i32, i32), Vec<usize>> = BTreeMap::new();
+        for (idx, star) in stars.iter().enumerate() {
+            grid.entry(grid_key(star.pos_ly)).or_default().push(idx);
+        }
         Self {
             stars,
             by_id,
             fingerprint,
+            grid,
         }
     }
 
@@ -127,6 +150,33 @@ impl Galaxy {
         let a = self.star(a)?;
         let b = self.star(b)?;
         Some(distance_between(a.pos_ly, b.pos_ly))
+    }
+
+    /// All stars within `radius_ly` of `origin` (which need not be a
+    /// star), as `(distance, id)` pairs sorted by distance then id.
+    /// Radius must be ≤ `GRID_CELL_LY`. The result is a pure
+    /// function of the catalog.
+    pub fn stars_within(&self, origin: [f32; 3], radius_ly: f64) -> Vec<(f64, u32)> {
+        debug_assert!(radius_ly <= GRID_CELL_LY);
+        let (cx, cy, cz) = grid_key(origin);
+        let mut out: Vec<(f64, u32)> = Vec::new();
+        for dx in -1..=1 {
+            for dy in -1..=1 {
+                for dz in -1..=1 {
+                    if let Some(bucket) = self.grid.get(&(cx + dx, cy + dy, cz + dz)) {
+                        for &idx in bucket {
+                            let star = &self.stars[idx];
+                            let d = distance_between(origin, star.pos_ly);
+                            if d <= radius_ly + 1e-9 {
+                                out.push((d, star.id));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        out.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+        out
     }
 }
 

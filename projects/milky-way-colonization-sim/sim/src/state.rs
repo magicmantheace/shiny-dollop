@@ -1,15 +1,26 @@
-//! The deterministic, headless simulation state and rules (S1).
+//! The deterministic, headless simulation state and rules.
 //!
 //! One tick is one game day. Economy and population are settled every
 //! 30 ticks. The core is a pure step function: it does not read a wall
 //! clock and it does not call platform randomness. All random-looking
 //! values are derived from the campaign seed.
+//!
+//! S1 built this for one civilization. S3 generalizes the same rules
+//! to many: every command is parameterized by the acting
+//! civilization, ships and colonies carry their owner, survey
+//! knowledge is per-civilization (the fog of war is state, not a
+//! view trick), and AI civilizations re-plan inside the monthly
+//! settlement step — so advancing a save by N days produces the same
+//! galaxy whether the days were played live or applied as offline
+//! catch-up. The S1 public API remains as player-civilization
+//! wrappers over the generalized commands.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use crate::catalog::Galaxy;
 use crate::profile::{profile_for_star, survey_duration_days, SystemProfile};
+use crate::race::{generate_ai_civs, AiCivSpec, HomeworldRules, Personality};
 use crate::rng::SeededRng;
 
 pub const DAYS_PER_MONTH: u64 = 30;
@@ -58,6 +69,10 @@ pub enum SimError {
         actual: u8,
     },
     SpecializationAlreadySet(StarId),
+    ShipNotOwned(ShipId),
+    NotYourColony(StarId),
+    NoForeignClaim(StarId),
+    DisputeAlreadyOpen(StarId),
     InvalidSave(String),
     GalaxyMismatch,
 }
@@ -111,6 +126,18 @@ impl fmt::Display for SimError {
             ),
             Self::SpecializationAlreadySet(id) => {
                 write!(f, "system {id} already has a specialization")
+            }
+            Self::ShipNotOwned(id) => {
+                write!(f, "ship {id} is not owned by the acting civilization")
+            }
+            Self::NotYourColony(id) => {
+                write!(f, "system {id}'s colony belongs to another civilization")
+            }
+            Self::NoForeignClaim(id) => {
+                write!(f, "system {id} is not claimed by another civilization")
+            }
+            Self::DisputeAlreadyOpen(id) => {
+                write!(f, "a dispute over system {id} is already open for this civilization")
             }
             Self::InvalidSave(msg) => write!(f, "invalid save: {msg}"),
             Self::GalaxyMismatch => write!(f, "save does not belong to this galaxy table"),
@@ -237,6 +264,9 @@ impl ShipState {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ship {
     pub id: ShipId,
+    /// The civilization that owns this hull (S3). Every order checks
+    /// the acting civilization against this field.
+    pub owner: u32,
     pub design_idx: u32,
     pub fuel: f64,
     pub state: ShipState,
@@ -277,7 +307,14 @@ pub struct Colony {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SystemState {
+    /// Surveyed by at least one civilization (the revealed truth;
+    /// `profile` below is a pure function of seed + star, so storing
+    /// it once is safe). Who knows it lives in `surveyed_by`.
     pub survey: SurveyState,
+    /// Civilizations that have completed a survey of this system
+    /// (S3). This set is the fog of war: commands, AI planning, and
+    /// player-facing views all gate on it.
+    pub surveyed_by: BTreeSet<u32>,
     pub profile: Option<SystemProfile>,
     pub claimed_by: Option<u32>,
     pub colony: Option<Colony>,
@@ -287,6 +324,7 @@ impl Default for SystemState {
     fn default() -> Self {
         Self {
             survey: SurveyState::Unknown,
+            surveyed_by: BTreeSet::new(),
             profile: None,
             claimed_by: None,
             colony: None,
@@ -308,6 +346,12 @@ pub enum EventKind {
     ColonyFounded,
     ColonyAbandoned,
     SpecializationSet,
+    /// S3: two civilizations met (design §6.3). `civ` is the
+    /// discoverer, `other_civ` the civilization discovered.
+    FirstContact,
+    /// S3: `civ` lodged a competing claim against `other_civ`'s
+    /// claim on `system` (design §6.3's disputes).
+    ClaimContested,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -316,6 +360,24 @@ pub struct GameEvent {
     pub kind: EventKind,
     pub system: Option<StarId>,
     pub ship: Option<ShipId>,
+    /// S3: the civilization this event is about (the actor or
+    /// owner). The catch-up review uses it to surface AI
+    /// developments during the player's absence.
+    pub civ: Option<u32>,
+    /// S3: the second civilization for relational events
+    /// (FirstContact, ClaimContested).
+    pub other_civ: Option<u32>,
+}
+
+/// An open claim dispute (design §6.3): `challenger` contests
+/// `holder`'s claim on `system`. Disputes are records with opinion
+/// effects; settling them is diplomacy (S4).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Dispute {
+    pub system: StarId,
+    pub holder: u32,
+    pub challenger: u32,
+    pub opened_day: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -324,6 +386,59 @@ pub struct Civilization {
     pub name: String,
     pub credits: f64,
     pub home_system: StarId,
+    /// S3: the archetype name for AI civilizations ("Merchant
+    /// League", …); `None` for the player.
+    pub archetype: Option<String>,
+    /// S3: the personality vector for AI civilizations (design
+    /// §6.2); `None` for the player.
+    pub personality: Option<Personality>,
+}
+
+impl Civilization {
+    pub fn is_ai(&self) -> bool {
+        self.id != PLAYER_CIV
+    }
+}
+
+/// Setup for a full game (S3): the player plus AI civilizations.
+#[derive(Debug, Clone)]
+pub struct GameSetup {
+    /// AI civilizations to place (design §11.3: 12 by default; the
+    /// 4–40 setup slider counts all civilizations, so at most 39).
+    pub ai_count: usize,
+    pub player_name: String,
+    pub home_rules: HomeworldRules,
+}
+
+impl Default for GameSetup {
+    fn default() -> Self {
+        Self {
+            ai_count: crate::race::DEFAULT_AI_COUNT,
+            player_name: "Player Civilization".into(),
+            home_rules: HomeworldRules::default(),
+        }
+    }
+}
+
+/// One AI civilization as placed by game setup.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AiCivSetup {
+    pub civ_id: u32,
+    pub name: String,
+    pub archetype: String,
+    pub home_system: StarId,
+    /// Design §6.1's homeworld guarantee, flagged openly: true when
+    /// the star's natural profile was below the homeworld bar and
+    /// setup granted the standard profile anyway.
+    pub homeworld_adjusted: bool,
+}
+
+/// What game setup did, for the setup screen and the records.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SetupReport {
+    pub player_home: StarId,
+    pub spacing_used_ly: f64,
+    pub ai: Vec<AiCivSetup>,
 }
 
 #[derive(Debug, Clone)]
@@ -333,14 +448,32 @@ pub struct Campaign {
     pub(crate) seed: u64,
     pub(crate) day: u64,
     pub(crate) rng: SeededRng,
-    pub(crate) civ: Civilization,
+    /// All civilizations, indexed by id; `civs[PLAYER_CIV]` is the
+    /// player. S1 campaigns hold exactly one entry.
+    pub(crate) civs: Vec<Civilization>,
     pub(crate) designs: Vec<ShipDesign>,
     pub(crate) systems: BTreeMap<StarId, SystemState>,
     pub(crate) ships: BTreeMap<ShipId, Ship>,
     pub(crate) events: Vec<GameEvent>,
+    /// S3: first-contact days, keyed by the sorted civilization
+    /// pair `(lo, hi)`.
+    pub(crate) contacts: BTreeMap<(u32, u32), u64>,
+    /// S3: open claim disputes, in the order they opened.
+    pub(crate) disputes: Vec<Dispute>,
     pub(crate) next_ship_id: ShipId,
     pub(crate) next_project_id: u32,
+    /// Derived cache (never serialized, rebuilt lazily after load):
+    /// stars within `NEIGHBOR_CACHE_RANGE_LY` of a key star, sorted
+    /// by `(distance, id)`. It exists so monthly AI planning over a
+    /// 113k-star catalog does not rescan the galaxy per ship; its
+    /// contents cannot change any decision, only how fast it is
+    /// reached.
+    pub(crate) neighbor_cache: BTreeMap<StarId, Vec<(f64, StarId)>>,
 }
+
+/// The neighbor cache's fixed radius: just beyond the longest
+/// design range in the game (75 ly colony/survey designs).
+pub(crate) const NEIGHBOR_CACHE_RANGE_LY: f64 = 80.0;
 
 impl Campaign {
     /// Start at Sol (Adam's §11.7 ruling). If a test/custom galaxy has
@@ -363,49 +496,151 @@ impl Campaign {
         if galaxy.star(home_system).is_none() {
             return Err(SimError::UnknownStar(home_system));
         }
-        let designs = vec![
-            ShipDesign {
-                name: "Pathfinder Surveyor".into(),
-                kind: ShipKind::Surveyor,
-                tank_capacity: 150.0,
-                fuel_per_ly: 2.0,
-                speed_ly_per_day: 0.30,
-                payload_capacity: 8.0,
+        let mut campaign = Self::shell(galaxy, seed);
+        campaign.add_civilization(
+            Civilization {
+                id: PLAYER_CIV,
+                name: civ_name.into(),
+                credits: 15_000.0,
+                home_system,
+                archetype: None,
+                personality: None,
             },
-            ShipDesign {
-                name: "Mayflower Colony Ship".into(),
-                kind: ShipKind::Colony,
-                tank_capacity: 300.0,
-                fuel_per_ly: 4.0,
-                speed_ly_per_day: 0.18,
-                payload_capacity: 120.0,
-            },
-        ];
+            SystemProfile::homeworld(),
+        );
+        Ok(campaign)
+    }
 
-        let mut campaign = Self {
+    /// Start a full S3 game: the player at Sol (ruling §11.7) plus
+    /// `setup.ai_count` AI civilizations placed by the §6.1 fairness
+    /// algorithm, each starting under exactly the player's rules —
+    /// same credits, same homeworld colony, same two ships.
+    pub fn new_game(
+        galaxy: &Galaxy,
+        seed: u64,
+        setup: &GameSetup,
+    ) -> SimResult<(Self, SetupReport)> {
+        if setup.ai_count > crate::race::MAX_AI_COUNT {
+            return Err(SimError::InvalidHomeworld);
+        }
+        let player_home = galaxy
+            .find_by_name("Sol")
+            .map(|s| s.id)
+            .or_else(|| galaxy.star(0).map(|s| s.id))
+            .ok_or(SimError::InvalidHomeworld)?;
+        let (specs, spacing_used): (Vec<AiCivSpec>, f64) = if setup.ai_count == 0 {
+            (Vec::new(), setup.home_rules.min_spacing_ly)
+        } else {
+            generate_ai_civs(galaxy, seed, player_home, setup.ai_count, &setup.home_rules)
+        };
+        if specs.len() < setup.ai_count {
+            // The galaxy cannot seat that many civilizations under
+            // the fairness rules — refuse rather than silently
+            // start a smaller game than was asked for.
+            return Err(SimError::InvalidHomeworld);
+        }
+        let mut campaign = Self::shell(galaxy, seed);
+        campaign.add_civilization(
+            Civilization {
+                id: PLAYER_CIV,
+                name: setup.player_name.clone(),
+                credits: 15_000.0,
+                home_system: player_home,
+                archetype: None,
+                personality: None,
+            },
+            SystemProfile::homeworld(),
+        );
+        let mut report_ai = Vec::with_capacity(specs.len());
+        for (i, spec) in specs.iter().enumerate() {
+            let civ_id = (i + 1) as u32;
+            let star_name = galaxy
+                .star(spec.home_system)
+                .map(|s| s.name.clone())
+                .unwrap_or_default();
+            campaign.add_civilization(
+                Civilization {
+                    id: civ_id,
+                    name: spec.name.clone(),
+                    credits: 15_000.0,
+                    home_system: spec.home_system,
+                    archetype: Some(spec.archetype.to_string()),
+                    personality: Some(spec.personality),
+                },
+                SystemProfile::homeworld_named(format!("{star_name} Prime")),
+            );
+            report_ai.push(AiCivSetup {
+                civ_id,
+                name: spec.name.clone(),
+                archetype: spec.archetype.to_string(),
+                home_system: spec.home_system,
+                homeworld_adjusted: spec.homeworld_adjusted,
+            });
+        }
+        Ok((
+            campaign,
+            SetupReport {
+                player_home,
+                spacing_used_ly: spacing_used,
+                ai: report_ai,
+            },
+        ))
+    }
+
+    /// An empty campaign shell: the two fixed S1 ship designs
+    /// (custom designs are a later slice, per the S2 scope notes),
+    /// no civilizations yet.
+    fn shell(galaxy: &Galaxy, seed: u64) -> Self {
+        Self {
             galaxy_fingerprint: galaxy.fingerprint().to_string(),
             star_count: galaxy.len(),
             seed,
             day: 0,
             rng: SeededRng::new(seed),
-            civ: Civilization {
-                id: PLAYER_CIV,
-                name: civ_name.into(),
-                credits: 15_000.0,
-                home_system,
-            },
-            designs,
+            civs: Vec::new(),
+            designs: vec![
+                ShipDesign {
+                    name: "Pathfinder Surveyor".into(),
+                    kind: ShipKind::Surveyor,
+                    tank_capacity: 150.0,
+                    fuel_per_ly: 2.0,
+                    speed_ly_per_day: 0.30,
+                    payload_capacity: 8.0,
+                },
+                ShipDesign {
+                    name: "Mayflower Colony Ship".into(),
+                    kind: ShipKind::Colony,
+                    tank_capacity: 300.0,
+                    fuel_per_ly: 4.0,
+                    speed_ly_per_day: 0.18,
+                    payload_capacity: 120.0,
+                },
+            ],
             systems: BTreeMap::new(),
             ships: BTreeMap::new(),
             events: Vec::new(),
+            contacts: BTreeMap::new(),
+            disputes: Vec::new(),
             next_ship_id: 1,
             next_project_id: 1,
-        };
+            neighbor_cache: BTreeMap::new(),
+        }
+    }
 
+    /// Seat a civilization on its homeworld: the standard starting
+    /// colony (identical numbers for every civilization — §6.1's
+    /// "same rules"), a surveyor and a colony ship in orbit, and
+    /// the campaign-started event.
+    fn add_civilization(&mut self, civ: Civilization, home_profile: SystemProfile) {
+        let civ_id = civ.id;
+        let home_system = civ.home_system;
+        debug_assert_eq!(self.civs.len() as u32, civ_id);
+        self.civs.push(civ);
         let home_state = SystemState {
             survey: SurveyState::Surveyed,
-            profile: Some(SystemProfile::homeworld()),
-            claimed_by: Some(PLAYER_CIV),
+            surveyed_by: BTreeSet::from([civ_id]),
+            profile: Some(home_profile),
+            claimed_by: Some(civ_id),
             colony: Some(Colony {
                 founded_day: 0,
                 population_millions: 1_200.0,
@@ -426,11 +661,16 @@ impl Campaign {
                 construction_queue: Vec::new(),
             }),
         };
-        campaign.systems.insert(home_system, home_state);
-        campaign.spawn_ship(0, home_system);
-        campaign.spawn_ship(1, home_system);
-        campaign.push_event(EventKind::CampaignStarted, Some(home_system), None);
-        Ok(campaign)
+        self.systems.insert(home_system, home_state);
+        self.spawn_ship(civ_id, 0, home_system);
+        self.spawn_ship(civ_id, 1, home_system);
+        self.push_event(
+            EventKind::CampaignStarted,
+            Some(home_system),
+            None,
+            Some(civ_id),
+            None,
+        );
     }
 
     pub fn seed(&self) -> u64 {
@@ -441,12 +681,79 @@ impl Campaign {
         self.day
     }
 
+    /// The player's credits (S1 accessor; see `credits_for`).
     pub fn credits(&self) -> f64 {
-        self.civ.credits
+        self.credits_for(PLAYER_CIV)
     }
 
+    pub fn credits_for(&self, civ_id: u32) -> f64 {
+        self.civ(civ_id).map(|c| c.credits).unwrap_or(0.0)
+    }
+
+    /// The player's home system (S1 accessor; see `civ`).
     pub fn home_system(&self) -> StarId {
-        self.civ.home_system
+        self.civs[PLAYER_CIV as usize].home_system
+    }
+
+    pub fn civ(&self, id: u32) -> Option<&Civilization> {
+        self.civs.get(id as usize)
+    }
+
+    pub fn civs(&self) -> &[Civilization] {
+        &self.civs
+    }
+
+    /// Has `civ_id` completed a survey of `system`? This is that
+    /// civilization's fog-of-war knowledge, nothing more global.
+    pub fn surveyed_by(&self, civ_id: u32, system: StarId) -> bool {
+        self.systems
+            .get(&system)
+            .map(|s| s.surveyed_by.contains(&civ_id))
+            .unwrap_or(false)
+    }
+
+    /// The system's profile as known by `civ_id`: present only when
+    /// that civilization has surveyed the system.
+    pub fn known_profile(&self, civ_id: u32, system: StarId) -> Option<&SystemProfile> {
+        if !self.surveyed_by(civ_id, system) {
+            return None;
+        }
+        self.systems.get(&system).and_then(|s| s.profile.as_ref())
+    }
+
+    /// Systems where `civ_id` holds a colony, ascending by star id.
+    pub fn colonies_of(&self, civ_id: u32) -> Vec<StarId> {
+        self.systems
+            .iter()
+            .filter(|(_, s)| s.claimed_by == Some(civ_id) && s.colony.is_some())
+            .map(|(id, _)| *id)
+            .collect()
+    }
+
+    /// Ships owned by `civ_id`, ascending by ship id.
+    pub fn ships_of(&self, civ_id: u32) -> Vec<ShipId> {
+        self.ships
+            .values()
+            .filter(|s| s.owner == civ_id)
+            .map(|s| s.id)
+            .collect()
+    }
+
+    /// Systems this civilization has surveyed, ascending by id.
+    pub fn surveyed_systems_of(&self, civ_id: u32) -> Vec<StarId> {
+        self.systems
+            .iter()
+            .filter(|(_, s)| s.surveyed_by.contains(&civ_id))
+            .map(|(id, _)| *id)
+            .collect()
+    }
+
+    pub fn disputes(&self) -> &[Dispute] {
+        &self.disputes
+    }
+
+    pub fn contacts(&self) -> &BTreeMap<(u32, u32), u64> {
+        &self.contacts
     }
 
     pub fn designs(&self) -> &[ShipDesign] {
@@ -477,48 +784,147 @@ impl Campaign {
         &self.events
     }
 
+    /// Systems the **player** has surveyed (S1 accessor semantics,
+    /// per-civilization since S3; see `surveyed_count_for`).
     pub fn surveyed_count(&self) -> usize {
+        self.surveyed_count_for(PLAYER_CIV)
+    }
+
+    pub fn surveyed_count_for(&self, civ_id: u32) -> usize {
         self.systems
             .values()
-            .filter(|s| s.survey == SurveyState::Surveyed)
+            .filter(|s| s.surveyed_by.contains(&civ_id))
             .count()
     }
 
+    /// Colonies held by the **player** (see `colonized_count_for`
+    /// and `total_colonized_count`).
     pub fn colonized_count(&self) -> usize {
+        self.colonized_count_for(PLAYER_CIV)
+    }
+
+    pub fn colonized_count_for(&self, civ_id: u32) -> usize {
+        self.colonies_of(civ_id).len()
+    }
+
+    /// Colonies held by all civilizations together — the §6.5
+    /// hegemony denominator.
+    /// Systems surveyed by at least one civilization.
+    pub fn total_surveyed_count(&self) -> usize {
+        self.systems
+            .values()
+            .filter(|s| !s.surveyed_by.is_empty())
+            .count()
+    }
+
+    pub fn total_colonized_count(&self) -> usize {
         self.systems.values().filter(|s| s.colony.is_some()).count()
     }
 
-    pub fn total_population_millions(&self) -> f64 {
+    pub fn total_claimed_count(&self) -> usize {
         self.systems
             .values()
-            .filter_map(|s| s.colony.as_ref())
+            .filter(|s| s.claimed_by.is_some())
+            .count()
+    }
+
+    /// The **player's** total population (see `population_for`).
+    pub fn total_population_millions(&self) -> f64 {
+        self.population_for(PLAYER_CIV)
+    }
+
+    pub fn population_for(&self, civ_id: u32) -> f64 {
+        self.colonies_of(civ_id)
+            .into_iter()
+            .filter_map(|id| self.systems.get(&id).and_then(|s| s.colony.as_ref()))
             .map(|c| c.population_millions)
             .sum()
     }
 
+    /// The **player's** total fuel stock (see `fuel_stock_for`).
     pub fn total_fuel_stock(&self) -> f64 {
-        self.systems
-            .values()
-            .filter_map(|s| s.colony.as_ref())
+        self.fuel_stock_for(PLAYER_CIV)
+    }
+
+    pub fn fuel_stock_for(&self, civ_id: u32) -> f64 {
+        self.colonies_of(civ_id)
+            .into_iter()
+            .filter_map(|id| self.systems.get(&id).and_then(|s| s.colony.as_ref()))
             .map(|c| c.fuel_stock)
             .sum()
+    }
+
+    /// Stars within `max_ly` of `from`, nearest first, ties broken
+    /// by star id. Backed by the derived neighbor cache; the result
+    /// is a pure function of the catalog.
+    pub fn neighbors_within(
+        &mut self,
+        galaxy: &Galaxy,
+        from: StarId,
+        max_ly: f64,
+    ) -> Vec<(f64, StarId)> {
+        if galaxy.star(from).is_none() {
+            return Vec::new();
+        }
+        if !self.neighbor_cache.contains_key(&from) {
+            let origin = galaxy.star(from).expect("checked above").pos_ly;
+            let near: Vec<(f64, StarId)> = galaxy
+                .stars_within(origin, NEIGHBOR_CACHE_RANGE_LY)
+                .into_iter()
+                .filter(|(_, id)| *id != from)
+                .collect();
+            self.neighbor_cache.insert(from, near);
+        }
+        self.neighbor_cache
+            .get(&from)
+            .map(|entries| {
+                entries
+                    .iter()
+                    .copied()
+                    .filter(|(d, _)| *d <= max_ly + 1e-9)
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Record first contact between two civilizations (§6.3):
+    /// idempotent, and the second and later meetings change nothing.
+    pub(crate) fn note_contact(&mut self, a: u32, b: u32, system: Option<StarId>) {
+        if a == b {
+            return;
+        }
+        let key = if a < b { (a, b) } else { (b, a) };
+        if self.contacts.contains_key(&key) {
+            return;
+        }
+        self.contacts.insert(key, self.day);
+        self.push_event(EventKind::FirstContact, system, None, Some(a), Some(b));
     }
 
     fn system_mut_or_default(&mut self, id: StarId) -> &mut SystemState {
         self.systems.entry(id).or_default()
     }
 
-    fn push_event(&mut self, kind: EventKind, system: Option<StarId>, ship: Option<ShipId>) {
+    fn push_event(
+        &mut self,
+        kind: EventKind,
+        system: Option<StarId>,
+        ship: Option<ShipId>,
+        civ: Option<u32>,
+        other_civ: Option<u32>,
+    ) {
         let day = self.day;
         self.events.push(GameEvent {
             day,
             kind,
             system,
             ship,
+            civ,
+            other_civ,
         });
     }
 
-    fn spawn_ship(&mut self, design_idx: u32, system: StarId) -> ShipId {
+    fn spawn_ship(&mut self, owner: u32, design_idx: u32, system: StarId) -> ShipId {
         let id = self.next_ship_id;
         self.next_ship_id += 1;
         let fuel = self.designs[design_idx as usize].tank_capacity;
@@ -526,6 +932,7 @@ impl Campaign {
             id,
             Ship {
                 id,
+                owner,
                 design_idx,
                 fuel,
                 state: ShipState::AtSystem { system },
@@ -535,11 +942,27 @@ impl Campaign {
     }
 
     /// Begin surveying the system a surveyor is already sitting in.
+    /// (Player-civilization wrapper over `begin_survey_for`.)
     pub fn begin_survey(&mut self, galaxy: &Galaxy, ship_id: ShipId) -> SimResult<()> {
+        self.begin_survey_for(PLAYER_CIV, galaxy, ship_id)
+    }
+
+    /// `begin_survey` for an acting civilization: the ship must be
+    /// theirs, and "already surveyed" means surveyed *by them* —
+    /// another civilization's survey is invisible to them (§6.1).
+    pub fn begin_survey_for(
+        &mut self,
+        civ_id: u32,
+        galaxy: &Galaxy,
+        ship_id: ShipId,
+    ) -> SimResult<()> {
         let ship = self
             .ships
             .get(&ship_id)
             .ok_or(SimError::UnknownShip(ship_id))?;
+        if ship.owner != civ_id {
+            return Err(SimError::ShipNotOwned(ship_id));
+        }
         let design = self
             .design(ship.design_idx)
             .ok_or(SimError::UnknownDesign(ship.design_idx))?;
@@ -551,13 +974,7 @@ impl Campaign {
             _ => return Err(SimError::ShipBusy(ship_id)),
         };
         let star = galaxy.star(system).ok_or(SimError::UnknownStar(system))?;
-        if self
-            .systems
-            .get(&system)
-            .map(|s| s.survey)
-            .unwrap_or(SurveyState::Unknown)
-            == SurveyState::Surveyed
-        {
+        if self.surveyed_by(civ_id, system) {
             return Err(SimError::SystemAlreadySurveyed(system));
         }
         let days = survey_duration_days(self.seed, star);
@@ -566,13 +983,20 @@ impl Campaign {
             system,
             days_remaining: days,
         };
-        self.push_event(EventKind::SurveyStarted, Some(system), Some(ship_id));
+        self.push_event(
+            EventKind::SurveyStarted,
+            Some(system),
+            Some(ship_id),
+            Some(civ_id),
+            None,
+        );
         Ok(())
     }
 
     /// Dispatch a ship to another system. Normal orders are refused
     /// when the destination is beyond the design's range or beyond
-    /// the fuel actually on board.
+    /// the fuel actually on board. (Player wrapper over
+    /// `dispatch_ship_for`.)
     pub fn dispatch_ship(
         &mut self,
         galaxy: &Galaxy,
@@ -580,7 +1004,7 @@ impl Campaign {
         destination: StarId,
         purpose: Purpose,
     ) -> SimResult<()> {
-        self.dispatch_inner(galaxy, ship_id, destination, purpose, false)
+        self.dispatch_inner(PLAYER_CIV, galaxy, ship_id, destination, purpose, false)
     }
 
     /// A deliberate one-way order (design §5.2). This is the only S1
@@ -594,11 +1018,26 @@ impl Campaign {
         destination: StarId,
         purpose: Purpose,
     ) -> SimResult<()> {
-        self.dispatch_inner(galaxy, ship_id, destination, purpose, true)
+        self.dispatch_inner(PLAYER_CIV, galaxy, ship_id, destination, purpose, true)
+    }
+
+    /// `dispatch_ship` for an acting civilization: the ship must be
+    /// theirs, and purpose preconditions (surveyed, claimed) are
+    /// judged against *their* knowledge and claims.
+    pub fn dispatch_ship_for(
+        &mut self,
+        civ_id: u32,
+        galaxy: &Galaxy,
+        ship_id: ShipId,
+        destination: StarId,
+        purpose: Purpose,
+    ) -> SimResult<()> {
+        self.dispatch_inner(civ_id, galaxy, ship_id, destination, purpose, false)
     }
 
     fn dispatch_inner(
         &mut self,
+        civ_id: u32,
         galaxy: &Galaxy,
         ship_id: ShipId,
         destination: StarId,
@@ -613,6 +1052,9 @@ impl Campaign {
                 .ships
                 .get(&ship_id)
                 .ok_or(SimError::UnknownShip(ship_id))?;
+            if ship.owner != civ_id {
+                return Err(SimError::ShipNotOwned(ship_id));
+            }
             let from = match ship.state {
                 ShipState::AtSystem { system } => system,
                 _ => return Err(SimError::ShipBusy(ship_id)),
@@ -634,8 +1076,8 @@ impl Campaign {
         }
         if from == destination {
             return match purpose {
-                Purpose::Survey => self.begin_survey(galaxy, ship_id),
-                Purpose::Colonize => self.found_colony_with_ship(ship_id).map(|_| ()),
+                Purpose::Survey => self.begin_survey_for(civ_id, galaxy, ship_id),
+                Purpose::Colonize => self.found_colony_with_ship_for(civ_id, ship_id).map(|_| ()),
                 Purpose::Relocate => Ok(()),
             };
         }
@@ -650,17 +1092,11 @@ impl Campaign {
         }
         match purpose {
             Purpose::Survey => {
-                if self
-                    .systems
-                    .get(&destination)
-                    .map(|s| s.survey)
-                    .unwrap_or(SurveyState::Unknown)
-                    == SurveyState::Surveyed
-                {
+                if self.surveyed_by(civ_id, destination) {
                     return Err(SimError::SystemAlreadySurveyed(destination));
                 }
             }
-            Purpose::Colonize => self.require_colonizable(destination)?,
+            Purpose::Colonize => self.require_colonizable_for(civ_id, destination)?,
             Purpose::Relocate => {}
         }
         let needed = distance * design.fuel_per_ly;
@@ -679,16 +1115,25 @@ impl Campaign {
             purpose,
             unchecked,
         };
-        self.push_event(EventKind::ShipDispatched, Some(destination), Some(ship_id));
+        self.push_event(
+            EventKind::ShipDispatched,
+            Some(destination),
+            Some(ship_id),
+            Some(civ_id),
+            None,
+        );
         Ok(())
     }
 
-    fn require_colonizable(&self, system: StarId) -> SimResult<()> {
-        let state = self.systems.get(&system);
-        if state.map(|s| s.survey).unwrap_or(SurveyState::Unknown) != SurveyState::Surveyed {
+    /// May `civ_id` found a colony at `system` right now? Judged
+    /// against that civilization's own survey knowledge and claim
+    /// (design §3's pipeline, per civilization since S3).
+    fn require_colonizable_for(&self, civ_id: u32, system: StarId) -> SimResult<()> {
+        if !self.surveyed_by(civ_id, system) {
             return Err(SimError::SystemNotSurveyed(system));
         }
-        if state.and_then(|s| s.claimed_by) != Some(PLAYER_CIV) {
+        let state = self.systems.get(&system);
+        if state.and_then(|s| s.claimed_by) != Some(civ_id) {
             return Err(SimError::SystemNotClaimed(system));
         }
         if state.map(|s| s.colony.is_some()).unwrap_or(false) {
@@ -698,36 +1143,113 @@ impl Campaign {
     }
 
     /// Claim a surveyed system. Claims precede founding (design §3).
+    /// (Player wrapper over `claim_system_for`.)
     pub fn claim_system(&mut self, system: StarId) -> SimResult<()> {
+        self.claim_system_for(PLAYER_CIV, system)
+    }
+
+    /// `claim_system` for an acting civilization: the system must be
+    /// surveyed *by them* and unclaimed. A system claimed by another
+    /// civilization cannot be taken by claiming — contesting it is
+    /// the diplomatic act (`contest_claim_for`), and taking it is
+    /// war (S5).
+    pub fn claim_system_for(&mut self, civ_id: u32, system: StarId) -> SimResult<()> {
+        if !self.surveyed_by(civ_id, system) {
+            return Err(SimError::SystemNotSurveyed(system));
+        }
         let state = self
             .systems
             .get(&system)
             .ok_or(SimError::SystemNotSurveyed(system))?;
-        if state.survey != SurveyState::Surveyed {
-            return Err(SimError::SystemNotSurveyed(system));
-        }
         if state.claimed_by.is_some() {
             return Err(SimError::SystemAlreadyClaimed(system));
         }
-        if self.civ.credits + 1e-9 < CLAIM_COST_CREDITS {
+        let credits = self.credits_for(civ_id);
+        if credits + 1e-9 < CLAIM_COST_CREDITS {
             return Err(SimError::InsufficientCredits {
                 needed: CLAIM_COST_CREDITS,
-                available: self.civ.credits,
+                available: credits,
             });
         }
-        self.civ.credits -= CLAIM_COST_CREDITS;
-        self.system_mut_or_default(system).claimed_by = Some(PLAYER_CIV);
-        self.push_event(EventKind::SystemClaimed, Some(system), None);
+        if let Some(civ) = self.civs.get_mut(civ_id as usize) {
+            civ.credits -= CLAIM_COST_CREDITS;
+        }
+        self.system_mut_or_default(system).claimed_by = Some(civ_id);
+        self.push_event(
+            EventKind::SystemClaimed,
+            Some(system),
+            None,
+            Some(civ_id),
+            None,
+        );
+        Ok(())
+    }
+
+    /// Contest another civilization's claim (player wrapper over
+    /// `contest_claim_for`).
+    pub fn contest_claim(&mut self, system: StarId) -> SimResult<()> {
+        self.contest_claim_for(PLAYER_CIV, system)
+    }
+
+    /// Lodge a competing claim against the civilization holding
+    /// `system` (design §6.3): the system must be surveyed by the
+    /// acting civilization and claimed by a different one. Opens a
+    /// dispute — a record with opinion effects — and establishes
+    /// contact if the two have somehow not met.
+    pub fn contest_claim_for(&mut self, civ_id: u32, system: StarId) -> SimResult<()> {
+        if !self.surveyed_by(civ_id, system) {
+            return Err(SimError::SystemNotSurveyed(system));
+        }
+        let holder = self
+            .systems
+            .get(&system)
+            .and_then(|s| s.claimed_by)
+            .filter(|&h| h != civ_id)
+            .ok_or(SimError::NoForeignClaim(system))?;
+        if self
+            .disputes
+            .iter()
+            .any(|d| d.system == system && d.challenger == civ_id)
+        {
+            return Err(SimError::DisputeAlreadyOpen(system));
+        }
+        self.disputes.push(Dispute {
+            system,
+            holder,
+            challenger: civ_id,
+            opened_day: self.day,
+        });
+        self.note_contact(civ_id, holder, Some(system));
+        self.push_event(
+            EventKind::ClaimContested,
+            Some(system),
+            None,
+            Some(civ_id),
+            Some(holder),
+        );
         Ok(())
     }
 
     /// Found a colony using a colony ship that is already in the
     /// target system. The ship is consumed (design §3).
+    /// (Player wrapper over `found_colony_with_ship_for`.)
     pub fn found_colony_with_ship(&mut self, ship_id: ShipId) -> SimResult<StarId> {
+        self.found_colony_with_ship_for(PLAYER_CIV, ship_id)
+    }
+
+    /// `found_colony_with_ship` for the ship's owning civilization.
+    pub fn found_colony_with_ship_for(
+        &mut self,
+        civ_id: u32,
+        ship_id: ShipId,
+    ) -> SimResult<StarId> {
         let ship = self
             .ships
             .get(&ship_id)
             .ok_or(SimError::UnknownShip(ship_id))?;
+        if ship.owner != civ_id {
+            return Err(SimError::ShipNotOwned(ship_id));
+        }
         let design = self
             .design(ship.design_idx)
             .ok_or(SimError::UnknownDesign(ship.design_idx))?;
@@ -738,18 +1260,24 @@ impl Campaign {
             ShipState::AtSystem { system } => system,
             _ => return Err(SimError::ShipBusy(ship_id)),
         };
-        self.require_colonizable(system)?;
+        self.require_colonizable_for(civ_id, system)?;
         let remaining_fuel = ship.fuel;
-        self.found_colony(system, remaining_fuel);
+        self.found_colony(civ_id, system, remaining_fuel);
         self.ships.remove(&ship_id);
-        self.push_event(EventKind::ColonyFounded, Some(system), Some(ship_id));
+        self.push_event(
+            EventKind::ColonyFounded,
+            Some(system),
+            Some(ship_id),
+            Some(civ_id),
+            None,
+        );
         Ok(system)
     }
 
-    fn found_colony(&mut self, system: StarId, remaining_ship_fuel: f64) {
+    fn found_colony(&mut self, civ_id: u32, system: StarId, remaining_ship_fuel: f64) {
         let day = self.day;
         let state = self.system_mut_or_default(system);
-        state.claimed_by = Some(PLAYER_CIV);
+        state.claimed_by = Some(civ_id);
         state.colony = Some(Colony {
             founded_day: day,
             population_millions: 0.25,
@@ -773,17 +1301,42 @@ impl Campaign {
 
     /// Queue a ship at a colonized system. Costs are paid at enqueue;
     /// the hull appears when its deterministic build time elapses.
+    /// (Player wrapper over `build_ship_for`.)
     pub fn build_ship(&mut self, system: StarId, design_idx: u32) -> SimResult<u32> {
+        self.build_ship_for(PLAYER_CIV, system, design_idx)
+    }
+
+    /// `build_ship` for an acting civilization: the colony must be
+    /// theirs — its alloys are spent and the acting civilization's
+    /// treasury pays.
+    pub fn build_ship_for(
+        &mut self,
+        civ_id: u32,
+        system: StarId,
+        design_idx: u32,
+    ) -> SimResult<u32> {
         let design = self
             .design(design_idx)
             .ok_or(SimError::UnknownDesign(design_idx))?
             .clone();
         let credits_cost = design.credits_cost();
         let alloys_cost = design.alloys_cost();
-        if self.civ.credits + 1e-9 < credits_cost {
+        let owner = self
+            .systems
+            .get(&system)
+            .and_then(|s| s.claimed_by);
+        match self.systems.get(&system).and_then(|s| s.colony.as_ref()) {
+            None => return Err(SimError::NoColony(system)),
+            Some(_) if owner != Some(civ_id) => {
+                return Err(SimError::NotYourColony(system));
+            }
+            Some(_) => {}
+        }
+        let credits = self.credits_for(civ_id);
+        if credits + 1e-9 < credits_cost {
             return Err(SimError::InsufficientCredits {
                 needed: credits_cost,
-                available: self.civ.credits,
+                available: credits,
             });
         }
         let state = self
@@ -798,7 +1351,9 @@ impl Campaign {
                 available: colony.alloys_stock,
             });
         }
-        self.civ.credits -= credits_cost;
+        if let Some(civ) = self.civs.get_mut(civ_id as usize) {
+            civ.credits -= credits_cost;
+        }
         colony.alloys_stock -= alloys_cost;
         let project_id = self.next_project_id;
         self.next_project_id += 1;
@@ -815,12 +1370,23 @@ impl Campaign {
     /// amount transferred. A ship stranded at a system becomes usable
     /// again; a ship stranded en route cannot be reached in S1 (it
     /// awaits the tanker mechanics of a later slice).
+    /// (Player wrapper over `refuel_ship_for`.)
     pub fn refuel_ship(&mut self, ship_id: ShipId) -> SimResult<f64> {
+        self.refuel_ship_for(PLAYER_CIV, ship_id)
+    }
+
+    /// `refuel_ship` for the ship's owning civilization: fuel comes
+    /// from a colony of *their own* — drawing on another
+    /// civilization's stocks is trade or treaty business (S4).
+    pub fn refuel_ship_for(&mut self, civ_id: u32, ship_id: ShipId) -> SimResult<f64> {
         let (system, design_idx, current_fuel, pending) = {
             let ship = self
                 .ships
                 .get(&ship_id)
                 .ok_or(SimError::UnknownShip(ship_id))?;
+            if ship.owner != civ_id {
+                return Err(SimError::ShipNotOwned(ship_id));
+            }
             let pending = match ship.state {
                 ShipState::AtSystem { system } => (system, None),
                 ShipState::StrandedAtSystem {
@@ -839,6 +1405,19 @@ impl Campaign {
         if wanted <= 1e-9 {
             return Ok(0.0);
         }
+        if self
+            .systems
+            .get(&system)
+            .and_then(|s| s.claimed_by)
+            != Some(civ_id)
+            && self
+                .systems
+                .get(&system)
+                .map(|s| s.colony.is_some())
+                .unwrap_or(false)
+        {
+            return Err(SimError::NotYourColony(system));
+        }
         let state = self
             .systems
             .get_mut(&system)
@@ -856,7 +1435,13 @@ impl Campaign {
         let ship = self.ships.get_mut(&ship_id).unwrap();
         ship.fuel += amount;
         ship.state = ShipState::AtSystem { system };
-        self.push_event(EventKind::ShipRefuelled, Some(system), Some(ship_id));
+        self.push_event(
+            EventKind::ShipRefuelled,
+            Some(system),
+            Some(ship_id),
+            Some(civ_id),
+            None,
+        );
 
         // A ship that arrived empty with an order still outstanding
         // now carries that order out.
@@ -871,7 +1456,7 @@ impl Campaign {
                     let _ = purpose;
                 }
                 Purpose::Colonize => {
-                    self.found_colony_with_ship(ship_id)?;
+                    self.found_colony_with_ship_for(civ_id, ship_id)?;
                 }
                 Purpose::Relocate => {}
             }
@@ -879,11 +1464,32 @@ impl Campaign {
         Ok(amount)
     }
 
+    /// (Player wrapper over `assign_specialization_for`.)
     pub fn assign_specialization(
         &mut self,
         system: StarId,
         specialization: Specialization,
     ) -> SimResult<()> {
+        self.assign_specialization_for(PLAYER_CIV, system, specialization)
+    }
+
+    pub fn assign_specialization_for(
+        &mut self,
+        civ_id: u32,
+        system: StarId,
+        specialization: Specialization,
+    ) -> SimResult<()> {
+        match self.systems.get(&system) {
+            None => return Err(SimError::NoColony(system)),
+            Some(state) => {
+                if state.colony.is_none() {
+                    return Err(SimError::NoColony(system));
+                }
+                if state.claimed_by != Some(civ_id) {
+                    return Err(SimError::NotYourColony(system));
+                }
+            }
+        }
         let state = self
             .systems
             .get_mut(&system)
@@ -899,7 +1505,13 @@ impl Campaign {
             return Err(SimError::SpecializationAlreadySet(system));
         }
         colony.specialization = Some(specialization);
-        self.push_event(EventKind::SpecializationSet, Some(system), None);
+        self.push_event(
+            EventKind::SpecializationSet,
+            Some(system),
+            None,
+            Some(civ_id),
+            None,
+        );
         Ok(())
     }
 
@@ -918,6 +1530,19 @@ impl Campaign {
         self.process_construction();
         if self.day % DAYS_PER_MONTH == 0 {
             self.monthly_settlement();
+            // AI civilizations re-plan on the settlement boundary
+            // (design §2: AI civs re-plan; §6.5), *after* the same
+            // settlement the player experiences, so monthly chunking
+            // is identical to daily stepping for every actor.
+            let ai_civs: Vec<u32> = self
+                .civs
+                .iter()
+                .filter(|c| c.is_ai())
+                .map(|c| c.id)
+                .collect();
+            for civ_id in ai_civs {
+                crate::ai::plan_month(self, galaxy, civ_id);
+            }
         }
     }
 
@@ -980,14 +1605,40 @@ impl Campaign {
         }
 
         for ship_id in stranded {
-            let system = self
-                .ships
-                .get(&ship_id)
-                .and_then(|s| s.state.current_system());
-            self.push_event(EventKind::ShipStranded, system, Some(ship_id));
+            let (system, owner) = match self.ships.get(&ship_id) {
+                Some(s) => (s.state.current_system(), Some(s.owner)),
+                None => (None, None),
+            };
+            self.push_event(
+                EventKind::ShipStranded,
+                system,
+                Some(ship_id),
+                owner,
+                None,
+            );
         }
         for (ship_id, system, purpose) in arrivals {
-            self.push_event(EventKind::ShipArrived, Some(system), Some(ship_id));
+            // Arriving where another civilization holds a claim is
+            // first contact (design §6.1) — for both sides at once.
+            if let Some(owner) = self.ships.get(&ship_id).map(|s| s.owner) {
+                if let Some(present) = self
+                    .systems
+                    .get(&system)
+                    .and_then(|s| s.claimed_by)
+                {
+                    if present != owner {
+                        self.note_contact(owner, present, Some(system));
+                    }
+                }
+            }
+            let arrival_owner = self.ships.get(&ship_id).map(|s| s.owner);
+            self.push_event(
+                EventKind::ShipArrived,
+                Some(system),
+                Some(ship_id),
+                arrival_owner,
+                None,
+            );
             // A ship that arrives with dry tanks is stranded for
             // *movement*, but its arrival order itself does not need
             // fuel: surveying is local sensor work, and founding a
@@ -1012,7 +1663,9 @@ impl Campaign {
                         Some(ShipState::AtSystem { .. })
                     );
                     if is_idle {
-                        let _ = self.begin_survey(galaxy, ship_id);
+                        if let Some(owner) = self.ships.get(&ship_id).map(|s| s.owner) {
+                            let _ = self.begin_survey_for(owner, galaxy, ship_id);
+                        }
                     }
                 }
                 Purpose::Colonize => {
@@ -1033,7 +1686,9 @@ impl Campaign {
                         Some(ShipState::AtSystem { .. })
                     );
                     if is_idle {
-                        let _ = self.found_colony_with_ship(ship_id);
+                        if let Some(owner) = self.ships.get(&ship_id).map(|s| s.owner) {
+                            let _ = self.found_colony_with_ship_for(owner, ship_id);
+                        }
                     }
                 }
                 Purpose::Relocate => {}
@@ -1060,16 +1715,40 @@ impl Campaign {
             }
         }
         for (ship_id, system) in completed {
+            let owner = self.ships.get(&ship_id).map(|s| s.owner);
             if let Some(star) = galaxy.star(system) {
                 let profile = profile_for_star(self.seed, star);
                 let state = self.system_mut_or_default(system);
                 state.survey = SurveyState::Surveyed;
                 state.profile = Some(profile);
+                if let Some(owner) = owner {
+                    state.surveyed_by.insert(owner);
+                }
             }
             if let Some(ship) = self.ships.get_mut(&ship_id) {
                 ship.state = ShipState::AtSystem { system };
             }
-            self.push_event(EventKind::SurveyCompleted, Some(system), Some(ship_id));
+            // Surveying a system another civilization holds is first
+            // contact (design §6.1) — the surveyor learns someone is
+            // here, and the holder learns of the surveyor.
+            if let Some(owner) = owner {
+                if let Some(holder) = self
+                    .systems
+                    .get(&system)
+                    .and_then(|s| s.claimed_by)
+                {
+                    if holder != owner {
+                        self.note_contact(owner, holder, Some(system));
+                    }
+                }
+            }
+            self.push_event(
+                EventKind::SurveyCompleted,
+                Some(system),
+                Some(ship_id),
+                owner,
+                None,
+            );
         }
     }
 
@@ -1096,20 +1775,34 @@ impl Campaign {
             }
         }
         for (system, design_idx) in completed {
-            let ship_id = self.spawn_ship(design_idx, system);
-            self.push_event(EventKind::ShipBuilt, Some(system), Some(ship_id));
+            let owner = self
+                .systems
+                .get(&system)
+                .and_then(|s| s.claimed_by)
+                .unwrap_or(PLAYER_CIV);
+            let ship_id = self.spawn_ship(owner, design_idx, system);
+            self.push_event(
+                EventKind::ShipBuilt,
+                Some(system),
+                Some(ship_id),
+                Some(owner),
+                None,
+            );
         }
     }
 
     fn monthly_settlement(&mut self) {
         let system_ids: Vec<StarId> = self.systems.keys().copied().collect();
-        let mut abandoned: Vec<StarId> = Vec::new();
-        let mut credits_delta = 0.0;
+        let mut abandoned: Vec<(StarId, u32)> = Vec::new();
+        // Each colony's income lands in its *owner's* treasury
+        // (design §6.5: same economy rules for every civilization).
+        let mut credits_delta: BTreeMap<u32, f64> = BTreeMap::new();
 
         for system in system_ids {
             let Some(state) = self.systems.get_mut(&system) else {
                 continue;
             };
+            let owner = state.claimed_by.unwrap_or(PLAYER_CIV);
             let profile = state.profile.clone();
             let Some(colony) = state.colony.as_mut() else {
                 continue;
@@ -1193,7 +1886,7 @@ impl Campaign {
             let income =
                 colony.population_millions * 0.045 * (0.7 + dev * 0.08) * efficiency * trade_mult;
             let upkeep = 2.0 + dev * 1.0 + colony.population_millions * 0.004;
-            credits_delta += income - upkeep;
+            *credits_delta.entry(owner).or_insert(0.0) += income - upkeep;
 
             // Population: logistic growth toward a habitability and
             // development carrying capacity when supplied; decline
@@ -1216,16 +1909,26 @@ impl Campaign {
                 colony.population_millions *= 0.995;
             }
             if colony.unsupplied_months >= 12 {
-                abandoned.push(system);
+                abandoned.push((system, owner));
             }
         }
 
-        self.civ.credits += credits_delta;
-        for system in abandoned {
+        for (owner, delta) in credits_delta {
+            if let Some(civ) = self.civs.get_mut(owner as usize) {
+                civ.credits += delta;
+            }
+        }
+        for (system, owner) in abandoned {
             if let Some(state) = self.systems.get_mut(&system) {
                 state.colony = None;
             }
-            self.push_event(EventKind::ColonyAbandoned, Some(system), None);
+            self.push_event(
+                EventKind::ColonyAbandoned,
+                Some(system),
+                None,
+                Some(owner),
+                None,
+            );
         }
     }
 }
