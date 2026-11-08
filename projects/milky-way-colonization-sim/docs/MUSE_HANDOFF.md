@@ -30,9 +30,13 @@ say so — the swap is frontend-side only.
   `saved_at_unix` (the trustworthy timestamp the 2026-11-04
   offline-progression ruling requires) + game day + the untouched
   core `save_bytes()` payload. Atomic writes (tmp + rename);
-  `saved_at` refreshes on every bridge write, but a load whose
-  elapsed time floors to 0 days does **not** rewrite the file (a
-  partial unplayed day is never eaten).
+  `saved_at` is the catch-up anchor: an advancing load moves it
+  forward by exactly the consumed whole days — never to the write
+  moment — so the unconsumed partial day stays banked for the next
+  load (Codex fix, 2026-11-08; see the section at the end of this
+  file); other bridge writes stamp their write time, and a load
+  whose elapsed time floors to 0 days does **not** rewrite the
+  file (a partial unplayed day is never eaten).
 - **Catch-up on load:** elapsed whole days =
   `floor((now − saved_at) / 86400)` (a request may inject `now` or
   an explicit elapsed override — the frontend exposes the override
@@ -317,3 +321,40 @@ implementation contract, kept for the record:
 session: 8–15 AI civilizations expanding under the same rules with
 weaker information, contact and border friction (§6), feeding the
 same event log / catch-up review surface S2 built.
+
+## 2026-11-08 — Codex review fixes (findings on PR #29, fixed on main)
+
+Two Codex findings against the merged S2 work, both verified against
+the code before fixing:
+
+- **`new` could silently overwrite a campaign (P1).** `op_new`
+  wrote unconditionally, and the viewer's default save name is
+  `campaign1` on every launch. Fix, bridge-first: `op_new` refuses
+  an occupied save path (`save already exists: ...`) unless the
+  request carries `"overwrite": true` — silent overwrite is now
+  impossible for any bridge caller. The viewer treats that refusal
+  as a question: a confirmation dialog ("permanently replace it")
+  and only the player's explicit Overwrite click retries with the
+  flag. Regression test `new_refuses_to_overwrite_existing_save`
+  (refusal leaves the state hash untouched; the flagged request
+  produces a fresh day-0 campaign).
+- **Catch-up ate the fractional day (P2).** `op_load` floored the
+  elapsed time to whole days but rewrote the envelope with `now`,
+  discarding the partial day on every advancing load (new at T,
+  load at T+36 h → day 1, load at T+48 h → still day 1, violating
+  the full-catch-up rule). Fix, no format change: the rewrite
+  anchor is `saved_at + elapsed × 86400`, so the remainder stays
+  banked; the sequence above now reaches day 2, hash-identical to
+  one uninterrupted +48 h load. The `elapsed_override_days` path
+  keeps its old anchor-at-`now` behaviour (no wall-clock remainder
+  exists to preserve). Envelope format unchanged (still v1).
+  Regression test `catchup_fractional_remainder_preserved`.
+
+Suites re-run on this VM 2026-11-08: bridge **18/18** (was 16),
+sim **19/19**, pipeline **22/22** — all green. The viewer dialog
+code follows the menu's existing code-built UI pattern but was
+**not** run under Godot on this VM (no Godot binary here); the
+bridge behaviour it depends on is fully covered by the cargo
+tests. Note: the S3 draft (PR #43) also touches
+`bridge/src/main.rs` and `viewer/scripts/main.gd`; expect a
+textual merge reconciliation when one of the two lands second.

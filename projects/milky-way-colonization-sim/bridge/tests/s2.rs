@@ -653,3 +653,121 @@ fn bad_inputs() {
     assert!(status.success(), "exit should be 0, got {status}");
     assert!(!get_bool(&resp, "ok"), "resp: {resp}");
 }
+
+fn load_at(dir: &Path, data: &Path, save: &Path, now: u64, tag: &str) -> Value {
+    run_req(
+        dir,
+        data,
+        req_obj(vec![
+            ("op", Value::from("load")),
+            ("save", save_str(save)),
+            ("now_unix", Value::from(now)),
+        ]),
+        tag,
+    )
+}
+
+#[test]
+fn new_refuses_to_overwrite_existing_save() {
+    let dir = test_dir("new_overwrite_refusal");
+    let data = write_stars(&dir);
+    let save = dir.join("campaign.mwsb");
+    let resp_new = new_save(&dir, &data, &save, "new");
+    assert!(get_bool(&resp_new, "ok"), "resp: {resp_new}");
+    // Give the campaign progress that an overwrite would destroy.
+    let r = exec_cmds(
+        &dir,
+        &data,
+        &save,
+        Value::Array(vec![cmd(vec![
+            ("cmd", Value::from("advance")),
+            ("days", Value::from(50u64)),
+        ])]),
+        "advance-50",
+    );
+    assert!(get_bool(&r, "ok"), "advance: {r}");
+    let hash_before = state_hash(&r);
+    // A second "new" on the same path is refused and changes nothing.
+    let (resp, status) = run_bridge(
+        &dir,
+        &data,
+        &req_obj(vec![
+            ("op", Value::from("new")),
+            ("save", save_str(&save)),
+            ("seed", Value::from(42u64)),
+            ("now_unix", Value::from(NOW)),
+        ])
+        .to_json_string(),
+        "new-again",
+    );
+    assert!(status.success(), "exit should be 0, got {status}");
+    assert!(!get_bool(&resp, "ok"), "resp should fail: {resp}");
+    let err = get_str(&resp, "error");
+    assert!(
+        err.contains("already exists"),
+        "error should say the save exists, got: {err}"
+    );
+    let resp_view = run_req(
+        &dir,
+        &data,
+        req_obj(vec![
+            ("op", Value::from("view")),
+            ("save", save_str(&save)),
+        ]),
+        "view",
+    );
+    assert_eq!(
+        state_hash(&resp_view),
+        hash_before,
+        "refused overwrite must leave the campaign intact"
+    );
+    // Explicit overwrite is the deliberate path: it succeeds, fresh day 0.
+    let resp_over = run_req(
+        &dir,
+        &data,
+        req_obj(vec![
+            ("op", Value::from("new")),
+            ("save", save_str(&save)),
+            ("seed", Value::from(42u64)),
+            ("now_unix", Value::from(NOW)),
+            ("overwrite", Value::Bool(true)),
+        ]),
+        "new-overwrite",
+    );
+    assert!(get_bool(&resp_over, "ok"), "resp: {resp_over}");
+    assert_eq!(get_u64(view(&resp_over), "day"), 0);
+    let galaxy = Galaxy::load_table_file(&data).unwrap();
+    let expected = Campaign::new_default(&galaxy, 42).unwrap();
+    assert_eq!(state_hash(&resp_over), expected.state_hash());
+}
+
+#[test]
+fn catchup_fractional_remainder_preserved() {
+    let dir = test_dir("catchup_remainder");
+    let data = write_stars(&dir);
+    let save = dir.join("campaign.mwsb");
+    new_save(&dir, &data, &save, "new");
+    // +36h: one whole day consumed, 12h banked — not discarded.
+    let resp = load_at(&dir, &data, &save, NOW + 36 * 3_600, "load-36h");
+    assert!(get_bool(&resp, "ok"), "resp: {resp}");
+    assert_eq!(get_u64(get(&resp, "catchup"), "days"), 1);
+    assert_eq!(get_u64(view(&resp), "day"), 1);
+    // +48h: the banked 12h plus 12 new hours complete day 2.
+    let resp = load_at(&dir, &data, &save, NOW + 48 * 3_600, "load-48h");
+    assert!(get_bool(&resp, "ok"), "resp: {resp}");
+    assert_eq!(get_u64(get(&resp, "catchup"), "days"), 1);
+    assert_eq!(get_u64(view(&resp), "day"), 2);
+    let hash_two_step = state_hash(&resp);
+    // No double-counting: a load 2h later advances nothing further.
+    let resp = load_at(&dir, &data, &save, NOW + 50 * 3_600, "load-50h");
+    assert!(get_bool(&resp, "ok"), "resp: {resp}");
+    assert_eq!(get_u64(get(&resp, "catchup"), "days"), 0);
+    assert_eq!(get_u64(view(&resp), "day"), 2);
+    // Equivalence: one uninterrupted load at +48h lands on the same state.
+    let save_b = dir.join("direct.mwsb");
+    new_save(&dir, &data, &save_b, "new-b");
+    let resp_b = load_at(&dir, &data, &save_b, NOW + 48 * 3_600, "load-direct");
+    assert!(get_bool(&resp_b, "ok"), "resp: {resp_b}");
+    assert_eq!(get_u64(view(&resp_b), "day"), 2);
+    assert_eq!(state_hash(&resp_b), hash_two_step);
+}

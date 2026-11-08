@@ -36,6 +36,17 @@ Result: **16 passed, 0 failed** (7 unit + 9 integration in
   - **Whole-days floor:** +36 h of clock elapsed advances exactly
     1 day; +23 h advances 0 and does not rewrite the save (the
     unplayed partial day is not eaten).
+  - **Fractional remainder preserved (2026-11-08):** a load at
+    +36 h reaches day 1, and a second load at +48 h reaches day 2 —
+    the first load's rewrite banks the unconsumed 12 h instead of
+    discarding it; a single uninterrupted load at +48 h lands on
+    the identical state hash, and a load at +50 h advances nothing
+    further (no double-counting).
+  - **Overwrite protection (2026-11-08):** a second `new` against
+    an occupied save path is refused (`save already exists`), the
+    existing campaign's state hash is unchanged afterwards, and
+    `new` with `"overwrite": true` is the explicit replacement
+    path, producing a fresh day-0 campaign.
   - **Refusal surfacing:** an illegal command (claim an unsurveyed
     system) returns the core's error, leaves credits/systems
     untouched, the save still loads, and a subsequent legal command
