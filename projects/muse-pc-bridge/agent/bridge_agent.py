@@ -112,6 +112,7 @@ DEFAULT_CONFIG = {
     "job_history_limit": 100,              # finished jobs retained in memory
     "job_output_cap_bytes": 8 * 1024 * 1024,  # per-stream capture cap per job
     "session_idle_timeout_s": 1800,
+    "uac_poll_interval_s": 2.0,          # UAC consent prompt polling
     "auth_fail_limit": 5,                  # failures inside the window ...
     "auth_fail_window_s": 60,              # ... trigger a temporary block
     "auth_block_s": 30,
@@ -328,6 +329,172 @@ def send_magic_packet(mac: str, broadcast: str, port: int) -> dict:
             "bytes": len(packet)}
 
 
+# ---------------------------------------------------------------------------
+# UAC consent detection (Windows)
+# ---------------------------------------------------------------------------
+
+def _declare_snapshot_signatures(kernel32) -> None:
+    """Declare argtypes/restype for the Toolhelp32 snapshot calls.
+
+    Same handle discipline as _declare_process_signatures: the
+    snapshot handle is pointer-sized, so every handle slot is
+    c_void_p — an undeclared restype would truncate it to a C int.
+    Kept separate from _declare_process_signatures because the two
+    declaration sets cover different calls.
+    """
+    import ctypes
+    P = ctypes.c_void_p
+    I = ctypes.c_int
+    UL = ctypes.c_ulong
+    kernel32.CreateToolhelp32Snapshot.argtypes = [UL, UL]
+    kernel32.CreateToolhelp32Snapshot.restype = P
+    kernel32.Process32FirstW.argtypes = [P, P]
+    kernel32.Process32FirstW.restype = I          # BOOL
+    kernel32.Process32NextW.argtypes = [P, P]
+    kernel32.Process32NextW.restype = I           # BOOL
+    kernel32.CloseHandle.argtypes = [P]
+    kernel32.CloseHandle.restype = I              # BOOL
+
+
+def consent_prompt_active() -> bool:
+    """True while Windows is showing a UAC consent prompt.
+
+    consent.exe runs (in the SYSTEM session) for exactly the
+    lifetime of an elevation prompt on the secure desktop, so its
+    presence in the process list is the classic signal. Windows
+    only: everywhere else this is False, and any probe failure is
+    also False — a phantom "needs you" would be worse than none.
+    Presence only: nothing about the prompt's contents is read, and
+    nothing about any credential is ever observed or logged.
+
+    PC-VERIFICATION PENDING: the Toolhelp32 path is written against
+    the documented Win32 ABI but has never run on Windows (see
+    docs/TEST_PLAN.md); the monitor's transition logic is what the
+    VM suite exercises, with this probe stubbed.
+    """
+    if not IS_WINDOWS:
+        return False
+    import ctypes
+
+    class _PROCESSENTRY32W(ctypes.Structure):
+        _fields_ = [
+            ("dwSize", ctypes.c_ulong),
+            ("cntUsage", ctypes.c_ulong),
+            ("th32ProcessID", ctypes.c_ulong),
+            ("th32DefaultHeapID", ctypes.c_void_p),   # ULONG_PTR
+            ("th32ModuleID", ctypes.c_ulong),
+            ("cntThreads", ctypes.c_ulong),
+            ("th32ParentProcessID", ctypes.c_ulong),
+            ("pcPriClassBase", ctypes.c_long),
+            ("dwFlags", ctypes.c_ulong),
+            ("szExeFile", ctypes.c_wchar * 260),
+        ]
+
+    TH32CS_SNAPPROCESS = 0x00000002
+    try:
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        _declare_snapshot_signatures(kernel32)
+        handle = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        if not handle or handle == ctypes.c_void_p(-1).value:
+            return False
+        try:
+            entry = _PROCESSENTRY32W()
+            entry.dwSize = ctypes.sizeof(entry)
+            ok = kernel32.Process32FirstW(handle, ctypes.byref(entry))
+            while ok:
+                if entry.szExeFile.lower() == "consent.exe":
+                    return True
+                ok = kernel32.Process32NextW(handle, ctypes.byref(entry))
+            return False
+        finally:
+            kernel32.CloseHandle(handle)
+    except Exception:  # a broken probe must never claim a prompt
+        return False
+
+
+class UacMonitor:
+    """Polls the consent probe and tracks prompt state transitions.
+
+    Surfaces: snapshot() feeds /v1/status ("uac_prompt") and the
+    avatar's display-state mapping; transitions are written to the
+    audit log as uac_prompt_shown / uac_prompt_cleared events. The
+    probe is injectable so the transition logic is unit-testable on
+    any platform.
+    """
+
+    def __init__(self, core: "BridgeCore", probe=None):
+        self._core = core
+        self._probe = probe if probe is not None else consent_prompt_active
+        try:
+            self._poll_s = float(core.cfg.get("uac_poll_interval_s") or 2.0)
+        except (TypeError, ValueError):
+            self._poll_s = 2.0
+        self._poll_s = max(0.5, self._poll_s)
+        self._lock = threading.Lock()
+        self._active = False
+        self._since: float | None = None
+
+    def check_once(self, now: float | None = None) -> bool:
+        """Run one probe; audit and record any transition."""
+        now = time.time() if now is None else now
+        try:
+            active = bool(self._probe())
+        except Exception:  # a failing probe reads as "no prompt"
+            active = False
+        with self._lock:
+            was = self._active
+            if active and not was:
+                self._active = True
+                self._since = now
+            elif was and not active:
+                self._active = False
+                waited = now - (self._since or now)
+                self._since = None
+            else:
+                waited = None
+        if active and not was:
+            self._core.audit({
+                "event": "uac_prompt_shown", "ip": None, "method": None,
+                "path": None,
+                "summary": "UAC consent prompt is awaiting the owner",
+                "status": None, "duration_ms": None,
+            })
+        elif was and not active:
+            self._core.audit({
+                "event": "uac_prompt_cleared", "ip": None, "method": None,
+                "path": None,
+                "summary": f"UAC consent prompt cleared after "
+                           f"{waited:.0f}s",
+                "status": None, "duration_ms": None,
+            })
+        return active
+
+    def snapshot(self) -> dict:
+        with self._lock:
+            since = None
+            if self._active and self._since is not None:
+                since = datetime.fromtimestamp(
+                    self._since, timezone.utc).isoformat(
+                    timespec="milliseconds").replace("+00:00", "Z")
+            return {"active": self._active, "since": since}
+
+    def run(self) -> None:
+        """Poll loop for the lifetime of the agent (daemon thread).
+
+        A no-op off Windows: there is no consent prompt to detect,
+        and the status field simply reports inactive.
+        """
+        if not IS_WINDOWS:
+            return
+        while True:
+            self.check_once()
+            time.sleep(self._poll_s)
+
+
+def _uac_watch(core: "BridgeCore") -> None:
+    core.uac.run()
+
+
 def kill_tree(proc: subprocess.Popen) -> None:
     """Terminate a process and (POSIX) its process group."""
     try:
@@ -451,6 +618,9 @@ class BridgeCore:
         self._sessions_lock = threading.Lock()
         self.uploads: dict[str, "Upload"] = {}
         self._uploads_lock = threading.Lock()
+        # UAC consent-prompt monitor (polled by a thread started in
+        # create_server; inert off Windows).
+        self.uac = UacMonitor(self)
         self._load_processes()
         self._load_uploads()
 
@@ -2144,6 +2314,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "processes_alive": procs_alive,
             "processes_tracked": procs_total,
             "sessions_open": sessions_open,
+            "uac_prompt": core.uac.snapshot(),
             "disk": disk,
             "audit_log": str(core.audit_path),
             "audit_bytes": audit_bytes,
@@ -2733,6 +2904,8 @@ def create_server(cfg: dict) -> ThreadingHTTPServer:
     core.log_start()
     threading.Thread(target=_session_reaper, args=(core,), daemon=True,
                      name="session-reaper").start()
+    threading.Thread(target=_uac_watch, args=(core,), daemon=True,
+                     name="uac-watch").start()
     return server
 
 

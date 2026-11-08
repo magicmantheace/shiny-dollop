@@ -102,6 +102,34 @@ class DisplayStateTests(unittest.TestCase):
                                             "at": NOW - 5}))
         self.assertEqual(v["state"], "alert")
 
+    # -- v1.1: UAC consent prompt -------------------------------------------
+    def test_uac_prompt_shows_approval_needed(self):
+        v = self.resolve(agt=agent(uac_prompt={"active": True,
+                                               "since": "2026-11-08T00:00:00Z"}))
+        self.assertEqual((v["state"], v["art"], v["label"]),
+                         ("alert", "alert", "Approval needed at PC"))
+
+    def test_uac_prompt_outranks_working_and_session(self):
+        v = self.resolve(agt=agent(uac_prompt={"active": True, "since": None},
+                                   jobs_running=2, sessions_open=1))
+        self.assertEqual(v["label"], "Approval needed at PC")
+
+    def test_uac_inactive_or_absent_falls_through(self):
+        v = self.resolve(agt=agent(uac_prompt={"active": False,
+                                               "since": None}))
+        self.assertEqual(v["state"], "idle")
+        v = self.resolve(agt=agent())  # field absent (older agent)
+        self.assertEqual(v["state"], "idle")
+        v = self.resolve(agt=agent(uac_prompt=None))
+        self.assertEqual(v["state"], "idle")
+
+    def test_update_failure_outranks_uac(self):
+        v = self.resolve(agt=agent(uac_prompt={"active": True,
+                                               "since": None}),
+                         upd=update(result={"outcome": "apply_failed",
+                                            "at": NOW - 5}))
+        self.assertEqual(v["label"], "Update failed")
+
 
 if __name__ == "__main__":
     unittest.main()
