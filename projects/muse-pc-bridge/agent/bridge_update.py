@@ -108,11 +108,32 @@ def _safe_extract(bundle: Path, dest_dir: Path) -> dict:
     return manifest
 
 
+def _validate_version(version: str) -> None:
+    """A version names exactly ONE directory under staging/.
+
+    stage_update() rmtree()s the previous staging dir before the
+    bundle is fetched or verified, so anything but a single safe
+    path component — absolute paths, ``..``, separators — would aim
+    that delete outside the staging root.
+    """
+    if not isinstance(version, str) or not version.strip():
+        raise ValueError("version is required")
+    if version in (".", "..") or "/" in version or "\\" in version \
+            or "\x00" in version:
+        raise ValueError(f"unsafe version (must be a single path "
+                         f"component): {version!r}")
+
+
 def stage_update(source: str, expected_sha256: str, version: str,
                  install_root: Path, state_dir: Path) -> dict:
     """Stage a release bundle for the supervisor to apply at restart."""
+    _validate_version(version)
     state_dir = Path(state_dir)
-    staging = state_dir / "staging" / version
+    staging_root = state_dir / "staging"
+    staging = staging_root / version
+    if staging.resolve().parent != staging_root.resolve():
+        raise ValueError(f"staging dir escapes the staging root: "
+                         f"{version!r}")
     if staging.exists():
         shutil.rmtree(staging)
     staging.mkdir(parents=True, exist_ok=True)

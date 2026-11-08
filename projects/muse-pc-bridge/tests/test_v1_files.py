@@ -221,6 +221,39 @@ class FilesTestCase(unittest.TestCase):
                                  {"path": ".", "recursive": True})
         self.assertEqual(s, 400)
 
+    def test_tree_does_not_follow_symlink_out_of_root(self):
+        # Codex PR #27: /v1/file/tree recursed through directory
+        # symlinks with no containment check on descendants (only the
+        # requested path went through resolve_in_root), leaking the
+        # names/sizes of files outside the configured root.
+        outside = Path(self.tmp.name) / "outside"
+        outside.mkdir(exist_ok=True)
+        (outside / "secret-outside.txt").write_text("shh",
+                                                    encoding="utf-8")
+        try:
+            os.symlink(outside, self.files_root / "escape-link",
+                       target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("cannot create symlinks on this platform")
+        s, tree = self.http.request("GET", "/v1/file/tree?path=.")
+        self.assertEqual(s, 200)
+        blob = json.dumps(tree)
+        self.assertNotIn("secret-outside.txt", blob)
+        self.assertNotIn("escape-link", blob)
+        # A symlink whose target stays INSIDE the root is still listed
+        # and followed — only escapes are skipped.
+        real_dir = self.files_root / "real-dir"
+        real_dir.mkdir(exist_ok=True)
+        (real_dir / "inside.txt").write_text("ok", encoding="utf-8")
+        try:
+            os.symlink(real_dir, self.files_root / "inside-link",
+                       target_is_directory=True)
+        except (OSError, NotImplementedError):
+            return
+        s, tree = self.http.request("GET", "/v1/file/tree?path=.")
+        self.assertEqual(s, 200)
+        self.assertIn("inside.txt", json.dumps(tree))
+
     def test_second_named_root(self):
         result = self.client.put_small(self._write_local("note.txt", b"hi"),
                                        "note.txt", root="extra")
@@ -258,6 +291,27 @@ class FilesTestCase(unittest.TestCase):
         self.assertEqual(result["state"], "done")
         self.assertIn("client-hello", result["stdout"])
         self.assertEqual(result["exit_code"], 0)
+
+    def test_client_job_wait_drains_large_output(self):
+        # Codex PR #27: job_wait() advanced its poll offsets straight
+        # to the stream totals (stdout_bytes), but one response carries
+        # at most max_output_bytes (256 KiB) of text — everything past
+        # the first slice was skipped, even for a finished job.
+        # 600_000 bytes are retained in full (cap is 8 MiB), so every
+        # byte must come back through job_wait, untruncated.
+        if os.name == "nt":
+            cmd = "[Console]::Out.Write('x' * 600000)"
+            shell = "powershell"
+        else:
+            cmd = "head -c 600000 /dev/zero | tr '\\0' 'x'"
+            shell = "posix"
+        result = self.client.exec_run(cmd, shell=shell)
+        self.assertEqual(result["state"], "done")
+        self.assertFalse(result["stdout_truncated"])
+        if os.name == "nt":
+            self.assertGreaterEqual(result["stdout"].count("x"), 600000)
+        else:
+            self.assertEqual(result["stdout"], "x" * 600000)
 
 
 if __name__ == "__main__":

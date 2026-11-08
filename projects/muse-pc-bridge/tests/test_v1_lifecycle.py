@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 import socket
+import subprocess
 import sys
 import tempfile
 import threading
@@ -143,6 +144,56 @@ class UpdateMechanicsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             bridge_update.apply_staged(self.state, self.install)
 
+    def test_stage_rejects_absolute_version(self):
+        # Codex PR #27: stage_update() rmtree()s staging/<version>
+        # before the bundle is fetched or verified; an absolute
+        # `version` made the join select the victim directory itself.
+        bundle, sha = make_bundle(Path(self.tmp.name), "1.0.1",
+                                  {"agent/bridge_agent.py": "V2"})
+        victim = Path(self.tmp.name) / "victim-abs"
+        victim.mkdir()
+        (victim / "keep.txt").write_text("precious", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            bridge_update.stage_update(str(bundle), sha, str(victim),
+                                       self.install, self.state)
+        self.assertEqual((victim / "keep.txt").read_text(encoding="utf-8"),
+                         "precious")
+        self.assertIsNone(bridge_update.update_status(self.state)["staged"])
+
+    def test_stage_rejects_traversal_version(self):
+        # Same finding, traversal form: "../victim" relative to the
+        # staging root lands on state/victim.
+        bundle, sha = make_bundle(Path(self.tmp.name), "1.0.1",
+                                  {"agent/bridge_agent.py": "V2"})
+        victim = self.state / "victim"
+        victim.mkdir()
+        (victim / "keep.txt").write_text("precious", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            bridge_update.stage_update(str(bundle), sha, "../victim",
+                                       self.install, self.state)
+        self.assertEqual((victim / "keep.txt").read_text(encoding="utf-8"),
+                         "precious")
+        self.assertIsNone(bridge_update.update_status(self.state)["staged"])
+
+    def test_stage_rejects_noncomponent_version(self):
+        # A version must be exactly one safe path component. The
+        # marker proves rejection happens BEFORE any rmtree: pre-fix,
+        # "." resolved to the staging root itself and ".." to the
+        # whole state dir, and both were deleted before the manifest
+        # check got a chance to reject the request.
+        bundle, sha = make_bundle(Path(self.tmp.name), "1.0.1",
+                                  {"agent/bridge_agent.py": "V2"})
+        staging_root = self.state / "staging"
+        staging_root.mkdir()
+        marker = staging_root / "marker.txt"
+        marker.write_text("keep", encoding="utf-8")
+        for bad in ("", " ", ".", "..", "a/b", "a\\b", "1.0.1/x"):
+            with self.assertRaises(ValueError, msg=f"version={bad!r}"):
+                bridge_update.stage_update(str(bundle), sha, bad,
+                                           self.install, self.state)
+            self.assertEqual(marker.read_text(encoding="utf-8"), "keep")
+        self.assertIsNone(bridge_update.update_status(self.state)["staged"])
+
 
 class SupervisorTests(unittest.TestCase):
     def setUp(self):
@@ -239,6 +290,86 @@ class SupervisorTests(unittest.TestCase):
             .get("outcome") == "applied_ok",
             what="healthy update confirmation")
         self.assertEqual(self.agent_file.read_text(encoding="utf-8"), v2)
+
+
+def wait_for_audit(audit_path: Path, event: str, timeout: float = 15.0):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if audit_path.exists():
+            try:
+                lines = audit_path.read_text(encoding="utf-8").splitlines()
+            except OSError:
+                lines = []
+            for line in lines:
+                try:
+                    if json.loads(line).get("event") == event:
+                        return True
+                except json.JSONDecodeError:
+                    pass
+        time.sleep(0.1)
+    return False
+
+
+@unittest.skipIf(os.name == "nt",
+                 "SIGTERM semantics are POSIX; the Windows graceful "
+                 "path (CTRL_BREAK_EVENT) is owner-PC verification")
+class GracefulShutdownTests(unittest.TestCase):
+    """Codex PR #27: a normal stop must let the agent run its audited
+    shutdown (AGENTS.md: server start/stop are audited). Previously
+    Supervisor._stop_child() terminated the agent and the audit log
+    was left holding only server_start."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        self.audit = root / "logs" / "audit.jsonl"
+        self.config = root / "config.json"
+        self.config.write_text(json.dumps({
+            "host": "127.0.0.1", "port": free_port(),
+            "token": "test-token-graceful",
+            "allowed_file_root": str(root / "bridge-files"),
+            "audit_log": str(self.audit),
+            "state_dir": str(root / "state"),
+        }), encoding="utf-8")
+        self.state = root / "state"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_agent_sigterm_writes_server_stop(self):
+        agent = PROJECT_DIR / "agent" / "bridge_agent.py"
+        proc = subprocess.Popen(
+            [sys.executable, str(agent), "--config", str(self.config)],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        try:
+            self.assertTrue(wait_for_audit(self.audit, "server_start"),
+                            "agent did not start / audit server_start")
+            proc.terminate()      # exactly what _stop_child() sends
+            proc.wait(timeout=15)
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=5)
+            if proc.stdout is not None:
+                proc.stdout.close()
+        self.assertTrue(wait_for_audit(self.audit, "server_stop"),
+                        "no audited server_stop after SIGTERM")
+
+    def test_supervisor_stop_child_writes_server_stop(self):
+        sup = supervisor_mod.Supervisor(PROJECT_DIR, self.config,
+                                        self.state)
+        child = sup._start_child()
+        try:
+            self.assertTrue(wait_for_audit(self.audit, "server_start"),
+                            "agent did not start / audit server_start")
+            sup._stop_child(timeout=15)
+            self.assertIsNotNone(child.poll())
+        finally:
+            if child.poll() is None:
+                child.kill()
+                child.wait(timeout=5)
+        self.assertTrue(wait_for_audit(self.audit, "server_stop"),
+                        "supervisor stop left no audited server_stop")
 
 
 if __name__ == "__main__":

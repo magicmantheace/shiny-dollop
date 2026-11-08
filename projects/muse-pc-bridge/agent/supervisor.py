@@ -86,7 +86,13 @@ class Supervisor:
                 "--config", str(self.config_path)]
 
     def _start_child(self) -> subprocess.Popen:
-        self._child = subprocess.Popen(self._agent_cmd())
+        kwargs: dict = {}
+        if os.name == "nt":
+            # Own process group so _stop_child can deliver
+            # CTRL_BREAK_EVENT to the agent alone (a graceful stop),
+            # not to every process sharing this console.
+            kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+        self._child = subprocess.Popen(self._agent_cmd(), **kwargs)
         return self._child
 
     def _stop_child(self, timeout: float = 10.0) -> None:
@@ -94,9 +100,17 @@ class Supervisor:
         if child is None or child.poll() is not None:
             return
         try:
-            child.terminate()
+            if os.name == "nt" and hasattr(signal, "CTRL_BREAK_EVENT"):
+                # Graceful first: the agent maps SIGBREAK to its
+                # audited shutdown path (server_stop in the audit
+                # log). TerminateProcess would bypass it entirely.
+                child.send_signal(signal.CTRL_BREAK_EVENT)
+            else:
+                # SIGTERM on POSIX — the agent handles it the same
+                # graceful way.
+                child.terminate()
             child.wait(timeout=timeout)
-        except (OSError, subprocess.SubprocessError):
+        except (OSError, subprocess.SubprocessError, ValueError):
             try:
                 child.kill()
             except OSError:
