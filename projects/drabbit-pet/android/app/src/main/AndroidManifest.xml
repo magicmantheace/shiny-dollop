@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The only permission the app needs: talking to the desktop
+         companion server on the owner's own network. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- The companion server speaks plain HTTP on the owner's LAN /
+         Tailscale (token-authenticated, no cloud). Android blocks
+         cleartext by default, so it is explicitly allowed for this
+         app; see android/README.md. -->
+    <application
+        android:allowBackup="true"
+        android:label="Drabbit"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        android:usesCleartextTraffic="true">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
