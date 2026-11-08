@@ -1,0 +1,18 @@
+; Godot 4 project for verifying Game Asset Builder hand-off packages.
+; Copy the exported asset folders into assets/<slug>/ next to this
+; file, drop a verify-spec.json beside it (shape documented in
+; verify_handoff.gd), then:
+;   godot --headless --path <this folder> --import
+;   godot --headless --path <this folder> --script verify_handoff.gd
+; The console build of Godot is enough; nothing is rendered.
+
+config_version=5
+
+[application]
+
+config/name="GAB Handoff Verify"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"

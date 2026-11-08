@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>three.js hand-off verification</title>
+<!--
+  Playback verification for Game Asset Builder three.js hand-offs.
+  Place beside this file: three.module.js AND three.core.js
+  (three >= 0.170 splits its module build across the two) and
+  addons/ (loaders/GLTFLoader.js + utils/BufferGeometryUtils.js)
+  from any local three.js install (the Drabbit Pet desktop app's
+  node_modules has them; version used for the P3 proof: 0.180.0).
+  Serve this folder over local HTTP — Chrome blocks file://
+  ES-module imports — and open with query params:
+  ?glb=<file.glb>&clips=idle,hop&bones=14
+  For a prop pass clips= (empty) and bones=0.
+  The verdict lands in the page's result element as JSON and in
+  the title. Headless run (owner's PC, Chrome):
+    chrome --headless=new --use-angle=swiftshader-webgl
+      --enable-unsafe-swiftshader --timeout=60000 --dump-dom
+      "http://127.0.0.1:<port>/verify.html?glb=..."
+-->
+<script type="importmap">
+{"imports": {
+  "three": "./three.module.js",
+  "three/addons/": "./addons/"
+}}
+</script>
+</head>
+<body>
+<pre id="result">PENDING</pre>
+<script>
+  // Surface module/import failures: an error before the module's
+  // own try/catch runs would otherwise leave the result PENDING.
+  const show = (text) => {
+    document.getElementById('result').textContent = text;
+  };
+  window.addEventListener('error',
+    (e) => show('PAGE_ERROR ' + (e.message || e.type)));
+  window.addEventListener('unhandledrejection',
+    (e) => show('PAGE_REJECTED ' + (e.reason && e.reason.message
+                                    || e.reason)));
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const q = new URLSearchParams(location.search);
+const out = { glb: q.get('glb'), ok: false, clips: {} };
+show('IMPORTED');
+const wantClips = (q.get('clips') || '').split(',').filter(Boolean);
+const wantBones = Number(q.get('bones') || 0);
+
+function bonePositions(scene) {
+  const pos = [];
+  scene.traverse((o) => {
+    if (o.isBone) {
+      const v = new THREE.Vector3();
+      o.getWorldPosition(v);
+      pos.push(v);
+    }
+  });
+  return pos;
+}
+
+try {
+  show('LOADING ' + out.glb);
+  const gltf = await new GLTFLoader().loadAsync(out.glb);
+  show('PARSED ' + out.glb);
+  const scene = gltf.scene;
+  let boneCount = 0;
+  let meshCount = 0;
+  scene.traverse((o) => {
+    if (o.isBone) boneCount++;
+    if (o.isMesh) meshCount++;
+  });
+  out.bones = boneCount;
+  out.meshes = meshCount;
+  const mixer = new THREE.AnimationMixer(scene);
+  for (const clip of gltf.animations) {
+    const action = mixer.clipAction(clip);
+    action.play();
+    mixer.setTime(0);
+    scene.updateMatrixWorld(true);
+    const p0 = bonePositions(scene);
+    mixer.setTime(Math.max(clip.duration * 0.5, 0.01));
+    scene.updateMatrixWorld(true);
+    const p1 = bonePositions(scene);
+    let delta = 0;
+    for (let i = 0; i < Math.min(p0.length, p1.length); i++) {
+      delta = Math.max(delta, p0[i].distanceTo(p1[i]));
+    }
+    out.clips[clip.name] = {
+      duration_s: clip.duration, max_bone_delta: delta,
+      ok: clip.duration > 0 && (boneCount === 0 || delta > 0.0005),
+    };
+    action.stop();
+  }
+  out.ok = boneCount === wantBones && meshCount > 0 &&
+    wantClips.every((name) => out.clips[name] && out.clips[name].ok) &&
+    Object.keys(out.clips).length === wantClips.length;
+} catch (err) {
+  out.error = String(err && err.message || err);
+}
+document.title = 'THREEJS_VERIFY ' + JSON.stringify(out);
+document.getElementById('result').textContent = JSON.stringify(out, null, 1);
+</script>
+</body>
+</html>
