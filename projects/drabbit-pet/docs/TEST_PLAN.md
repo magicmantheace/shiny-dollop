@@ -162,6 +162,19 @@ wire contract is covered by the fixture evidence instead.
 | **Ran on this VM** | The **fixtures themselves**: 13 raw responses captured over real HTTP from the compiled P3 server (Node, temp-dir PetService, dummy token), plus an independent strict shape validation (exact key sets/types, cursor semantics, error codes) — all passing. The Kotlin suite has **not** been executed (no JDK); first run is owner-side in Android Studio. |
 | **Owner-device only** | Gradle build + the test run above, install on the Pixel 9a, pairing against the real desktop server, UI behaviour on a physical phone. |
 
+**Codex-fix slice (2026-11-08):** core suite **48 tests**
+(+2 persistence: a save missing any of `pet.events` / `stepCount` /
+`lastTickAt` / `mood` / `needs.happiness` is rejected `bad_save`;
+malformed event entries rejected). Desktop suite **98 tests** (+1
+SaveStore: a save missing `pet.events` routes to `fresh-corrupt`
+recovery, not `loaded`; +1 `desktop/tests/pet-service.test.ts`:
+doAction returns the post-callback summary when auto-care feeds a
+just-woken hungry pet synchronously inside the change
+notification). Both new tests fail with their fixes reverted. The
+Android `PetViewModel` mutex change has **no** test evidence: no
+Android toolchain on this VM; it is unverified until compiled
+owner-side.
+
 ## Honesty rule
 
 A test counts as evidence only for the layer it runs on. VM test

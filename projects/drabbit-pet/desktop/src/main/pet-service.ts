@@ -193,9 +193,14 @@ export class PetService {
     this.eventTotal += events.length;
 
     this.deps.store.save(this.envelope);
-    const summary = this.getSummary();
     this.emit(events);
-    return { summary, events };
+    // Read the summary AFTER emit: change callbacks run synchronously
+    // and can themselves act on the pet (auto-care feeding a pet that
+    // was just woken, via onChanged → consider → doAction). A summary
+    // captured before emit would be stale the moment it is returned —
+    // callers (care panel, companion actions) would overwrite the
+    // newer broadcast state with it.
+    return { summary: this.getSummary(), events };
   }
 
   /** Final advance + persist, called on quit. */

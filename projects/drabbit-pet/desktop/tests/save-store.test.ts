@@ -54,6 +54,16 @@ describe('SaveStore', () => {
     expect(logs.join('\n')).toMatch(/corrupt/i);
   });
 
+  it('treats a save missing a required pet field as corrupt, not loaded', () => {
+    const dir = tmpDir();
+    const raw = JSON.parse(serialize(freshEnvelope(T0))) as Record<string, unknown>;
+    delete (raw.pet as Record<string, unknown>).events;
+    fs.writeFileSync(path.join(dir, SAVE_FILENAME), JSON.stringify(raw), 'utf8');
+    const result = new SaveStore(dir).loadOrCreate(T0, freshEnvelope);
+    expect(result.outcome).toBe('fresh-corrupt');
+    expect(result.backupPath).toBeDefined();
+  });
+
   it('treats valid JSON with an invalid shape as corrupt', () => {
     const dir = tmpDir();
     fs.writeFileSync(path.join(dir, SAVE_FILENAME), '{"hello":"world"}', 'utf8');
