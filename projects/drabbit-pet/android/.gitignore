@@ -1,0 +1,13 @@
+# Android / Gradle build outputs and machine-local state. Never commit.
+.gradle/
+build/
+app/build/
+local.properties
+*.apk
+*.aab
+*.ap_
+captures/
+.externalNativeBuild/
+.cxx/
+.idea/
+*.iml

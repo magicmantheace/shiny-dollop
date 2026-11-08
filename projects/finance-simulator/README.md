@@ -1,6 +1,16 @@
 # Offline Personal Finance Simulator
 
-**Status:** PLANNED — project definition only; no working application is implemented by this intake commit.
+**Status:** MVP — Worker B (React UI, UI tests, docs) slice committed on `finance-simulator/mvp`; backend by Worker A. **Not end-to-end verified.** Honest state:
+
+- ✅ React UI builds (`npm run build:renderer`) and typechecks clean; 48/48 UI tests pass.
+- ✅ UI codes against the actual preload contract (several deviations from the brief were found and handled — see `docs/IMPLEMENTATION_STATUS.md`).
+- ❌ `npm run smoke` fails in Worker A's backend (`installSecurityGuards` calls `session.defaultSession` before app ready) — no window boot verified.
+- ❌ 2 failing tests in Worker A's `tests/engine/simulator.test.ts` (engine semantics, his domain).
+- ❌ No Windows run / portable zip produced yet.
+
+See [implementation status](docs/IMPLEMENTATION_STATUS.md), [test plan](docs/TEST_PLAN.md),
+[specification](docs/PRODUCT_SPEC.md) (incl. as-built appendix), and
+[Windows install notes](docs/WINDOWS_INSTALL.md).
 
 **Priority:** 5 of 17 in the approved intake queue.
 **Category:** Private finance / Windows desktop

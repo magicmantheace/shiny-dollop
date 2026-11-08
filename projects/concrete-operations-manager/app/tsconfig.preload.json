@@ -1,0 +1,1 @@
+{"compilerOptions":{"lib":["ES2023","DOM"],"module":"CommonJS","moduleResolution":"node","noEmit":false,"outDir":"dist","rootDir":".","types":[]},"extends":"./tsconfig.json","include":["electron/preload/**/*","shared/**/*"]}

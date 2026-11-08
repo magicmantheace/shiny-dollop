@@ -1,0 +1,21 @@
+[package]
+name = "mwcs-bridge"
+version = "0.1.0"
+edition = "2021"
+description = "Milky Way Colonization Simulator — sim-bridge binary (S2): envelope saves, JSON command protocol, catch-up load"
+license = "CC-BY-SA-4.0"
+
+[dependencies]
+mwcs-sim = { path = "../sim" }
+mwcs-pipeline = { path = "../pipeline" }
+
+[lib]
+name = "mwcs_bridge"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sim-bridge"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3

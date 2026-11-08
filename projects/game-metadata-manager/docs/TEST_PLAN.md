@@ -1,6 +1,16 @@
 # Test plan — Game Library Metadata Enricher
 
-**Current test status:** NOT RUN. This document defines future acceptance; no test results are implied.
+**Current test status:** RUN 2026-10-23 (Linux VM, Node 24) — **82/82 pass**:
+`tests/*` backend (32): scanner, artwork validation, library CRUD, undo, bundle
+round-trip/conflict/version rules, **acceptance walkthrough** (import 3-game
+fixture → edit title/description/tags/artwork → missing detection without
+deletion → export v1.0.0 bundle → wipe → re-import identical);
+`renderer/tests/*` (50): search/filters, missing badge, artwork assignment,
+tag/collection management, bundle import conflicts display, undo, form
+validation, missing-flag merge (`hooks.test.tsx`).
+`npm run typecheck` clean (main+preload+renderer), `npm run lint` clean,
+`npm run build` green, `npm run smoke` PASS (real window, SMOKE_OK).
+Windows click-through not executed here — marked pending, not passing.
 
 ## Required automated and integration scenarios
 
