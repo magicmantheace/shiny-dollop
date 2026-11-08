@@ -57,6 +57,46 @@ describe("persistence", () => {
     );
   });
 
+  it("rejects a save whose pet lost a required field", () => {
+    const env = createSave({ id: "broken", name: "Broken", fur: "sky" }, 0);
+    const drop = (path: string[]): string => {
+      const raw = JSON.parse(serialize(env)) as Record<string, unknown>;
+      let node = raw;
+      for (const key of path.slice(0, -1)) {
+        node = node[key] as Record<string, unknown>;
+      }
+      delete node[path[path.length - 1] as string];
+      return JSON.stringify(raw);
+    };
+    // pet.events is the reproduced case: the field-less save used to
+    // parse, load as 'loaded', and crash PetService on
+    // pet.events.length instead of reaching corrupt-save recovery.
+    for (const path of [
+      ["pet", "events"],
+      ["pet", "stepCount"],
+      ["pet", "lastTickAt"],
+      ["pet", "mood"],
+      ["pet", "needs", "happiness"],
+    ]) {
+      expect(() => parse(drop(path)), path.join(".")).toThrowError(
+        expect.objectContaining({ code: "bad_save" }),
+      );
+    }
+  });
+
+  it("rejects malformed event entries in a save", () => {
+    const env = createSave({ id: "broken2", name: "Broken", fur: "sky" }, 0);
+    const raw = JSON.parse(serialize(env)) as { pet: { events: unknown } };
+    raw.pet.events = [{ t: 0, kind: "born" }]; // detail missing
+    expect(() => parse(JSON.stringify(raw))).toThrowError(
+      expect.objectContaining({ code: "bad_save" }),
+    );
+    raw.pet.events = "not-an-array";
+    expect(() => parse(JSON.stringify(raw))).toThrowError(
+      expect.objectContaining({ code: "bad_save" }),
+    );
+  });
+
   it("rejects saves from a newer schema version", () => {
     const env = createSave({ id: "future", name: "Future", fur: "sky" }, 0);
     const future = serialize({ ...env, schemaVersion: 99 });
