@@ -701,10 +701,11 @@ def _audit_lock_for(audit_path: Path) -> threading.Lock:
     core writing to that path. Two cores in one process (the test
     fixtures run the agent and the helper as two servers in one
     process) must not rely on the file lock alone: Windows
-    byte-range locks do not conflict between handles of the SAME
-    process, and closing any handle to a file drops that process's
-    byte-range locks on it — either would silently reopen the
-    rotation race. Keyed by the resolved path so differently
+    byte-range locks have per-handle semantics quite unlike flock
+    — including dropping a process's locks on a file when ANY of
+    its handles to that file closes — so co-hosted serialization
+    is made independent of those subtleties by sharing this plain
+    threading lock. Keyed by the resolved path so differently
     spelled references to one log still share the lock."""
     key = str(Path(audit_path).resolve())
     with _AUDIT_PATH_LOCKS_GUARD:

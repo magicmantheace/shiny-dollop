@@ -10,22 +10,26 @@ a single rotation would have retained.
 
 The race test primes the log and its archives with sentinel
 entries, sets the rotation cap so exactly ONE of two concurrent
-appends may rotate, widens the rename window (a short sleep before
-the current -> .1 rename) so the second writer's stale rotation
-decision lands mid-rotation, and asserts that every entry a correct
-serialized run retains is still on disk afterwards. A second test
-pins the plain sequential sharing behaviour.
+appends may rotate, and forces the fatal interleave: the first
+writer is parked between its rotation size check and the archive
+renames (its decision is already taken from the primed state)
+until the second writer has rotated and appended in full — the
+first writer's stale rotation then shifts the archives a second
+time and overwrites a retained archive. It asserts that every
+entry a correct serialized run retains is still on disk
+afterwards. A second test pins the plain sequential sharing
+behaviour.
 
 Coordination is two layers: a per-path threading lock shared by
-every core in the process (Windows byte-range locks do not
-conflict between handles of one process, and the first version of
-this fix — file lock only — still lost an archive in the owner-PC
-suite run for exactly that reason), and an OS file lock on a
-sidecar for the cross-process case. These tests prove the
-coordination end to end where the suite runs; the production
-split (agent process vs helper process) exercises the file-lock
-layer, and the owner-PC run of this same test file is recorded in
-docs/TEST_PLAN.md.
+every core in the process, and an OS file lock on a sidecar for
+the cross-process case (the production split: agent process vs
+helper process). The shared threading lock exists so co-hosted
+cores never depend on platform file-lock subtleties — Windows
+byte-range locks have per-handle semantics quite unlike flock,
+including dropping a process's locks when any of its handles to
+the file closes. These tests prove the coordination end to end
+where the suite runs; the owner-PC run of this same test file is
+recorded in docs/TEST_PLAN.md.
 """
 
 from __future__ import annotations
@@ -122,7 +126,6 @@ class TwoCoreRotationRaceTests(unittest.TestCase):
         root = Path(tmp.name)
         audit = root / "logs" / "audit.jsonl"
         audit.parent.mkdir(parents=True)
-        line_bytes = LINE + 1     # chars + the newline
         # Prime: the current log holds C1+C2, the archives R1/R2/R3.
         audit.write_text(_line("C1") + "\n" + _line("C2") + "\n",
                          encoding="utf-8")
@@ -130,25 +133,56 @@ class TwoCoreRotationRaceTests(unittest.TestCase):
                                (".3", "R3")):
             audit.with_name(audit.name + suffix).write_text(
                 _line(marker) + "\n", encoding="utf-8")
-        # Cap = exactly the primed current size: the first append
-        # must rotate (2 lines + 1 incoming > cap); once it has, the
-        # fresh current holds a single line, so the second append
-        # must NOT rotate (1 + 1 <= cap). A second rotation can only
-        # come from a stale, uncoordinated decision.
+        # The cap comes from MEASURED on-disk sizes, not arithmetic:
+        # a line occupies LINE+1 bytes on POSIX but LINE+2 on
+        # Windows (text mode writes CRLF), while the core accounts
+        # an incoming line as len(line)+1. (An arithmetic cap of
+        # 2*(LINE+1) sat one byte per line too low on Windows and
+        # made the second append rotate legitimately — the first
+        # owner-PC failure of this test was that accounting, not the
+        # coordination.) Capped at the primed current size, the
+        # first append necessarily rotates (size + incoming >
+        # size); afterwards the fresh current holds one line, whose
+        # on-disk size + incoming stays under the cap on both
+        # platforms — so a second rotation can only come from a
+        # stale, uncoordinated decision.
+        cap = audit.stat().st_size
+        self.assertGreaterEqual(
+            audit.with_name(audit.name + ".1").stat().st_size,
+            LINE + 1)
         core_a = _make_core(root, "agent-state", audit,
-                            max_bytes=2 * line_bytes, keep=3)
+                            max_bytes=cap, keep=3)
         core_b = _make_core(root, "helper-state", audit,
-                            max_bytes=2 * line_bytes, keep=3)
+                            max_bytes=cap, keep=3)
 
-        # Widen the race window: pause just before the rename that
-        # moves the current log to .1, so the second writer takes
-        # its rotation decision from the pre-rename state too.
-        real_replace = os.replace
+        # Force the fatal interleave deterministically: park the
+        # FIRST writer inside its rotation size check — the stat
+        # result is already computed from the primed state, but not
+        # yet returned — until the second writer has rotated and
+        # appended in full. Uncoordinated, the first writer then
+        # acts on its stale decision: its renames shift the archives
+        # a second time and overwrite a retained archive.
+        # Coordinated (the fix), the second writer blocks on the
+        # audit locks and cannot complete, so the park simply times
+        # out and the first writer finishes alone and correctly.
+        real_stat = os.stat
+        release = threading.Event()
+        park_lock = threading.Lock()
+        parked_once = [False]
 
-        def slow_replace(src, dst):
-            if Path(dst).name == audit.name + ".1":
-                time.sleep(0.25)
-            return real_replace(src, dst)
+        def stat_wrapper(path, *args, **kwargs):
+            result = real_stat(path, *args, **kwargs)
+            try:
+                is_audit = os.fspath(path) == str(audit)
+            except TypeError:
+                is_audit = False
+            if is_audit:
+                with park_lock:
+                    first = not parked_once[0]
+                    parked_once[0] = True
+                if first:
+                    release.wait(timeout=3)
+            return result
 
         barrier = threading.Barrier(2)
         errors: list[Exception] = []
@@ -159,8 +193,10 @@ class TwoCoreRotationRaceTests(unittest.TestCase):
                 core.audit(_entry(marker))
             except Exception as exc:  # surfaced by the assert below
                 errors.append(exc)
+            finally:
+                release.set()
 
-        os.replace = slow_replace
+        os.stat = stat_wrapper
         try:
             threads = [threading.Thread(target=write,
                                         args=(core_a, "EA")),
@@ -171,7 +207,7 @@ class TwoCoreRotationRaceTests(unittest.TestCase):
             for thread in threads:
                 thread.join(timeout=30)
         finally:
-            os.replace = real_replace
+            os.stat = real_stat
         self.assertEqual(errors, [])
         found = _markers_on_disk(audit)
         # R3 is the one legitimate discard (oldest archive at
