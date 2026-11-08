@@ -1,7 +1,18 @@
 diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/desktop-shell.c
 --- a/clients/desktop-shell.c	2026-04-24 08:06:05.000000000 +0000
-+++ b/clients/desktop-shell.c	2026-11-07 10:13:11.222102442 +0000
-@@ -56,6 +56,7 @@
++++ b/clients/desktop-shell.c	2026-11-08 19:09:12.329936911 +0000
+@@ -34,6 +34,10 @@
+ #include <math.h>
+ #include <cairo.h>
+ #include <sys/wait.h>
++#include <sys/socket.h>
++#include <sys/un.h>
++#include <sys/epoll.h>
++#include <dirent.h>
+ #include <linux/input.h>
+ #include <libgen.h>
+ #include <ctype.h>
+@@ -56,6 +60,7 @@
  #include "single-pixel-buffer-v1-client-protocol.h"
  #include "tablet-unstable-v2-client-protocol.h"
  #include "weston-desktop-shell-client-protocol.h"
@@ -9,7 +20,7 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
  
  #define DEFAULT_CLOCK_FORMAT CLOCK_FORMAT_MINUTES
  #define DEFAULT_SPACING 10
-@@ -68,9 +69,23 @@
+@@ -68,9 +73,49 @@
  	CLOCK_FORMAT_NONE
  };
  
@@ -25,15 +36,41 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +	struct wl_list link;
 +};
 +
++/* Synveil tray status (shell polish pass): the panel's status
++ * area shows the machine's real network link state (read from
++ * /sys/class/net) and the A/B update state (read from the update
++ * agent's typed socket, synveil.ab-agent/v1 — the same read-only
++ * status request the updates window makes). Refreshed by a
++ * periodic timer; the agent query is a non-blocking state
++ * machine so the panel never stalls on it. The helper stays an
++ * unprivileged client: sysfs is world-readable, and the agent
++ * socket is the session's own group-writable status surface. */
++struct sv_tray {
++	int net_present;
++	int net_up;
++	int update_known;
++	int update_pending;
++	struct toytimer timer;
++	int timer_live;
++	int query_fd;
++	struct task query_task;
++	int query_sent;
++	size_t query_len;
++	uint64_t query_deadline_ms;
++	uint64_t last_query_ms;
++	char query_buf[16384];
++};
++
  struct desktop {
  	struct display *display;
  	struct weston_desktop_shell *shell;
 +	struct synveil_shell_panel *synveil_panel;
 +	struct wl_list synveil_tasks;
++	struct sv_tray sv_tray;
  	struct unlock_dialog *unlock_dialog;
  	struct task unlock_task;
  	struct wl_list outputs;
-@@ -99,6 +114,25 @@
+@@ -99,6 +144,26 @@
  
  struct output;
  
@@ -52,6 +89,7 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +	const char *path;
 +	const char *arg;
 +	const char *app_id;
++	int icon;
 +	int focused, pressed;
 +	struct wl_list link;
 +};
@@ -59,7 +97,7 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
  struct panel {
  	struct surface base;
  
-@@ -112,6 +146,13 @@
+@@ -112,6 +177,23 @@
  	enum weston_desktop_shell_panel_position panel_position;
  	enum clock_format clock_format;
  	uint32_t color;
@@ -70,10 +108,20 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +	struct wl_list task_list;
 +	struct wl_list menu_list;
 +	int menu_open;
++	/* Synveil tray + menu slide (shell polish pass) */
++	struct widget *tray_net_widget;
++	struct widget *tray_update_widget;
++	struct toytimer menu_timer;
++	int menu_timer_live;
++	int menu_closing;
++	double menu_p;
++	double menu_anim_from;
++	double menu_anim_to;
++	uint64_t menu_anim_start_ms;
  };
  
  struct background {
-@@ -294,17 +335,171 @@
+@@ -294,17 +376,391 @@
  			      ((color >> 24) & 0xff) / 255.0);
  }
  
@@ -95,6 +143,9 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +#define SV_COLOR_SURFACE_HI 0x383838
 +#define SV_COLOR_STROKE 0x454545
 +#define SV_COLOR_ACCENT 0x4CC2FF
++#define SV_COLOR_ACCENT_PRESSED 0x38A8E8
++#define SV_COLOR_INK_FAINT 0x8A8A8A
++#define SV_COLOR_DANGER 0xE81123
 +
 +static void
 +sv_set_rgb(cairo_t *cr, uint32_t hex)
@@ -165,12 +216,224 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +	cairo_show_text(cr, "…");
 +}
 +
++static uint64_t
++sv_now_ms(void)
++{
++	struct timespec ts;
++
++	clock_gettime(CLOCK_MONOTONIC, &ts);
++	return (uint64_t) ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
++}
++
++/* UI_DESIGN motion curve: ease-out cubic approximation of the
++ * Windows 11 curve (fast start, gentle settle, no overshoot). */
++static double
++sv_ease_out_cubic(double t)
++{
++	double u = 1.0 - t;
++
++	return 1.0 - u * u * u;
++}
++
++/* The shell's original geometric marks (shell polish pass),
++ * replacing the menu's letter tiles and the taskbar's generic
++ * glyphs. Every mark is drawn cairo primitives in the UI_DESIGN
++ * tokens plus per-app hues — no artwork files, no third-party
++ * icon sets. Designs sit on a 24-unit grid scaled to size. */
++enum sv_icon {
++	SV_ICON_FILES,
++	SV_ICON_UPDATES,
++	SV_ICON_BROWSER,
++	SV_ICON_TERMINAL,
++	SV_ICON_DEMO,
++	SV_ICON_WINDOW,
++	SV_ICON_NET_UP,
++	SV_ICON_NET_DOWN,
++	SV_ICON_NET_NONE,
++	SV_ICON_UPDATE_READY,
++	SV_ICON_UPDATE_CURRENT
++};
++
++static void
++sv_draw_net_arcs(cairo_t *cr, double u, uint32_t hex, int dot)
++{
++	int i;
++
++	sv_set_rgb(cr, hex);
++	cairo_set_line_width(cr, 2.0 * u);
++	cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
++	for (i = 0; i < 3; i++) {
++		cairo_arc(cr, 12 * u, 17.5 * u, (5.5 + 3.6 * i) * u,
++			  M_PI * 1.18, M_PI * 1.82);
++		cairo_stroke(cr);
++	}
++	if (dot) {
++		cairo_arc(cr, 12 * u, 17.5 * u, 1.7 * u, 0, 2 * M_PI);
++		cairo_fill(cr);
++	}
++}
++
++static void
++sv_draw_update_arrow(cairo_t *cr, double u, uint32_t hex)
++{
++	sv_set_rgb(cr, hex);
++	cairo_rectangle(cr, 10.2 * u, 3 * u, 3.6 * u, 9 * u);
++	cairo_fill(cr);
++	cairo_move_to(cr, 5 * u, 10 * u);
++	cairo_line_to(cr, 19 * u, 10 * u);
++	cairo_line_to(cr, 12 * u, 18 * u);
++	cairo_close_path(cr);
++	cairo_fill(cr);
++	cairo_rectangle(cr, 4 * u, 20 * u, 16 * u, 2.2 * u);
++	cairo_fill(cr);
++}
++
++static void
++sv_draw_icon(cairo_t *cr, int icon, double x, double y, double size)
++{
++	double u = size / 24.0;
++
++	cairo_save(cr);
++	cairo_translate(cr, x, y);
++	switch (icon) {
++	case SV_ICON_TERMINAL:
++		sv_rounded_rect(cr, 1 * u, 3 * u, 22 * u, 18 * u, 3 * u);
++		sv_set_rgb(cr, 0x202020);
++		cairo_fill_preserve(cr);
++		sv_set_rgb(cr, SV_COLOR_STROKE);
++		cairo_set_line_width(cr, 1);
++		cairo_stroke(cr);
++		sv_set_rgb(cr, 0x7EE787);
++		cairo_set_line_width(cr, 2.2 * u);
++		cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
++		cairo_move_to(cr, 6 * u, 8 * u);
++		cairo_line_to(cr, 10.5 * u, 12 * u);
++		cairo_line_to(cr, 6 * u, 16 * u);
++		cairo_stroke(cr);
++		cairo_move_to(cr, 12.5 * u, 16.5 * u);
++		cairo_line_to(cr, 18 * u, 16.5 * u);
++		cairo_stroke(cr);
++		break;
++	case SV_ICON_FILES:
++		sv_set_rgb(cr, 0xC77F27);
++		sv_rounded_rect(cr, 2 * u, 6 * u, 20 * u, 13 * u, 2 * u);
++		cairo_fill(cr);
++		cairo_rectangle(cr, 2 * u, 4 * u, 9 * u, 4 * u);
++		cairo_fill(cr);
++		sv_set_rgb(cr, 0xF0B95A);
++		cairo_move_to(cr, 2 * u, 10 * u);
++		cairo_line_to(cr, 22 * u, 10 * u);
++		cairo_line_to(cr, 20.5 * u, 19 * u);
++		cairo_line_to(cr, 3.5 * u, 19 * u);
++		cairo_close_path(cr);
++		cairo_fill(cr);
++		break;
++	case SV_ICON_UPDATES:
++		sv_draw_update_arrow(cr, u, SV_COLOR_ACCENT);
++		break;
++	case SV_ICON_BROWSER:
++		sv_set_rgb(cr, 0x2F5D8A);
++		cairo_arc(cr, 12 * u, 12 * u, 9.5 * u, 0, 2 * M_PI);
++		cairo_fill_preserve(cr);
++		sv_set_rgb(cr, 0xBFD9F2);
++		cairo_set_line_width(cr, 1.1 * u);
++		cairo_stroke(cr);
++		cairo_save(cr);
++		cairo_arc(cr, 12 * u, 12 * u, 9.5 * u, 0, 2 * M_PI);
++		cairo_clip(cr);
++		sv_set_rgb(cr, 0xBFD9F2);
++		cairo_set_line_width(cr, 1.0 * u);
++		cairo_move_to(cr, 2.5 * u, 12 * u);
++		cairo_line_to(cr, 21.5 * u, 12 * u);
++		cairo_stroke(cr);
++		cairo_move_to(cr, 2.5 * u, 7.5 * u);
++		cairo_line_to(cr, 21.5 * u, 7.5 * u);
++		cairo_stroke(cr);
++		cairo_save(cr);
++		cairo_translate(cr, 12 * u, 12 * u);
++		cairo_scale(cr, 0.45, 1.0);
++		cairo_arc(cr, 0, 0, 9.5 * u, 0, 2 * M_PI);
++		cairo_restore(cr);
++		cairo_stroke(cr);
++		cairo_restore(cr);
++		break;
++	case SV_ICON_DEMO:
++		sv_rounded_rect(cr, 2 * u, 4 * u, 20 * u, 16 * u, 2.5 * u);
++		sv_set_rgb(cr, 0x1B4B8F);
++		cairo_fill(cr);
++		cairo_save(cr);
++		sv_rounded_rect(cr, 2 * u, 4 * u, 20 * u, 16 * u, 2.5 * u);
++		cairo_clip(cr);
++		sv_set_rgb(cr, 0x202020);
++		cairo_rectangle(cr, 2 * u, 4 * u, 20 * u, 5 * u);
++		cairo_fill(cr);
++		cairo_restore(cr);
++		sv_set_rgb(cr, SV_COLOR_ACCENT);
++		cairo_arc(cr, 6 * u, 6.5 * u, 1.6 * u, 0, 2 * M_PI);
++		cairo_fill(cr);
++		break;
++	case SV_ICON_WINDOW:
++		sv_rounded_rect(cr, 3 * u, 5 * u, 18 * u, 14 * u, 2 * u);
++		sv_set_rgb(cr, SV_COLOR_SURFACE_HI);
++		cairo_fill_preserve(cr);
++		sv_set_rgb(cr, SV_COLOR_INK_FAINT);
++		cairo_set_line_width(cr, 1.1 * u);
++		cairo_stroke(cr);
++		sv_set_rgb(cr, SV_COLOR_INK_FAINT);
++		cairo_rectangle(cr, 4.5 * u, 9.5 * u, 15 * u, 1.2 * u);
++		cairo_fill(cr);
++		break;
++	case SV_ICON_NET_UP:
++		sv_draw_net_arcs(cr, u, SV_COLOR_ACCENT, 1);
++		break;
++	case SV_ICON_NET_DOWN:
++		sv_draw_net_arcs(cr, u, SV_COLOR_INK_FAINT, 0);
++		sv_set_rgb(cr, SV_COLOR_DANGER);
++		cairo_set_line_width(cr, 2.2 * u);
++		cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
++		cairo_move_to(cr, 5 * u, 19 * u);
++		cairo_line_to(cr, 19 * u, 5 * u);
++		cairo_stroke(cr);
++		break;
++	case SV_ICON_NET_NONE:
++		sv_draw_net_arcs(cr, u, SV_COLOR_STROKE, 0);
++		break;
++	case SV_ICON_UPDATE_READY:
++		sv_draw_update_arrow(cr, u, SV_COLOR_ACCENT);
++		sv_set_rgb(cr, 0x7EE787);
++		cairo_arc(cr, 17.5 * u, 17.5 * u, 3.4 * u, 0, 2 * M_PI);
++		cairo_fill_preserve(cr);
++		sv_set_rgb(cr, 0x202020);
++		cairo_set_line_width(cr, 1.2 * u);
++		cairo_stroke(cr);
++		break;
++	case SV_ICON_UPDATE_CURRENT:
++		sv_draw_update_arrow(cr, u, SV_COLOR_INK_FAINT);
++		break;
++	}
++	cairo_restore(cr);
++}
++
++static int sv_menu_height(struct panel *panel);
++
++/* Rendered vertical offset of the Start menu card and its
++ * items: the card slides up from behind the strip as menu_p
++ * eases 0 -> 1 over the UI_DESIGN menu duration (200 ms). */
++static double
++sv_menu_dy(struct panel *panel)
++{
++	if (!panel->menu_open)
++		return 0;
++	return (1.0 - panel->menu_p) * sv_menu_height(panel);
++}
++
 +struct synveil_app {
 +	const char *name;
 +	const char *path;
 +	const char *arg;
 +	const char *app_id;
 +	const char *marker;
++	int icon;
 +};
 +
 +/* The Start menu's applications, gated by the same marker
@@ -178,15 +441,16 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 + * an entry also requires its binary to be installed. */
 +static const struct synveil_app synveil_apps[] = {
 +	{ "Files", "/usr/bin/synveil-files", NULL,
-+	  "org.synveil.files", "/etc/synveil/files-app" },
++	  "org.synveil.files", "/etc/synveil/files-app", SV_ICON_FILES },
 +	{ "Updates", "/usr/bin/synveil-update-gui", NULL,
-+	  "org.synveil.update-gui", "/etc/synveil/ab-system" },
++	  "org.synveil.update-gui", "/etc/synveil/ab-system",
++	  SV_ICON_UPDATES },
 +	{ "Browser", "/usr/bin/synveil-browser", NULL,
-+	  NULL, "/etc/synveil/browser" },
++	  NULL, "/etc/synveil/browser", SV_ICON_BROWSER },
 +	{ "Terminal", "/usr/bin/weston-terminal", NULL,
-+	  NULL, NULL },
++	  NULL, NULL, SV_ICON_TERMINAL },
 +	{ "Demo window", "/usr/bin/synveil-first-window", "--interactive",
-+	  "org.synveil.first-window", NULL },
++	  "org.synveil.first-window", NULL, SV_ICON_DEMO },
 +};
 +
  static void
@@ -220,15 +484,13 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +		strip.y = alloc.height - SV_STRIP_H;
 +		strip.width = alloc.width;
 +		strip.height = SV_STRIP_H;
-+		set_hex_color(cr, panel->color);
-+		cairo_rectangle(cr, strip.x, strip.y, strip.width,
-+				strip.height);
-+		cairo_fill(cr);
-+		widget_input_region_add(panel->widget, &strip);
 +
++		/* The menu card is painted first and the strip
++		 * over it, so during the slide the card rises
++		 * from behind the taskbar instead of over it. */
 +		if (panel->menu_open) {
 +			card.x = 4;
-+			card.y = 4;
++			card.y = 4 + (int) sv_menu_dy(panel);
 +			card.width = SV_MENU_WIDTH;
 +			card.height = alloc.height - SV_STRIP_H - 8;
 +			sv_rounded_rect(cr, card.x, card.y, card.width,
@@ -240,6 +502,12 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +			cairo_stroke(cr);
 +			widget_input_region_add(panel->widget, &card);
 +		}
++
++		set_hex_color(cr, panel->color);
++		cairo_rectangle(cr, strip.x, strip.y, strip.width,
++				strip.height);
++		cairo_fill(cr);
++		widget_input_region_add(panel->widget, &strip);
 +	} else {
 +		set_hex_color(cr, panel->color);
 +		cairo_paint(cr);
@@ -247,7 +515,7 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
  
  	cairo_destroy(cr);
  	surface = window_get_surface(panel->window);
-@@ -542,6 +737,627 @@
+@@ -542,6 +998,1133 @@
  	widget_set_redraw_handler(clock->widget, panel_clock_redraw_handler);
  }
  
@@ -300,22 +568,42 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +
 +	wl_list_for_each(ptask, &panel->task_list, link) {
 +		const char *title = ptask->task->title;
-+		int w = (int) sv_text_width(title ? title : "", 12) + 28;
++		int w = (int) sv_text_width(title ? title : "", 12) + 50;
 +
-+		if (w < 84)
-+			w = 84;
-+		if (w > 176)
-+			w = 176;
++		if (w < 106)
++			w = 106;
++		if (w > 198)
++			w = 198;
 +		widget_set_allocation(ptask->widget, x, strip_y + 6, w, 36);
 +		x += w + 4;
 +	}
 +
-+	if (panel->clock) {
-+		int w = panel->clock_format == CLOCK_FORMAT_SECONDS ?
-+			170 : 150;
++	{
++		struct desktop *desktop = panel_get_desktop(panel);
++		int clock_w = 0;
++		int tray_right, upd_w;
 +
-+		widget_set_allocation(panel->clock->widget, width - w,
-+				      strip_y, w, SV_STRIP_H);
++		if (panel->clock) {
++			clock_w = panel->clock_format ==
++				CLOCK_FORMAT_SECONDS ? 170 : 150;
++			widget_set_allocation(panel->clock->widget,
++					      width - clock_w, strip_y,
++					      clock_w, SV_STRIP_H);
++		}
++		/* Tray, right to left from the clock: update
++		 * state (only while the agent has answered —
++		 * an unanswered updater is not drawn at all),
++		 * then network link state. */
++		tray_right = width - clock_w - (clock_w ? 4 : 8);
++		upd_w = desktop->sv_tray.update_known ? 26 : 0;
++		if (panel->tray_update_widget)
++			widget_set_allocation(panel->tray_update_widget,
++					      tray_right - upd_w, strip_y,
++					      upd_w, SV_STRIP_H);
++		if (panel->tray_net_widget)
++			widget_set_allocation(panel->tray_net_widget,
++					      tray_right - upd_w - 26,
++					      strip_y, 26, SV_STRIP_H);
 +	}
 +
 +	i = 0;
@@ -332,23 +620,104 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +}
 +
 +static void
++sv_menu_redraw_all(struct panel *panel)
++{
++	struct panel_menu_item *item;
++
++	widget_schedule_redraw(panel->widget);
++	widget_schedule_redraw(panel->start_widget);
++	wl_list_for_each(item, &panel->menu_list, link)
++		widget_schedule_redraw(item->widget);
++}
++
++static void
++sv_menu_close_finalize(struct panel *panel)
++{
++	struct desktop *desktop = panel_get_desktop(panel);
++	struct rectangle alloc;
++
++	panel->menu_open = 0;
++	panel->menu_closing = 0;
++	panel->menu_p = 0;
++	if (desktop->synveil_panel)
++		synveil_shell_panel_set_menu_open(desktop->synveil_panel,
++						  0);
++	widget_get_allocation(panel->widget, &alloc);
++	if (alloc.width > 0)
++		window_schedule_resize(panel->window, alloc.width,
++				       SV_STRIP_H);
++	sv_menu_redraw_all(panel);
++}
++
++static void
++sv_menu_anim_cb(struct toytimer *tt)
++{
++	struct panel *panel = container_of(tt, struct panel, menu_timer);
++	uint64_t now = sv_now_ms();
++	double t = (double) (now - panel->menu_anim_start_ms) / 200.0;
++
++	if (t >= 1.0) {
++		panel->menu_p = panel->menu_anim_to;
++		panel->menu_timer_live = 0;
++		if (panel->menu_closing)
++			sv_menu_close_finalize(panel);
++		else
++			sv_menu_redraw_all(panel);
++		return;
++	}
++	panel->menu_p = panel->menu_anim_from +
++		(panel->menu_anim_to - panel->menu_anim_from) *
++		sv_ease_out_cubic(t);
++	sv_menu_redraw_all(panel);
++	toytimer_arm_once_usec(&panel->menu_timer, 16000);
++}
++
++static void
++sv_menu_anim_start(struct panel *panel, double to)
++{
++	panel->menu_anim_from = panel->menu_p;
++	panel->menu_anim_to = to;
++	panel->menu_anim_start_ms = sv_now_ms();
++	if (!panel->menu_timer_live) {
++		panel->menu_timer_live = 1;
++		toytimer_arm_once_usec(&panel->menu_timer, 1000);
++	}
++}
++
++/* Open or close the Start menu with the UI_DESIGN slide:
++ * 200 ms ease-out, driven by the panel's frame timer. Opening
++ * resizes the panel surface immediately (input is never
++ * delayed by the animation; only the drawing moves), closing
++ * lands its resize and protocol transition when the slide
++ * completes, in sv_menu_close_finalize. */
++static void
 +panel_set_menu_open(struct panel *panel, int open)
 +{
 +	struct desktop *desktop = panel_get_desktop(panel);
 +	struct rectangle alloc;
 +
-+	if (panel->menu_open == open)
-+		return;
-+	panel->menu_open = open;
-+	if (desktop->synveil_panel)
-+		synveil_shell_panel_set_menu_open(desktop->synveil_panel,
-+						  open);
-+	widget_get_allocation(panel->widget, &alloc);
-+	if (alloc.width > 0)
-+		window_schedule_resize(panel->window, alloc.width,
-+				       open ? SV_STRIP_H +
-+					      sv_menu_height(panel)
-+					    : SV_STRIP_H);
++	if (open) {
++		if (panel->menu_open && !panel->menu_closing)
++			return;
++		if (!panel->menu_open) {
++			panel->menu_open = 1;
++			if (desktop->synveil_panel)
++				synveil_shell_panel_set_menu_open(
++					desktop->synveil_panel, 1);
++			widget_get_allocation(panel->widget, &alloc);
++			if (alloc.width > 0)
++				window_schedule_resize(
++					panel->window, alloc.width,
++					SV_STRIP_H + sv_menu_height(panel));
++		}
++		panel->menu_closing = 0;
++		sv_menu_anim_start(panel, 1.0);
++	} else {
++		if (!panel->menu_open || panel->menu_closing)
++			return;
++		panel->menu_closing = 1;
++		sv_menu_anim_start(panel, 0.0);
++	}
 +	widget_schedule_redraw(panel->widget);
 +	widget_schedule_redraw(panel->start_widget);
 +}
@@ -368,7 +737,12 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +		return;
 +
 +	cr = widget_cairo_create(panel->widget);
-+	if (panel->menu_open || panel->start_focused) {
++	if (panel->start_pressed) {
++		sv_rounded_rect(cr, alloc.x, alloc.y, alloc.width,
++				alloc.height, 4);
++		sv_set_rgb(cr, SV_COLOR_ACCENT_PRESSED);
++		cairo_fill(cr);
++	} else if (panel->menu_open || panel->start_focused) {
 +		sv_rounded_rect(cr, alloc.x, alloc.y, alloc.width,
 +				alloc.height, 4);
 +		sv_set_rgb(cr, SV_COLOR_SURFACE_HI);
@@ -407,6 +781,7 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +	struct panel *panel = data;
 +
 +	panel->start_focused = 0;
++	panel->start_pressed = 0;
 +	widget_schedule_redraw(widget);
 +}
 +
@@ -416,12 +791,54 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +		     enum wl_pointer_button_state state, void *data)
 +{
 +	struct panel *panel = data;
++	int want;
 +
-+	if (state == WL_POINTER_BUTTON_STATE_RELEASED)
-+		panel_set_menu_open(panel, !panel->menu_open);
++	if (button != BTN_LEFT)
++		return;
++	if (state == WL_POINTER_BUTTON_STATE_PRESSED) {
++		panel->start_pressed = 1;
++		widget_schedule_redraw(widget);
++		return;
++	}
++	panel->start_pressed = 0;
++	/* A re-press mid close-slide re-opens. */
++	want = (!panel->menu_open || panel->menu_closing) ? 1 : 0;
++	panel_set_menu_open(panel, want);
++}
++
++static int
++start_motion_handler(struct widget *widget, struct input *input,
++		     uint32_t time, float x, float y, void *data)
++{
++	widget_set_tooltip(widget, "Start", x, y);
++	return CURSOR_LEFT_PTR;
 +}
 +
 +/* ---- Task buttons ---- */
++
++static int
++sv_icon_for_task(struct synveil_task *task)
++{
++	const char *app_id = task->app_id;
++	const char *title = task->title;
++
++	if (app_id) {
++		if (strstr(app_id, "files"))
++			return SV_ICON_FILES;
++		if (strstr(app_id, "update"))
++			return SV_ICON_UPDATES;
++		if (strstr(app_id, "first-window"))
++			return SV_ICON_DEMO;
++		if (strstr(app_id, "terminal"))
++			return SV_ICON_TERMINAL;
++		if (strstr(app_id, "chromium") ||
++		    strstr(app_id, "browser"))
++			return SV_ICON_BROWSER;
++	}
++	if (title && strcmp(title, "Terminal") == 0)
++		return SV_ICON_TERMINAL;
++	return SV_ICON_WINDOW;
++}
 +
 +static void
 +panel_task_redraw_handler(struct widget *widget, void *data)
@@ -442,7 +859,12 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +		return;
 +
 +	cr = widget_cairo_create(ptask->panel->widget);
-+	if (activated || ptask->focused) {
++	if (ptask->pressed) {
++		sv_rounded_rect(cr, alloc.x, alloc.y, alloc.width,
++				alloc.height, 4);
++		sv_set_rgb(cr, SV_COLOR_ACCENT_PRESSED);
++		cairo_fill(cr);
++	} else if (activated || ptask->focused) {
 +		sv_rounded_rect(cr, alloc.x, alloc.y, alloc.width,
 +				alloc.height, 4);
 +		sv_set_rgb(cr, SV_COLOR_SURFACE_HI);
@@ -454,6 +876,8 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +				alloc.y + alloc.height - 3, 24, 3);
 +		cairo_fill(cr);
 +	}
++	sv_draw_icon(cr, sv_icon_for_task(task), alloc.x + 8,
++		     alloc.y + 10, 16);
 +	cairo_set_font_size(cr, 12);
 +	cairo_text_extents(cr, "Ag", &extents);
 +	if (minimized)
@@ -464,9 +888,9 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +	else
 +		cairo_set_source_rgb(cr, 0xC8 / 255.0, 0xC8 / 255.0,
 +				     0xC8 / 255.0);
-+	cairo_move_to(cr, alloc.x + 10,
++	cairo_move_to(cr, alloc.x + 30,
 +		      alloc.y + alloc.height / 2 + extents.height / 2 - 1);
-+	sv_show_text_clipped(cr, title, 12, alloc.width - 20);
++	sv_show_text_clipped(cr, title, 12, alloc.width - 38);
 +	cairo_destroy(cr);
 +}
 +
@@ -488,6 +912,7 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +	struct panel_task *ptask = data;
 +
 +	ptask->focused = 0;
++	ptask->pressed = 0;
 +	widget_destroy_tooltip(widget);
 +	widget_schedule_redraw(widget);
 +}
@@ -517,8 +942,15 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +	int minimized = (task->state &
 +			 SYNVEIL_SHELL_PANEL_WINDOW_STATE_MINIMIZED) != 0;
 +
-+	if (state != WL_POINTER_BUTTON_STATE_RELEASED)
++	if (state == WL_POINTER_BUTTON_STATE_PRESSED) {
++		if (button == BTN_LEFT) {
++			ptask->pressed = 1;
++			widget_schedule_redraw(widget);
++		}
 +		return;
++	}
++	ptask->pressed = 0;
++	widget_schedule_redraw(widget);
 +	if (!desktop->synveil_panel)
 +		return;
 +	if (ptask->panel->menu_open)
@@ -587,6 +1019,341 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +	widget_schedule_redraw(panel->widget);
 +}
 +
++/* ---- Tray / status area (shell polish pass) ----
++ *
++ * Real status only, through surfaces the unprivileged helper
++ * may already use: the network link state is the kernel's own
++ * /sys/class/net carrier flags (world-readable), and the
++ * update state comes from the A/B agent's typed socket using
++ * the same read-only "status" request the updates window
++ * makes (docs/UPDATE_GUI.md). If the agent never answers, the
++ * update slot is not drawn at all — the shell never claims a
++ * state it could not read. */
++
++#define SV_AB_AGENT_SOCKET "/run/synveil-ab/agent.sock"
++#define SV_TRAY_QUERY_EVERY_MS 8000
++#define SV_TRAY_QUERY_TIMEOUT_MS 3000
++
++static void
++sv_tray_sync_panels(struct desktop *desktop)
++{
++	struct output *output;
++	struct rectangle alloc;
++
++	wl_list_for_each(output, &desktop->outputs, link) {
++		if (!output->panel)
++			continue;
++		widget_get_allocation(output->panel->widget, &alloc);
++		if (alloc.width > 0)
++			panel_layout(output->panel, alloc.width,
++				     alloc.height);
++		if (output->panel->tray_net_widget)
++			widget_schedule_redraw(
++				output->panel->tray_net_widget);
++		if (output->panel->tray_update_widget)
++			widget_schedule_redraw(
++				output->panel->tray_update_widget);
++	}
++}
++
++static void
++sv_tray_net_poll(struct desktop *desktop)
++{
++	struct sv_tray *tray = &desktop->sv_tray;
++	DIR *dir;
++	struct dirent *ent;
++	int present = 0, up = 0;
++
++	dir = opendir("/sys/class/net");
++	if (dir) {
++		while ((ent = readdir(dir)) != NULL) {
++			char path[300];
++			FILE *f;
++			char v = 0;
++
++			if (ent->d_name[0] == '.' ||
++			    strcmp(ent->d_name, "lo") == 0)
++				continue;
++			snprintf(path, sizeof path,
++				 "/sys/class/net/%s/carrier", ent->d_name);
++			f = fopen(path, "r");
++			if (!f)
++				continue;
++			if (fread(&v, 1, 1, f) == 1) {
++				present = 1;
++				if (v == '1')
++					up = 1;
++			}
++			fclose(f);
++		}
++		closedir(dir);
++	}
++	if (present != tray->net_present || up != tray->net_up) {
++		tray->net_present = present;
++		tray->net_up = up;
++		sv_tray_sync_panels(desktop);
++	}
++}
++
++static void sv_tray_query_done(struct desktop *desktop, int ok);
++
++static void
++sv_tray_query_abort(struct desktop *desktop)
++{
++	struct sv_tray *tray = &desktop->sv_tray;
++
++	if (tray->query_fd >= 0) {
++		display_unwatch_fd(desktop->display, tray->query_fd);
++		close(tray->query_fd);
++		tray->query_fd = -1;
++	}
++}
++
++static void
++sv_tray_query_done(struct desktop *desktop, int ok)
++{
++	struct sv_tray *tray = &desktop->sv_tray;
++	const char *t, *a, *sig;
++	int pending = 0;
++
++	sv_tray_query_abort(desktop);
++	tray->last_query_ms = sv_now_ms();
++	if (!ok)
++		return;
++	/* Trust only the agent's own versioned envelope: the
++	 * schema must be synveil.ab-agent/v1 and ok must be
++	 * true before any state field is read. The status
++	 * fields keep the agent's documented key order
++	 * (docs/UPDATE_GUI.md), so targeted reads suffice —
++	 * the same approach as the updates window's facts
++	 * parsing, without a general JSON parser. */
++	if (!strstr(tray->query_buf,
++		    "\"schema\":\"synveil.ab-agent/v1\"") ||
++	    !strstr(tray->query_buf, "\"ok\":true"))
++		return;
++	if (!strstr(tray->query_buf, "\"enabled\":true"))
++		return;
++	t = strstr(tray->query_buf, "\"trial\":");
++	if (t) {
++		t += strlen("\"trial\":");
++		while (*t == ' ')
++			t++;
++		if (*t == '{')
++			pending = 1;
++	}
++	a = strstr(tray->query_buf, "\"available\":");
++	if (a) {
++		sig = strstr(a, "\"signature\":\"valid\"");
++		if (sig && sig - a < 512)
++			pending = 1;
++	}
++	if (!tray->update_known || tray->update_pending != pending) {
++		tray->update_known = 1;
++		tray->update_pending = pending;
++		sv_tray_sync_panels(desktop);
++	}
++}
++
++static void
++sv_tray_query_task_run(struct task *task, uint32_t events)
++{
++	struct desktop *desktop =
++		container_of(task, struct desktop, sv_tray.query_task);
++	struct sv_tray *tray = &desktop->sv_tray;
++	static const char request[] =
++		"{\"schema\":\"synveil.ab-agent/v1\",\"id\":\"tray\","
++		"\"action\":\"status\"}\n";
++
++	if (events & (EPOLLERR | EPOLLHUP)) {
++		sv_tray_query_done(desktop, 0);
++		return;
++	}
++	if (!tray->query_sent && (events & EPOLLOUT)) {
++		ssize_t n = send(tray->query_fd, request,
++				 sizeof(request) - 1, MSG_NOSIGNAL);
++
++		if (n < 0) {
++			if (errno == EAGAIN || errno == EWOULDBLOCK)
++				return;
++			sv_tray_query_done(desktop, 0);
++			return;
++		}
++		tray->query_sent = 1;
++	}
++	if (events & EPOLLIN) {
++		for (;;) {
++			ssize_t n;
++
++			if (tray->query_len >= sizeof(tray->query_buf) - 1)
++				break;
++			n = recv(tray->query_fd,
++				 tray->query_buf + tray->query_len,
++				 sizeof(tray->query_buf) - 1 -
++				 tray->query_len, 0);
++			if (n > 0) {
++				tray->query_len += (size_t) n;
++				tray->query_buf[tray->query_len] = '\0';
++				if (memchr(tray->query_buf, '\n',
++					   tray->query_len)) {
++					sv_tray_query_done(desktop, 1);
++					return;
++				}
++				continue;
++			}
++			if (n == 0) {
++				sv_tray_query_done(desktop,
++						   tray->query_len > 0);
++				return;
++			}
++			if (errno == EAGAIN || errno == EWOULDBLOCK)
++				return;
++			sv_tray_query_done(desktop, 0);
++			return;
++		}
++		/* A full buffer with no newline is unusable. */
++		sv_tray_query_done(desktop, 0);
++	}
++}
++
++static void
++sv_tray_query_start(struct desktop *desktop)
++{
++	struct sv_tray *tray = &desktop->sv_tray;
++	struct sockaddr_un addr;
++	int fd, flags;
++
++	fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
++	if (fd < 0)
++		return;
++	flags = fcntl(fd, F_GETFL, 0);
++	if (flags >= 0)
++		fcntl(fd, F_SETFL, flags | O_NONBLOCK);
++	memset(&addr, 0, sizeof addr);
++	addr.sun_family = AF_UNIX;
++	snprintf(addr.sun_path, sizeof addr.sun_path, "%s",
++		 SV_AB_AGENT_SOCKET);
++	if (connect(fd, (struct sockaddr *) &addr, sizeof addr) < 0 &&
++	    errno != EINPROGRESS) {
++		close(fd);
++		tray->last_query_ms = sv_now_ms();
++		return;
++	}
++	tray->query_fd = fd;
++	tray->query_sent = 0;
++	tray->query_len = 0;
++	tray->query_buf[0] = '\0';
++	tray->query_deadline_ms = sv_now_ms() + SV_TRAY_QUERY_TIMEOUT_MS;
++	tray->query_task.run = sv_tray_query_task_run;
++	display_watch_fd(desktop->display, fd,
++			 EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP,
++			 &tray->query_task);
++}
++
++static void
++sv_tray_timer_cb(struct toytimer *tt)
++{
++	struct desktop *desktop =
++		container_of(tt, struct desktop, sv_tray.timer);
++	struct sv_tray *tray = &desktop->sv_tray;
++
++	sv_tray_net_poll(desktop);
++	if (tray->query_fd >= 0) {
++		if (sv_now_ms() > tray->query_deadline_ms)
++			sv_tray_query_done(desktop, 0);
++	} else if (sv_now_ms() - tray->last_query_ms >=
++		   SV_TRAY_QUERY_EVERY_MS) {
++		sv_tray_query_start(desktop);
++	}
++	toytimer_arm_once_usec(&tray->timer, 1000000);
++}
++
++static void
++sv_tray_init(struct desktop *desktop)
++{
++	struct sv_tray *tray = &desktop->sv_tray;
++
++	if (tray->timer_live)
++		return;
++	tray->query_fd = -1;
++	toytimer_init(&tray->timer, CLOCK_MONOTONIC, desktop->display,
++		      sv_tray_timer_cb);
++	tray->timer_live = 1;
++	sv_tray_net_poll(desktop);
++	sv_tray_query_start(desktop);
++	toytimer_arm_once_usec(&tray->timer, 1000000);
++}
++
++static void
++tray_net_redraw_handler(struct widget *widget, void *data)
++{
++	struct panel *panel = data;
++	struct desktop *desktop = panel_get_desktop(panel);
++	cairo_t *cr;
++	struct rectangle alloc;
++	int icon;
++
++	widget_get_allocation(widget, &alloc);
++	if (alloc.width == 0)
++		return;
++	cr = widget_cairo_create(panel->widget);
++	icon = !desktop->sv_tray.net_present ? SV_ICON_NET_NONE :
++	       desktop->sv_tray.net_up ? SV_ICON_NET_UP :
++	       SV_ICON_NET_DOWN;
++	sv_draw_icon(cr, icon, alloc.x + 4, alloc.y + 15, 18);
++	cairo_destroy(cr);
++}
++
++static int
++tray_net_motion_handler(struct widget *widget, struct input *input,
++			uint32_t time, float x, float y, void *data)
++{
++	struct panel *panel = data;
++	struct desktop *desktop = panel_get_desktop(panel);
++
++	if (!desktop->sv_tray.net_present)
++		widget_set_tooltip(widget, "Network: no interface", x, y);
++	else if (desktop->sv_tray.net_up)
++		widget_set_tooltip(widget, "Network: link up", x, y);
++	else
++		widget_set_tooltip(widget, "Network: link down", x, y);
++	return CURSOR_LEFT_PTR;
++}
++
++static void
++tray_update_redraw_handler(struct widget *widget, void *data)
++{
++	struct panel *panel = data;
++	struct desktop *desktop = panel_get_desktop(panel);
++	cairo_t *cr;
++	struct rectangle alloc;
++
++	widget_get_allocation(widget, &alloc);
++	if (alloc.width == 0)
++		return;
++	cr = widget_cairo_create(panel->widget);
++	sv_draw_icon(cr,
++		     desktop->sv_tray.update_pending ?
++		     SV_ICON_UPDATE_READY : SV_ICON_UPDATE_CURRENT,
++		     alloc.x + 4, alloc.y + 15, 18);
++	cairo_destroy(cr);
++}
++
++static int
++tray_update_motion_handler(struct widget *widget, struct input *input,
++			   uint32_t time, float x, float y, void *data)
++{
++	struct panel *panel = data;
++	struct desktop *desktop = panel_get_desktop(panel);
++
++	if (desktop->sv_tray.update_pending)
++		widget_set_tooltip(widget,
++				   "Updates: an update is ready", x, y);
++	else
++		widget_set_tooltip(widget,
++				   "Updates: no update staged", x, y);
++	return CURSOR_LEFT_PTR;
++}
++
 +/* ---- Start menu items ---- */
 +
 +static void
@@ -643,33 +1410,31 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +		return;
 +
 +	cr = widget_cairo_create(item->panel->widget);
-+	if (item->focused) {
++	/* The item slides with the card (sv_menu_dy); its input
++	 * position stays at the final layout. */
++	cairo_save(cr);
++	cairo_translate(cr, 0, sv_menu_dy(item->panel));
++	if (item->pressed) {
++		sv_rounded_rect(cr, alloc.x, alloc.y, alloc.width,
++				alloc.height, 4);
++		sv_set_rgb(cr, SV_COLOR_ACCENT_PRESSED);
++		cairo_fill(cr);
++	} else if (item->focused) {
 +		sv_rounded_rect(cr, alloc.x, alloc.y, alloc.width,
 +				alloc.height, 4);
 +		sv_set_rgb(cr, SV_COLOR_SURFACE_HI);
 +		cairo_fill(cr);
 +	}
-+	/* Glyph: accent rounded square carrying the app's
-+	 * initial — an original geometric mark, no artwork. */
-+	sv_rounded_rect(cr, alloc.x + 4, alloc.y + 4, 28, 28, 4);
-+	sv_set_rgb(cr, SV_COLOR_ACCENT);
-+	cairo_fill(cr);
-+	cairo_set_source_rgb(cr, 0x20 / 255.0, 0x20 / 255.0, 0x20 / 255.0);
-+	cairo_set_font_size(cr, 15);
-+	{
-+		char initial[2] = { item->name[0], '\0' };
-+
-+		cairo_text_extents(cr, initial, &extents);
-+		cairo_move_to(cr, alloc.x + 4 + 14 - extents.width / 2,
-+			      alloc.y + 4 + 14 + extents.height / 2);
-+		cairo_show_text(cr, initial);
-+	}
++	/* The app's original geometric mark (shell polish pass):
++	 * drawn primitives only, no artwork files. */
++	sv_draw_icon(cr, item->icon, alloc.x + 4, alloc.y + 4, 28);
 +	cairo_set_source_rgb(cr, 1, 1, 1);
 +	cairo_set_font_size(cr, 13);
 +	cairo_text_extents(cr, "Ag", &extents);
 +	cairo_move_to(cr, alloc.x + 44,
 +		      alloc.y + alloc.height / 2 + extents.height / 2);
 +	cairo_show_text(cr, item->name);
++	cairo_restore(cr);
 +	cairo_destroy(cr);
 +}
 +
@@ -691,6 +1456,7 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +	struct panel_menu_item *item = data;
 +
 +	item->focused = 0;
++	item->pressed = 0;
 +	widget_schedule_redraw(widget);
 +}
 +
@@ -701,8 +1467,15 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +{
 +	struct panel_menu_item *item = data;
 +
-+	if (state != WL_POINTER_BUTTON_STATE_RELEASED)
++	if (state == WL_POINTER_BUTTON_STATE_PRESSED) {
++		if (button == BTN_LEFT) {
++			item->pressed = 1;
++			widget_schedule_redraw(widget);
++		}
 +		return;
++	}
++	item->pressed = 0;
++	widget_schedule_redraw(widget);
 +	panel_menu_item_activate(item);
 +	panel_set_menu_open(item->panel, 0);
 +}
@@ -724,6 +1497,7 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +		item->path = app->path;
 +		item->arg = app->arg;
 +		item->app_id = app->app_id;
++		item->icon = app->icon;
 +		item->widget = widget_add_widget(panel->widget, item);
 +		wl_list_insert(panel->menu_list.prev, &item->link);
 +		widget_set_redraw_handler(item->widget,
@@ -875,7 +1649,7 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
  static void
  panel_resize_handler(struct widget *widget,
  		     int32_t width, int32_t height, void *data)
-@@ -556,6 +1372,12 @@
+@@ -556,6 +2139,12 @@
  	int first_pad_h = horizontal ? 0 : DEFAULT_SPACING / 2;
  	int first_pad_w = horizontal ? DEFAULT_SPACING / 2 : 0;
  
@@ -888,7 +1662,7 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
  	wl_list_for_each(launcher, &panel->launcher_list, link) {
  		widget_set_allocation(launcher->widget, x, y,
  				      w + first_pad_w + 1, h + first_pad_h + 1);
-@@ -604,8 +1426,13 @@
+@@ -604,8 +2193,13 @@
  	}
  
  	switch (desktop->panel_position) {
@@ -903,7 +1677,7 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
  		height = 32;
  		break;
  	case WESTON_DESKTOP_SHELL_PANEL_POSITION_LEFT:
-@@ -649,6 +1476,8 @@
+@@ -649,6 +2243,8 @@
  {
  	struct panel_launcher *tmp;
  	struct panel_launcher *launcher;
@@ -912,7 +1686,7 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
  
  	if (panel->clock)
  		panel_destroy_clock(panel->clock);
-@@ -656,6 +1485,16 @@
+@@ -656,6 +2252,21 @@
  	wl_list_for_each_safe(launcher, tmp, &panel->launcher_list, link)
  		panel_destroy_launcher(launcher);
  
@@ -925,11 +1699,16 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +	}
 +	if (panel->start_widget)
 +		widget_destroy(panel->start_widget);
++	if (panel->tray_net_widget)
++		widget_destroy(panel->tray_net_widget);
++	if (panel->tray_update_widget)
++		widget_destroy(panel->tray_update_widget);
++	toytimer_fini(&panel->menu_timer);
 +
  	widget_destroy(panel->widget);
  	window_destroy(panel->window);
  
-@@ -675,6 +1514,8 @@
+@@ -675,6 +2286,8 @@
  	panel->window = window_create_custom(desktop->display);
  	panel->widget = window_add_widget(panel->window, panel);
  	wl_list_init(&panel->launcher_list);
@@ -938,7 +1717,7 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
  
  	window_set_title(panel->window, "panel");
  	window_set_user_data(panel->window, panel);
-@@ -682,6 +1523,14 @@
+@@ -682,17 +2295,49 @@
  	widget_set_redraw_handler(panel->widget, panel_redraw_handler);
  	widget_set_resize_handler(panel->widget, panel_resize_handler);
  
@@ -948,12 +1727,35 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
 +	widget_set_enter_handler(panel->start_widget, start_enter_handler);
 +	widget_set_leave_handler(panel->start_widget, start_leave_handler);
 +	widget_set_button_handler(panel->start_widget, start_button_handler);
++	widget_set_motion_handler(panel->start_widget, start_motion_handler);
 +	panel_build_menu(panel);
 +
  	panel->panel_position = desktop->panel_position;
  	panel->clock_format = desktop->clock_format;
  	if (panel->clock_format != CLOCK_FORMAT_NONE)
-@@ -693,6 +1542,11 @@
+ 		panel_add_clock(panel);
+ 
++	/* Synveil tray (shell polish pass): status widgets and
++	 * the status refresh machinery live for the panel's
++	 * lifetime. */
++	panel->tray_net_widget = widget_add_widget(panel->widget, panel);
++	widget_set_redraw_handler(panel->tray_net_widget,
++				  tray_net_redraw_handler);
++	widget_set_motion_handler(panel->tray_net_widget,
++				  tray_net_motion_handler);
++	panel->tray_update_widget = widget_add_widget(panel->widget,
++						      panel);
++	widget_set_redraw_handler(panel->tray_update_widget,
++				  tray_update_redraw_handler);
++	widget_set_motion_handler(panel->tray_update_widget,
++				  tray_update_motion_handler);
++	toytimer_init(&panel->menu_timer, CLOCK_MONOTONIC,
++		      window_get_display(panel->window), sv_menu_anim_cb);
++	sv_tray_init(desktop);
++
+ 	s = weston_config_get_section(desktop->config, "shell", NULL, NULL);
+ 	weston_config_section_get_color(s, "panel-color",
+ 					&panel->color, 0xaa000000);
  
  	panel_add_launchers(panel, desktop);
  
@@ -965,7 +1767,7 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
  	return panel;
  }
  
-@@ -1506,6 +2360,13 @@
+@@ -1506,6 +3151,13 @@
  		weston_desktop_shell_add_listener(desktop->shell,
  						  &listener,
  						  desktop);
@@ -979,7 +1781,31 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
  	} else if (!strcmp(interface, "wl_output")) {
  		create_output(desktop, id);
  	}
-@@ -1627,6 +2488,7 @@
+@@ -1560,16 +3212,13 @@
+ 		free(displayname);
+ 	}
+ 
+-	if (count == 0) {
+-		char *name = file_name_with_datadir("terminal.png");
+-
+-		/* add default launcher */
+-		panel_add_launcher(panel,
+-				   name,
+-				   BINDIR "/weston-terminal",
+-				   "Terminal");
+-		free(name);
+-	}
++	/* Synveil (shell polish pass): upstream's fallback
++	 * launcher (a stock terminal.png tile) is not added.
++	 * With no [launcher] sections the strip stays clean —
++	 * launching belongs to the Start menu, where Terminal
++	 * is a first-class entry with the shell's own icon.
++	 * Configured [launcher] sections still work as before. */
++	(void) count;
+ }
+ 
+ static void
+@@ -1627,6 +3276,7 @@
  
  	desktop.unlock_task.run = unlock_dialog_finish;
  	wl_list_init(&desktop.outputs);
@@ -989,7 +1815,7 @@ diff -ruN '--exclude=buildroot-build' a/clients/desktop-shell.c b/clients/deskto
  	desktop.config = weston_config_parse(config_file);
 diff -ruN '--exclude=buildroot-build' a/clients/meson.build b/clients/meson.build
 --- a/clients/meson.build	2026-04-24 08:06:05.000000000 +0000
-+++ b/clients/meson.build	2026-11-07 10:13:06.176606338 +0000
++++ b/clients/meson.build	2026-11-08 19:01:13.035161114 +0000
 @@ -490,6 +490,8 @@
  		'desktop-shell.c',
  		weston_desktop_shell_client_protocol_h,
@@ -1001,7 +1827,7 @@ diff -ruN '--exclude=buildroot-build' a/clients/meson.build b/clients/meson.buil
  		include_directories: common_inc,
 diff -ruN '--exclude=buildroot-build' a/desktop-shell/meson.build b/desktop-shell/meson.build
 --- a/desktop-shell/meson.build	2026-04-24 08:06:05.000000000 +0000
-+++ b/desktop-shell/meson.build	2026-11-07 10:13:06.176688401 +0000
++++ b/desktop-shell/meson.build	2026-11-08 19:01:13.035322186 +0000
 @@ -6,6 +6,8 @@
  		'input-panel.c',
  		weston_desktop_shell_server_protocol_h,
@@ -1013,7 +1839,7 @@ diff -ruN '--exclude=buildroot-build' a/desktop-shell/meson.build b/desktop-shel
  	]
 diff -ruN '--exclude=buildroot-build' a/desktop-shell/shell.c b/desktop-shell/shell.c
 --- a/desktop-shell/shell.c	2026-04-24 08:06:05.000000000 +0000
-+++ b/desktop-shell/shell.c	2026-11-07 10:13:06.177087150 +0000
++++ b/desktop-shell/shell.c	2026-11-08 19:01:13.036468035 +0000
 @@ -39,6 +39,7 @@
  #include "shell.h"
  #include "frontend/weston.h"
@@ -1363,7 +2189,7 @@ diff -ruN '--exclude=buildroot-build' a/desktop-shell/shell.c b/desktop-shell/sh
  	shell->panel_position = WESTON_DESKTOP_SHELL_PANEL_POSITION_TOP;
 diff -ruN '--exclude=buildroot-build' a/desktop-shell/shell.h b/desktop-shell/shell.h
 --- a/desktop-shell/shell.h	2026-04-24 08:06:05.000000000 +0000
-+++ b/desktop-shell/shell.h	2026-11-07 10:13:06.177498457 +0000
++++ b/desktop-shell/shell.h	2026-11-08 19:01:13.036679572 +0000
 @@ -130,6 +130,16 @@
  
  	int focus_count;
@@ -1398,7 +2224,7 @@ diff -ruN '--exclude=buildroot-build' a/desktop-shell/shell.h b/desktop-shell/sh
  	struct timespec startup_time;
 diff -ruN '--exclude=buildroot-build' a/protocol/meson.build b/protocol/meson.build
 --- a/protocol/meson.build	2026-04-24 08:06:05.000000000 +0000
-+++ b/protocol/meson.build	2026-11-07 10:13:06.177597165 +0000
++++ b/protocol/meson.build	2026-11-08 19:01:13.036760083 +0000
 @@ -32,6 +32,7 @@
  	[ 'pointer-constraints', 'unstable', 'v1' ],
  	[ 'relative-pointer', 'unstable', 'v1' ],
@@ -1409,7 +2235,7 @@ diff -ruN '--exclude=buildroot-build' a/protocol/meson.build b/protocol/meson.bu
  	[ 'text-cursor-position', 'internal' ],
 diff -ruN '--exclude=buildroot-build' a/protocol/synveil-shell-panel.xml b/protocol/synveil-shell-panel.xml
 --- a/protocol/synveil-shell-panel.xml	1970-01-01 00:00:00.000000000 +0000
-+++ b/protocol/synveil-shell-panel.xml	2026-11-07 10:13:06.177632228 +0000
++++ b/protocol/synveil-shell-panel.xml	2026-11-08 19:01:13.036794755 +0000
 @@ -0,0 +1,103 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<protocol name="synveil_shell_panel">
