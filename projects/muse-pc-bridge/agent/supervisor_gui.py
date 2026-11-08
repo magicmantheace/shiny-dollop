@@ -35,6 +35,11 @@ would act on the wrong desktop — the agent brokers those routes to
 the helper, which lives here in the owner's session. The helper
 stops when the window closes; the core keeps running and its
 desktop routes answer 501 until an avatar (and helper) runs again.
+One helper owns a state directory: a second window attaching to
+the same core reuses the live helper instead of starting another
+(start_attach_helper; the helper itself enforces it with an
+ownership lock) — two helpers would overwrite each other's
+registration while their process registries diverged.
 
 Usage:
   pythonw supervisor_gui.py [--config C:\\path\\config.json]
@@ -55,6 +60,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import bridge_agent  # noqa: E402
 import bridge_update  # noqa: E402
 import display_state  # noqa: E402
 import session_helper  # noqa: E402
@@ -192,6 +198,48 @@ def choose_gui_mode(config_path: Path, state_dir: Path, *,
             return ("attach", status) if is_bridge_agent(status) \
                 else ("foreign", status)
     return ("own", None)
+
+
+def start_attach_helper(config_path: Path,
+                        state_dir: Path) -> session_helper.SessionHelper | None:
+    """Start the session helper for an attach-mode window — unless
+    a live helper already owns this state directory.
+
+    Opening the launcher twice must not start two helpers: their
+    heartbeats would overwrite the same session-helper.json while
+    their process registries diverged, and brokered processes
+    would vanish depending on whose heartbeat landed last (Codex
+    PR #47 finding). So: when a LIVE registration already exists
+    (fresh heartbeat, live pid — the same test the agent applies),
+    reuse it and start nothing; a race the registration check
+    cannot see is settled by the helper's ownership lock, and the
+    loser of that race also starts nothing. Returns the helper this
+    window started (and must stop), or None when this window hosts
+    no helper of its own — the window is display-only either way,
+    and desktop brokering continues through the existing helper.
+    A STALE registration never blocks: it fails the liveness test
+    here just as it does agent-side, and the fresh helper takes
+    over the file.
+    """
+    reg = bridge_agent.read_session_helper(state_dir)
+    if reg is not None:
+        print(f"[supervisor-gui] A session helper is already "
+              f"registered on 127.0.0.1:{reg['port']} for this "
+              f"state directory; reusing it — this window starts "
+              f"no second helper.", flush=True)
+        return None
+    try:
+        helper = session_helper.SessionHelper(
+            config_path, state_dir).start()
+    except session_helper.HelperOwnershipError:
+        print("[supervisor-gui] Another window already hosts the "
+              "session helper for this state directory; this "
+              "window is display-only.", flush=True)
+        return None
+    print(f"[supervisor-gui] Session helper registered on "
+          f"127.0.0.1:{helper.port} for desktop brokering.",
+          flush=True)
+    return helper
 
 
 def _enable_dpi_awareness() -> None:
@@ -514,15 +562,14 @@ def main(argv: list[str] | None = None) -> int:
               "this window is display-only.", flush=True)
         # Host the interactive session helper from this (user
         # session) process, so the core can broker desktop routes
-        # here. Failure to start it must not block the avatar — the
-        # core then answers 501 for desktop routes, honestly.
+        # here — unless a live helper already owns this state dir
+        # (a second launcher window reuses it; see
+        # start_attach_helper). Failure to start one must not block
+        # the avatar — the core then answers 501 for desktop
+        # routes, honestly.
         helper = None
         try:
-            helper = session_helper.SessionHelper(
-                args.config, state_dir).start()
-            print(f"[supervisor-gui] Session helper registered on "
-                  f"127.0.0.1:{helper.port} for desktop brokering.",
-                  flush=True)
+            helper = start_attach_helper(args.config, state_dir)
         except Exception as exc:  # never block the window on it
             print(f"[supervisor-gui] WARNING: session helper failed "
                   f"to start ({exc}); desktop routes will answer "

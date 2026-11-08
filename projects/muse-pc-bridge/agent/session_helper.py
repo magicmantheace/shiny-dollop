@@ -16,6 +16,12 @@ those routes itself. This helper is the other half of that design:
 - It registers itself in <state_dir>/session-helper.json with a
   heartbeat; the main agent proxies desktop routes to a fresh
   registration and answers an honest 501 when none exists.
+- It holds an exclusive ownership lock
+  (<state_dir>/session-helper-owner.lock) for its whole lifetime:
+  exactly one helper may own a state directory, so a second avatar
+  window can never start a rival helper against the same
+  registration file (its start is refused with
+  HelperOwnershipError and the GUI reuses the live helper).
 - It shares the main audit log (its entries are marked
   "via": "session-helper"; the proxying agent marks its own
   "via": "session-broker"), and keeps its own process registry in
@@ -47,6 +53,19 @@ import bridge_agent  # noqa: E402
 import bridge_update  # noqa: E402
 
 HEARTBEAT_S = 5.0
+
+# Single-helper ownership of a state directory. Two helpers against
+# one state dir overwrite the same session-helper.json registration
+# while keeping divergent process registries, so brokered processes
+# vanish depending on whose heartbeat landed last (Codex PR #47
+# finding). The owner holds an OS exclusive lock on this sidecar
+# file for its whole lifetime; the lock dies with the process, so
+# a crashed owner never needs a janitor.
+HELPER_OWNER_LOCK_NAME = "session-helper-owner.lock"
+
+
+class HelperOwnershipError(RuntimeError):
+    """Another live session helper already owns this state dir."""
 
 # The ONLY routes this server serves. Anything else is a 404: the
 # helper exists to put desktop operations in the interactive
@@ -114,6 +133,9 @@ class SessionHelper:
         self.session_id = bridge_agent.current_session_id()
         self._stop = threading.Event()
         self._threads: list[threading.Thread] = []
+        # The state-dir ownership lock handle, held from start()
+        # until stop() (or process exit). None until acquired.
+        self._owner_fh = None
 
     # -- registration ------------------------------------------------------
     def _registry_obj(self) -> dict:
@@ -149,10 +171,56 @@ class SessionHelper:
         while not self._stop.wait(HEARTBEAT_S):
             self._write_registry()
 
+    # -- ownership ---------------------------------------------------------
+    def _acquire_ownership(self) -> None:
+        """Claim exclusive helper ownership of the state dir.
+
+        Raises HelperOwnershipError when a live helper already
+        holds it. The lock is the held-open file handle itself:
+        closing it (stop(), or the process dying) releases the
+        claim, so a stale REGISTRATION file alone never blocks a
+        fresh helper — read_session_helper's freshness/pid checks
+        decide whether a registration is trusted, this lock decides
+        who may write it.
+        """
+        lock_path = self.state_dir / HELPER_OWNER_LOCK_NAME
+        try:
+            self.state_dir.mkdir(parents=True, exist_ok=True)
+            fh = open(lock_path, "a+b")
+        except OSError as exc:
+            raise HelperOwnershipError(
+                f"cannot claim helper ownership of {self.state_dir} "
+                f"({exc})") from exc
+        if not bridge_agent._try_lock_file_exclusive(fh):
+            try:
+                fh.close()
+            except OSError:
+                pass
+            raise HelperOwnershipError(
+                f"another session helper already owns "
+                f"{self.state_dir}")
+        self._owner_fh = fh
+
+    def _release_ownership(self) -> None:
+        fh, self._owner_fh = self._owner_fh, None
+        if fh is not None:
+            bridge_agent._unlock_file(fh)
+            try:
+                fh.close()
+            except OSError:
+                pass
+
     # -- lifecycle -----------------------------------------------------------
     def start(self) -> "SessionHelper":
         self._started_at = time.time()
-        self.server = bridge_agent.create_server(self.cfg)
+        # Ownership FIRST: a refused helper must not load the shared
+        # registries or write a registration over the owner's.
+        self._acquire_ownership()
+        try:
+            self.server = bridge_agent.create_server(self.cfg)
+        except Exception:
+            self._release_ownership()
+            raise
         self.server.RequestHandlerClass = HelperHandler
         self.server.is_helper = True  # audit entries: via=session-helper
         self.port = int(self.server.server_address[1])
@@ -177,6 +245,7 @@ class SessionHelper:
             self.server.shutdown()
             self.server.server_close()
             self.server = None
+        self._release_ownership()
 
 
 def _os_getpid() -> int:
@@ -200,7 +269,12 @@ def main(argv: list[str] | None = None) -> int:
     state_dir = Path(state_value)
     if not state_dir.is_absolute():
         state_dir = (args.config.resolve().parent / state_dir).resolve()
-    helper = SessionHelper(args.config, state_dir).start()
+    try:
+        helper = SessionHelper(args.config, state_dir).start()
+    except HelperOwnershipError as exc:
+        print(f"[session-helper] {exc}; not starting a second one.",
+              file=sys.stderr)
+        return 1
     print(f"[session-helper] Desktop helper on 127.0.0.1:{helper.port} "
           f"(session {bridge_agent.current_session_id()}); "
           f"registered in {state_dir}. Ctrl+C stops it.")
