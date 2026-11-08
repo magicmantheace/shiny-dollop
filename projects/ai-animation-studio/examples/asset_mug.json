@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0.0",
+  "asset_id": "mug_wood_01",
+  "kind": "prop",
+  "uri": "assets/props/mug_wood_01.glb",
+  "status": "candidate",
+  "tags": [
+    "hand_prop",
+    "drink",
+    "wood"
+  ],
+  "rig_id": null,
+  "metadata": {
+    "compatible_actions": [
+      "hold",
+      "drink",
+      "place"
+    ],
+    "socket": "right_hand",
+    "note": "Example metadata only; referenced model is not included."
+  }
+}
