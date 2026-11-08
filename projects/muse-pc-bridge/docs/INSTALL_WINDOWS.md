@@ -174,3 +174,91 @@ stages a signed-by-hash bundle via `POST /v1/update/stage`, and the
 supervisor applies it at the next restart with a health check and
 automatic rollback. (Self-update only exists in the supervised
 form.)
+
+## v1.1 boot topology (core at boot, avatar at logon) — OPTIONAL, owner-activated
+
+**Status: built and VM-verified 2026-11-08; NOT activated.**
+Activation is a separate, owner-approved step — nothing in the
+v1.1 branch installs a task or changes the running bridge by
+itself. The production bridge keeps running in the avatar form
+until you do this.
+
+### What starts when
+
+| When | What | Task | Runs as |
+| --- | --- | --- | --- |
+| Machine boot | **Core**: `supervisor.py --headless` (pythonw) → agent | `Muse PC Bridge (core)` (new) | SYSTEM |
+| User logon | **Avatar**: `supervisor_gui.py`, attaches display-only to the core | `Muse PC Bridge (avatar)` (existing) | the user |
+| — (rollback) | Console supervisor form | `Muse PC Bridge (supervised)` (existing, currently disabled) | the user |
+
+The core does no GUI work. `display-state.json` is published by
+the supervisor core in every form, so it stays fresh before logon
+and with no window open. The avatar attaching does not own the
+agent: closing it leaves the bridge running (its menu reads
+"Close avatar (bridge keeps running)"). If the avatar starts and
+no core answers, it falls back to running its own supervisor,
+exactly as before v1.1.
+
+### Activation (owner, interactive, in order)
+
+1. Pull the v1.1 branch on the PC checkout and run the suite:
+   `python -m unittest discover -s tests -v` — expect OK under
+   Windows Python (skips for POSIX-only tests are expected, the
+   reverse of the VM).
+2. Deploy agent 1.1.0 to production the usual way (staged
+   self-update or a manual swap during a stopped window) and
+   confirm `client\bridge_client.py status` reports
+   `"version": "1.1.0"` and a `uac_prompt` field.
+3. Stop the bridge (avatar kill switch) so no supervisor owns the
+   agent port.
+4. From an **elevated** PowerShell in `scripts\`:
+   `.\bridge-core.ps1 -Action install` — expect a UAC prompt
+   (creating a SYSTEM task needs it); the script also warns if
+   the old `(supervised)` logon task is still enabled — leave it
+   disabled; it is the rollback path, not a second owner.
+5. `.\bridge-core.ps1 -Action start`, wait ~10 s, then
+   `.\bridge-core.ps1 -Action status` — the supervisor status
+   file should show `running`; from the VM, Muse's `status`
+   check should answer **without anyone logged on** after a
+   reboot (that is the point of the exercise — verify it with an
+   actual reboot when convenient).
+6. Log on: the avatar task starts the GUI, which should attach —
+   its state follows the already-running agent, and closing it
+   (to test) leaves `status` answering from the VM.
+
+### Rollback
+
+`.\bridge-core.ps1 -Action stop`, then
+`.\bridge-core.ps1 -Action uninstall`, then start the avatar form
+(or re-enable the `(supervised)` console task via
+`bridge-service.ps1`). Config, token, state dir, and audit log
+are shared by all forms and are not touched by any of this.
+
+### v1.1 feature checks on the PC (the VM could not prove these)
+
+1. **UAC signal**: with the bridge running, trigger an elevation
+   prompt (e.g. run `bridge-core.ps1 -Action status` from a
+   non-elevated shell via "Run as administrator" on something
+   harmless, or install anything). While the prompt is up:
+   `client\bridge_client.py status` shows
+   `"uac_prompt": {"active": true, ...}`, the avatar reads
+   "Approval needed at PC", and `logs\audit.jsonl` gains a
+   `uac_prompt_shown` line. Dismiss the prompt: status flips back
+   and the audit log gains `uac_prompt_cleared` with the seconds
+   it waited.
+2. **GUI launch**: `client\bridge_client.py spawn-gui <path to
+   Godot exe>` (or any GUI app) — the window opens on the PC,
+   `processes` shows it alive with `gui: true` and the app's own
+   pid, and `processes <id> kill` closes it. This replaces the old
+   exec + Start-Process workaround.
+3. **Wake-on-LAN, from the PC**: note another LAN machine's MAC
+   (`ipconfig /all` on it), power it down with WoL enabled in its
+   BIOS, then `client\bridge_client.py wol <MAC> --broadcast
+   <subnet broadcast, e.g. 192.168.1.255>` — it should wake.
+4. **Wake-on-LAN, to the PC**: from any other awake device on the
+   LAN, run `python scripts\wol-send.py <the PC NIC's MAC>
+   --broadcast <subnet broadcast>` while the PC is asleep — the
+   PC should wake. (The bridge cannot do this direction itself; a
+   sleeping PC runs no agent. One-time prerequisites on the PC:
+   WoL enabled in BIOS/UEFI, the wired NIC allowed to wake the
+   machine in Device Manager, wired Ethernet connected.)

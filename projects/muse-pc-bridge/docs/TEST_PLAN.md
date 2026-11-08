@@ -44,8 +44,17 @@ PC during install verification.
 
 | File | Covers |
 | --- | --- |
-| `tests/test_display_state.py` (14) | the pure signal→display mapping: idle / working (job or tracked process) / session outranks working / staged update → connecting / fresh `applied_ok` → celebrate, stale → falls through / apply + rollback failures and a fresh rollback → alert / supervisor failure states → alert / agent unreachable: briefly → connecting, during restart states → connecting, too long → alert / alert outranks activity |
+| `tests/test_display_state.py` (18) | the pure signal→display mapping: idle / working (job or tracked process) / session outranks working / staged update → connecting / fresh `applied_ok` → celebrate, stale → falls through / apply + rollback failures and a fresh rollback → alert / supervisor failure states → alert / agent unreachable: briefly → connecting, during restart states → connecting, too long → alert / alert outranks activity / **v1.1: an active UAC prompt → alert art with label "Approval needed at PC", outranking working/session but not update failures; inactive or absent `uac_prompt` falls through** |
 | `tests/test_supervisor_gui.py` (4) | import-level smoke only (module imports with no window created); every art key the mapping can emit has a committed animation asset; the mapping only ever emits known art keys; every asset declares a transparent colour (byte-level Graphic Control Extension check — the floating window is colour-key transparent). A real Tk window needs a display and is verified on the owner's PC, never claimed from a headless run |
+
+### v1.1 suites (added 2026-11-08)
+
+| File | Covers |
+| --- | --- |
+| `tests/test_v1_gui_spawn.py` (9) | detached GUI launch: `{"gui": true, "executable", "args"}` spawns the executable directly and the registry tracks its real, live pid (the pid's own cmdline is the spawned program, not a wrapper); client-library round trip; missing/nonexistent `executable` → 400; bad `args` (string, non-string list, object) → 400; bad `cwd` → 400; the `gui` flag persists in `state/processes.json` and survives a record restore; a restored record (no Popen handle) reports liveness by OS pid; shell spawn still works and reports `gui: false` |
+| `tests/test_v1_wol.py` (12, 2 environment-skipped) | magic-packet layout (102 bytes: 6×0xFF + MAC×16); MAC normalization (colon/dash/bare/lowercase) and rejection of garbage; payload validation incl. defaults (255.255.255.255:9) and bad port/broadcast rejection; the route with the sender stubbed (validation → sender called with canonical values → result returned → audit line written with the MAC, status 200); auth required (401 both ways); `wol` in status capabilities; the standalone `scripts/wol-send.py` produces byte-identical packets. **Live delivery tests** (agent → UDP listener on loopback receives the exact packet; client-library live send) run only where the environment permits outbound UDP — the build VM's sandbox refuses ALL UDP sends (EPERM, verified for plain loopback with no broadcast flag), so they skip there with the reason stated |
+| `tests/test_v1_uac.py` (7) | monitor transitions with a stubbed probe: appear (snapshot `active` + ISO `since`), steady state (no duplicate transition, stable `since`), clear; exactly one `uac_prompt_shown` and one `uac_prompt_cleared` audit event, the cleared event carrying the waited seconds, and no credential strings anywhere in the events; a raising probe reads as no prompt; poll-interval config hardening (junk → 2.0 default, floor 0.5 s); the real probe returns False off Windows; `/v1/status` carries `uac_prompt: {active: false, since: null}` by default and flips when the core monitor transitions |
+| `tests/test_v1_boot_core.py` (12) | the supervisor core publishes `display-state.json` itself: working / idle / agent-down-too-long → alert states resolved from stubbed signals; write-on-change only (identical bytes incl. `since` on a repeat publish); the real run loop with a fake agent publishes and settles to idle; `choose_gui_mode` — attach when our agent answers, foreign when another agent answers, own immediately when nothing answers (no pointless wait, incl. when a core reports steady "running" but the agent is gone), attach after retries while a core reports a transient state, own after retries when it never answers; `--headless` stdio guard redirects pythonw-style None streams to `supervisor-core.log`; a real `supervisor.py --headless` subprocess starts its fake agent and reports `running` |
 
 ### Verified so far
 
@@ -209,6 +218,24 @@ PC during install verification.
   test. **Not verified:** the Windows graceful-stop path
   (CTRL_BREAK_EVENT) and everything else Windows-side; nothing was
   deployed to the owner's PC — the production bridge is untouched.
+- 2026-11-08 (v1.1 features, Muse's Linux VM, Python 3.12):
+  baseline re-run before the work: **88 tests, OK (1 skip)**.
+  After: **full suite 132 tests, OK (3 skips)** — the pre-existing
+  Windows-only real-capture skip plus the two WoL live-delivery
+  tests, which skip in this sandbox because it refuses all outbound
+  UDP (EPERM on a plain loopback send, no broadcast involved);
+  the WoL route is still proven end-to-end there with the sender
+  stubbed, and the packet bytes are proven exactly. The 44 new
+  tests cover GUI-mode detached spawn, Wake-on-LAN, the UAC
+  monitor + status field + display mapping, and the boot-core
+  topology (display publishing, GUI mode choice, headless entry).
+  **Not verified (owner-PC only, activation not performed):** the
+  Toolhelp32 consent.exe probe against a real UAC prompt; a real
+  GUI application launched via gui mode (window appears, pid
+  tracked, breakaway flags); a magic packet actually waking a
+  sleeping machine; the SYSTEM boot task starting the core before
+  logon and the avatar attaching on the real desktop. Nothing was
+  deployed to the owner's PC.
 
 ## What the tests cannot prove
 
@@ -233,6 +260,28 @@ These require the owner's PC and are **not** claimed by any VM test:
 - **v1 exit criteria from the plan**: surviving a reboot and a week
   of unattended running, and the four 2026-11-04 workflows running
   with zero workarounds — these are owner-PC, elapsed-time checks.
+- **v1.1 UAC probe on real Windows**: that consent.exe presence
+  tracks a real elevation prompt's lifetime, that the agent (in
+  whichever session the core runs) can enumerate it, and that the
+  avatar flips to "Approval needed at PC" while a prompt is up and
+  back when it clears. The VM proves the monitor logic and every
+  surface with the probe stubbed — never the probe itself.
+- **v1.1 GUI launch on real Windows**: spawning an actual GUI
+  executable (e.g. Godot) with `gui: true` — window opens, the
+  tracked pid is the app, the app survives the request and agent
+  restarts of the supervisor, and the breakaway-from-job flags
+  behave. The VM proves the direct-spawn mechanics with a console
+  child only.
+- **v1.1 Wake-on-LAN end-to-end**: a packet from the agent (or from
+  `scripts/wol-send.py` on another LAN device) actually waking a
+  configured, sleeping machine — a property of that machine's
+  BIOS/NIC/OS settings. The VM build sandbox cannot even send UDP,
+  so live delivery is unproven there by environment, not by code.
+- **v1.1 boot topology activation**: the "Muse PC Bridge (core)"
+  task firing at boot as SYSTEM, the agent answering before logon,
+  the avatar attaching at logon (and its close leaving the core
+  running), and rollback to the logon form. Script/code + VM tests
+  only; activation is a separate owner-approved step.
 
 ## Owner-PC verification checklist (part of install)
 

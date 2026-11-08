@@ -28,6 +28,20 @@ Owner's Windows PC                          Muse's Linux VM
   Long-running HTTP server. Started manually via
   `scripts/start-bridge.cmd` (visible console) or, optionally, by a
   logon task.
+- **Supervisor forms (v1.1 topology)**: one `Supervisor` core
+  (`agent/supervisor.py`) — crash restart, staged-update apply with
+  health check and rollback, `supervisor-status.json`, and (since
+  v1.1) publishing of `display-state.json` — runs in three forms:
+  a visible **console** (the original kill-switch form), a
+  **headless core** (`--headless`, pythonw, started at machine boot
+  by the "Muse PC Bridge (core)" Scheduled Task as SYSTEM, before
+  any logon), and embedded in the **avatar GUI**
+  (`agent/supervisor_gui.py`). When a core already answers, the GUI
+  **attaches display-only** instead of starting a second supervisor:
+  closing the avatar then leaves the bridge running, and the window
+  says so. The headless core never does GUI work; display-state
+  publishing is the supervisor's, so the file local apps read stays
+  fresh with no window open.
 - **Client** (`client/bridge_client.py`): thin CLI used by Muse.
   Reads `MUSE_PC_BRIDGE_URL` / `MUSE_PC_BRIDGE_TOKEN` from the
   environment.
@@ -69,6 +83,16 @@ Response (agent `1.0.0`; v0 fields retained):
 `capabilities` lists what this agent on this platform can do;
 Windows-only services appear in `platform_limited` (and return 501)
 on other platforms.
+
+Since v1.1 the status body also carries **`uac_prompt`**:
+`{"active": bool, "since": <ISO timestamp or null>}` — whether a
+UAC elevation/consent prompt is currently awaiting the owner on
+the PC (detected by the presence of `consent.exe`, polled every
+`uac_poll_interval_s`, default 2 s; always inactive off Windows).
+Presence only: the agent never reads the prompt's contents.
+Transitions are audited as `uac_prompt_shown` /
+`uac_prompt_cleared` events, and the avatar maps an active prompt
+to its alert art with the label "Approval needed at PC".
 
 ### POST /v1/exec — jobs (v1)
 Exec is a **job**. Submitting returns `202` with a `job_id`
@@ -122,6 +146,31 @@ state dir. `GET /v1/processes`, `GET /v1/processes/{id}?tail_bytes=N`,
 `POST /v1/processes/{id}/kill`. The registry persists to
 `state/processes.json`; after an agent restart, tracked processes
 are reported by OS pid liveness.
+
+**GUI mode (v1.1):** with `"gui": true`, the request names an
+`executable` (plus optional `args` list) instead of a shell
+`command`, and the agent spawns the executable **directly**. A
+shell-wrapped spawn cannot track a GUI application — the wrapper
+exits as soon as it hands off to the GUI exe, so the app reported
+dead instantly (hit with the Godot launches, 2026-11-06). In GUI
+mode the tracked pid IS the application; on Windows the spawn also
+requests breakaway from any job object that dies with the agent,
+retrying without that flag when the job refuses. Records and
+responses carry `"gui": true/false`. A command string is not
+accepted in GUI mode — it cannot be split into argv safely.
+
+### Wake-on-LAN (v1.1)
+`POST /v1/wol` with `{"mac": "AA:BB:CC:DD:EE:FF", "broadcast":
+"192.168.1.255", "port": 9}` (broadcast/port optional; defaults
+255.255.255.255 and 9) sends the 102-byte magic packet by UDP
+broadcast **from the agent machine**, for waking *other* machines
+on its LAN. Token-authed and audited like every route; advertised
+as the `wol` capability. The honest limit: a sleeping PC runs no
+agent, so **the bridge cannot wake its own host** — waking the
+bridge PC itself requires a sender on some other always-on LAN
+device (or an awake Tailscale peer on that LAN); `scripts/wol-send.py`
+is that sender, and its docstring lists the target-side
+prerequisites (BIOS WoL, NIC wake permission, wired Ethernet).
 
 ### Interactive sessions (v1)
 `POST /v1/sessions` opens a shell session; `GET /v1/sessions/{id}`

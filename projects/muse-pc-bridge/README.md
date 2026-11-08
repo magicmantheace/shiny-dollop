@@ -27,9 +27,12 @@ things protect it — read `docs/DESIGN.md` before changing any of them:
 3. **Audit log** — append-only JSONL on the PC records every
    request (including failed auth), every command, and every file
    transfer. Non-negotiable.
-4. **Kill switch** — v0 runs in a visible console window. Window
-   open = running. Close it and access ends immediately. No
-   background service.
+4. **Kill switch** — the console and avatar forms run in a visible
+   window: window open = running, close it and access ends
+   immediately. The optional v1.1 **boot core** runs headless from
+   machine boot (see below); its switches are the Scheduled Task
+   controls and `scripts\bridge-core.ps1 -Action stop`, and the
+   avatar at logon shows its state.
 
 ## Quick start (owner's PC, summary)
 
@@ -55,17 +58,20 @@ and token to Muse **out-of-band** — never via git.
 | Path | What |
 | --- | --- |
 | `agent/bridge_agent.py` | the server (runs on the PC) |
-| `agent/supervisor.py` | v1 service form: visible-console supervisor (auto-restart, staged-update apply + health check + auto-rollback) |
-| `agent/supervisor_gui.py` | avatar-display supervisor form: same Supervisor core in a floating window — Muse's avatar animated by real bridge activity, colour-key transparent so only the character shows on the desktop; closing the window is the kill switch |
-| `agent/display_state.py` | pure signal→display-state mapping for the avatar window (idle / working / session / connecting / celebrate / alert) |
+| `agent/supervisor.py` | supervisor core (auto-restart, staged-update apply + health check + auto-rollback, publishes `display-state.json`): visible-console form, or `--headless` boot-core form under pythonw |
+| `agent/supervisor_gui.py` | avatar-display form: floating window — Muse's avatar animated by real bridge activity, colour-key transparent so only the character shows on the desktop; owns its supervisor (closing the window is the kill switch) or **attaches display-only** to a running core (closing it then leaves the bridge running, and the menu says so) |
+| `agent/display_state.py` | pure signal→display-state mapping for the avatar (idle / working / session / connecting / celebrate / alert; an active UAC prompt maps to alert with label "Approval needed at PC") |
 | `agent/assets/avatar/` | avatar animation loops, one full-frame transparent GIF per display state |
 | `agent/bridge_update.py` | self-update mechanics (bundle verify, staged apply, rollback) |
 | `agent/helpers/uia.ps1` | fixed UI Automation helper driven by the agent (JSON parameters only) |
-| `client/bridge_client.py` | Muse-side library + CLI (jobs, processes, sessions, chunked files, screenshot/input/clipboard/uia) |
+| `client/bridge_client.py` | Muse-side library + CLI (jobs, processes incl. `spawn-gui`, sessions, chunked files, screenshot/input/clipboard/uia, `wol`) |
 | `scripts/start-bridge.cmd` | start the agent in a visible console |
 | `scripts/start-bridge-service.cmd` | start the supervised agent (v1 service form) |
-| `scripts/start-bridge-gui.cmd` | start the avatar-display supervisor form (no console window) |
+| `scripts/start-bridge-gui.cmd` | start the avatar-display form (no console window) |
+| `scripts/start-bridge-core.cmd` | start the headless core (v1.1 boot form, pythonw, no window) |
 | `scripts/bridge-service.ps1` | manage the supervised form as a logon task (install/start/stop/status/uninstall) |
+| `scripts/bridge-core.ps1` | manage the boot core task (install/start/stop/status/uninstall; SYSTEM, at startup) |
+| `scripts/wol-send.py` | standalone Wake-on-LAN sender (for waking the bridge PC itself from another LAN device — the bridge cannot wake its own host) |
 | `scripts/install-autostart.ps1` | OPTIONAL logon autostart (same visible console) |
 | `config.example.json` | config shape (real `config.json` is git-ignored) |
 | `tests/` | end-to-end suites: boot the real server on loopback (`test_bridge.py` + `test_v1_*.py`) |
@@ -125,3 +131,27 @@ test that failed pre-fix. **Verified on Muse's Linux VM:
 PC**, and this branch is **not deployed** — the production
 bridge still runs the pre-fix build. See the 2026-11-08 entry in
 `docs/MUSE_HANDOFF.md`.
+
+**Update (2026-11-08, v1.1 — agent `1.1.0`, branch
+`muse-pc-bridge/v1-1-features`):** four features, all owner-requested.
+(1) **UAC consent signal**: the agent polls for `consent.exe` and
+reports `uac_prompt` on `/v1/status`, audits appear/clear, and the
+avatar shows "Approval needed at PC". (2) **Boot-surviving core**:
+a headless supervisor form started by a SYSTEM boot task
+(`scripts\bridge-core.ps1`) brings the bridge up before logon; the
+avatar attaches to it display-only. (3) **Wake-on-LAN**:
+`POST /v1/wol` sends a magic packet from the PC to wake other LAN
+machines, plus the standalone `scripts\wol-send.py` for the other
+direction (the bridge cannot wake its own host — stated plainly in
+both places). (4) **Detached GUI launch**: `process_spawn` gains a
+`gui` mode that spawns the executable directly so the tracked pid
+is the app itself. **Verified on Muse's Linux VM: 132 tests,
+OK (3 skips)** — baseline was 88; the new skips are the two WoL
+live-delivery tests, which need outbound UDP the VM sandbox
+refuses. **Not verified on the PC** (no PC contact during this
+work, at the owner's direction): the consent.exe probe against a
+real prompt, a real GUI app spawn, an actual machine waking, and
+the boot-task activation. **Not deployed** — production still runs
+the pre-v1.1 build; deploying and activating the boot core are
+separate owner-approved steps. See the 2026-11-08 v1.1 entry in
+`docs/MUSE_HANDOFF.md` and the checklists in `docs/TEST_PLAN.md`.

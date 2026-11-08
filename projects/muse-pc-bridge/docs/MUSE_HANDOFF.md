@@ -607,3 +607,69 @@ proven end-to-end with the real agent (direct SIGTERM and via
 (needs the owner's PC), and no deployment was made — the
 production bridge on the PC still runs the pre-fix v1.0.0 build.
 Deploying this branch is a separate owner-directed step.
+
+## 2026-11-08 — v1.1 features built (branch `muse-pc-bridge/v1-1-features`), VM-verified, NOT deployed
+
+The owner directed the bridge v1.1 wish list ("Build them in
+then", 2026-11-08) and barred PC testing that day — so this was
+built entirely on the VM: **no PC contact, no deployment, no task
+installed**. Agent version is now `1.1.0`.
+
+**What was built** (one commit per feature on top of main
+`822083c`, which already carried the PR #46 fixes):
+
+1. **UAC consent detection + signal** (`bd22931`). A `UacMonitor`
+   in the agent polls `consent.exe` presence via a Toolhelp32
+   snapshot (ctypes signatures declared per the house discipline).
+   Surfaces: `/v1/status` gains `uac_prompt: {active, since}`;
+   audit events `uac_prompt_shown` / `uac_prompt_cleared`
+   (presence/duration only — never credential content); the
+   display mapping sends an active prompt to the avatar's alert
+   art with the distinct label "Approval needed at PC". Poll
+   interval is config `uac_poll_interval_s` (default 2.0). The
+   probe is a no-op (False) off Windows and on any probe failure.
+2. **Boot-surviving core** (`e32561a`). `supervisor.py --headless`
+   is the core form (pythonw, prints to
+   `state/supervisor-core.log`), started at boot by the new
+   "Muse PC Bridge (core)" SYSTEM task (`scripts/bridge-core.ps1`
+   + `start-bridge-core.cmd`) — bridge up before/without logon.
+   The supervisor (all forms) now publishes `display-state.json`
+   itself; the avatar window no longer writes it. The GUI probes
+   first and **attaches display-only** when a core answers (with a
+   short retry only while a core reports a transient state — the
+   logon/boot race); its menu then reads "Close avatar (bridge
+   keeps running)". A non-bridge answer on the port refuses
+   startup. No core → the historical own-supervisor form.
+   Rollback = uninstall the boot task, return to a logon form;
+   config/token/state/audit are shared and untouched.
+3. **Wake-on-LAN** (`3b22829`). `POST /v1/wol {mac, broadcast?,
+   port?}` sends the 102-byte magic packet from the PC (token +
+   audit, `wol` capability), client `wol()` + CLI. Standalone
+   `scripts/wol-send.py` covers waking the bridge PC itself, with
+   the honest prerequisite in its docstring: some other always-on
+   LAN device must send the packet — a sleeping PC runs no agent.
+4. **Detached GUI launch** (`262c73e`). `POST /v1/processes` with
+   `{"gui": true, "executable", "args"}` spawns the executable
+   directly — the tracked pid is the app, not a shell wrapper that
+   exits on handoff (the Milky Way Godot defect). Windows spawn
+   also requests breakaway-from-job, retrying without it when
+   refused. Records persist/report `"gui"`. Client `process_spawn`
+   gains `gui/executable/args`; CLI gains `spawn-gui`.
+
+**Verified (Muse's Linux VM, 2026-11-08):** baseline before the
+work **88 tests, OK (skipped=1)**; after, **full suite 132 tests,
+OK (skipped=3)**. The two new skips are the WoL live-delivery
+tests: this VM's sandbox refuses ALL outbound UDP (EPERM on a
+plain loopback send, verified separately), so they skip with the
+reason stated and run where UDP is permitted; the WoL route is
+otherwise proven end-to-end with the sender stubbed and the
+packet bytes proven exactly.
+
+**NOT verified — PC-verification pending** (activation/checklist
+in `docs/INSTALL_WINDOWS.md`, list in `docs/TEST_PLAN.md`): the
+consent.exe probe against a real UAC prompt; a real GUI app
+spawned via gui mode; a magic packet waking a real machine (both
+directions); the boot task firing as SYSTEM, the agent answering
+before logon, and the avatar attaching on the real desktop.
+Deploying 1.1.0 and activating the boot core are separate
+owner-approved steps — do not treat this branch landing as either.
