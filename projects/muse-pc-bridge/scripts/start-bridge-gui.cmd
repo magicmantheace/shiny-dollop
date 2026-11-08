@@ -1,8 +1,8 @@
 @echo off
-rem muse-pc-bridge — start the GUI (avatar display) supervisor.
+rem muse-pc-bridge -- start the GUI (avatar display) supervisor.
 rem The floating avatar window is the visible indicator that the
 rem bridge is running, and stopping it (x or right-click > Stop
-rem bridge) stops the supervisor AND the agent — that is the kill
+rem bridge) stops the supervisor AND the agent -- that is the kill
 rem switch, same as closing the console in the other forms. The
 rem supervisor still restarts the agent on crash and applies staged
 rem updates with automatic rollback (see agent\supervisor_gui.py).

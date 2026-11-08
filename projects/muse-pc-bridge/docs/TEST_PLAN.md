@@ -56,6 +56,7 @@ PC during install verification.
 | `tests/test_v1_uac.py` (7) | monitor transitions with a stubbed probe: appear (snapshot `active` + ISO `since`), steady state (no duplicate transition, stable `since`), clear; exactly one `uac_prompt_shown` and one `uac_prompt_cleared` audit event, the cleared event carrying the waited seconds, and no credential strings anywhere in the events; a raising probe reads as no prompt; poll-interval config hardening (junk → 2.0 default, floor 0.5 s); the real probe returns False off Windows; `/v1/status` carries `uac_prompt: {active: false, since: null}` by default and flips when the core monitor transitions |
 | `tests/test_v1_boot_core.py` (18) | the supervisor core publishes `display-state.json` itself: working / idle / agent-down-too-long → alert states resolved from stubbed signals; write-on-change only (identical bytes incl. `since` on a repeat publish); **a label-only change (alert reason: agent down → UAC waiting) republishes with the original `since`**; the real run loop with a fake agent publishes and settles to idle; `choose_gui_mode` — attach when our agent answers, foreign when another agent answers, own immediately when nothing answers and no live core is evidenced (no status file / "stopped" / stale timestamp with a dead pid), **wait while a core may be alive (fresh status — including steady "running", which the supervisor writes before the agent binds — or a live agent_pid), then attach when the agent starts answering**, own after the bounded wait when it never answers; **stop-request file: a running supervisor consumes it and stops gracefully (status "stopped", no restart, file consumed), and a stale file is cleared at startup**; `--headless` stdio guard redirects pythonw-style None streams to `supervisor-core.log`; a real `supervisor.py --headless` subprocess starts its fake agent and reports `running` |
 | `tests/test_v1_session_broker.py` (9) | the session broker: desktop-route whitelist matrix (exec/status/files/sessions/WoL/update all excluded); the helper server 404s non-desktop routes, 501s desktop routes honestly off Windows, still enforces auth; registration lifecycle (fresh registry with port/pid/session, removed on stop); **a real main server proxies a GUI spawn → inspect → kill to a real helper, the record living with the helper, and both sides audit with `via` markers (`session-broker` / `session-helper`)**; a stale registration or `session_broker: false` means local service; **a session-0 agent (session probe patched to 0) refuses desktop routes 501 without a helper and proxies them with one**; the helper starts no second UAC watch (watch starts counted via the entry point; the monitor loop itself is a no-op off Windows) |
+| `tests/test_script_encoding.py` (2) | every shipped `.ps1`/`.cmd` file is **pure ASCII bytes** -- Windows PowerShell 5.1 reads a BOM-less `.ps1` as ANSI, so a UTF-8 em dash decodes to bytes including a stray `"` and the whole file fails to parse (the `bridge-core.ps1` install failure on the owner's PC, 2026-11-08). The scan must find the scripts (incl. `bridge-core.ps1`) and every byte must be < 128 |
 
 ### Verified so far
 
@@ -258,6 +259,22 @@ PC during install verification.
   reason changed — it now compares state+art+label and republishes,
   preserving `since`. **Full suite on the VM: 147 tests, OK
   (3 skips)** — the same three skips as the 132 run.
+- 2026-11-08 (script encoding fix, Muse's Linux VM, Python 3.12):
+  the owner's first run of `scripts/bridge-core.ps1 -Action install`
+  on the PC failed to parse under Windows PowerShell 5.1 with
+  cascading errors (the error text itself showed mojibake): every
+  shipped `.ps1`/`.cmd` file contained UTF-8 em dashes saved
+  without a BOM, and 5.1 reads BOM-less files as ANSI, so the em
+  dash decoded to bytes including a stray `"` that broke string
+  quoting. All 21 em dashes across 8 files replaced with `--`;
+  files are byte-pure ASCII. New regression suite
+  `tests/test_script_encoding.py` (2 tests) asserts ASCII-only
+  bytes for every shipped script -- verified to FAIL against the
+  pre-fix `bridge-core.ps1` and pass after. **Full suite on the
+  VM: 149 tests, OK (3 skips).** Owner-PC proof the same day:
+  PowerShell's own parser (`Parser::ParseFile`) run over the
+  pulled scripts on the PC reported 0 errors for each -- see the
+  run note in `docs/MUSE_HANDOFF.md`.
 
 ## What the tests cannot prove
 

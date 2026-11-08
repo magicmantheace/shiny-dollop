@@ -1,10 +1,10 @@
-# muse-pc-bridge — BOOT CORE management (v1.1).
+# muse-pc-bridge -- BOOT CORE management (v1.1).
 #
 # The core is a machine-boot Scheduled Task running the supervisor
 # headless as SYSTEM (agent\supervisor.py --headless via
 # scripts\start-bridge-core.cmd): the bridge comes up with the
 # machine, before and without any user logon. The avatar stays a
-# per-user logon component and ATTACHES to this core display-only —
+# per-user logon component and ATTACHES to this core display-only --
 # closing the avatar does not stop the core.
 #
 #   .\bridge-core.ps1 -Action install     register the boot task
@@ -13,14 +13,14 @@
 #   .\bridge-core.ps1 -Action stop        stop task + core processes
 #   .\bridge-core.ps1 -Action status      task + supervisor state
 #
-# install/uninstall create a SYSTEM task and WILL prompt for UAC —
+# install/uninstall create a SYSTEM task and WILL prompt for UAC --
 # run this yourself, interactively, from an elevated PowerShell.
 # Installing is an activation step: do it only when you mean to
 # switch the bridge to the boot topology. Before installing, stop
-# any other bridge form (console supervisor / avatar in own mode) —
+# any other bridge form (console supervisor / avatar in own mode) --
 # two supervisors cannot own one agent port. ROLLBACK: uninstall
 # this task and go back to the logon form (bridge-service.ps1
-# -Action install, or the avatar task) — nothing else changes; the
+# -Action install, or the avatar task) -- nothing else changes; the
 # config, token, state dir and audit log are shared and untouched.
 
 param(
@@ -71,7 +71,7 @@ switch ($Action) {
         # by dropping a stop-request file into the state dir. The
         # supervisor consumes it and stops the agent through its
         # normal path, so the audit log gains its server_stop entry.
-        # Killing processes outright would bypass that entry — the
+        # Killing processes outright would bypass that entry -- the
         # sweep below is only the fallback for a supervisor that
         # does not answer within 20 s.
         $requestFile = Join-Path $StateDir "stop-request.json"
@@ -91,7 +91,7 @@ switch ($Action) {
             Start-Sleep -Milliseconds 500
         }
         if ($graceful) {
-            Write-Output "Core stopped gracefully (audited shutdown — see agent\logs\audit.jsonl for server_stop)."
+            Write-Output "Core stopped gracefully (audited shutdown -- see agent\logs\audit.jsonl for server_stop)."
             break
         }
         Write-Warning "Graceful stop did not complete within 20 s; terminating processes directly. The audit log may miss its server_stop entry for this stop."

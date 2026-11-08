@@ -673,3 +673,16 @@ directions); the boot task firing as SYSTEM, the agent answering
 before logon, and the avatar attaching on the real desktop.
 Deploying 1.1.0 and activating the boot core are separate
 owner-approved steps — do not treat this branch landing as either.
+
+---
+
+**Script encoding fix (2026-11-08, later):** the owner's first
+interactive run of `bridge-core.ps1 -Action install` failed to
+parse on the PC -- Windows PowerShell 5.1 reads BOM-less `.ps1`
+files as ANSI, and the UTF-8 em dashes in the scripts decoded to
+bytes including a stray `"`, cascading into "Missing closing
+'}'" parse errors. All 8 shipped `.ps1`/`.cmd` files carried em
+dashes (21 total); all replaced with `--`, files now byte-pure
+ASCII. `tests/test_script_encoding.py` guards this (fails on the
+pre-fix files, passes now). Suite: **149 tests, OK (skipped=3)**
+on the VM. Owner-PC parser proof appended below once run.
