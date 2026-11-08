@@ -5,10 +5,10 @@
  "source_concept": "media-generation-quadruped-triceratops-v2-conce-0-ee82e801-a2f9-4911-9b7a-63fa35f916c2.webp",
  "asset_file": "triceratops.glb",
  "asset_location": "outputs/<slug>/ (local; not in git)",
- "sha256": "274c11a87e73c39dc99ff4fe42eca0da44db86d3d6876ad978404b2c5bbb6847",
- "bytes": 20292116,
+ "sha256": "06c5a1e2e837b5324ae9062e9e364ae0bdc5d0c6f972c8aeba1dd033d452bf0a",
+ "bytes": 20292012,
  "counts": {
-  "verts": 45001,
+  "verts": 45756,
   "faces": 89998,
   "raw_mesh_verts": 513882,
   "raw_mesh_faces": 667540
@@ -39,8 +39,94 @@
   "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
   "rigged": true,
   "rig_template": "quadruped",
-  "weight_method": "bone-heat (automatic weights)",
-  "rotate_z": 90,
+  "weight_method": "bone-heat (automatic weights); geodesic distance veto (factor 0.85, floor 0.19); label-aware veto (P3-SAM parts, 1323 entries vetoed by label); distance rescue on 542 verts",
+  "segmentation": {
+   "model": "P3-SAM (Tencent Hunyuan3D-Part)",
+   "parts": 5,
+   "proxy_faces": 50000,
+   "islands_relabelled": 7,
+   "separated_verts_added": 755,
+   "labelled_verts": 45756
+  },
+  "label_map": {
+   "0": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.HL",
+     "leg2.FR",
+     "leg2.HR"
+    ]
+   },
+   "1": {
+    "dominant": "leg2.HR",
+    "allowed": [
+     "head",
+     "leg.HR",
+     "leg2.HR",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.HL",
+     "leg2.FR"
+    ]
+   },
+   "2": {
+    "dominant": "leg.HL",
+    "allowed": [
+     "head",
+     "hips",
+     "leg.FR",
+     "leg.HL",
+     "leg.HR",
+     "leg2.FL",
+     "leg2.HL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg2.FR",
+     "leg2.HR"
+    ]
+   },
+   "3": {
+    "dominant": "neck",
+    "allowed": [
+     "head",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.HL",
+     "leg2.FR",
+     "leg2.HR"
+    ]
+   },
+   "4": {
+    "dominant": "leg2.FR",
+    "allowed": [
+     "head",
+     "leg.FR",
+     "leg2.FR",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.HL",
+     "leg2.HR"
+    ]
+   }
+  },
   "gpu_host": {
    "hostname": "AthenZ971",
    "agent": "1.0.0"

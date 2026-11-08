@@ -214,6 +214,98 @@
   pose still sails the flank, reduced but not eliminated versus
   pre-veto. No tearing at either amplitude.
 
+## Verified — 2026-11-06 (P2 cleanup slice: preflight, geodesic veto, segmentation)
+
+Layer 1 — concept pose spec + pre-flight check (VM):
+
+- Spec written into `docs/DESIGN.md` ("Concept pose & separation
+  spec", per body plan, with canonical prompt blocks).
+  `stages/prep/preflight.py` scores a concept image (pass/warn,
+  recorded in the run manifest by `pipeline.py` for rigged runs).
+  Calibration, all measured: the new to-spec giraffe concept
+  **passes** (4 leg components after erosion, min leg gap 0.035);
+  the ORIGINAL snow-goblin concept **warns** (arm-daylight row
+  fraction 0.009 — arms fused to the torso, the defect P1.1/P2
+  then had to fix downstream); the triceratops v2 concept passes.
+  Thresholds are documented in-code as heuristic.
+
+Layer 2 — geodesic weights (VM, Blender rig probes from the saved
+textured meshes):
+
+- The veto's reach comparison now uses max(Euclidean, graph-
+  geodesic) distance over the mesh surface (`stages/rig/
+  geodesic.py`); geodesic ALONE was measured worse (goblin heat
+  gate-rejected, torso share 0.268) because arm seed sleeves
+  legitimately spread over the flank — the union is the shipped
+  semantics. A beyond-TAIL exemption keeps distal flesh (toes,
+  fingertips) with its bone; exempting both ends re-broke the
+  goblin (ruff past the shoulder: share 0.133 → 0.320, rejected)
+  — tail-only is shipped, with the measurements in
+  `skin_policy.py`.
+- The P1.1-era quadruped belly guard zone was exercised for the
+  first time and MISFIRED (it enclosed the leg centrelines and
+  read 0.58 on a healthy rig); the zone was redrawn to the belly
+  wall between the leg columns (reads 0.204 on the same weights),
+  threshold unchanged at 0.25.
+- Probes without labels: goblin torso share 0.166, head 0.891;
+  triceratops feet 1.0, head 1.0, belly 0.197, coverage 1.0 both.
+
+Layer 3 — segmentation bake-off + stage (PC GPU + VM):
+
+- Bake-off (full record: `benchmarks/segmentation/scores.md`):
+  **P3-SAM adopted** — goblin CLEAN (arms split at the shoulder),
+  triceratops ROUGH (2 of 4 legs split); 100–188 s/mesh, peak
+  9.7 GB, VRAM back to baseline after exit; Tencent Community
+  licence permits commercial use in Canada. **PartField rejected
+  on licence** (NVIDIA non-commercial-only) despite CLEAN/CLEAN
+  quality; SAMesh not run (the bake-off's gating condition never
+  triggered).
+- The pipeline gained a `segment` stage (registry + orchestrator):
+  proxy built on the VM with the bake-off's exact recipe (a
+  rig-frame variant collapsed the triceratops draw to ONE part —
+  measured and reverted), P3-SAM as its own PC process in its own
+  venv, labels transferred in the rig by nearest face centroid
+  under the recorded canonical transform, geometry separated at
+  part boundaries (+1,803 goblin / +755 triceratops verts), and a
+  label-aware veto (foreign-part dominants forbidden on
+  non-boundary or beyond-reach pairs; plurality label→bone map).
+  Two failure modes were found and fixed during integration:
+  mass-summed label dominants emptied the goblin's leg bones
+  (heat rejected → plurality voting), and one degenerate proxy
+  face silently shifted trimesh's face indexing (make_proxy now
+  drops degenerate/duplicate faces; the glue validates counts).
+- **Snow Goblin re-proof** (full stack, from the saved textured
+  mesh; prior artifacts under `outputs/snow-goblin/
+  before-cleanup/`): 9 parts; heat accepted; coverage 1.0;
+  torso arm share **0.139 → 0.079**; head dominance 0.787 →
+  0.881; feet 0.904 → 0.831; hands 0.997 → 0.778 (the label
+  veto's cost on this draw — arm labels split the arms, and
+  interior arm verts lose some forearm weight; the gate is 0.5
+  and the wave render is clean). Wave @1.9 rad: chest/ruff stay
+  put. Stress @2.2 rad: the flank sail is **materially reduced**
+  in the front view (a narrower fin tight to the arm, flank no
+  longer bridges) and reduced in three-quarter; the residual is
+  the arm part's own webbing rotating with the arm — the fused
+  fur had to be assigned somewhere, and at 0.3 rad beyond the
+  shipped clip it still shows. New GLB sha256 `e94fb4cb…`,
+  catalogue re-issued, cold re-import verify passes.
+- **Triceratops re-proof** (full stack): 5 parts — head+frill
+  (11,052 faces), body (34,128), two far-side legs as their own
+  parts (2,599 + 2,116 faces), one small part (105); the two
+  near-side legs remain in the body label (P3-SAM's documented
+  weakness, same as the scored bake-off — the leg-separation
+  criterion is therefore only half met). Rig: heat accepted,
+  coverage 1.0, feet dominance **1.0** (= P1), head **1.0**
+  (≥ P1), belly leg share 0.200 (new gate; unvetoed heat
+  measures 0.352 and would fail), tail 0.427 (P1: 0.491 — the
+  stubby-tail evidence zone, not gated), bounce render clean.
+  New GLB sha256 `06c5a1e2…`, catalogue re-issued.
+- Ember Dragon and Treasure Chest outputs/catalogue entries
+  byte-identical (sha256 re-verified against their catalogue
+  entries). Full suite: **79 tests passing** (57 pre-P2 + 7
+  preflight + 10 geodesic/exemption + 4 label-veto + registry
+  update).
+
 ## Not yet verified
 
 - TRELLIS's proper textured export — blocked on the
@@ -228,15 +320,25 @@
   proportions (the goblin is a big-head chibi), and either template
   on a mesh whose facing needs `--rotate-z 180/270` (only 90 is
   exercised so far).
-- The weight-distance veto on any creature besides the Snow
-  Goblin: the radius defaults were calibrated on one fused-fur
-  biped; the quadruped belly guard zone and the winged torso guard
-  zone are defined but unexercised, and no other asset has been
-  re-rigged with the veto (the shipped Ember Dragon / Triceratops
-  rigs predate it and were deliberately left untouched).
-- A clean 2.2 rad stress pose for the goblin: beyond the shipped
-  clip the flank still sails (see the P1.1 section) — a geodesic
-  or hand-cleanup pass would be needed; not attempted.
+- The weight-distance veto's radius defaults were calibrated on
+  one fused-fur biped; the winged torso guard zone is still
+  defined but unexercised, and the Ember Dragon's shipped rig
+  still predates the veto (deliberately untouched). The
+  quadruped belly guard zone WAS exercised in P2 (and redrawn —
+  see the P2 section).
+- A fully clean 2.2 rad stress pose for the goblin: P2 reduced
+  the sail materially (front view) but the arm part's own web
+  still sweeps as a fin at that amplitude (see the P2 section).
+- The segment stage on any creature beyond the two re-proofs,
+  and P3-SAM's draw variance across tessellations: two draws on
+  near-identical goblin proxies gave 5 and 9 parts. The stage
+  accepts whatever multi-part draw it gets; a single-part draw
+  (seen once, on a non-scored proxy recipe) degrades the rig to
+  the Layer-2 stack rather than failing.
+- The label-aware veto on the winged-creature template
+  (unexercised), and separation's coincident-vertex seams under
+  engine rendering (Blender-verified only, like everything else
+  pre-P3).
 - GLB playback of the P1 assets in a game engine — same P3 caveat
   as P0; Blender-verified only.
 - The cleanup's debris-shell rule (< 0.5% of the largest shell) on a

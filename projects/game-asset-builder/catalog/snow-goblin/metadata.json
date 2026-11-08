@@ -5,10 +5,10 @@
  "source_concept": "media-generation-biped-snowgoblin-concept-0-7a45eb0e-b49c-4ecd-93c2-2db237069047.webp",
  "asset_file": "snow-goblin.glb",
  "asset_location": "outputs/<slug>/ (local; not in git)",
- "sha256": "86c91cd654ac179595f284463eaf0825b6e645d234c740da6c8999f8e849c49b",
+ "sha256": "e94fb4cb9f998ac2ee2322284c5a878f3ebd512c91b0a40dc42978c3325d4b08",
  "bytes": 22196376,
  "counts": {
-  "verts": 49080,
+  "verts": 50883,
   "faces": 98583,
   "raw_mesh_verts": 854106,
   "raw_mesh_faces": 1072406
@@ -37,7 +37,188 @@
   "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
   "rigged": true,
   "rig_template": "biped",
-  "weight_method": "bone-heat (automatic weights); distance veto (factor 0.85, floor 0.19); distance rescue on 1485 verts",
+  "weight_method": "bone-heat (automatic weights); geodesic distance veto (factor 0.85, floor 0.19); label-aware veto (P3-SAM parts, 50965 entries vetoed by label); distance rescue on 2753 verts",
+  "segmentation": {
+   "model": "P3-SAM (Tencent Hunyuan3D-Part)",
+   "parts": 9,
+   "proxy_faces": 49999,
+   "islands_relabelled": 103,
+   "separated_verts_added": 1803,
+   "labelled_verts": 50883
+  },
+  "label_map": {
+   "0": {
+    "dominant": "leg2.L",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg2.L",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.L",
+     "arm.L",
+     "arm.R",
+     "arm2.R",
+     "ear.L",
+     "leg2.R"
+    ]
+   },
+   "1": {
+    "dominant": "leg2.R",
+    "allowed": [
+     "head",
+     "leg.R",
+     "leg2.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.L",
+     "arm.L",
+     "arm.R",
+     "arm2.R",
+     "ear.L",
+     "leg2.L",
+     "leg2.L"
+    ]
+   },
+   "2": {
+    "dominant": "arm.L",
+    "allowed": [
+     "arm.L",
+     "arm2.L",
+     "ear.R",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.R",
+     "arm2.R",
+     "ear.L",
+     "leg2.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "3": {
+    "dominant": "arm.R",
+    "allowed": [
+     "arm.R",
+     "arm2.R",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.L",
+     "arm.L",
+     "ear.L",
+     "leg2.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "4": {
+    "dominant": "arm.L",
+    "allowed": [
+     "arm.L",
+     "arm2.L",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.R",
+     "arm2.R",
+     "ear.L",
+     "leg2.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "5": {
+    "dominant": "arm2.R",
+    "allowed": [
+     "arm.R",
+     "arm2.R",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.L",
+     "arm.L",
+     "ear.L",
+     "leg2.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "6": {
+    "dominant": "arm.L",
+    "allowed": [
+     "arm.L",
+     "arm2.L",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.R",
+     "arm2.R",
+     "ear.L",
+     "leg2.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "7": {
+    "dominant": "leg2.L",
+    "allowed": [
+     "arm2.L",
+     "head",
+     "leg.L",
+     "leg2.L",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.L",
+     "arm.L",
+     "arm.R",
+     "arm2.R",
+     "ear.L",
+     "leg2.R"
+    ]
+   },
+   "8": {
+    "dominant": "ear.L",
+    "allowed": [
+     "ear.L",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.L",
+     "arm.L",
+     "arm.R",
+     "arm2.R",
+     "leg2.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   }
+  },
   "gpu_host": {
    "hostname": "AthenZ971",
    "agent": "1.0.0"

@@ -7,7 +7,8 @@ class StageRegistryTests(unittest.TestCase):
     def test_stage_order_is_the_pipeline_order(self):
         self.assertEqual(
             stage_names(),
-            ["prep", "mesh", "texture", "rig", "animate", "catalog"])
+            ["prep", "mesh", "texture", "segment", "rig", "animate",
+             "catalog"])
 
     def test_stage_names_are_unique(self):
         names = stage_names()
