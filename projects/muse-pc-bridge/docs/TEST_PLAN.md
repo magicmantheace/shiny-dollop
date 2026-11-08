@@ -55,7 +55,8 @@ PC during install verification.
 | `tests/test_v1_wol.py` (12, 2 environment-skipped) | magic-packet layout (102 bytes: 6×0xFF + MAC×16); MAC normalization (colon/dash/bare/lowercase) and rejection of garbage; payload validation incl. defaults (255.255.255.255:9) and bad port/broadcast rejection; the route with the sender stubbed (validation → sender called with canonical values → result returned → audit line written with the MAC, status 200); auth required (401 both ways); `wol` in status capabilities; the standalone `scripts/wol-send.py` produces byte-identical packets. **Live delivery tests** (agent → UDP listener on loopback receives the exact packet; client-library live send) run only where the environment permits outbound UDP — the build VM's sandbox refuses ALL UDP sends (EPERM, verified for plain loopback with no broadcast flag), so they skip there with the reason stated |
 | `tests/test_v1_uac.py` (7) | monitor transitions with a stubbed probe: appear (snapshot `active` + ISO `since`), steady state (no duplicate transition, stable `since`), clear; exactly one `uac_prompt_shown` and one `uac_prompt_cleared` audit event, the cleared event carrying the waited seconds, and no credential strings anywhere in the events; a raising probe reads as no prompt; poll-interval config hardening (junk → 2.0 default, floor 0.5 s); the real probe returns False off Windows; `/v1/status` carries `uac_prompt: {active: false, since: null}` by default and flips when the core monitor transitions |
 | `tests/test_v1_boot_core.py` (18) | the supervisor core publishes `display-state.json` itself: working / idle / agent-down-too-long → alert states resolved from stubbed signals; write-on-change only (identical bytes incl. `since` on a repeat publish); **a label-only change (alert reason: agent down → UAC waiting) republishes with the original `since`**; the real run loop with a fake agent publishes and settles to idle; `choose_gui_mode` — attach when our agent answers, foreign when another agent answers, own immediately when nothing answers and no live core is evidenced (no status file / "stopped" / stale timestamp with a dead pid), **wait while a core may be alive (fresh status — including steady "running", which the supervisor writes before the agent binds — or a live agent_pid), then attach when the agent starts answering**, own after the bounded wait when it never answers; **stop-request file: a running supervisor consumes it and stops gracefully (status "stopped", no restart, file consumed), and a stale file is cleared at startup**; `--headless` stdio guard redirects pythonw-style None streams to `supervisor-core.log`; a real `supervisor.py --headless` subprocess starts its fake agent and reports `running` |
-| `tests/test_v1_session_broker.py` (9) | the session broker: desktop-route whitelist matrix (exec/status/files/sessions/WoL/update all excluded); the helper server 404s non-desktop routes, 501s desktop routes honestly off Windows, still enforces auth; registration lifecycle (fresh registry with port/pid/session, removed on stop); **a real main server proxies a GUI spawn → inspect → kill to a real helper, the record living with the helper, and both sides audit with `via` markers (`session-broker` / `session-helper`)**; a stale registration or `session_broker: false` means local service; **a session-0 agent (session probe patched to 0) refuses desktop routes 501 without a helper and proxies them with one**; the helper starts no second UAC watch (watch starts counted via the entry point; the monitor loop itself is a no-op off Windows) |
+| `tests/test_v1_session_broker.py` (11) | the session broker: desktop-route whitelist matrix (exec/status/files/sessions/WoL/update all excluded); the helper server 404s non-desktop routes, 501s desktop routes honestly off Windows, still enforces auth; registration lifecycle (fresh registry with port/pid/session, removed on stop); **a real main server proxies a GUI spawn → inspect → kill to a real helper, the record living with the helper, and both sides audit with `via` markers (`session-broker` / `session-helper`)**; a stale registration or `session_broker: false` means local service; **a session-0 agent (session probe patched to 0) refuses desktop routes 501 without a helper and proxies them with one**; the helper starts no second UAC watch (watch starts counted via the entry point; the monitor loop itself is a no-op off Windows); **the listing merge (Codex PR #47 re-review): a brokered spawn appears in the main agent's `GET /v1/processes` (tagged `via: session-helper`) and in `/v1/status` process counts, kill through the main agent is reflected in both, and the listing/counts degrade to local-only when the helper stops** |
+| `tests/test_v1_audit_coordination.py` (2) | audit coordination across two cores sharing ONE log (Codex PR #47 re-review): two `BridgeCore` instances append in strict alternation with entries in order; **the rotation race — the log + archives are primed with sentinel entries, the cap is derived from measured on-disk sizes so exactly one of two concurrent appends may rotate, and the first writer is parked between its rotation size check and the renames until the second writer has fully rotated and appended; every entry a serialized run retains (all but the oldest archive) must survive**. The cap deliberately comes from measured sizes: a line occupies one more byte on disk on Windows than POSIX (text-mode CRLF) while the core accounts `len(line)+1`, and an arithmetic cap made the second append rotate legitimately on Windows |
 | `tests/test_script_encoding.py` (2) | every shipped `.ps1`/`.cmd` file is **pure ASCII bytes** -- Windows PowerShell 5.1 reads a BOM-less `.ps1` as ANSI, so a UTF-8 em dash decodes to bytes including a stray `"` and the whole file fails to parse (the `bridge-core.ps1` install failure on the owner's PC, 2026-11-08). The scan must find the scripts (incl. `bridge-core.ps1`) and every byte must be < 128 |
 
 ### Verified so far
@@ -275,6 +276,52 @@ PC during install verification.
   PowerShell's own parser (`Parser::ParseFile`) run over the
   pulled scripts on the PC reported 0 errors for each -- see the
   run note in `docs/MUSE_HANDOFF.md`.
+- 2026-11-08 (Codex PR #47 re-review fixes, VM + owner's PC):
+  Codex's re-review of the broker fix round left two findings;
+  both verified real and fixed. (P1) The agent and the session
+  helper append to ONE audit log through separate `BridgeCore`
+  instances whose per-instance threading locks cannot coordinate
+  rotation: both could rotate from the same stale size and shift
+  the archives twice, discarding retained entries. `audit()` now
+  wraps rotate+append in two layers — a threading lock shared per
+  resolved log path within the process, and an OS file lock on a
+  sidecar (`audit.jsonl.lock`) across processes; acquisition
+  failure degrades to the previous unlocked behaviour with a
+  stderr warning (never a crash, never a dropped entry; no entry
+  content or rotation policy change). (P2) Brokered GUI spawns
+  lived only in the helper's registry while `GET /v1/processes`
+  and the `/v1/status` counts read only the local one; both now
+  merge the helper's records (tagged `via: session-helper`), and
+  a missing/unanswering helper degrades the merge to local-only.
+  **Full suite on the VM: 153 tests, OK (3 skips).** Owner-PC
+  runs (checkout pulled through the production bridge as jobs;
+  production 1.1.0 in the avatar form stayed up throughout;
+  Windows, Python 3.14.2): at `7664444` (the two fixes) the suite
+  ran 153 with **one failure** — the new audit race test lost a
+  retained archive (R2); at `73f53ab` (shared per-path lock added)
+  the same single failure recurred. Root cause then traced to the
+  TEST, not the lock: Windows text mode writes CRLF, so a line
+  occupies `len+2` bytes on disk while the core accounts an
+  incoming line as `len(line)+1`; the test's arithmetic cap sat
+  low enough on Windows that the second append rotated
+  legitimately and discarded R2 by the book. (The `73f53ab`
+  commit message attributed the first PC failure to msvcrt
+  same-process lock semantics; that claim is not established —
+  the accounting bug fully explains both PC runs — and commit
+  `f4d0306` corrects the record in the code/test comments. The
+  shared lock stays as deliberate hardening.) The test now
+  derives its cap from measured on-disk sizes and forces the
+  interleave structurally (first writer parked between its size
+  check and the renames until the second writer has fully
+  rotated and appended): against the pre-fix agent on the VM it
+  fails 3/3 with exactly the predicted R2 loss, and at
+  `f4d0306` the **owner-PC suite is fully green: 153 tests, OK
+  (8 skips)** — the 8 skips are the platform-mirror tests. Still
+  unproven: the file-lock layer under the real two-PROCESS split
+  (both suites run the two cores in one process, exercising the
+  in-process layer; the cross-process layer is exercised by the
+  activation verification below, not by the suite), and the boot
+  topology activation itself — see "What the tests cannot prove".
 
 ## What the tests cannot prove
 

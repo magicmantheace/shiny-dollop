@@ -694,3 +694,60 @@ each of `bridge-core.ps1`, `bridge-service.ps1`,
 on the PC confirmed **0 non-ASCII bytes** in all 8 shipped
 scripts (`.ps1` + `.cmd`). Production was not restarted. The
 install itself remains the owner's interactive run.
+
+---
+
+**Codex PR #47 re-review fixes + owner-PC suite (2026-11-08,
+later still):** the owner ran the install interactively — the
+"Muse PC Bridge (core)" boot task is now REGISTERED on the PC
+(State=Ready, confirmed from the owner's elevated shell; the
+agent's UAC monitor caught the consent prompt live, audit pair
+`uac_prompt_shown`/`uac_prompt_cleared` present). Codex's
+re-review of the broker fix round left two findings; both were
+verified real and fixed. (P1, commit `7664444`) The agent and
+the session helper append to ONE audit log through separate
+`BridgeCore` instances whose threading locks cannot coordinate
+rotation, so both could rotate from the same stale size and
+discard retained entries: `audit()` now wraps rotate+append in
+a per-path shared threading lock plus an OS file lock on a
+sidecar (`audit.jsonl.lock`), degrading to the previous unlocked
+behaviour with a warning if the lock cannot be taken (never a
+crash, never a dropped entry; no content or policy change).
+(P2, same commit) Brokered GUI spawns lived only in the helper's
+registry while `GET /v1/processes` and the `/v1/status` counts
+read only the local one; both now merge the helper's records
+(tagged `via: session-helper`), degrading to local-only when no
+helper answers. Regression tests were demonstrated failing
+pre-fix (the audit race lost primed entries 6/6 on the VM in its
+first form; the brokered spawn was absent from the main listing).
+**VM suite: 153 tests, OK (skipped=3).** Owner-PC verification
+ran as bridge jobs (production 1.1.0, avatar form, stayed up;
+checkout pulled by fast-forward each time): at `7664444` and
+again at `73f53ab` the PC suite ran 153 with ONE failure — the
+new audit race test losing a retained archive. That failure was
+traced to the TEST's byte accounting, not the lock: Windows text
+mode writes CRLF, so a line occupies `len+2` bytes on disk while
+the core accounts `len(line)+1`, and the test's arithmetic cap
+made the second append rotate legitimately on Windows. (The
+`73f53ab` commit message's attribution of the first failure to
+msvcrt same-process lock semantics is NOT established — the
+accounting bug fully explains both runs; `f4d0306` corrects the
+record. The shared lock from `73f53ab` stays as hardening.) At
+`f4d0306` — cap derived from measured on-disk sizes, interleave
+forced structurally (pre-fix agent on the VM now fails 3/3 with
+exactly the predicted loss) — the **owner-PC suite is fully
+green: 153 tests, OK (skipped=8), Python 3.14.2**. What remains
+unproven is unchanged in kind: the file-lock layer under the
+real two-process split (the suites co-host the cores in one
+process) and the boot-topology switch itself. The switch is
+staged, not performed: the core task is installed and Ready;
+production still runs the avatar form, executing the code loaded
+at its last start (the `c7b93bd` deployment); the checkout has
+since been pulled to `f4d0306`, which takes effect only when the
+agent restarts — at the switch.
+The choreographed switch (owner clicks the avatar's close =
+audited stop; owner runs `bridge-core.ps1 -Action start` in the
+elevated shell; verify the core on 8765; start the avatar task
+to attach + register the helper; verify display-state freshness
+and brokered desktop routes) is a separate owner-accompanied
+step — see `docs/TEST_PLAN.md` for the verification split.

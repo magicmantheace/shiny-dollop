@@ -181,6 +181,11 @@ hosted by the avatar process in the owner's logon session:
 - GUI process records live with the helper (its own registry under
   `state/session-helper/`); inspect/kill for an id the agent does
   not own are brokered too;
+- `GET /v1/processes` and the `/v1/status` process counts merge
+  the helper's records (tagged `via: session-helper`), so a
+  brokered process stays discoverable after its spawn response is
+  gone; a registered helper that does not answer degrades the
+  merge to local-only rather than failing the request;
 - with no helper registered, a session-0 agent answers these
   routes **501** with the reason, rather than touching the wrong
   desktop; an agent already in the interactive session (console /
@@ -314,6 +319,15 @@ line:
   `audit_max_bytes` (default 10 MiB), it is rotated to
   `audit.jsonl.1`, older files shift up, and at most `audit_keep`
   (default 5) rotated files are kept. Set either to 0 to disable.
+- **Two writers, one log (v1.1):** the session helper appends to
+  the same log through its own core. Rotation + append are
+  serialized across both writers by a threading lock shared per
+  log path within a process, plus an OS file lock on a sidecar
+  (`audit.jsonl.lock`) across processes — so the size check and
+  the archive renames cannot interleave into a double rotation
+  that discards retained entries. If the file lock cannot be
+  taken, the append proceeds unlocked with a console warning
+  rather than dropping the entry.
 - **Job completion entries:** every job completion writes a
   `job_finish` entry with the `job_id`, exit code, timed-out flag,
   per-stream byte totals, and the **SHA-256 of the captured stdout
