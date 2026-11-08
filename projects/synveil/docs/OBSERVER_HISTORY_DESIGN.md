@@ -7,6 +7,13 @@ below. This document records the accepted design for the
 remaining Phase 3 observer items. The first slice
 (lifecycle events) is authorized by the acceptance;
 storage/aggregation follow as their own slices.
+**Aggregation slice implemented 2026-11-07**: the sampler
+now also folds the four windowed metrics into ephemeral
+1-minute mean/max buckets (see `docs/OBSERVER.md`, History
+section, and
+`docs/validation/observe-aggregation-abaeef7/`). "Storage"
+in this design means the ephemeral in-memory store only —
+no durable telemetry storage exists or is authorized.
 
 ## Context
 
