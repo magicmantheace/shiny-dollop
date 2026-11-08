@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0.0",
+  "character_id": "traveler_01",
+  "rig_id": "studio_humanoid_v1",
+  "body_base": "adult_average_01",
+  "head": "rounded_01",
+  "hair": "curly_shag_01",
+  "outfit": [
+    "tunic_01",
+    "boots_01"
+  ],
+  "colors": {
+    "hair": "#663e32",
+    "eyes": "#4a86b8",
+    "outfit": "#577c59"
+  },
+  "voice_profile": "unset",
+  "personality_tags": [
+    "nervous",
+    "polite"
+  ],
+  "status": "candidate"
+}

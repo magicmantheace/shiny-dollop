@@ -16,6 +16,12 @@ __pycache__/
 *.log
 *.sqlite
 *.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+*.sqlite3-wal
+*.sqlite3-shm
+*.sqlite3-journal
 *.db
 *.db-*
 *.bak
@@ -28,6 +34,10 @@ __pycache__/
 *.tmp
 .local/
 user-data/
-backups/
-exports/
-artifacts/
+# artwork cache contents (local state) — keep the directory itself
+app/artwork-cache/*
+!app/artwork-cache/.gitkeep
+
+/backups/
+/exports/
+/artifacts/

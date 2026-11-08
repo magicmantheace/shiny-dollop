@@ -10,6 +10,7 @@ This repository is a permanent, **multi-project** workspace. Its root is an inde
 | GitHub Development Command Center | [`projects/github-development-command-center/`](projects/github-development-command-center/README.md) | PARKED — do not implement without new authorization |
 | AthenZ | [`projects/athenz/`](projects/athenz/README.md) | Imported copy of the standalone AthenZ repo (main `ff3b407`); unmerged review PR — do not overwrite |
 | Muse PC Bridge | [`projects/muse-pc-bridge/`](projects/muse-pc-bridge/README.md) | v0 foundation on an unmerged branch; VM-tested only — not yet installed on the owner's PC |
+| Game Asset Builder | [`projects/game-asset-builder/`](projects/game-asset-builder/README.md) | Fully local, no-API game asset pipeline (owner-commissioned 2026-11-06); scaffold + model bake-off on its own branch/PR — do not overwrite |
 
 ## New Muse application queue — specifications only
 
@@ -28,14 +29,20 @@ This repository is a permanent, **multi-project** workspace. Its root is an inde
 | 9 | Digital Product Template Factory | [`projects/digital-template-factory/`](projects/digital-template-factory/README.md) | Planned |
 | 10 | Small Business Website Generator | [`projects/business-website-generator/`](projects/business-website-generator/README.md) | Planned |
 | 11 | Personal Knowledge Vault | [`projects/personal-knowledge-vault/`](projects/personal-knowledge-vault/README.md) | Planned |
-| 12 | Desktop Automation Builder | [`projects/desktop-automation-builder/`](projects/desktop-automation-builder/README.md) | Planned |
-| 13 | Local AI Command Center | [`projects/local-ai-command-center/`](projects/local-ai-command-center/README.md) | Planned |
-| 14 | Novel and Worldbuilding Manager | [`projects/worldbuilding-manager/`](projects/worldbuilding-manager/README.md) | Planned |
-| 15 | Procedural Dungeon Designer | [`projects/procedural-dungeon-designer/`](projects/procedural-dungeon-designer/README.md) | Planned |
-| 16 | AI Dungeon Master | [`projects/ai-dungeon-master/`](projects/ai-dungeon-master/README.md) | Planned |
-| 17 | Crawl Live Spectator Desktop | [`projects/crawl-spectator-desktop/`](projects/crawl-spectator-desktop/README.md) | Planned |
+| 12 | Desktop Automation Builder | [`projects/desktop-automation-builder/`](projects/desktop-automation-builder/README.md) | MVP functional / review ready |
+| 13 | Local AI Command Center | [`projects/local-ai-command-center/`](projects/local-ai-command-center/README.md) | MVP functional / review ready |
+| 14 | Novel and Worldbuilding Manager | [`projects/worldbuilding-manager/`](projects/worldbuilding-manager/README.md) | MVP functional / review ready |
+| 15 | Procedural Dungeon Designer | [`projects/procedural-dungeon-designer/`](projects/procedural-dungeon-designer/README.md) | MVP functional / review ready |
+| 16 | AI Dungeon Master | [`projects/ai-dungeon-master/`](projects/ai-dungeon-master/README.md) | MVP functional / review ready |
+| 17 | Crawl Live Spectator Desktop | [`projects/crawl-spectator-desktop/`](projects/crawl-spectator-desktop/README.md) | MVP functional / review ready |
 
 **Start implementation with:** [Universal Game Save Manager](projects/game-save-manager/docs/MUSE_HANDOFF.md). Begin its real MVP first; do not simultaneously scaffold or claim completion for all projects.
+
+## Independent project: AI Animation Studio
+
+| Project | Directory | Status |
+| --- | --- | --- |
+| Stylized 3D AI Animation Studio | [`projects/ai-animation-studio/`](projects/ai-animation-studio/README.md) | Foundation scaffold and documentation, not production-ready; separate development track |
 
 ## Repository rules
 
