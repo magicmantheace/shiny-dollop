@@ -1,0 +1,280 @@
+{
+  "schema": "synveil.core/v1",
+  "id": "synctl-227",
+  "ok": true,
+  "result": {
+    "aggregates": {
+      "bucket_ms": 60000,
+      "buckets_per_series": 60,
+      "dropped_buckets": 0,
+      "omitted_series": 0,
+      "response_omitted_buckets": 0,
+      "retained_buckets": 15,
+      "series": [
+        {
+          "buckets": [
+            {
+              "max": 2273,
+              "mean": 1211,
+              "samples": 4,
+              "start_unix_ms": 1794125640000
+            }
+          ],
+          "metric": "cpu.busy",
+          "name": "aggregate",
+          "unit": "basis_points"
+        },
+        {
+          "buckets": [
+            {
+              "max": 0,
+              "mean": 0,
+              "samples": 4,
+              "start_unix_ms": 1794125640000
+            }
+          ],
+          "metric": "disk.throughput.bps",
+          "name": "loop0",
+          "unit": "bytes_per_second"
+        },
+        {
+          "buckets": [
+            {
+              "max": 0,
+              "mean": 0,
+              "samples": 4,
+              "start_unix_ms": 1794125640000
+            }
+          ],
+          "metric": "disk.throughput.bps",
+          "name": "loop1",
+          "unit": "bytes_per_second"
+        },
+        {
+          "buckets": [
+            {
+              "max": 0,
+              "mean": 0,
+              "samples": 4,
+              "start_unix_ms": 1794125640000
+            }
+          ],
+          "metric": "disk.throughput.bps",
+          "name": "loop2",
+          "unit": "bytes_per_second"
+        },
+        {
+          "buckets": [
+            {
+              "max": 0,
+              "mean": 0,
+              "samples": 4,
+              "start_unix_ms": 1794125640000
+            }
+          ],
+          "metric": "disk.throughput.bps",
+          "name": "loop3",
+          "unit": "bytes_per_second"
+        },
+        {
+          "buckets": [
+            {
+              "max": 0,
+              "mean": 0,
+              "samples": 4,
+              "start_unix_ms": 1794125640000
+            }
+          ],
+          "metric": "disk.throughput.bps",
+          "name": "loop4",
+          "unit": "bytes_per_second"
+        },
+        {
+          "buckets": [
+            {
+              "max": 0,
+              "mean": 0,
+              "samples": 4,
+              "start_unix_ms": 1794125640000
+            }
+          ],
+          "metric": "disk.throughput.bps",
+          "name": "loop5",
+          "unit": "bytes_per_second"
+        },
+        {
+          "buckets": [
+            {
+              "max": 0,
+              "mean": 0,
+              "samples": 4,
+              "start_unix_ms": 1794125640000
+            }
+          ],
+          "metric": "disk.throughput.bps",
+          "name": "loop6",
+          "unit": "bytes_per_second"
+        },
+        {
+          "buckets": [
+            {
+              "max": 0,
+              "mean": 0,
+              "samples": 4,
+              "start_unix_ms": 1794125640000
+            }
+          ],
+          "metric": "disk.throughput.bps",
+          "name": "loop7",
+          "unit": "bytes_per_second"
+        },
+        {
+          "buckets": [
+            {
+              "max": 0,
+              "mean": 0,
+              "samples": 4,
+              "start_unix_ms": 1794125640000
+            }
+          ],
+          "metric": "disk.throughput.bps",
+          "name": "vda",
+          "unit": "bytes_per_second"
+        },
+        {
+          "buckets": [
+            {
+              "max": 0,
+              "mean": 0,
+              "samples": 4,
+              "start_unix_ms": 1794125640000
+            }
+          ],
+          "metric": "disk.throughput.bps",
+          "name": "vda1",
+          "unit": "bytes_per_second"
+        },
+        {
+          "buckets": [
+            {
+              "max": 0,
+              "mean": 0,
+              "samples": 4,
+              "start_unix_ms": 1794125640000
+            }
+          ],
+          "metric": "disk.throughput.bps",
+          "name": "vda2",
+          "unit": "bytes_per_second"
+        },
+        {
+          "buckets": [
+            {
+              "max": 200450048,
+              "mean": 200307712,
+              "samples": 4,
+              "start_unix_ms": 1794125640000
+            }
+          ],
+          "metric": "memory.used",
+          "name": "system",
+          "unit": "bytes"
+        },
+        {
+          "buckets": [
+            {
+              "max": 0,
+              "mean": 0,
+              "samples": 4,
+              "start_unix_ms": 1794125640000
+            }
+          ],
+          "metric": "net.throughput.bps",
+          "name": "lo",
+          "unit": "bytes_per_second"
+        },
+        {
+          "buckets": [
+            {
+              "max": 0,
+              "mean": 0,
+              "samples": 4,
+              "start_unix_ms": 1794125640000
+            }
+          ],
+          "metric": "net.throughput.bps",
+          "name": "sit0",
+          "unit": "bytes_per_second"
+        }
+      ]
+    },
+    "events": [
+      {
+        "component": "veil-core",
+        "event": "process_exited",
+        "fields": {
+          "process": {
+            "parent_pid": 215,
+            "pid": 221,
+            "start_time_ticks": 27902,
+            "system_ticks": 0,
+            "user_ticks": 0
+          }
+        },
+        "git_revision": "254542809e4c7f7806b6d042237d7119341c9501",
+        "pid": 220,
+        "schema": "synveil.observe-event/v1",
+        "sequence": 0,
+        "unix_time_ms": 1794125652280,
+        "version": "0.1.0-dev"
+      },
+      {
+        "component": "veil-core",
+        "event": "process_started",
+        "fields": {
+          "process": {
+            "parent_pid": 215,
+            "pid": 225,
+            "start_time_ticks": 28810,
+            "system_ticks": 0,
+            "user_ticks": 0
+          }
+        },
+        "git_revision": "254542809e4c7f7806b6d042237d7119341c9501",
+        "pid": 220,
+        "schema": "synveil.observe-event/v1",
+        "sequence": 1,
+        "unix_time_ms": 1794125652280,
+        "version": "0.1.0-dev"
+      },
+      {
+        "component": "veil-core",
+        "event": "process_started",
+        "fields": {
+          "process": {
+            "parent_pid": 215,
+            "pid": 226,
+            "start_time_ticks": 28810,
+            "system_ticks": 0,
+            "user_ticks": 0
+          }
+        },
+        "git_revision": "254542809e4c7f7806b6d042237d7119341c9501",
+        "pid": 220,
+        "schema": "synveil.observe-event/v1",
+        "sequence": 2,
+        "unix_time_ms": 1794125652280,
+        "version": "0.1.0-dev"
+      }
+    ],
+    "sampler": {
+      "cadence_ms": 5000,
+      "dropped_events": 0,
+      "enabled": true,
+      "response_omitted_events": 0,
+      "retained_events": 3,
+      "ring_capacity": 1024
+    },
+    "schema": "synveil.observe-history/v1"
+  }
+}

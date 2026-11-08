@@ -275,7 +275,58 @@ the alive snapshot and its `process_exited` event (same
 identity, later sequence) after it exits — see
 [evidence](validation/observe-history-bb422ea/README.md)
 (`SYNVEIL_OBSERVE_QEMU_PASS`, probe pid 219, started
-sequence 1, exited sequence 3). Aggregation (1-minute
-buckets) and any durable storage are later slices of
-`docs/OBSERVER_HISTORY_DESIGN.md`, not part of this section's
-claims.
+sequence 1, exited sequence 3).
+
+### Aggregation — 1-minute buckets (ADR 0026)
+
+The same sampler series now also feeds a windowed
+aggregation store (in-memory only, like the ring). At each
+tick the sampler folds its own **rated** values into
+1-minute buckets keyed by (metric, series):
+
+- `cpu.busy` (basis points, series `aggregate`) from the
+  CPU utilization rating;
+- `memory.used` (bytes, series `system`) = total −
+  available;
+- `disk.throughput.bps` (bytes/second, one series per
+  block device) and `net.throughput.bps` (one series per
+  interface), summed per source from the interval ratings.
+
+Devices and interfaces are never summed into a system
+total — a partition and its whole device would
+double-count, exactly as the snapshot refuses to. A source
+whose rating was withheld or invalid folds no point. Each
+bucket carries its sample count, the floored mean and the
+max; at most 60 buckets are retained per series (one hour)
+under the ADR 0026 storage bound (64 series by name, never
+silently merged — overflow is counted in
+`omitted_series`), and out-of-order samples (clock stepped
+back) are skipped: history is append-only.
+
+`observe-history` serves the store as an `aggregates`
+object beside the events: bucket size, retention,
+store-wide `dropped_buckets`, and per-series bucket lists.
+Because responses share the 64 KiB wire limit, the oldest
+aggregate buckets are trimmed (counted in
+`response_omitted_buckets`) before any event is dropped.
+`synctl` validates the aggregate block client-side (known
+metric/unit pairs, minute-aligned strictly increasing
+bucket starts, mean ≤ max, bucket accounting). Aggregates
+are telemetry: they never enter the hash-chained audit
+journal, nothing is written to disk, and a core restart
+clears the store. "Storage" in the ADR 0026 design means
+this ephemeral store only — durable storage is not part
+of the design.
+
+Host proof: unit tests over the aggregator (bucket
+folding, mean/max, hour retention with drop counting,
+out-of-order skip, series cap, snapshot trim accounting)
+and the dispatcher's response fitting. Native QEMU
+validation on 2026-11-08: the observe gate requires the
+aggregates block in all three snapshots and, in the final
+one, all four metric families with sane ranges (cpu.busy
+max ≤ 10,000 bp; memory.used > 0) — see
+[evidence](validation/observe-aggregation-abaeef7/README.md)
+(`SYNVEIL_OBSERVE_QEMU_PASS`, probe pid 225; the cpu.busy
+bucket accumulates 2 → 4 → 6 samples across the three
+snapshots of the same boot).

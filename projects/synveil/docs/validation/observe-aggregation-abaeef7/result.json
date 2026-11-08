@@ -1,0 +1,128 @@
+{
+  "schema": "synveil.observe-acceptance/v1",
+  "image_sha256": "a0c9f55b2e0fffaec1dc83eb8db4c41bcef91adc95581be7344012bc9dbd3eb5",
+  "passed": true,
+  "physical_hardware_tested": false,
+  "attempts": 2,
+  "pressure_status": {
+    "cpu": "ready",
+    "memory": "ready",
+    "io": "ready"
+  },
+  "history": {
+    "probe_pid": 225,
+    "aggregates": {
+      "series": [
+        {
+          "metric": "cpu.busy",
+          "name": "aggregate",
+          "buckets": 1,
+          "latest_mean": 956,
+          "latest_max": 2273
+        },
+        {
+          "metric": "disk.throughput.bps",
+          "name": "loop0",
+          "buckets": 1,
+          "latest_mean": 0,
+          "latest_max": 0
+        },
+        {
+          "metric": "disk.throughput.bps",
+          "name": "loop1",
+          "buckets": 1,
+          "latest_mean": 0,
+          "latest_max": 0
+        },
+        {
+          "metric": "disk.throughput.bps",
+          "name": "loop2",
+          "buckets": 1,
+          "latest_mean": 0,
+          "latest_max": 0
+        },
+        {
+          "metric": "disk.throughput.bps",
+          "name": "loop3",
+          "buckets": 1,
+          "latest_mean": 0,
+          "latest_max": 0
+        },
+        {
+          "metric": "disk.throughput.bps",
+          "name": "loop4",
+          "buckets": 1,
+          "latest_mean": 0,
+          "latest_max": 0
+        },
+        {
+          "metric": "disk.throughput.bps",
+          "name": "loop5",
+          "buckets": 1,
+          "latest_mean": 0,
+          "latest_max": 0
+        },
+        {
+          "metric": "disk.throughput.bps",
+          "name": "loop6",
+          "buckets": 1,
+          "latest_mean": 0,
+          "latest_max": 0
+        },
+        {
+          "metric": "disk.throughput.bps",
+          "name": "loop7",
+          "buckets": 1,
+          "latest_mean": 0,
+          "latest_max": 0
+        },
+        {
+          "metric": "disk.throughput.bps",
+          "name": "vda",
+          "buckets": 1,
+          "latest_mean": 0,
+          "latest_max": 0
+        },
+        {
+          "metric": "disk.throughput.bps",
+          "name": "vda1",
+          "buckets": 1,
+          "latest_mean": 0,
+          "latest_max": 0
+        },
+        {
+          "metric": "disk.throughput.bps",
+          "name": "vda2",
+          "buckets": 1,
+          "latest_mean": 0,
+          "latest_max": 0
+        },
+        {
+          "metric": "memory.used",
+          "name": "system",
+          "buckets": 1,
+          "latest_mean": 200389973,
+          "latest_max": 200556544
+        },
+        {
+          "metric": "net.throughput.bps",
+          "name": "lo",
+          "buckets": 1,
+          "latest_mean": 0,
+          "latest_max": 0
+        },
+        {
+          "metric": "net.throughput.bps",
+          "name": "sit0",
+          "buckets": 1,
+          "latest_mean": 0,
+          "latest_max": 0
+        }
+      ]
+    },
+    "started_sequence": 1,
+    "probe_start_time_ticks": 28810,
+    "exited_sequence": 5
+  },
+  "failures": []
+}

@@ -374,8 +374,15 @@ anchoring and physical power-loss testing remain open.
     QEMU validation passed on the joined guest at `bb422ea` (a known
     probe process's started and exited events asserted in order; see
     [lifecycle evidence](docs/validation/observe-history-bb422ea/README.md)).
-    Historical aggregation (1-minute buckets) and any durable storage
-    remain open. The earlier load schema passed QEMU at
+    Historical aggregation is implemented: the sampler folds its
+    rated cpu.busy / memory.used / disk.throughput.bps /
+    net.throughput.bps values into ephemeral in-memory 1-minute
+    buckets (mean/max, 60 retained per series) served by the same
+    `observe-history` request; host tests and native QEMU
+    validation passed on the joined guest at `abaeef7` (see
+    [aggregation evidence](docs/validation/observe-aggregation-abaeef7/README.md)).
+    Durable storage is not part of the accepted design
+    (ADR 0026: the history store is ephemeral only). The earlier load schema passed QEMU at
     [255101d](docs/validation/native-255101d/README.md).
 - [ ] disk/I/O metrics
   - Raw, per-device read/write counts, 512-byte sector counters, in-flight I/O,
