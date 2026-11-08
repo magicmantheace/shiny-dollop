@@ -1,0 +1,99 @@
+{
+ "entry_version": 1,
+ "name": "Triceratops",
+ "slug": "triceratops",
+ "source_concept": "media-generation-quadruped-triceratops-v2-conce-0-ee82e801-a2f9-4911-9b7a-63fa35f916c2.webp",
+ "asset_file": "triceratops.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "274c11a87e73c39dc99ff4fe42eca0da44db86d3d6876ad978404b2c5bbb6847",
+ "bytes": 20292116,
+ "counts": {
+  "verts": 45001,
+  "faces": 89998,
+  "raw_mesh_verts": 513882,
+  "raw_mesh_faces": 667540
+ },
+ "bones": [
+  "root",
+  "spine",
+  "hips",
+  "neck",
+  "head",
+  "leg.FL",
+  "leg2.FL",
+  "leg.HL",
+  "leg2.HL",
+  "leg.FR",
+  "leg2.FR",
+  "leg.HR",
+  "leg2.HR",
+  "tail.1",
+  "tail.2"
+ ],
+ "actions": [
+  "bounce",
+  "idle"
+ ],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": true,
+  "rig_template": "quadruped",
+  "weight_method": "bone-heat (automatic weights)",
+  "rotate_z": 90,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.0.0"
+  },
+  "mesh_stage": {
+   "runner": {
+    "name": "triceratops_shape",
+    "exit_code": 0,
+    "seconds": 300.87,
+    "baseline_vram_mib": 851,
+    "peak_vram_mib": 7224,
+    "peak_delta_mib": 6373,
+    "vram_after_exit_mib": 781,
+    "n_samples": 631,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"triceratops_shape\", \"exit_code\": 0, \"seconds\": 300.87, \"baseline_vram_mib\": 851, \"peak_vram_mib\": 7224, \"peak_delta_mib\": 6373, \"vram_after_exit_mib\": 781, \"n_samples\": 631}\r\n"
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 333772,
+    "faces": 667540,
+    "load_s": 117.59,
+    "inference_s": 157.16,
+    "total_s": 274.83,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\triceratops\\shape.glb"
+   }
+  },
+  "texture_stage": {
+   "runner": {
+    "name": "triceratops_texture",
+    "exit_code": 0,
+    "seconds": 597.61,
+    "baseline_vram_mib": 770,
+    "peak_vram_mib": 12040,
+    "peak_delta_mib": 11270,
+    "vram_after_exit_mib": 793,
+    "n_samples": 1240,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"triceratops_texture\", \"exit_code\": 0, \"seconds\": 597.61, \"baseline_vram_mib\": 770, \"peak_vram_mib\": 12040, \"peak_delta_mib\": 11270, \"vram_after_exit_mib\": 793, \"n_samples\": 1240}\r\n"
+   },
+   "stats": {
+    "stage": "texture",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+    "verts": 513882,
+    "faces": 667540,
+    "load_s": 105.0,
+    "texture_s": 466.47,
+    "total_s": 572.31,
+    "torch_peak_mib": 9938.7,
+    "output": "D:\\asset-forge-lab\\out\\gab\\triceratops\\textured.glb"
+   }
+  }
+ }
+}

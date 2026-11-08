@@ -11,17 +11,36 @@ zero weights). Fit the winged-creature template
 that lands outside the mesh volume onto the nearest surface point,
 pulled slightly inward — bbox fractions cannot know where a generated
 model folded its wings, and heat weighting gives outside bones nothing.
-Skin with automatic (bone-heat) weights; the acceptance policy in
-stages/rig/skin_policy.py decides whether the result ships. A handful
-of verts the heat field never reaches are rescued with distance
-weights (counted in the report); only a rejected heat result falls
-back to full distance-to-bone weights, and the report says which
-method produced the shipped weights and why.
+Skin with automatic (bone-heat) weights, then restrain them with the
+weight-distance veto (stages/rig/skin_policy.py): heat diffuses
+through a fused mass, so an appendage bone can come to own most of
+the torso and drag it when it swings — the Snow Goblin's ruff was
+51% arm-weighted and its wave smeared the chest fur. Any non-trunk
+bone's weight on a vertex farther than its reach radius (a fraction
+of bone length, floored by a fraction of mesh height) is zeroed and
+renormalized onto the survivors; the root->head trunk chain is
+exempt (its flesh IS the body mass). The acceptance policy in
+skin_policy.py then decides whether the result ships, including a
+guard-zone share check that fails a rig whose torso is still
+appendage-owned. A handful of verts the heat field never reaches are
+rescued with distance weights (counted in the report); only a
+rejected heat result falls back to full distance-to-bone weights,
+and the report says which method produced the shipped weights and
+why.
 
 Usage:
   blender -b --python rig_blender.py -- --input textured.glb \
       --output rigged.glb --blend rigged.blend --report rig-report.json \
       --template winged-creature --ears 0 --arms 1 --target-verts 50000
+
+``--template`` selects the armature template (winged-creature,
+quadruped, biped — stages/rig/template.py); the skinning stack
+(cleanup -> snap -> bone heat -> skin_policy) and the report shape are
+the same for all of them, with the policy's tip check and the zone
+checks chosen per template. ``--rotate-z`` turns the canonicalized
+mesh about Z before fitting: generated meshes do not guarantee the
+character faces -Y, and the honest fix is a recorded per-run rotation
+(chosen from renders of the raw mesh), not a template that pretends.
 """
 
 import argparse
@@ -37,8 +56,9 @@ from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
-from template import build_template  # noqa: E402
-from skin_policy import assess_heat  # noqa: E402
+from template import build_template, trunk_chain  # noqa: E402
+from skin_policy import (  # noqa: E402
+    apply_veto, assess_heat, assess_zone_share)
 
 
 def parse_args():
@@ -52,6 +72,19 @@ def parse_args():
     p.add_argument("--ears", type=int, default=0)
     p.add_argument("--arms", type=int, default=1)
     p.add_argument("--target-verts", type=int, default=50000)
+    p.add_argument("--rotate-z", type=int, default=0,
+                   choices=(0, 90, 180, 270),
+                   help="rotate the canonicalized mesh about Z so the "
+                        "character faces -Y before fitting the template")
+    p.add_argument("--veto-factor", type=float, default=0.85,
+                   help="weight-distance veto: a non-trunk bone's reach "
+                        "radius is this factor times its length, floored "
+                        "by --veto-floor times the mesh height "
+                        "(calibrated on the Snow Goblin, see "
+                        "skin_policy.py)")
+    p.add_argument("--veto-floor", type=float, default=0.19,
+                   help="weight-distance veto radius floor, as a "
+                        "fraction of mesh height")
     return p.parse_args(argv)
 
 
@@ -100,6 +133,26 @@ def canonicalize(obj):
     obj.location.y -= (y0 + y1) / 2
     obj.location.z -= z0
     bpy.ops.object.transform_apply(location=True, rotation=False,
+                                   scale=False)
+
+
+def rotate_z(obj, degrees):
+    """Rotate about the world Z axis through the origin (the mesh is
+    XY-centered and grounded after canonicalize, so this is a pure
+    facing change), baking the rotation into the vertices.
+
+    Applied through matrix_world, NOT rotation_euler: glTF imports
+    arrive in QUATERNION rotation mode, where euler writes are
+    silently ignored (the bake-off scorer's lesson, relearned here —
+    the first quadruped run's rotate-z was a no-op for exactly this
+    reason)."""
+    if not degrees:
+        return
+    from mathutils import Matrix
+    obj.matrix_world = Matrix.Rotation(
+        math.radians(degrees), 4, "Z") @ obj.matrix_world
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.transform_apply(location=False, rotation=True,
                                    scale=False)
 
 
@@ -366,22 +419,46 @@ def dominant_check(obj, dims, bone_names):
     return (ok / total if total else 0.0), total
 
 
-def zone_dominance(obj, dims):
-    """Head- and tail-zone dominance, same idea as the wingtip check:
-    verts in the head zone (high, central) should be driven by the head
-    bone; verts in the tail zone (back quarter, low) by the tail chain.
-    Zones are bbox-relative, so a model whose tail curls sideways may
-    legitimately score low — the numbers are evidence, not gates."""
+def _zone_defs(template, dims):
+    """Per-template evidence zones: (predicate, wanted bone names).
+    Zones are bbox-relative, so a model whose anatomy departs from the
+    template's assumptions may legitimately score low — the numbers
+    are evidence; only the tip check (tip_dominance) gates."""
     (x0, x1), (y0, y1), (z0, z1) = dims
     w, d, h = x1 - x0, y1 - y0, z1 - z0
-    zones = {
+    if template == "quadruped":
+        return {
+            "head": (lambda x, y, z: y < y0 + 0.20 * d
+                     and z > z0 + 0.40 * h, ("neck", "head")),
+            "tail": (lambda x, y, z: y > y0 + 0.78 * d,
+                     ("tail.1", "tail.2")),
+        }
+    if template == "biped":
+        return {
+            # No centre-strip constraint, unlike the winged head zone:
+            # a biped's ears sit at the silhouette edge but are head
+            # appendages, so the zone spans the full width and counts
+            # the ear bones as head bones. (First measured on the Snow
+            # Goblin: the strip version read 0.24 while the actual
+            # skull zone was ~87% head/ear-driven.)
+            "head": (lambda x, y, z: z > z0 + 0.62 * h,
+                     ("head", "ear.L", "ear.R")),
+            "feet": (lambda x, y, z: z < z0 + 0.10 * h,
+                     ("leg.L", "leg2.L", "leg.R", "leg2.R")),
+        }
+    return {
         "head": (lambda x, y, z: z > z0 + 0.62 * h and abs(x) < 0.30 * w,
                  ("head",)),
         "tail": (lambda x, y, z: y > y0 + 0.72 * d and z < z0 + 0.45 * h,
                  ("tail.1", "tail.2", "tail.3")),
     }
+
+
+def zone_dominance(obj, dims, template="winged-creature"):
+    """Zone dominance checks, same idea as the wingtip check: verts in
+    a zone should be driven by that zone's own bones."""
     out = {}
-    for zone, (test, want) in zones.items():
+    for zone, (test, want) in _zone_defs(template, dims).items():
         ok = total = 0
         for v in obj.data.vertices:
             if not test(v.co.x, v.co.y, v.co.z):
@@ -394,6 +471,51 @@ def zone_dominance(obj, dims):
                 ok += 1
         out[zone] = (round(ok / total, 4) if total else 0.0, total)
     return out
+
+
+def _dominance_where(obj, test, want_for):
+    """Share of verts passing ``test`` whose dominant group is in
+    ``want_for(vertex)``. Returns (fraction, verts_checked)."""
+    ok = total = 0
+    for v in obj.data.vertices:
+        if not test(v.co.x, v.co.y, v.co.z):
+            continue
+        total += 1
+        if not v.groups:
+            continue
+        top = max(v.groups, key=lambda g: g.weight)
+        if obj.vertex_groups[top.group].name in want_for(v.co.x):
+            ok += 1
+    return (ok / total if total else 0.0), total
+
+
+def tip_dominance(obj, dims, template="winged-creature"):
+    """The skin_policy gate check, per template: the extremity the
+    template most often loses to the body mass.
+    - winged-creature: wingtips (see dominant_check)
+    - quadruped: the feet — lowest 10% of verts should belong to the
+      leg bones, not the belly/spine
+    - biped: the hands — verts outboard and below shoulder height
+      should belong to that side's arm bones, not the torso
+    Returns (fraction, verts_checked, label)."""
+    (x0, x1), (y0, y1), (z0, z1) = dims
+    w, d, h = x1 - x0, y1 - y0, z1 - z0
+    if template == "quadruped":
+        legs = ("leg.FL", "leg2.FL", "leg.FR", "leg2.FR",
+                "leg.HL", "leg2.HL", "leg.HR", "leg2.HR")
+        frac, total = _dominance_where(
+            obj, lambda x, y, z: z < z0 + 0.10 * h, lambda x: legs)
+        return frac, total, "feet"
+    if template == "biped":
+        frac, total = _dominance_where(
+            obj,
+            lambda x, y, z: abs(x) > 0.30 * w and z < z0 + 0.55 * h,
+            lambda x: ("arm.L", "arm2.L") if x > 0
+            else ("arm.R", "arm2.R"))
+        return frac, total, "hands"
+    frac, total = dominant_check(obj, dims,
+                                 [g.name for g in obj.vertex_groups])
+    return frac, total, "wingtip"
 
 
 def weight_metrics(obj, bone_names):
@@ -433,19 +555,37 @@ def weight_metrics(obj, bone_names):
     }
 
 
-def _distance_matrix(heads, tails, verts):
+def _segment_projection(heads, tails, verts):
+    """(verts x bones) raw projection parameter along each bone
+    segment: 0 at the head, 1 at the tail, outside [0, 1] beyond the
+    endpoints (skin_policy's rescue eligibility uses exactly that)."""
     import numpy as np
     heads = np.asarray(heads, dtype=np.float64)
     tails = np.asarray(tails, dtype=np.float64)
     seg = tails - heads
     seg_len2 = (seg ** 2).sum(axis=1)
-    weights = np.zeros((len(verts), len(heads)))
+    t = np.zeros((len(verts), len(heads)))
     for i in range(len(heads)):
-        t = np.clip(((verts - heads[i]) * seg[i]).sum(axis=1)
-                    / max(seg_len2[i], 1e-9), 0, 1)
-        closest = heads[i] + t[:, None] * seg[i]
-        dist = np.linalg.norm(verts - closest, axis=1)
-        weights[:, i] = 1.0 / (dist + 0.03) ** 2
+        t[:, i] = ((verts - heads[i]) * seg[i]).sum(axis=1) \
+            / max(seg_len2[i], 1e-9)
+    return t
+
+
+def _segment_distances(heads, tails, verts):
+    """(verts x bones) distance from each vertex to each bone segment."""
+    import numpy as np
+    heads = np.asarray(heads, dtype=np.float64)
+    tails = np.asarray(tails, dtype=np.float64)
+    seg = tails - heads
+    t = np.clip(_segment_projection(heads, tails, verts), 0, 1)
+    closest = heads[None, :, :] + t[:, :, None] * seg[None, :, :]
+    return np.linalg.norm(verts[:, None, :] - closest, axis=2)
+
+
+def _distance_matrix(heads, tails, verts):
+    import numpy as np
+    dist = _segment_distances(heads, tails, verts)
+    weights = 1.0 / (dist + 0.03) ** 2
     for v in range(len(verts)):
         top = np.argsort(weights[v])[::-1][:4]
         mask = np.zeros(len(heads))
@@ -511,11 +651,121 @@ def distance_weights(obj, arm, bones, dims):
     apply_weight_matrix(obj, arm, names, weights)
 
 
+def _weight_matrix(obj, bone_names):
+    """Current vertex-group influences as an (n_verts x n_bones)
+    numpy matrix, columns in ``bone_names`` order."""
+    import numpy as np
+    col = {name: i for i, name in enumerate(bone_names)}
+    weights = np.zeros((len(obj.data.vertices), len(bone_names)))
+    for v in obj.data.vertices:
+        for g in v.groups:
+            name = obj.vertex_groups[g.group].name
+            if name in col:
+                weights[v.index, col[name]] = g.weight
+    return weights
+
+
+def apply_distance_veto(obj, arm, bones, dims, factor, floor_frac):
+    """Restrain the heat weights in place with skin_policy's veto.
+
+    Reach radius per bone = max(factor * bone length, floor_frac *
+    mesh height), applied to every bone outside the root->head trunk
+    chain. Writes the vetoed matrix back through apply_weight_matrix
+    and returns the stats for the rig report (radii included, so a
+    future run can see exactly what reach each bone was allowed)."""
+    import numpy as np
+    names, heads, tails = _bone_endpoints(arm)
+    lengths = [float(np.linalg.norm(np.array(t) - np.array(hd)))
+               for hd, t in zip(heads, tails)]
+    (_, _), (_, _), (z0, z1) = dims
+    height = z1 - z0
+    radii = [max(factor * length, floor_frac * height)
+             for length in lengths]
+    trunk = trunk_chain(bones)
+    veto_cols = [i for i, name in enumerate(names) if name not in trunk]
+    verts = np.empty(len(obj.data.vertices) * 3)
+    obj.data.vertices.foreach_get("co", verts)
+    verts = verts.reshape(-1, 3)
+    distances = _segment_distances(heads, tails, verts)
+    projection = _segment_projection(heads, tails, verts)
+    beyond_end = (projection < 0.0) | (projection > 1.0)
+    weights = _weight_matrix(obj, names)
+    new_weights, stats = apply_veto(
+        weights.tolist(), distances.tolist(), radii, veto_cols,
+        beyond_end=beyond_end.tolist())
+    apply_weight_matrix(obj, arm, names, np.array(new_weights))
+    return {
+        "factor": factor,
+        "floor_frac": floor_frac,
+        "trunk_bones": [n for n in names if n in trunk],
+        "vetoed_bones": [names[i] for i in veto_cols],
+        "radius_by_bone": {n: round(r, 4)
+                           for n, r in zip(names, radii)},
+        "vetoed_entries": stats["vetoed_entries"],
+        "verts_touched": stats["verts_touched"],
+        "rescued_verts": len(stats["rescued_verts"]),
+    }
+
+
+def _share_zone_defs(template, dims):
+    """Guard zones for the zone-share gate: (predicate, appendage
+    group, group label) per zone — body mass whose weight must NOT
+    sit on the appendages that swing past it. Bbox-relative like the
+    dominance zones; the biped torso band sits below the head zone
+    and inboard of the hands zone."""
+    (x0, x1), (y0, y1), (z0, z1) = dims
+    w, d, h = x1 - x0, y1 - y0, z1 - z0
+    if template == "quadruped":
+        legs = ("leg.FL", "leg2.FL", "leg.FR", "leg2.FR",
+                "leg.HL", "leg2.HL", "leg.HR", "leg2.HR")
+        return {
+            "belly": (lambda x, y, z: z0 + 0.10 * h <= z <= z0 + 0.40 * h
+                      and abs(x) < 0.25 * w, legs, "leg"),
+        }
+    if template == "biped":
+        return {
+            "torso": (lambda x, y, z: z0 + 0.30 * h <= z <= z0 + 0.62 * h
+                      and abs(x) < 0.30 * w,
+                      ("arm.L", "arm2.L", "arm.R", "arm2.R"), "arm"),
+        }
+    return {
+        "torso": (lambda x, y, z: z0 + 0.30 * h <= z <= z0 + 0.62 * h
+                  and abs(x) < 0.30 * w,
+                  ("wing.L", "wing2.L", "wing.R", "wing2.R",
+                   "arm.L", "arm.R"), "wing/arm"),
+    }
+
+
+def zone_weight_share(obj, dims, template="winged-creature"):
+    """Per guard zone: the share of the zone's total vertex weight
+    held by the zone's appendage group, as (share, verts_checked).
+    This is the number the Snow Goblin's ruff failed before the veto:
+    0.51 of its torso weight sat on the arm bones."""
+    out = {}
+    for zone, (test, group, _label) in \
+            _share_zone_defs(template, dims).items():
+        group_idx = {g.index for g in obj.vertex_groups
+                     if g.name in group}
+        held = total = 0.0
+        count = 0
+        for v in obj.data.vertices:
+            if not test(v.co.x, v.co.y, v.co.z):
+                continue
+            count += 1
+            for g in v.groups:
+                total += g.weight
+                if g.group in group_idx:
+                    held += g.weight
+        out[zone] = (round(held / total, 4) if total else 0.0, count)
+    return out
+
+
 def main():
     args = parse_args()
     obj = import_mesh(args.input)
     raw_verts, raw_faces = len(obj.data.vertices), len(obj.data.polygons)
     canonicalize(obj)
+    rotate_z(obj, args.rotate_z)
     weld(obj)
     welded_verts = len(obj.data.vertices)
     pre_verts, post_verts = decimate(obj, args.target_verts)
@@ -542,45 +792,65 @@ def main():
 
     method = None
     heat_checks = None
+    veto_stats = None
+    shares = {}
     rescue_filled = 0
     coverage, per_bone = 0.0, {}
-    wing_frac, wing_total = 0.0, 0
+    tip_frac, tip_total, tip_label = 0.0, 0, "wingtip"
     if heat_error is None and obj.vertex_groups:
         # Heat fields leave small per-vert sum residuals; normalize so
         # shipped influences sum to 1.
         bpy.context.view_layer.objects.active = obj
         bpy.ops.object.vertex_group_normalize_all(
             group_select_mode="ALL", lock_active=False)
+        # Distance veto: heat owns too much of the body through fused
+        # masses; restrain appendage bones to their reach BEFORE the
+        # policy measures anything, so the gate judges what ships.
+        veto_stats = apply_distance_veto(
+            obj, arm, bones, dims, args.veto_factor, args.veto_floor)
+        rescue_filled = veto_stats["rescued_verts"]
+        # Rescue: any vert still carrying no meaningful weight (the
+        # veto's nearest-bone rescue normally covers these) gets
+        # distance weights — ONLY those verts are (re)assigned.
+        import numpy as np
+        sums = np.zeros(len(obj.data.vertices))
+        for v in obj.data.vertices:
+            sums[v.index] = sum(g.weight for g in v.groups)
+        bare = np.nonzero(sums < 0.05)[0]
+        if len(bare):
+            verts = np.empty(len(obj.data.vertices) * 3)
+            obj.data.vertices.foreach_get("co", verts)
+            names, heads, tails = _bone_endpoints(arm)
+            matrix = _distance_matrix(heads, tails,
+                                      verts.reshape(-1, 3))
+            apply_weight_matrix(obj, arm, names, matrix,
+                                only_verts=[int(i) for i in bare])
+            rescue_filled += int(len(bare))
         coverage, per_bone = weight_coverage(obj, bone_names)
-        wing_frac, wing_total = dominant_check(obj, dims, bone_names)
-        zones = zone_dominance(obj, dims)
+        tip_frac, tip_total, tip_label = tip_dominance(
+            obj, dims, args.template)
+        zones = zone_dominance(obj, dims, args.template)
+        shares = zone_weight_share(obj, dims, args.template)
+        share_defs = _share_zone_defs(args.template, dims)
         heat_checks = {"coverage": round(coverage, 4),
-                       "wingtip_dominance": round(wing_frac, 4),
-                       "head_dominance": zones["head"][0],
-                       "tail_dominance": zones["tail"][0]}
+                       f"{tip_label}_dominance": round(tip_frac, 4)}
+        for zone_name, (zone_frac, _n) in zones.items():
+            heat_checks[f"{zone_name}_dominance"] = zone_frac
+        for zone_name, (share, _n) in shares.items():
+            heat_checks[f"{zone_name}_"
+                        f"{share_defs[zone_name][2]}_share"] = share
         accepted, reasons = assess_heat(coverage, per_bone, bone_names,
-                                        wing_frac)
-        if accepted:
-            method = "bone-heat (automatic weights)"
-            # Rescue: verts the heat field never reached still need
-            # weights — give ONLY those verts distance weights.
-            import numpy as np
-            sums = np.zeros(len(obj.data.vertices))
-            for v in obj.data.vertices:
-                sums[v.index] = sum(g.weight for g in v.groups)
-            bare = np.nonzero(sums < 0.05)[0]
-            if len(bare):
-                verts = np.empty(len(obj.data.vertices) * 3)
-                obj.data.vertices.foreach_get("co", verts)
-                names, heads, tails = _bone_endpoints(arm)
-                matrix = _distance_matrix(heads, tails,
-                                          verts.reshape(-1, 3))
-                apply_weight_matrix(obj, arm, names, matrix,
-                                    only_verts=[int(i) for i in bare])
-                rescue_filled = int(len(bare))
+                                        tip_frac, tip_label=tip_label)
+        for zone_name, (share, _n) in shares.items():
+            reasons += assess_zone_share(
+                share, zone_label=zone_name,
+                group_label=share_defs[zone_name][2])
+        if accepted and not reasons:
+            method = ("bone-heat (automatic weights); distance veto "
+                      f"(factor {args.veto_factor}, "
+                      f"floor {args.veto_floor})")
+            if rescue_filled:
                 method += f"; distance rescue on {rescue_filled} verts"
-            coverage, per_bone = weight_coverage(obj, bone_names)
-            wing_frac, wing_total = dominant_check(obj, dims, bone_names)
         else:
             heat_checks["rejected_because"] = reasons
     elif heat_error is not None:
@@ -590,14 +860,16 @@ def main():
         why = heat_error or "heat result rejected by skin_policy"
         method = f"distance-to-bone fallback ({why})"
         coverage, per_bone = weight_coverage(obj, bone_names)
-        wing_frac, wing_total = dominant_check(obj, dims, bone_names)
+        tip_frac, tip_total, tip_label = tip_dominance(
+            obj, dims, args.template)
         if not any(m.type == "ARMATURE" and m.object == arm
                    for m in obj.modifiers):
             mod = obj.modifiers.new("Armature", "ARMATURE")
             mod.object = arm
         obj.parent = arm
     metrics = weight_metrics(obj, bone_names)
-    zones = zone_dominance(obj, dims)
+    zones = zone_dominance(obj, dims, args.template)
+    shares = zone_weight_share(obj, dims, args.template)
 
     report = {
         "stage": "rig",
@@ -622,17 +894,25 @@ def main():
         },
         "weight_method": method,
         "bone_heat_checks": heat_checks,
+        "weight_veto": veto_stats,
         "rescue_filled_verts": rescue_filled,
         "weight_metrics": metrics,
-        "zone_dominance": {"head": zones["head"], "tail": zones["tail"]},
+        "zone_dominance": zones,
+        "zone_weight_share": shares,
         "weight_coverage": round(coverage, 4),
         "per_bone_weighted_verts": per_bone,
-        "wingtip_dominance": round(wing_frac, 4),
-        "wingtip_verts_checked": wing_total,
+        "tip_label": tip_label,
+        "tip_dominance": round(tip_frac, 4),
+        "tip_verts_checked": tip_total,
+        "rotate_z": args.rotate_z,
         "bbox_dims": [round(dims[0][1] - dims[0][0], 3),
                       round(dims[1][1] - dims[1][0], 3),
                       round(dims[2][1] - dims[2][0], 3)],
     }
+    if args.template == "winged-creature":
+        # P0 report keys, kept for the winged template's comparability.
+        report["wingtip_dominance"] = report["tip_dominance"]
+        report["wingtip_verts_checked"] = report["tip_verts_checked"]
     if args.blend:
         bpy.ops.wm.save_as_mainfile(filepath=args.blend)
     bpy.ops.object.select_all(action="SELECT")

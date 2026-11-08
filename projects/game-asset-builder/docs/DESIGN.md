@@ -88,8 +88,27 @@ structural, not a promise.
 
 - `winged-creature` — Pip's proven 14-bone layout (root, spine, head,
   ear.L/R, wing.L/R + wing2.L/R, leg.L/R, tail.1–3). Lands with P0.
-- `quadruped`, `biped` — P1.
-- Props (unrigged clean mesh + export) — P1.
+- `quadruped` — 15 bones: a spine/hips pair splitting the root so the
+  front and rear can pitch independently, neck + head at the front,
+  two-segment legs at all four corners, tail.1–2. Recipes: `idle`,
+  `bounce` (a two-hop happy bounce; a walk cycle was considered and
+  rejected — without ground-truth footfall timing it would be
+  invented motion, while the bounce's honesty is checkable in a
+  still). Landed with P1.
+- `biped` — 11 bones (13 with `--ears`): vertical root/spine/head,
+  two-segment arms and legs. The arm bones use a horizontal roll —
+  measured in Blender, that is what makes local +X the symmetric
+  raise axis a wave needs. Recipes: `idle`, `wave`. Landed with P1.
+- Props — not a template: a pipeline mode (`--prop`) that runs
+  prep → mesh → texture → clean static export → catalog with no rig
+  or animate stage, and catalog provenance that records the asset as
+  unrigged (`rigged: false`, no bones, no actions, no weight method).
+  Landed with P1.
+- Facing is a per-run input, not a template assumption: Hunyuan does
+  not always emit the canonical facing, so the rig stage accepts
+  `--rotate-z {0,90,180,270}`, recorded in the rig report and the
+  catalog provenance. (The first quadruped mesh arrived sideways;
+  the correction is how the template was proven on it.)
 
 ## Out of scope for P0
 

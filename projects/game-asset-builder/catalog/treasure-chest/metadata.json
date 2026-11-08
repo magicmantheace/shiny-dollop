@@ -1,0 +1,75 @@
+{
+ "entry_version": 1,
+ "name": "Treasure Chest",
+ "slug": "treasure-chest",
+ "source_concept": "media-generation-prop-treasure-chest-concept-0-3710d1f4-487e-4d5c-b5ba-ef15879e300b.webp",
+ "asset_file": "treasure-chest.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "2b6e51cc0d8273e318e6e2dad64d8b03cc0c3da029fe132463055f1b060125b1",
+ "bytes": 11249652,
+ "counts": {
+  "verts": 27041,
+  "faces": 50530,
+  "raw_mesh_verts": 1082755,
+  "raw_mesh_faces": 1505614
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.0.0"
+  },
+  "mesh_stage": {
+   "runner": {
+    "name": "treasure-chest_shape",
+    "exit_code": 0,
+    "seconds": 298.16,
+    "baseline_vram_mib": 769,
+    "peak_vram_mib": 7288,
+    "peak_delta_mib": 6519,
+    "vram_after_exit_mib": 827,
+    "n_samples": 616
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 752957,
+    "faces": 1505634,
+    "load_s": 115.64,
+    "inference_s": 157.1,
+    "total_s": 272.94,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\treasure-chest\\shape.glb"
+   }
+  },
+  "texture_stage": {
+   "runner": {
+    "name": "treasure-chest_texture",
+    "exit_code": 0,
+    "seconds": 1985.8,
+    "baseline_vram_mib": 829,
+    "peak_vram_mib": 12002,
+    "peak_delta_mib": 11173,
+    "vram_after_exit_mib": 779,
+    "n_samples": 3981
+   },
+   "stats": {
+    "stage": "texture",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+    "verts": 1082755,
+    "faces": 1505634,
+    "load_s": 103.78,
+    "texture_s": 1857.41,
+    "total_s": 1962.24,
+    "torch_peak_mib": 9971.0,
+    "output": "D:\\asset-forge-lab\\out\\gab\\treasure-chest\\textured.glb"
+   }
+  }
+ }
+}

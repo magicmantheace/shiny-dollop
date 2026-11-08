@@ -79,7 +79,9 @@ def cmd_run(args: argparse.Namespace) -> int:
     from pipeline import run_pipeline
     manifest = run_pipeline(
         args.concept, args.name, ears=args.ears, arms=not args.no_arms,
-        target_verts=args.target_verts, resume=args.resume)
+        target_verts=args.target_verts, resume=args.resume,
+        template=args.template, unrigged=args.prop,
+        rotate_z=args.rotate_z, prop_target_verts=args.prop_target_verts)
     print(json.dumps({k: manifest[k] for k in
                       ("name", "slug", "seconds_total", "final_glb",
                        "catalog_entry")}, indent=1))
@@ -109,11 +111,22 @@ def main(argv: list[str] | None = None) -> int:
     p_run = sub.add_parser("run", help="run the full pipeline on a concept")
     p_run.add_argument("--concept", required=True)
     p_run.add_argument("--name", required=True)
+    p_run.add_argument("--template", default="winged-creature",
+                       choices=("winged-creature", "quadruped", "biped"),
+                       help="rig template (ignored with --prop)")
+    p_run.add_argument("--prop", action="store_true",
+                       help="unrigged prop path: no rig/animate stages, "
+                            "catalogued as a static asset")
     p_run.add_argument("--ears", action="store_true",
                        help="template option: include ear bones")
     p_run.add_argument("--no-arms", action="store_true",
                        help="template option: omit arm bones")
+    p_run.add_argument("--rotate-z", type=int, default=0,
+                       choices=(0, 90, 180, 270),
+                       help="facing correction for the rig stage, "
+                            "chosen from renders of the generated mesh")
     p_run.add_argument("--target-verts", type=int, default=50000)
+    p_run.add_argument("--prop-target-verts", type=int, default=30000)
     p_run.add_argument("--resume", action="store_true",
                        help="skip prep/mesh/texture if artifacts exist")
     p_run.set_defaults(fn=cmd_run)
