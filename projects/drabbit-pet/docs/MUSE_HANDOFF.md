@@ -376,6 +376,42 @@ work started.
   (hop/sick/sleeping poses proven in Blender + unit tests,
   not yet caught live in the window).
 
+## Codex finding fixes (2026-11-08, branch `codex-fixes/drabbit-pet`)
+
+Three P2 findings Codex left on PR #28 (merged), fixed at the
+owner's direction:
+
+- **Save validation (core):** `parse()` in
+  `core/src/persistence.ts` now validates every field the service
+  and sim consume — the full pet record (timestamps, counters,
+  flags, mood/fur/adult-form vocabularies), all four needs, the
+  `events` array and each entry's `t`/`kind`/`detail`, and every
+  lineage ancestor. A valid-JSON save that lost a field (Codex
+  reproduced with `pet.events` removed) previously parsed, loaded
+  as `loaded`, and crashed `PetService` on `pet.events.length`; it
+  now throws `bad_save` and reaches SaveStore's existing
+  preserve-aside-and-start-fresh recovery.
+- **Stale action summary (desktop):** `PetService.doAction()` read
+  its return summary before invoking change callbacks; auto-care
+  acts synchronously inside those callbacks (wake a hungry sleeper
+  → it feeds during the wake's own emit), so callers got the
+  pre-feed state and overwrote the newer broadcast. The summary is
+  now read after emit completes.
+- **Android event-sync race:** `PetViewModel.syncEvents()` ran its
+  cursor-read / fetch / merge sequence unguarded, so a poll
+  overlapping an action or refresh could double-append events and
+  move the cursor backward. The whole operation now runs under a
+  `Mutex`.
+
+Verified (VM): core **48/48** (+2 persistence regression tests),
+desktop **98/98** (+1 SaveStore corrupt-route test, +1 doAction
+summary-freshness test wired like production: real PetService +
+real AutoCareService), typecheck (core + desktop 4 configs) and
+full desktop build clean. Each new test was confirmed to FAIL with
+its fix reverted. **Android: the Kotlin change is NOT compiled or
+verified — no Android toolchain on this VM; first compile is
+owner-side in Android Studio**, per the honesty rule above.
+
 ## Next step
 
 The v1 queue is complete; everything left is owner-side
