@@ -84,6 +84,7 @@ import urllib.request
 import uuid
 import zlib
 from collections import deque
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -655,6 +656,85 @@ class OutputBuffer:
 # Core: audit log, rate limiting, file roots, runtime registries
 # --------------------------------------------------------------------------
 
+def _lock_file_exclusive(fh) -> bool:
+    """Take an OS-level exclusive lock on an open file. The lock is
+    released by closing the file or via _unlock_file. Separate opens
+    conflict even within one process (flock is per open-file
+    description; Windows byte-range locks are per handle), which is
+    what makes this usable as a cross-writer mutex."""
+    if IS_WINDOWS:
+        import msvcrt
+        fh.seek(0, os.SEEK_END)
+        if fh.tell() == 0:
+            fh.write(b"\0")
+            fh.flush()
+        fh.seek(0)
+        msvcrt.locking(fh.fileno(), msvcrt.LK_LOCK, 1)
+        return True
+    try:
+        import fcntl
+    except ImportError:
+        return False
+    fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+    return True
+
+
+def _unlock_file(fh) -> None:
+    try:
+        if IS_WINDOWS:
+            import msvcrt
+            fh.seek(0)
+            msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+    except (OSError, ImportError):
+        pass
+
+
+@contextmanager
+def _audit_file_lock(audit_path: Path):
+    """Serialize one audit append (+ its rotation) across processes.
+
+    The main agent and the session helper append to the SAME audit
+    log from two processes; each core's threading lock serializes
+    only its own writers, so two cores could both decide to rotate
+    from the same stale file state and shift the archives twice,
+    discarding entries that should have been retained (Codex PR #47
+    finding). This lock lives in a sidecar file (audit log name +
+    ".lock") because rotation renames the log itself; the sidecar
+    name never changes. Acquisition failure never takes auditing
+    down with it: on OSError the caller proceeds unlocked, with a
+    stderr warning — the uncoordinated behaviour is the fallback,
+    never a crash and never a silently dropped entry.
+    """
+    lock_path = audit_path.with_name(audit_path.name + ".lock")
+    fh = None
+    locked = False
+    try:
+        try:
+            audit_path.parent.mkdir(parents=True, exist_ok=True)
+            fh = open(lock_path, "a+b")
+            locked = _lock_file_exclusive(fh)
+            if not locked:
+                print("[bridge] WARNING: no file-lock primitive on "
+                      "this platform; audit append proceeding "
+                      "without cross-process coordination",
+                      file=sys.stderr)
+        except OSError as exc:
+            print(f"[bridge] WARNING: audit lock unavailable: {exc}; "
+                  f"append proceeding unlocked", file=sys.stderr)
+        yield
+    finally:
+        if fh is not None:
+            if locked:
+                _unlock_file(fh)
+            try:
+                fh.close()
+            except OSError:
+                pass
+
+
 class BridgeCore:
     def __init__(self, cfg: dict):
         self.cfg = cfg
@@ -747,15 +827,25 @@ class BridgeCore:
         line = json.dumps(record, ensure_ascii=False)
         try:
             with self._audit_lock:
-                self.audit_path.parent.mkdir(parents=True, exist_ok=True)
-                self._rotate_audit_if_needed(len(line) + 1)
-                with open(self.audit_path, "a", encoding="utf-8") as fh:
-                    fh.write(line + "\n")
+                # The session helper appends to this same log from
+                # another process with its own threading lock; the
+                # file lock is what makes rotation + append atomic
+                # across BOTH writers (see _audit_file_lock).
+                with _audit_file_lock(self.audit_path):
+                    self.audit_path.parent.mkdir(
+                        parents=True, exist_ok=True)
+                    self._rotate_audit_if_needed(len(line) + 1)
+                    with open(self.audit_path, "a",
+                              encoding="utf-8") as fh:
+                        fh.write(line + "\n")
         except OSError as exc:  # never crash the server on audit failure
             print(f"[bridge] WARNING: audit write failed: {exc}", file=sys.stderr)
 
     def _rotate_audit_if_needed(self, incoming: int) -> None:
-        """Size-based rotation (v1 §5). Caller holds the audit lock."""
+        """Size-based rotation (v1 §5). Caller holds both audit
+        locks (the per-core threading lock and the cross-process
+        audit file lock), so the size check and the archive renames
+        cannot interleave with another writer's rotation."""
         max_bytes = int(self.cfg.get("audit_max_bytes") or 0)
         keep = int(self.cfg.get("audit_keep") or 0)
         if max_bytes <= 0 or keep <= 0:
@@ -2375,6 +2465,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
             with core._processes_lock:
                 procs = list(core.processes.values())
             listing = [p.describe() for p in procs]
+            # Brokered GUI spawns live in the helper's registry;
+            # merge them in so the listing covers every process
+            # this agent can inspect or kill.
+            listing += self._helper_processes()
             return 200, {"processes": listing}, \
                 f"processes list ({len(listing)})", {}
         if method == "GET" and proc_match and not proc_match.group(2):
@@ -2498,6 +2592,45 @@ class BridgeHandler(BaseHTTPRequestHandler):
             f"{route} via session helper (port {reg['port']})", \
             {"extra": {"via": "session-broker"}}
 
+    def _helper_processes(self) -> list[dict]:
+        """Process records owned by the registered session helper.
+
+        GUI spawns brokered to the helper live ONLY in the helper's
+        registry (inspect/kill by id already forward there); without
+        this merge the public listing and the status counts showed
+        only local records, so clients could not rediscover a
+        brokered process after losing the spawn response (Codex
+        PR #47 finding). Records are tagged via=session-helper.
+        Returns [] when no helper is registered or it does not
+        answer — a listing must never fail because the helper is
+        gone; the local records are still the truth locally.
+        """
+        core = self.core
+        reg = core.session_helper_registration()
+        if reg is None:
+            return []
+        url = f"http://127.0.0.1:{reg['port']}/v1/processes"
+        req = urllib.request.Request(
+            url, headers={"Authorization": f"Bearer {core.token}"},
+            method="GET")
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                obj = json.loads(resp.read().decode("utf-8"))
+        except (urllib.error.URLError, OSError, UnicodeDecodeError,
+                json.JSONDecodeError):
+            return []
+        procs = obj.get("processes") if isinstance(obj, dict) \
+            else None
+        if not isinstance(procs, list):
+            return []
+        merged = []
+        for item in procs:
+            if isinstance(item, dict):
+                item = dict(item)
+                item.setdefault("via", "session-helper")
+                merged.append(item)
+        return merged
+
     # -- status ------------------------------------------------------------------
     def _status_obj(self) -> dict:
         core = self.core
@@ -2509,6 +2642,12 @@ class BridgeHandler(BaseHTTPRequestHandler):
         with core._processes_lock:
             procs_alive = sum(1 for p in core.processes.values() if p.alive())
             procs_total = len(core.processes)
+        # Helper-owned (brokered) processes count too: without them
+        # the avatar reported idle while a GUI app it brokered was
+        # still running.
+        helper_procs = self._helper_processes()
+        procs_total += len(helper_procs)
+        procs_alive += sum(1 for p in helper_procs if p.get("alive"))
         with core._sessions_lock:
             sessions_open = sum(1 for s in core.sessions.values()
                                 if s.state == "running")

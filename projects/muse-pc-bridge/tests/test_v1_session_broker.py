@@ -258,6 +258,79 @@ class BrokerProxyTests(BrokerFixture):
         self.assertIn(obj["process_id"], server.core.processes)
 
 
+class BrokerListingMergeTests(BrokerFixture):
+    """Codex PR #47: brokered (helper-owned) processes must appear
+    in the main agent's GET /v1/processes and its /v1/status counts
+    — inspect/kill by id already forwarded, but the listing read
+    only the local registry, so a GUI spawn brokered to the helper
+    was invisible (and the avatar reported idle) until it exited."""
+
+    def test_listing_and_status_merge_helper_processes(self):
+        _server, port = self.start_main()
+        local = self.spawn_sleeper(port)     # no helper yet: local
+        self.assertIn(local["process_id"],
+                      self.servers[0].core.processes)
+        self.start_helper()
+        brokered = self.spawn_sleeper(port)  # now brokered
+        self.assertNotIn(brokered["process_id"],
+                         self.servers[0].core.processes)
+
+        status, obj = call("GET", port, "/v1/processes")
+        self.assertEqual(status, 200)
+        by_id = {p["process_id"]: p for p in obj["processes"]}
+        self.assertIn(local["process_id"], by_id)
+        self.assertIn(brokered["process_id"], by_id)
+        self.assertTrue(by_id[brokered["process_id"]]["alive"])
+        self.assertEqual(by_id[brokered["process_id"]].get("via"),
+                         "session-helper")
+        self.assertNotIn("via", by_id[local["process_id"]])
+
+        status, obj = call("GET", port, "/v1/status")
+        self.assertEqual(status, 200)
+        self.assertEqual(obj["processes_tracked"], 2)
+        self.assertEqual(obj["processes_alive"], 2)
+
+        # Kill the brokered process through the main agent; the
+        # merged listing and counts must follow its death.
+        status, killed = call(
+            "POST", port, f"/v1/processes/{brokered['process_id']}/kill")
+        self.assertEqual(status, 200)
+        self.assertTrue(killed["killed"])
+        deadline = time.time() + 10
+        alive = True
+        while time.time() < deadline and alive:
+            _s, obj = call("GET", port, "/v1/processes")
+            rec = {p["process_id"]: p
+                   for p in obj["processes"]}[brokered["process_id"]]
+            alive = bool(rec["alive"])
+            if alive:
+                time.sleep(0.1)
+        self.assertFalse(alive)
+        status, obj = call("GET", port, "/v1/status")
+        self.assertEqual(obj["processes_tracked"], 2)
+        self.assertEqual(obj["processes_alive"], 1)
+
+    def test_listing_degrades_when_helper_stops(self):
+        _server, port = self.start_main()
+        helper = self.start_helper()
+        brokered = self.spawn_sleeper(port)
+        status, killed = call(
+            "POST", port, f"/v1/processes/{brokered['process_id']}/kill")
+        self.assertEqual(status, 200)
+        self.assertTrue(killed["killed"])
+        helper.stop()
+        self.helpers.remove(helper)
+        # No helper: the listing is the local registry only, and
+        # neither it nor status may fail over the missing helper.
+        status, obj = call("GET", port, "/v1/processes")
+        self.assertEqual(status, 200)
+        self.assertEqual(obj["processes"], [])
+        status, obj = call("GET", port, "/v1/status")
+        self.assertEqual(status, 200)
+        self.assertEqual(obj["processes_tracked"], 0)
+        self.assertEqual(obj["processes_alive"], 0)
+
+
 class SessionZeroBlockTests(BrokerFixture):
     """Simulate the session-0 core by patching the platform probes:
     desktop routes must 501 without a helper and proxy with one."""
