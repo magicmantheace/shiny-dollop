@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 enum class Phase { Connect, Pet }
@@ -60,6 +62,16 @@ class PetViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Event-log cursor for delta polling (null until first sync). */
     private var eventCursor: Long? = null
+
+    /**
+     * Serializes [syncEvents]: connects, polls, refreshes, and actions
+     * all sync the event log from different coroutines, and the
+     * cursor-read / fetch / merge sequence must not interleave —
+     * two overlapping syncs would fetch with the same cursor, append
+     * the same events twice, and let an older response move the
+     * cursor backward.
+     */
+    private val eventSyncMutex = Mutex()
 
     private var pollJob: Job? = null
 
@@ -167,22 +179,25 @@ class PetViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** First sync takes the whole retained window (since = 0, capped
-     *  for display); later syncs are cursor deltas. */
+     *  for display); later syncs are cursor deltas. The whole
+     *  operation runs under [eventSyncMutex] — see its doc. */
     private suspend fun syncEvents() {
-        try {
-            val firstSync = eventCursor == null
-            val page = io { client.fetchEvents(if (firstSync) 0L else eventCursor) }
-            eventCursor = page.cursor
-            if (page.events.isNotEmpty()) {
-                _uiState.update { state ->
-                    val merged = if (firstSync) page.events else state.events + page.events
-                    state.copy(events = merged.takeLast(MAX_EVENTS_SHOWN))
+        eventSyncMutex.withLock {
+            try {
+                val firstSync = eventCursor == null
+                val page = io { client.fetchEvents(if (firstSync) 0L else eventCursor) }
+                eventCursor = page.cursor
+                if (page.events.isNotEmpty()) {
+                    _uiState.update { state ->
+                        val merged = if (firstSync) page.events else state.events + page.events
+                        state.copy(events = merged.takeLast(MAX_EVENTS_SHOWN))
+                    }
                 }
+            } catch (e: Exception) {
+                // Events are decoration on the status; a failed sync just
+                // retries on the next poll (the cursor is only advanced
+                // on success, so nothing is skipped or duplicated).
             }
-        } catch (e: Exception) {
-            // Events are decoration on the status; a failed sync just
-            // retries on the next poll (the cursor is only advanced
-            // on success, so nothing is skipped or duplicated).
         }
     }
 
