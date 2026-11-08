@@ -1,0 +1,66 @@
+{
+  "schema": "developmental-ai.observable-reversal-calibration-protocol/v1",
+  "created": "2026-10-21",
+  "committed_before_implementation": true,
+  "scope": "Offline intervention evidence routes between two separately learned numerical-feature outcome models after an action-consequence rule reversal; not general online causal discovery.",
+  "worlds": [
+    "route",
+    "route-reversed"
+  ],
+  "previous_source": "collect/train/0..79 via frozen original benchmark with public sensor outcomes",
+  "second_model": "route-reversed/train/300..379, 80 random exploration episodes with public sensor outcomes only",
+  "calibration": "train/900..911, twelve disposable episodes per seed per world, one selected public action/event per episode, chosen by model disagreement, with harm counted and without private rule information sent to the selector.",
+  "evaluation": "test/14000..14059, 60 target episodes per seed/world, models immutable during test",
+  "seeds": {
+    "development": [
+      71001,
+      71013,
+      71031
+    ],
+    "already_inspected_additional": [
+      81001,
+      81013,
+      81031
+    ]
+  },
+  "methods": [
+    "offline_calibrated",
+    "normal_only",
+    "reversal_only",
+    "flipped_calibration",
+    "abstain",
+    "privileged_oracle"
+  ],
+  "gates": {
+    "minimum_observations": 4,
+    "minimum_log_likelihood_margin": 2,
+    "likelihood_smoothing": 0.05
+  },
+  "report": [
+    "successes",
+    "harm",
+    "stalled",
+    "mean_steps",
+    "calibration_harmed",
+    "selected_model",
+    "abstentions",
+    "selection_accuracy_scoring_only",
+    "replay_sha",
+    "historical_model_immutability"
+  ],
+  "limitations": [
+    "Both rules and numeric feature->effect relation are engineered; no natural perception",
+    "The changed rule is explicitly given as a training family to the offline harness, not discovered by a live agent",
+    "Calibration probes occur in disposable simulator episodes, may be harmful, and would not be safe in real world",
+    "Six source seeds have already been inspected; not blind generalization",
+    "Selection between only two predefined models, cannot recognize a third unseen rule",
+    "Original outcome learner, benchmark, protocol, default and main remain untouched",
+    "No unauthenticated auto-promotion or OS/network interaction"
+  ],
+  "preserve": [
+    "original frozen numeric outcome-transfer benchmark including harmful reversed outcomes",
+    "historical 3-seed transfer regression",
+    "owner V2A then V2B roadmap",
+    "draft PR no merge"
+  ]
+}

@@ -1,0 +1,83 @@
+name: Shared evidence bank economics
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "benchmarks/shared_evidence_economics_protocol.json"
+      - "benchmarks/shared_evidence_economics_benchmark.py"
+      - "tests/test_shared_evidence_economics.py"
+      - ".github/workflows/shared-evidence-economics.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frozen-evidence-economics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Public evidence cost ledgers and prior witness regression
+        run: python -m unittest tests.test_shared_evidence_economics tests.test_independent_witness tests.test_validated_abstention -v
+      - name: Preregistered development cohort
+        run: python -m benchmarks.shared_evidence_economics_benchmark --cohort development > shared-development.json
+      - name: Preregistered additional cohort
+        run: python -m benchmarks.shared_evidence_economics_benchmark --cohort additional > shared-additional.json
+      - name: Report study cost without hiding upstream actor actions
+        run: |
+          python - <<'PY'
+          import json
+          merged={}
+          original_actor={"observations":0,"harmful":0}
+          for path in ("shared-development.json","shared-additional.json"):
+              report=json.load(open(path,encoding="utf8"))
+              print("RESULT",path,"blind",report["blind"],"rows",len(report["rows"]))
+              original_actor["observations"]+=report["base_actor_actions"]
+              original_actor["harmful"]+=report["base_actor_harm"]
+              for method,summary in report["study_costs"].items():
+                  if method not in merged:
+                      merged[method]={k:0 for k in summary}
+                  for k,v in summary.items():
+                      merged[method][k]+=v
+              for stage,checkpoints in (
+                  ("conditional",(0,8,16,32,64,96)),
+                  ("return_source",(0,8,16,32,64)),
+                  ("xor",(0,8,16,32,64,96))):
+                  stages=[row["stages"][stage] for row in report["rows"]]
+                  bank=[row["bank_actor_cost"][stage] for row in report["rows"]]
+                  print("BANK_PAID_ONCE",stage,
+                        {k:sum(b[k] for b in bank) for k in
+                         ("observations","harmful","productive","neutral")})
+                  for n in checkpoints:
+                      items=[r[str(n)] for r in stages]
+                      print("CHECKPOINT",stage,n,
+                            "shared_consumed",[i["shared"]["accepted_records"] for i in items],
+                            "fresh_consumed",[i["fresh"]["accepted_records"] for i in items])
+                      for mode in (
+                          "no_extra_evidence","fresh_witness","shared_bank",
+                          "always_act_gated","always_abstain","frozen_source",
+                          "privileged_known_xor","perfect_action_oracle"):
+                          scores=[r["scores"][mode] for r in items]
+                          print("SCORE",mode,{k:sum(s[k] for s in scores)
+                                for k in ("successes","harmful_actions","abstained")})
+                      fresh=[r["fresh_actor_cost"] for r in items]
+                      print("FRESH_ACTOR",stage,n,
+                            {k:sum(s[k] for s in fresh)
+                             for k in ("observations","harmful","productive","neutral")})
+          print("BASE_EXTERNAL_ACTOR",original_actor)
+          for method,row in merged.items():
+              print("TOTAL_LOSS",method,row)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shared-vs-fresh-actor-economic-ledger
+          path: |
+            shared-development.json
+            shared-additional.json
+          retention-days: 14

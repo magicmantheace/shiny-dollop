@@ -1,0 +1,71 @@
+{
+  "schema": "developmental-ai.outcome-event-memory-protocol/v1",
+  "status": "frozen-before-benchmark-evaluation",
+  "purpose": "Learn which inferred event spans merit retrieval based on downstream binary outcomes, not simply event duration",
+  "families": [
+    "source_bursts",
+    "shifted_bursts"
+  ],
+  "cohorts": {
+    "development": [
+      14003,
+      14009,
+      14033
+    ],
+    "additional_previously_inspected": [
+      27007,
+      27011,
+      27017
+    ]
+  },
+  "fit": {
+    "segmenter_family": "source_bursts",
+    "stream_only_indices": "train/0..159",
+    "em_iterations": 5,
+    "priority_family": "source_bursts",
+    "reward_only_indices": "train/2000..2199",
+    "reward_episodes": 200
+  },
+  "evaluation": {
+    "split": "test",
+    "start_index": 93000,
+    "episodes_per_seed_per_family": 64
+  },
+  "task": {
+    "public_contexts": [
+      0,
+      1
+    ],
+    "hidden_context_to_label": "deterministic seed-dependent preference for two distinct labels (simulator-side only)",
+    "candidate_events": "spans inferred from public raw 0..3 tokens by frozen HMM or raw run segmentation",
+    "selection": "span index, no hidden boundaries or target labels in learner",
+    "feedback": "only terminal boolean whether true hidden label at selected span center matches hidden context preference",
+    "absence": "may be impossible in some episodes; report achievable privileged oracle coverage"
+  },
+  "model": {
+    "update": "per-context per-decoded-label Beta-smoothed success counts, bounded UCB exploration during train, frozen greedy evaluation",
+    "trace": "versioned model-bound episode log; replay choices and reward evidence; no authentication"
+  },
+  "baselines": [
+    "frozen HMM longest inferred span",
+    "frozen HMM most-recent span",
+    "raw global-majority token",
+    "contextual reward-only raw-run bandit same episode budget",
+    "privileged true-hidden-label oracle"
+  ],
+  "metrics": [
+    "selected event reward success per cohort/family",
+    "mean available-oracle success",
+    "selected center latent-label correctness",
+    "model learned preferences and persistence",
+    "per-seed failures and shifted-family regressions"
+  ],
+  "limits": [
+    "The event-state alphabet is fixed to four, the context cue and feedback type are engineered",
+    "The target label is simulator hidden truth only; no hidden labels or true spans enter model propose/update",
+    "Do not modify this protocol or evaluation seeds after observing scores",
+    "Previously inspected seeds are not blind, no D3/D4 completion claims",
+    "No automatic model promotion, external actions, identity or memory access",
+    "Preserve v2A prior to overlapping v2B"
+  ]
+}

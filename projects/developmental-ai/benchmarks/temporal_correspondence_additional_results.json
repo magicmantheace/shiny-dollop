@@ -1,0 +1,82 @@
+{
+  "frozen_parameters": {
+    "latent_matches": 8,
+    "match": 0.75,
+    "mismatch": 0.08333333333333333,
+    "noise": 0.25
+  },
+  "independent_blind": false,
+  "observed_training_labels": false,
+  "protocol": "benchmarks/temporal_correspondence_protocol.json",
+  "rows": [
+    {
+      "correct_source": {
+        "correct_cue": 40,
+        "fixed_identity": 10,
+        "learned_old": 23,
+        "oracle_cipher_marginal": 24,
+        "unsup_marginal": 24,
+        "unsup_max_path": 26
+      },
+      "learned_token_mapping_exact": true,
+      "mean_uncalibrated_margin": 1.779116,
+      "model_training_sha256": "659ee49caf3c46386e1ddd60719f11468bef5dc3ca7f7e6394e469097204aecb",
+      "navigation_successes": {
+        "correct_cue": 39,
+        "fixed_identity": 9,
+        "learned_old": 22,
+        "oracle_cipher_marginal": 23,
+        "unsup_marginal": 23,
+        "unsup_max_path": 25
+      },
+      "seed": 72019
+    },
+    {
+      "correct_source": {
+        "correct_cue": 40,
+        "fixed_identity": 10,
+        "learned_old": 23,
+        "oracle_cipher_marginal": 30,
+        "unsup_marginal": 30,
+        "unsup_max_path": 28
+      },
+      "learned_token_mapping_exact": true,
+      "mean_uncalibrated_margin": 1.610813,
+      "model_training_sha256": "742c1dae85668b63dd7966235c263714f911bff6395c1ecdf159acac6267b1e9",
+      "navigation_successes": {
+        "correct_cue": 34,
+        "fixed_identity": 7,
+        "learned_old": 21,
+        "oracle_cipher_marginal": 26,
+        "unsup_marginal": 26,
+        "unsup_max_path": 25
+      },
+      "seed": 83003
+    },
+    {
+      "correct_source": {
+        "correct_cue": 40,
+        "fixed_identity": 7,
+        "learned_old": 26,
+        "oracle_cipher_marginal": 32,
+        "unsup_marginal": 32,
+        "unsup_max_path": 23
+      },
+      "learned_token_mapping_exact": true,
+      "mean_uncalibrated_margin": 1.641849,
+      "model_training_sha256": "cb496f6a3be4303380458fc9758f88fb985ff741a4ebf8c988077c7f77120733",
+      "navigation_successes": {
+        "correct_cue": 35,
+        "fixed_identity": 7,
+        "learned_old": 23,
+        "oracle_cipher_marginal": 27,
+        "unsup_marginal": 27,
+        "unsup_max_path": 20
+      },
+      "seed": 94009
+    }
+  ],
+  "schema": "developmental-ai.temporal-correspondence-benchmark/v1",
+  "test": "test/99700..99739",
+  "train": "train/89400..89639"
+}

@@ -1,0 +1,49 @@
+{
+  "schema": "developmental-ai.affordance-transfer-protocol/v1",
+  "note": "Design commitments recorded BEFORE implementing learner or inspecting any new seed's results. All tasks remain a common hand-designed simulator, not independently blind.",
+  "status": "development preregistration, not statistical trial registration",
+  "source_world": "Existing OpaqueWorld cargo + relay dynamics unchanged",
+  "semantics": "Opaque per-episode action IDs; new fixed numeric descriptors derived from action identity in simulator, externally visible, stable within a seed/family across episodes. Engineered semantic identity code, not learned perception.",
+  "features": "Two integers 0..255 per action; IDs rotate, numeric descriptor stable; descriptors are unsigned hashes of simulator action kinds. No lexical action names or hidden rules passed to policy.",
+  "training": "80 cargo source episodes train/0..79 with ORIGINAL novel-first baseline; per-step records of public descriptors and observations, per-episode boolean terminal success; stage learned hazard evidence only after each complete training episode. No test feedback to learner.",
+  "evaluation": "Cargo held-out episode indices 8200..8259 and relay retained tasks same indices; fixed 18-step action limit. Model used read-only.",
+  "development_seeds": [
+    31013,
+    31019,
+    31033
+  ],
+  "reserved_seeds": [
+    43013,
+    43019,
+    43033
+  ],
+  "baselines": [
+    "trained-risk",
+    "untrained-novel",
+    "cyclic",
+    "random",
+    "oracle",
+    "descriptor-shuffle-ablation",
+    "risk-token-oracle"
+  ],
+  "objective_metrics": [
+    "completion",
+    "blocked",
+    "attempts",
+    "spoilage",
+    "risk_tokens_learned",
+    "checkpoint_integrity",
+    "training_cost"
+  ],
+  "risk_classification": "Bayesian smoothed P(failure|descriptor attempted) compared with success if absent; require failures>=3, positives>=3 absent, and success_given_token<=0.1. This is confounded association not guaranteed causation.",
+  "safeguard": "No self-modification or real actions; static risk filter may exclude necessary actions, should be reversible and optional; strict read-only evaluation, replay verification.",
+  "nonclaims": [
+    "numeric descriptors leak engineered stable action identity",
+    "outcomes confounded by policy, no randomized intervention guarantee",
+    "training on cargo means improved cargo test is within-family adaptation, not zero-shot transfer to unrelated environments",
+    "one simulator codebase",
+    "no D3 completion",
+    "unseen reserved cohort once inspected is no longer blind"
+  ],
+  "historical": "Do not edit OpaqueWorld, OpaqueEpisodePolicy, frozen original benchmark or historic protocol."
+}

@@ -1,0 +1,182 @@
+{
+  "schema": "closed-loop-adaptation-summary/v1",
+  "source": "local execution of benchmarks.closed_loop_adaptation_benchmark",
+  "kind": "previously inspected seeds, not independent blind data",
+  "episodes_per_seed_per_schedule_method": 24,
+  "fit_train": 48,
+  "validation_train": 16,
+  "calibration_train": 12,
+  "iterations": 2,
+  "rounds": 1,
+  "evaluation_test_start": 99000,
+  "methods": [
+    "single",
+    "static",
+    "switching",
+    "physics_oracle"
+  ],
+  "schedules": [
+    "switch",
+    "original",
+    "changed"
+  ],
+  "rows": [
+    {
+      "seed": 17,
+      "cohort": "development",
+      "proposal_two_models": true,
+      "hazard": 0.04,
+      "success_counts": {
+        "switch": {
+          "single": 15,
+          "static": 19,
+          "switching": 17,
+          "physics_oracle": 16
+        },
+        "original": {
+          "single": 17,
+          "static": 16,
+          "switching": 17,
+          "physics_oracle": 17
+        },
+        "changed": {
+          "single": 3,
+          "static": 8,
+          "switching": 8,
+          "physics_oracle": 8
+        }
+      }
+    },
+    {
+      "seed": 23,
+      "cohort": "development",
+      "proposal_two_models": false,
+      "hazard": 0,
+      "success_counts": {
+        "switch": {
+          "single": 13,
+          "static": 13,
+          "switching": 13,
+          "physics_oracle": 20
+        },
+        "original": {
+          "single": 17,
+          "static": 17,
+          "switching": 17,
+          "physics_oracle": 19
+        },
+        "changed": {
+          "single": 2,
+          "static": 2,
+          "switching": 2,
+          "physics_oracle": 11
+        }
+      }
+    },
+    {
+      "seed": 41,
+      "cohort": "development",
+      "proposal_two_models": true,
+      "hazard": 0.1,
+      "success_counts": {
+        "switch": {
+          "single": 16,
+          "static": 17,
+          "switching": 15,
+          "physics_oracle": 22
+        },
+        "original": {
+          "single": 20,
+          "static": 19,
+          "switching": 20,
+          "physics_oracle": 21
+        },
+        "changed": {
+          "single": 5,
+          "static": 11,
+          "switching": 7,
+          "physics_oracle": 17
+        }
+      }
+    },
+    {
+      "seed": 1009,
+      "cohort": "inspected_audit",
+      "proposal_two_models": true,
+      "hazard": 0.1,
+      "success_counts": {
+        "switch": {
+          "single": 20,
+          "static": 12,
+          "switching": 17,
+          "physics_oracle": 17
+        },
+        "original": {
+          "single": 22,
+          "static": 18,
+          "switching": 18,
+          "physics_oracle": 20
+        },
+        "changed": {
+          "single": 1,
+          "static": 5,
+          "switching": 3,
+          "physics_oracle": 8
+        }
+      }
+    },
+    {
+      "seed": 1013,
+      "cohort": "inspected_audit",
+      "proposal_two_models": true,
+      "hazard": 0.1,
+      "success_counts": {
+        "switch": {
+          "single": 13,
+          "static": 14,
+          "switching": 19,
+          "physics_oracle": 20
+        },
+        "original": {
+          "single": 11,
+          "static": 16,
+          "switching": 17,
+          "physics_oracle": 19
+        },
+        "changed": {
+          "single": 11,
+          "static": 5,
+          "switching": 7,
+          "physics_oracle": 12
+        }
+      }
+    },
+    {
+      "seed": 1031,
+      "cohort": "inspected_audit",
+      "proposal_two_models": true,
+      "hazard": 0.01,
+      "success_counts": {
+        "switch": {
+          "single": 14,
+          "static": 20,
+          "switching": 21,
+          "physics_oracle": 17
+        },
+        "original": {
+          "single": 10,
+          "static": 19,
+          "switching": 19,
+          "physics_oracle": 19
+        },
+        "changed": {
+          "single": 9,
+          "static": 8,
+          "switching": 7,
+          "physics_oracle": 14
+        }
+      }
+    }
+  ],
+  "limitations": "Action policies diverge, changing simulator RNG draws; no independent blind data; physics-law oracle is a heuristic, not guaranteed upper bound. No default controller rollout."
+}

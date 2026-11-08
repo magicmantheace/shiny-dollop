@@ -1,0 +1,232 @@
+{
+  "calibration_samples_per_phase": 1800,
+  "kind": "inspected-development-not-blind",
+  "rows": [
+    {
+      "adapted_on_old": {
+        "episodes": 300,
+        "layout": "fixed",
+        "mean_nll": 2.66297,
+        "navigation_success": 0.13,
+        "noise": "standard",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 17,
+        "trained": 3600
+      },
+      "adapted_on_shift": {
+        "episodes": 300,
+        "layout": "shifted",
+        "mean_nll": 2.23914,
+        "navigation_success": 0.52,
+        "noise": "high",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 17,
+        "trained": 3600
+      },
+      "privileged_oracle": {
+        "episodes": 300,
+        "layout": "shifted",
+        "mean_nll": 2.19329,
+        "navigation_success": 0.57,
+        "noise": "high",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 17,
+        "trained": 0
+      },
+      "retained_original_model": {
+        "episodes": 300,
+        "layout": "fixed",
+        "mean_nll": 1.85006,
+        "navigation_success": 0.83,
+        "noise": "standard",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 17,
+        "trained": 3600
+      },
+      "seed": 17,
+      "standard_frozen_on_shift": {
+        "episodes": 300,
+        "layout": "shifted",
+        "mean_nll": 3.46666,
+        "navigation_success": 0.1867,
+        "noise": "high",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 17,
+        "trained": 1800
+      },
+      "standard_in_distribution": {
+        "episodes": 300,
+        "layout": "fixed",
+        "mean_nll": 1.85006,
+        "navigation_success": 0.83,
+        "noise": "standard",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 17,
+        "trained": 1800
+      },
+      "uninformed": {
+        "episodes": 300,
+        "layout": "shifted",
+        "mean_nll": 3.29584,
+        "navigation_success": 0.0,
+        "noise": "high",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 17,
+        "trained": 0
+      }
+    },
+    {
+      "adapted_on_old": {
+        "episodes": 300,
+        "layout": "fixed",
+        "mean_nll": 3.05255,
+        "navigation_success": 0.1133,
+        "noise": "standard",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 23,
+        "trained": 3600
+      },
+      "adapted_on_shift": {
+        "episodes": 300,
+        "layout": "shifted",
+        "mean_nll": 2.24807,
+        "navigation_success": 0.5133,
+        "noise": "high",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 23,
+        "trained": 3600
+      },
+      "privileged_oracle": {
+        "episodes": 300,
+        "layout": "shifted",
+        "mean_nll": 2.20493,
+        "navigation_success": 0.5733,
+        "noise": "high",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 23,
+        "trained": 0
+      },
+      "retained_original_model": {
+        "episodes": 300,
+        "layout": "fixed",
+        "mean_nll": 1.76502,
+        "navigation_success": 0.9233,
+        "noise": "standard",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 23,
+        "trained": 3600
+      },
+      "seed": 23,
+      "standard_frozen_on_shift": {
+        "episodes": 300,
+        "layout": "shifted",
+        "mean_nll": 3.44846,
+        "navigation_success": 0.16,
+        "noise": "high",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 23,
+        "trained": 1800
+      },
+      "standard_in_distribution": {
+        "episodes": 300,
+        "layout": "fixed",
+        "mean_nll": 1.76502,
+        "navigation_success": 0.9233,
+        "noise": "standard",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 23,
+        "trained": 1800
+      },
+      "uninformed": {
+        "episodes": 300,
+        "layout": "shifted",
+        "mean_nll": 3.29584,
+        "navigation_success": 0.0,
+        "noise": "high",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 23,
+        "trained": 0
+      }
+    },
+    {
+      "adapted_on_old": {
+        "episodes": 300,
+        "layout": "fixed",
+        "mean_nll": 2.73604,
+        "navigation_success": 0.15,
+        "noise": "standard",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 41,
+        "trained": 3600
+      },
+      "adapted_on_shift": {
+        "episodes": 300,
+        "layout": "shifted",
+        "mean_nll": 2.31632,
+        "navigation_success": 0.57,
+        "noise": "high",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 41,
+        "trained": 3600
+      },
+      "privileged_oracle": {
+        "episodes": 300,
+        "layout": "shifted",
+        "mean_nll": 2.25721,
+        "navigation_success": 0.59,
+        "noise": "high",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 41,
+        "trained": 0
+      },
+      "retained_original_model": {
+        "episodes": 300,
+        "layout": "fixed",
+        "mean_nll": 1.74313,
+        "navigation_success": 0.8533,
+        "noise": "standard",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 41,
+        "trained": 3600
+      },
+      "seed": 41,
+      "standard_frozen_on_shift": {
+        "episodes": 300,
+        "layout": "shifted",
+        "mean_nll": 3.38444,
+        "navigation_success": 0.1533,
+        "noise": "high",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 41,
+        "trained": 1800
+      },
+      "standard_in_distribution": {
+        "episodes": 300,
+        "layout": "fixed",
+        "mean_nll": 1.74313,
+        "navigation_success": 0.8533,
+        "noise": "standard",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 41,
+        "trained": 1800
+      },
+      "uninformed": {
+        "episodes": 300,
+        "layout": "shifted",
+        "mean_nll": 3.29584,
+        "navigation_success": 0.0,
+        "noise": "high",
+        "schema": "adaptive-dynamics/v1",
+        "seed": 41,
+        "trained": 0
+      }
+    }
+  ],
+  "schema": "adaptive-dynamics/v1",
+  "seeds": [
+    17,
+    23,
+    41
+  ],
+  "test_episodes": 300
+}

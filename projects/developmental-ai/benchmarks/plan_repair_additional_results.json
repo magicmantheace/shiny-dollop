@@ -1,0 +1,220 @@
+{
+  "blind": false,
+  "cohort": [
+    56003,
+    56009,
+    56017
+  ],
+  "episode_start": 87000,
+  "episodes_per_seed": 80,
+  "phases": {
+    "B": [
+      20,
+      60
+    ],
+    "first_A": [
+      0,
+      20
+    ],
+    "return_A": [
+      60,
+      80
+    ]
+  },
+  "protocol": "benchmarks/plan_repair_protocol.json",
+  "rows": [
+    {
+      "memory_sha256": "3f8cb6b55941577d7aea1c02b714e5c4f0899b1f6d794bb9de2ba0e529b4c536",
+      "methods": {
+        "latest": {
+          "B": 0,
+          "first_A": 20,
+          "mean_attempts": 7.0,
+          "mean_blocked": 1.5,
+          "return_A": 20,
+          "stalled": 0,
+          "total_success": 40
+        },
+        "oracle": {
+          "B": 40,
+          "first_A": 20,
+          "mean_attempts": 4.0,
+          "mean_blocked": 0.0,
+          "return_A": 20,
+          "stalled": 0,
+          "total_success": 80
+        },
+        "reactive": {
+          "B": 12,
+          "first_A": 3,
+          "mean_attempts": 7.0,
+          "mean_blocked": 1.6375,
+          "return_A": 8,
+          "stalled": 0,
+          "total_success": 23
+        },
+        "repair": {
+          "B": 0,
+          "first_A": 20,
+          "mean_attempts": 7.0,
+          "mean_blocked": 0.5,
+          "return_A": 20,
+          "stalled": 0,
+          "total_success": 40
+        },
+        "reset": {
+          "B": 12,
+          "first_A": 3,
+          "mean_attempts": 7.0,
+          "mean_blocked": 3.6625,
+          "return_A": 8,
+          "stalled": 0,
+          "total_success": 23
+        },
+        "role_order": {
+          "B": 40,
+          "first_A": 20,
+          "mean_attempts": 5.0,
+          "mean_blocked": 0.0,
+          "return_A": 20,
+          "stalled": 0,
+          "total_success": 80
+        }
+      },
+      "plan_lengths": [
+        7
+      ],
+      "seed": 56003,
+      "successful_plan_variants": 1
+    },
+    {
+      "memory_sha256": "1f7ab1bb7420f9be3958a763b55f539ea08fcc0d1d25833da507ee0f8514de1a",
+      "methods": {
+        "latest": {
+          "B": 40,
+          "first_A": 18,
+          "mean_attempts": 7.0,
+          "mean_blocked": 0.15,
+          "return_A": 20,
+          "stalled": 0,
+          "total_success": 78
+        },
+        "oracle": {
+          "B": 40,
+          "first_A": 20,
+          "mean_attempts": 4.0,
+          "mean_blocked": 0.0,
+          "return_A": 20,
+          "stalled": 0,
+          "total_success": 80
+        },
+        "reactive": {
+          "B": 12,
+          "first_A": 8,
+          "mean_attempts": 7.0,
+          "mean_blocked": 1.6375,
+          "return_A": 6,
+          "stalled": 0,
+          "total_success": 26
+        },
+        "repair": {
+          "B": 40,
+          "first_A": 18,
+          "mean_attempts": 7.0,
+          "mean_blocked": 0.075,
+          "return_A": 20,
+          "stalled": 0,
+          "total_success": 78
+        },
+        "reset": {
+          "B": 12,
+          "first_A": 8,
+          "mean_attempts": 7.0,
+          "mean_blocked": 3.6375,
+          "return_A": 6,
+          "stalled": 0,
+          "total_success": 26
+        },
+        "role_order": {
+          "B": 40,
+          "first_A": 20,
+          "mean_attempts": 5.0,
+          "mean_blocked": 0.0,
+          "return_A": 20,
+          "stalled": 0,
+          "total_success": 80
+        }
+      },
+      "plan_lengths": [
+        7
+      ],
+      "seed": 56009,
+      "successful_plan_variants": 1
+    },
+    {
+      "memory_sha256": "fe252ed22d9ac3081a4a46cc4f3898a1eda01cd180db9efa6f06205811decb16",
+      "methods": {
+        "latest": {
+          "B": 40,
+          "first_A": 20,
+          "mean_attempts": 7.0,
+          "mean_blocked": 0.0,
+          "return_A": 20,
+          "stalled": 0,
+          "total_success": 80
+        },
+        "oracle": {
+          "B": 40,
+          "first_A": 20,
+          "mean_attempts": 4.0,
+          "mean_blocked": 0.0,
+          "return_A": 20,
+          "stalled": 0,
+          "total_success": 80
+        },
+        "reactive": {
+          "B": 12,
+          "first_A": 5,
+          "mean_attempts": 7.0,
+          "mean_blocked": 1.675,
+          "return_A": 7,
+          "stalled": 0,
+          "total_success": 24
+        },
+        "repair": {
+          "B": 40,
+          "first_A": 20,
+          "mean_attempts": 7.0,
+          "mean_blocked": 0.0,
+          "return_A": 20,
+          "stalled": 0,
+          "total_success": 80
+        },
+        "reset": {
+          "B": 12,
+          "first_A": 5,
+          "mean_attempts": 7.0,
+          "mean_blocked": 3.875,
+          "return_A": 7,
+          "stalled": 0,
+          "total_success": 24
+        },
+        "role_order": {
+          "B": 40,
+          "first_A": 20,
+          "mean_attempts": 5.0,
+          "mean_blocked": 0.0,
+          "return_A": 20,
+          "stalled": 0,
+          "total_success": 80
+        }
+      },
+      "plan_lengths": [
+        7
+      ],
+      "seed": 56017,
+      "successful_plan_variants": 1
+    }
+  ],
+  "schema": "developmental-ai.plan-repair-benchmark/v1"
+}

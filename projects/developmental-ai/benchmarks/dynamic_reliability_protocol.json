@@ -1,0 +1,46 @@
+{
+  "schema": "developmental-ai.dynamic-reliability-protocol/v1",
+  "status": "frozen_before_first_evaluation",
+  "date": "2026-10-16",
+  "purpose": "Can reward-only per-episode evidence arbitrage outperform fixed source identities when reliable sources change independently every episode?",
+  "development_seeds": [
+    43103,
+    50021,
+    61031
+  ],
+  "reserved_seeds": [
+    72019,
+    83003,
+    94009
+  ],
+  "train_namespace": "train/88000..88359",
+  "test_namespace": "test/99000..99039",
+  "training_episodes_per_seed": 360,
+  "evaluation_episodes_per_seed": 40,
+  "grid_updater_train_episodes": 24,
+  "cue_count": 5,
+  "probe_count": 8,
+  "probe_alphabet": 4,
+  "correct_forecast_accuracy": 0.75,
+  "decoy_forecast_accuracy": 0.25,
+  "metric": "completed occluded-navigation tasks / 40 per seed; also cue accuracy",
+  "comparisons": [
+    "learned pooled reward-only forecast-consistency scorer",
+    "source/context identity-only reward baseline with identical training episodes",
+    "engineered max forecast agreement",
+    "random",
+    "first",
+    "last",
+    "public-beacon privileged oracle"
+  ],
+  "constraints": [
+    "No correct source, true beacon, actual goal position, simulator regime or reward hindsight enters selector action API",
+    "No paired training target cue; training feedback is terminal boolean only",
+    "Probe outcomes and each cue's forecasts are public *before* choice; the cue generator may use public beacon only to synthesize benchmark truth",
+    "Simple max-agreement heuristic and identity lookup are mandatory references",
+    "Development seeds are examined after freeze; reserved seeds only after implementation is frozen, no retuning on them",
+    "No test-namespace model updates, action authorization or default replacement",
+    "All seeds and regression failures retained",
+    "No D3 claim without beating strong simple alternative on new task families"
+  ]
+}

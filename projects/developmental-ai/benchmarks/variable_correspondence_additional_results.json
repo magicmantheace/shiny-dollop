@@ -1,0 +1,106 @@
+{
+  "blind": false,
+  "protocol": "benchmarks/variable_correspondence_protocol.json",
+  "rows": [
+    {
+      "correct_source": {
+        "correct_cue": 40,
+        "estimated_variable": 20,
+        "fixed_identity": 7,
+        "old_marginal_8": 22,
+        "old_max_path": 17,
+        "old_reward": 11,
+        "oracle_cipher_variable": 20
+      },
+      "inferred_match_probability": 0.804591,
+      "inferred_survival": 0.79069,
+      "mean_generator_common_event_count_scoring_only": 6.2,
+      "mean_predicted_common_events_on_true_candidate_scoring_only": 6.26492,
+      "navigation_successes": {
+        "correct_cue": 40,
+        "estimated_variable": 20,
+        "fixed_identity": 7,
+        "old_marginal_8": 22,
+        "old_max_path": 17,
+        "old_reward": 11,
+        "oracle_cipher_variable": 20
+      },
+      "permutation_correct": true,
+      "seed": 72019,
+      "supplemental_posthoc_absolute_count_error": {
+        "constant_6": 0.85,
+        "learned_model": 0.8558,
+        "public_length_minus_4": 0.5875
+      },
+      "training_digest": "ce0c6706da3f27d8aacda9891cfac4a5ceca41a1185c48553886414b2f498836"
+    },
+    {
+      "correct_source": {
+        "correct_cue": 40,
+        "estimated_variable": 26,
+        "fixed_identity": 10,
+        "old_marginal_8": 23,
+        "old_max_path": 25,
+        "old_reward": 22,
+        "oracle_cipher_variable": 26
+      },
+      "inferred_match_probability": 0.802388,
+      "inferred_survival": 0.78494,
+      "mean_generator_common_event_count_scoring_only": 5.925,
+      "mean_predicted_common_events_on_true_candidate_scoring_only": 6.14272,
+      "navigation_successes": {
+        "correct_cue": 39,
+        "estimated_variable": 25,
+        "fixed_identity": 10,
+        "old_marginal_8": 22,
+        "old_max_path": 24,
+        "old_reward": 21,
+        "oracle_cipher_variable": 25
+      },
+      "permutation_correct": true,
+      "seed": 83003,
+      "supplemental_posthoc_absolute_count_error": {
+        "constant_6": 0.725,
+        "learned_model": 0.8447,
+        "public_length_minus_4": 0.525
+      },
+      "training_digest": "2bca73ef9d973bda6eb7ee33d5c102f2bf1236bb231eed88c697231308c4be4e"
+    },
+    {
+      "correct_source": {
+        "correct_cue": 40,
+        "estimated_variable": 18,
+        "fixed_identity": 6,
+        "old_marginal_8": 17,
+        "old_max_path": 17,
+        "old_reward": 14,
+        "oracle_cipher_variable": 18
+      },
+      "inferred_match_probability": 0.831281,
+      "inferred_survival": 0.800026,
+      "mean_generator_common_event_count_scoring_only": 5.9,
+      "mean_predicted_common_events_on_true_candidate_scoring_only": 5.95382,
+      "navigation_successes": {
+        "correct_cue": 35,
+        "estimated_variable": 17,
+        "fixed_identity": 6,
+        "old_marginal_8": 16,
+        "old_max_path": 16,
+        "old_reward": 12,
+        "oracle_cipher_variable": 17
+      },
+      "permutation_correct": true,
+      "seed": 94009,
+      "supplemental_posthoc_absolute_count_error": {
+        "constant_6": 0.55,
+        "learned_model": 0.6682,
+        "public_length_minus_4": 0.575
+      },
+      "training_digest": "9859ed474e6a1cee4b9413fa026a48e38a75f056967493d029b46866434c9ceb"
+    }
+  ],
+  "schema": "developmental-ai.variable-correspondence-benchmark/v1",
+  "test": "test/99800..99839",
+  "train": "train/90000..90119",
+  "train_supervision": "public pseudo-selected streams only"
+}

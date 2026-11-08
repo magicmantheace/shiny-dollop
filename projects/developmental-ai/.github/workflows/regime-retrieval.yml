@@ -1,0 +1,61 @@
+name: Sequential public-outcome regime retrieval (focused)
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/observable_affordances.py"
+      - "benchmarks/regime_retrieval_protocol.json"
+      - "benchmarks/regime_retrieval_benchmark.py"
+      - "tests/test_regime_retrieval.py"
+      - ".github/workflows/regime-retrieval.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  retrieve-previous-regimes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Replay, evidence isolation and recovery tests
+        run: python -m unittest tests.test_regime_retrieval -v
+      - name: Frozen development cohort
+        run: python -m benchmarks.regime_retrieval_benchmark --cohort development > regime-development.json
+      - name: Frozen additional cohort
+        run: python -m benchmarks.regime_retrieval_benchmark --cohort additional > regime-additional.json
+      - name: Print measured performance including harmful training actions
+        run: |
+          python - <<'PY'
+          import json
+          for filename in ("regime-development.json", "regime-additional.json"):
+              data=json.load(open(filename,encoding="utf-8"))
+              print(filename, "blind:", data["blind"],
+                    "learner_training_actions:",data["learner_training_actions"])
+              for stage in ("A","B","return_A"):
+                  print("stage:",stage)
+                  for method in ("retrieved_bank","cumulative_knn",
+                                 "recent_32_knn","frozen_A_knn",
+                                 "untrained_random","always_abstain","privileged_oracle"):
+                      runs=[r["stages"][stage]["scores"][method] for r in data["rows"]]
+                      print(method,{k:sum(x[k] for x in runs) for k in
+                                    ("successes","hurt","abstained")})
+                  print("selected blocks:",[r["stages"][stage]["retrieval"]["chunk_index"]
+                                            for r in data["rows"]])
+              print("independent training source cost:", {
+                  k:sum(r["actor_total"][k] for r in data["rows"])
+                  for k in ("observations","harmful","productive","neutral")})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: regime-retrieval-full-public-synthetic-results
+          path: |
+            regime-development.json
+            regime-additional.json
+          retention-days: 14

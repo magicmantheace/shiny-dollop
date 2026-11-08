@@ -1,0 +1,87 @@
+{
+  "schema": "developmental-ai.plan-repair-protocol/v1",
+  "status": "frozen-before-implementation-evaluation",
+  "question": "Can a bounded simulation-only agent recover and retain plans when hidden prerequisites change and the explicit context label is absent?",
+  "world": {
+    "role_count": 7,
+    "opaque_role_tokens": "seed-stable; source identity remains a strong engineered prior",
+    "action_aliases": "reshuffled each episode",
+    "public_context": "NONE",
+    "hidden_graph_phases": [
+      "A",
+      "B",
+      "A"
+    ],
+    "phase_lengths": [
+      20,
+      40,
+      20
+    ],
+    "budget": 7,
+    "goal_role": 6,
+    "topology_A": {
+      "r2": [
+        "r0",
+        "r1"
+      ],
+      "r6": [
+        "r2"
+      ]
+    },
+    "topology_B": {
+      "r2": [
+        "r0",
+        "r3"
+      ],
+      "r6": [
+        "r2"
+      ]
+    },
+    "only_public_feedback": [
+      "accepted",
+      "blocked",
+      "goal",
+      "timeout"
+    ],
+    "notes": "A/B have overlapping prerequisites and a common goal; no hidden graph phase to controller"
+  },
+  "cohorts": {
+    "development": [
+      34007,
+      34019,
+      34031
+    ],
+    "additional_frozen": [
+      56003,
+      56009,
+      56017
+    ]
+  },
+  "evaluation": {
+    "split": "test",
+    "start_index": 87000,
+    "episodes_per_seed": 80
+  },
+  "agents": [
+    "online plan repair with bounded blocked-at-progress cache, successful-plan library and probe-first recovery",
+    "latest successful plan with no within-episode recovery",
+    "no persistent plan, identical fallback exploration",
+    "deterministic role-order heuristic",
+    "privileged hidden-graph oracle"
+  ],
+  "metrics": [
+    "success per phase and per seed",
+    "blocked attempts, total actions",
+    "plan coverage and change/reuse counts",
+    "integrity-checkpoint exact replay",
+    "no extra privileges"
+  ],
+  "restrictions": [
+    "No hidden graph, phase or source scenario labels in controller input or stored actions",
+    "No real tools, files, network or OS actions exposed",
+    "Plan archive relies on same opaque role IDs across episodes and may fail new role vocabularies",
+    "No tuning evaluation after looking at development cohort; preserve negative findings",
+    "Held-out seed list frozen before running; not independently blind",
+    "D1/D3/D4 remain open; V2A before overlapping V2B"
+  ]
+}

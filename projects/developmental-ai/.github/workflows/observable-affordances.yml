@@ -1,0 +1,56 @@
+name: Observable numeric affordance learning (focused)
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/observable_affordances.py"
+      - "benchmarks/observable_affordance_benchmark.py"
+      - "benchmarks/observable_affordance_protocol.json"
+      - "tests/test_observable_affordances.py"
+      - ".github/workflows/observable-affordances.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-behavior-transfer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Numeric feature/outcome public evidence tests
+        run: python -m unittest tests.test_observable_affordances -v
+      - name: Frozen development cohort
+        run: python -m benchmarks.observable_affordance_benchmark --cohort development > numeric-development.json
+      - name: Frozen reserved cohort
+        run: python -m benchmarks.observable_affordance_benchmark --cohort reserved > numeric-reserved.json
+      - name: Report every benchmark policy including shifted-world failures
+        run: |
+          python - <<'PY'
+          import json
+          for path in ("numeric-development.json","numeric-reserved.json"):
+              data=json.load(open(path,encoding="utf-8"))
+              print(path)
+              for domain in ("collect","route","route-reversed"):
+                  comparisons={}
+                  for policy in ("numeric_knn","novel","random","feature_shuffle","oracle"):
+                      rows=[s["scores"][domain][policy] for s in data["rows"]]
+                      comparisons[policy]={
+                          "success":sum(r["successes"] for r in rows),
+                          "harm":sum(r["hurt"] for r in rows),
+                          "stalled":sum(r["stalled"] for r in rows)}
+                  print(domain,json.dumps(comparisons,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: numeric-outcome-observation-cohorts
+          path: |
+            numeric-development.json
+            numeric-reserved.json
+          retention-days: 14

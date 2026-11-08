@@ -1,0 +1,58 @@
+name: Public-outcome reversal calibration (focused)
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/observable_reversal_calibration.py"
+      - "benchmarks/observable_reversal_calibration_benchmark.py"
+      - "benchmarks/observable_reversal_calibration_protocol.json"
+      - "tests/test_observable_reversal_calibration.py"
+      - ".github/workflows/observable-reversal-calibration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Focused public-outcome replay tests
+        run: python -m unittest tests.test_observable_reversal_calibration -v
+      - name: Inspected development calibration
+        run: python -m benchmarks.observable_reversal_calibration_benchmark --cohort development > reversal-development.json
+      - name: Inspected additional calibration
+        run: python -m benchmarks.observable_reversal_calibration_benchmark --cohort inspected-additional > reversal-additional.json
+      - name: Show all policies, including wrong calibration and abstention
+        run: |
+          python - <<'PY'
+          import json
+          for path in ("reversal-development.json","reversal-additional.json"):
+              data=json.load(open(path,encoding="utf-8"))
+              print(path)
+              for world in ("route","route-reversed"):
+                  report={}
+                  for method in ("offline_selected","source_only","changed_only",
+                                 "wrong_calibration","always_abstain","untrained_random","oracle"):
+                      samples=[row["scores"][world][method] for row in data["rows"]]
+                      report[method]={field:sum(r[field] for r in samples)
+                                      for field in ("successes","hurt","stalled")}
+                  report["calibration"]={
+                      "harmful_training_probes":sum(row["calibration"][world]["harmful_calibration_probes"] for row in data["rows"]),
+                      "selected_models":[row["calibration"][world]["decision"]["chosen"] for row in data["rows"]]}
+                  print(world,json.dumps(report,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: public-outcome-reversal-full-tables
+          path: |
+            reversal-development.json
+            reversal-additional.json
+          retention-days: 14

@@ -1,0 +1,77 @@
+{
+  "blind": false,
+  "rows": [
+    {
+      "delayed_long": {
+        "initial": 40,
+        "latest": 9,
+        "learned": 40
+      },
+      "gate_digest": "5882b082b901eaee9c3a59563718b420345ec124a3f3932064cf376e6617175a",
+      "occluded": {
+        "initial": 39,
+        "latest": 0,
+        "learned": 39
+      },
+      "seed": 17431,
+      "selected": "initial",
+      "validation": {
+        "initial": 120,
+        "latest": 38
+      }
+    },
+    {
+      "delayed_long": {
+        "initial": 40,
+        "latest": 9,
+        "learned": 40
+      },
+      "gate_digest": "9852021720834655da02b279a3c36936455d209fcb244363875d2fbd14f221bf",
+      "occluded": {
+        "initial": 39,
+        "latest": 0,
+        "learned": 39
+      },
+      "seed": 24869,
+      "selected": "initial",
+      "validation": {
+        "initial": 120,
+        "latest": 20
+      }
+    },
+    {
+      "delayed_long": {
+        "initial": 40,
+        "latest": 10,
+        "learned": 40
+      },
+      "gate_digest": "c878d50e0b2e26a11866131c12d12f4dfdf0fb46b52a1c2077b512bfa79503cc",
+      "occluded": {
+        "initial": 36,
+        "latest": 0,
+        "learned": 36
+      },
+      "seed": 37021,
+      "selected": "initial",
+      "validation": {
+        "initial": 120,
+        "latest": 28
+      }
+    }
+  ],
+  "schema": "developmental-ai.cross-task-retention-benchmark/v1",
+  "seeds": [
+    17431,
+    24869,
+    37021
+  ],
+  "test_episodes_per_family_seed": 40,
+  "test_indices": {
+    "delayed": "test/85000+",
+    "occluded": "test/86000+"
+  },
+  "train_episodes": 400,
+  "train_indices": "train/0..N-1",
+  "validation_episodes": 120,
+  "validation_indices": "train/5000+"
+}

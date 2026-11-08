@@ -1,0 +1,69 @@
+name: Generated nonlinear feature composition
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/composed_feature_memory.py"
+      - "benchmarks/composed_feature_protocol.json"
+      - "benchmarks/composed_feature_benchmark.py"
+      - "tests/test_composed_feature.py"
+      - ".github/workflows/composed-feature.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  composed-feature-frozen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Generated program grammar, replay and earlier causal tests
+        run: python -m unittest tests.test_composed_feature tests.test_cross_rule tests.test_regret_switch -v
+      - name: Frozen development seed cohort
+        run: python -m benchmarks.composed_feature_benchmark --cohort development > composed-development.json
+      - name: Frozen additional seed cohort
+        run: python -m benchmarks.composed_feature_benchmark --cohort additional > composed-additional.json
+      - name: Report complete chosen programs, harms and baseline task outcomes
+        run: |
+          python - <<'PY'
+          import json
+          for path in ("composed-development.json","composed-additional.json"):
+              data=json.load(open(path,encoding="utf8"))
+              print("RESULT",path,"blind",data["blind"],
+                    "learner_training_actions",data["learner_training_actions"])
+              for stage in ("source","product","return_source","square"):
+                  costs=[r["external_actor_costs"][stage] for r in data["rows"]]
+                  print("ACTOR",stage,{k:sum(a[k] for a in costs)
+                        for k in ("observations","harmful","productive","neutral")})
+              for phase,points in (("product",(0,4,8,16,32,64,96,128)),
+                                   ("return_source",(0,4,8,16,32,64)),
+                                   ("square",(0,4,8,16,32,64,96,128))):
+                  for n in points:
+                      entries=[r["stages"][phase][str(n)] for r in data["rows"]]
+                      print("CHECKPOINT",phase,n,
+                            "chosen",[x["composed_choice"]["selected"] for x in entries],
+                            "programs",[x["composed_choice"]["selected_program"] for x in entries])
+                      for method in ("composed_grammar","prior_fixed_library",
+                                     "frozen_source","recent8_span","recent32_span",
+                                     "recent32_product_privileged",
+                                     "recent32_square_privileged",
+                                     "privileged_action_oracle","untrained_random",
+                                     "always_abstain"):
+                          records=[x["scores"][method] for x in entries]
+                          print("SCORE",method,{k:sum(t[k] for t in records)
+                                for k in ("successes","harmful_actions","abstained")})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: composed-feature-frozen-full-results
+          path: |
+            composed-development.json
+            composed-additional.json
+          retention-days: 14

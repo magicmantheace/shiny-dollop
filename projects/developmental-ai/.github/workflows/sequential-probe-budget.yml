@@ -1,0 +1,60 @@
+name: Sequential probe-budget calibration (focused)
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "benchmarks/sequential_probe_protocol.json"
+      - "benchmarks/sequential_probe_benchmark.py"
+      - "tests/test_sequential_probe.py"
+      - ".github/workflows/sequential-probe-budget.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sequential-offline-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Replay and intervention-budget tests
+        run: python -m unittest tests.test_sequential_probe -v
+      - name: Inspected development comparison
+        run: python -m benchmarks.sequential_probe_benchmark --cohort development > sequential-development.json
+      - name: Inspected additional comparison
+        run: python -m benchmarks.sequential_probe_benchmark --cohort inspected-additional > sequential-additional.json
+      - name: Report ALL methods, offline harm and test failures
+        run: |
+          python - <<'PY'
+          import json
+          for path in ("sequential-development.json","sequential-additional.json"):
+              data=json.load(open(path,encoding="utf-8"))
+              print(path)
+              for world in ("route","route-reversed"):
+                  report={}
+                  for method in ("adaptive_stop","fixed12","forced4",
+                                 "stale_shift_adaptive","stale_shift_fixed12",
+                                 "always_abstain","privileged_oracle"):
+                      samples=[r["worlds"][world][method] for r in data["rows"]]
+                      report[method]={
+                          "successes":sum(r["evaluation"]["successes"] for r in samples),
+                          "test_hurt":sum(r["evaluation"]["hurt"] for r in samples),
+                          "probes":sum(r["calibration"]["probes"] for r in samples),
+                          "calibration_harm":sum(r["calibration"]["calibration_harm"] for r in samples),
+                          "selection":[r["calibration"]["choice"] for r in samples],
+                      }
+                  print(world,json.dumps(report,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sequential-probe-budget-full-tables
+          path: |
+            sequential-development.json
+            sequential-additional.json
+          retention-days: 14

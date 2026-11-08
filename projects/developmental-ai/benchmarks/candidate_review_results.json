@@ -1,0 +1,157 @@
+{
+  "candidate_split": "train 2000..",
+  "candidate_training_histories": 80,
+  "fit_split": "train 0..",
+  "independent_test_histories": 60,
+  "iterations": 5,
+  "kind": "inspected-development-not-blind",
+  "minimum_review_improvement": 0.02,
+  "notes": "Review separated from candidate fitting. Independent test is never consulted by review. Synthetic ring with known topology; no real-world action permissions.",
+  "review_histories": 40,
+  "rows": [
+    {
+      "arm": "missing_original",
+      "automatic_promotions": 0,
+      "candidate_digest": "abf4332fd60e86dba6da14b0e192281d8935f6355e95c3140a94644c30fb3817",
+      "independent_test_improved": true,
+      "review_digest": "613acedb4a964918e63a8727f06e827bd37249b420a70000eb661749e944d893",
+      "review_gain": 0.1004674,
+      "review_passed": true,
+      "seed": 17,
+      "test_gain_not_used_in_review": 0.10054595
+    },
+    {
+      "arm": "mixed_novelty",
+      "automatic_promotions": 0,
+      "candidate_digest": "81a3028f8851f17ac818f6c5dc180685bc1966cb2ba9b907a98129ccd981898c",
+      "independent_test_improved": false,
+      "review_digest": "7626fb9e78eb5880c2d9134c3a3ee2bc78502aac4794b656c5a704601789b3d3",
+      "review_gain": -0.00414342,
+      "review_passed": false,
+      "seed": 17,
+      "test_gain_not_used_in_review": -0.01110375
+    },
+    {
+      "arm": "missing_original",
+      "automatic_promotions": 0,
+      "candidate_digest": "4e623a26d8cad431999e47816350e5d334e6c10420ee7e8eab6c59de6a456277",
+      "independent_test_improved": true,
+      "review_digest": "06d9dd55f70d7b5896478cb8a96cd41e5229305032e435de213086e8943b046d",
+      "review_gain": 0.15997724,
+      "review_passed": true,
+      "seed": 23,
+      "test_gain_not_used_in_review": 0.17758355
+    },
+    {
+      "arm": "mixed_novelty",
+      "automatic_promotions": 0,
+      "candidate_digest": "a2afb1a5bd1a55fcd39a145538403569777deea26700f5381036798b5a10e36d",
+      "independent_test_improved": false,
+      "review_digest": "df1c5b3164b0f34ebc418fa4a46d90af5c5ed99c680d340bb4ca315f222cbf1b",
+      "review_gain": 0.00299225,
+      "review_passed": false,
+      "seed": 23,
+      "test_gain_not_used_in_review": 0.00308742
+    },
+    {
+      "arm": "missing_original",
+      "automatic_promotions": 0,
+      "candidate_digest": "0a9c4123af0768125321d3ad84b0e25bda8525473fc2612ff33c2d551e9ca5e5",
+      "independent_test_improved": true,
+      "review_digest": "bff889c08aa0ad15c68be3cd3558a9f92fd36ae4b91d75e4b6f101ff0b6fcb00",
+      "review_gain": 0.07924197,
+      "review_passed": true,
+      "seed": 41,
+      "test_gain_not_used_in_review": 0.09059584
+    },
+    {
+      "arm": "mixed_novelty",
+      "automatic_promotions": 0,
+      "candidate_digest": "9d457b63cdac85d6ec1d4daf3bf1543696f64f8a165375f49aa5cece65626d04",
+      "independent_test_improved": false,
+      "review_digest": "e682af474b31610859929b1a2f9658cec6c294cfce4f22c24fbd48619142f15d",
+      "review_gain": 0.01488576,
+      "review_passed": false,
+      "seed": 41,
+      "test_gain_not_used_in_review": -0.02737687
+    },
+    {
+      "arm": "missing_original",
+      "automatic_promotions": 0,
+      "candidate_digest": "ea134deabdc3be80b0efc498896d5459de397add942f94ca933d323fa79dde6b",
+      "independent_test_improved": true,
+      "review_digest": "e10c6630b179fc76496b0069b146f2fd1261b3394a85fd0f34d591ea89cd3e67",
+      "review_gain": 0.12797547,
+      "review_passed": true,
+      "seed": 1009,
+      "test_gain_not_used_in_review": 0.12034346
+    },
+    {
+      "arm": "mixed_novelty",
+      "automatic_promotions": 0,
+      "candidate_digest": "440ac24775c9206d1c8672f22eb03289e4a1222a3b0af4823b4e9bba52d95ff0",
+      "independent_test_improved": false,
+      "review_digest": "01245e8dc79600442342963ef57117078ff50dc96a26f041e8f7fa65cdfb4314",
+      "review_gain": 0.00799468,
+      "review_passed": false,
+      "seed": 1009,
+      "test_gain_not_used_in_review": 0.00173428
+    },
+    {
+      "arm": "missing_original",
+      "automatic_promotions": 0,
+      "candidate_digest": "5d0d253c1a643969dae9b3947bc92050ede4960d154c3ab7b07fbab75d5b69f9",
+      "independent_test_improved": true,
+      "review_digest": "ed8525f2bc40109c7ff225047a5ccbb60e002f478e29c8f22c3161d3d1fa79a1",
+      "review_gain": 0.13608123,
+      "review_passed": true,
+      "seed": 1013,
+      "test_gain_not_used_in_review": 0.10401578
+    },
+    {
+      "arm": "mixed_novelty",
+      "automatic_promotions": 0,
+      "candidate_digest": "94faa92bd894dd1958f923c98ea6b4788a5a0edfd0f67c0b370fc7beb7a21f8d",
+      "independent_test_improved": false,
+      "review_digest": "00a8cfd2b27eafe10d7fe1e1d159a0c25550750eb05215fda99ef6e1ac076ca8",
+      "review_gain": -0.00774959,
+      "review_passed": false,
+      "seed": 1013,
+      "test_gain_not_used_in_review": -0.00902173
+    },
+    {
+      "arm": "missing_original",
+      "automatic_promotions": 0,
+      "candidate_digest": "bc90d0ed721012613136d2803f548d61f31260cf7524e925d742c51fa4e0e53f",
+      "independent_test_improved": true,
+      "review_digest": "36a02decc43b24760b37aa0e1fa141cf599db386e6b3a154c020dec3997ad85b",
+      "review_gain": 0.14399885,
+      "review_passed": true,
+      "seed": 1031,
+      "test_gain_not_used_in_review": 0.12835038
+    },
+    {
+      "arm": "mixed_novelty",
+      "automatic_promotions": 0,
+      "candidate_digest": "59ca9e2ef882f570d517775e70a7828821773c053325a01843fbbead74a5955d",
+      "independent_test_improved": false,
+      "review_digest": "d69d27086c2cebdf44ed635499314f26a59b270f944257ff3a12dfc74df9c2b9",
+      "review_gain": -0.00823241,
+      "review_passed": false,
+      "seed": 1031,
+      "test_gain_not_used_in_review": 0.00183089
+    }
+  ],
+  "schema": "candidate-review-benchmark/v1",
+  "seeds": [
+    17,
+    23,
+    41,
+    1009,
+    1013,
+    1031
+  ],
+  "test_split": "test 12000..",
+  "training_histories_per_existing": 75,
+  "validation_split": "train 5000.."
+}

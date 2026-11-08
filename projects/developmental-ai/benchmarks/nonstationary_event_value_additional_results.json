@@ -1,0 +1,519 @@
+{
+  "adaptation": "shifted_bursts/train/6000..6119 then 6200..6319",
+  "blind": false,
+  "evaluation": "shifted_bursts/test/95000+,95100+,95200+; no feedback updates",
+  "initial": "source_bursts/train/2000..2199",
+  "protocol": "benchmarks/nonstationary_event_value_protocol.json",
+  "rows": [
+    {
+      "adaptation_first_20_rewards": {
+        "archive": {
+          "B": 3,
+          "return_A": 12
+        },
+        "cumulative": {
+          "B": 3,
+          "return_A": 14
+        },
+        "frozen": {
+          "B": 3,
+          "return_A": 14
+        },
+        "raw_window": {
+          "B": 2,
+          "return_A": 7
+        },
+        "window": {
+          "B": 3,
+          "return_A": 6
+        }
+      },
+      "adaptation_rewards": {
+        "archive": {
+          "A": 125,
+          "B": 53,
+          "return_A": 78
+        },
+        "cumulative": {
+          "A": 125,
+          "B": 19,
+          "return_A": 80
+        },
+        "frozen": {
+          "A": 125,
+          "B": 14,
+          "return_A": 80
+        },
+        "raw_window": {
+          "A": 81,
+          "B": 28,
+          "return_A": 41
+        },
+        "window": {
+          "A": 125,
+          "B": 63,
+          "return_A": 72
+        }
+      },
+      "archive_switch_details": [
+        {
+          "step": 203,
+          "to": "recent"
+        },
+        {
+          "step": 212,
+          "to": "anchor"
+        },
+        {
+          "step": 221,
+          "to": "recent"
+        },
+        {
+          "step": 269,
+          "to": "anchor"
+        },
+        {
+          "step": 278,
+          "to": "recent"
+        },
+        {
+          "step": 287,
+          "to": "anchor"
+        },
+        {
+          "step": 296,
+          "to": "recent"
+        },
+        {
+          "step": 321,
+          "to": "anchor"
+        },
+        {
+          "step": 350,
+          "to": "recent"
+        },
+        {
+          "step": 369,
+          "to": "anchor"
+        },
+        {
+          "step": 378,
+          "to": "recent"
+        },
+        {
+          "step": 399,
+          "to": "anchor"
+        }
+      ],
+      "checkpoints": {
+        "archive": "5cfccfab8e8892111152c3a9b299cba34626814e4aac2088c12fe2f7738b7e13",
+        "cumulative": "5d7d6b3d8ca19e64a49d3596d852596c7a4451a8e99d138756c5cd6f1f2c9d11",
+        "frozen": "137df358ffca96245fa6268e23db35471f0823f3615f539bd7a30450120cae13",
+        "raw_window": "9d1ae0c389832db887b146662d77ed4448dca8bc722c6512e1bb5becd21d56ed",
+        "window": "81163099cbda3c78a9f02033ffc9f4d2aae602dd9cab283799fe5b1c70c7e37f"
+      },
+      "families": {
+        "A": {
+          "archive_active": "anchor",
+          "archive_switches": 0,
+          "episodes": 40,
+          "successes": {
+            "archive": 35,
+            "available_oracle": 40,
+            "cumulative": 35,
+            "frozen": 35,
+            "raw_window": 19,
+            "window": 35
+          }
+        },
+        "B": {
+          "archive_active": "recent",
+          "archive_switches": 7,
+          "episodes": 40,
+          "successes": {
+            "archive": 30,
+            "available_oracle": 36,
+            "cumulative": 2,
+            "frozen": 1,
+            "raw_window": 13,
+            "window": 30
+          }
+        },
+        "return_A": {
+          "archive_active": "anchor",
+          "archive_switches": 12,
+          "episodes": 40,
+          "successes": {
+            "archive": 30,
+            "available_oracle": 37,
+            "cumulative": 30,
+            "frozen": 30,
+            "raw_window": 16,
+            "window": 31
+          }
+        }
+      },
+      "return_to_anchor_delay": 1,
+      "seed": 27007
+    },
+    {
+      "adaptation_first_20_rewards": {
+        "archive": {
+          "B": 3,
+          "return_A": 5
+        },
+        "cumulative": {
+          "B": 3,
+          "return_A": 11
+        },
+        "frozen": {
+          "B": 3,
+          "return_A": 11
+        },
+        "raw_window": {
+          "B": 8,
+          "return_A": 4
+        },
+        "window": {
+          "B": 4,
+          "return_A": 3
+        }
+      },
+      "adaptation_rewards": {
+        "archive": {
+          "A": 119,
+          "B": 40,
+          "return_A": 44
+        },
+        "cumulative": {
+          "A": 119,
+          "B": 23,
+          "return_A": 54
+        },
+        "frozen": {
+          "A": 119,
+          "B": 23,
+          "return_A": 54
+        },
+        "raw_window": {
+          "A": 77,
+          "B": 43,
+          "return_A": 32
+        },
+        "window": {
+          "A": 116,
+          "B": 49,
+          "return_A": 38
+        }
+      },
+      "archive_switch_details": [
+        {
+          "step": 203,
+          "to": "recent"
+        },
+        {
+          "step": 212,
+          "to": "anchor"
+        },
+        {
+          "step": 221,
+          "to": "recent"
+        },
+        {
+          "step": 230,
+          "to": "anchor"
+        },
+        {
+          "step": 239,
+          "to": "recent"
+        },
+        {
+          "step": 252,
+          "to": "anchor"
+        },
+        {
+          "step": 261,
+          "to": "recent"
+        },
+        {
+          "step": 280,
+          "to": "anchor"
+        },
+        {
+          "step": 289,
+          "to": "recent"
+        },
+        {
+          "step": 299,
+          "to": "anchor"
+        },
+        {
+          "step": 308,
+          "to": "recent"
+        },
+        {
+          "step": 322,
+          "to": "anchor"
+        },
+        {
+          "step": 331,
+          "to": "recent"
+        },
+        {
+          "step": 340,
+          "to": "anchor"
+        },
+        {
+          "step": 353,
+          "to": "recent"
+        },
+        {
+          "step": 365,
+          "to": "anchor"
+        },
+        {
+          "step": 374,
+          "to": "recent"
+        },
+        {
+          "step": 383,
+          "to": "anchor"
+        },
+        {
+          "step": 392,
+          "to": "recent"
+        },
+        {
+          "step": 402,
+          "to": "anchor"
+        },
+        {
+          "step": 411,
+          "to": "recent"
+        },
+        {
+          "step": 420,
+          "to": "anchor"
+        },
+        {
+          "step": 438,
+          "to": "recent"
+        }
+      ],
+      "checkpoints": {
+        "archive": "8225b08dfb838da5796461ca3089b133b663c4b63e8b31c0b089899fa0e884e5",
+        "cumulative": "aaa2f3179e0ccbc0d00e5e71f58b8998715a6f04e0cd69699110080cb79edeab",
+        "frozen": "92e0a8d0124d1e0f3e0e8917e31b9852d318b6dc83e659a41b585fcfcdaed467",
+        "raw_window": "de2e0046334987ce0562f8d243ade55026a6ebf214b654e8f35d35332e1238ad",
+        "window": "1e847d3cd739f60c105721cd132082c4a8c564110e68800a7fe2a95ac87c43ee"
+      },
+      "families": {
+        "A": {
+          "archive_active": "anchor",
+          "archive_switches": 0,
+          "episodes": 40,
+          "successes": {
+            "archive": 22,
+            "available_oracle": 39,
+            "cumulative": 22,
+            "frozen": 22,
+            "raw_window": 17,
+            "window": 22
+          }
+        },
+        "B": {
+          "archive_active": "recent",
+          "archive_switches": 11,
+          "episodes": 40,
+          "successes": {
+            "archive": 19,
+            "available_oracle": 38,
+            "cumulative": 3,
+            "frozen": 3,
+            "raw_window": 10,
+            "window": 19
+          }
+        },
+        "return_A": {
+          "archive_active": "recent",
+          "archive_switches": 23,
+          "episodes": 40,
+          "successes": {
+            "archive": 24,
+            "available_oracle": 35,
+            "cumulative": 24,
+            "frozen": 24,
+            "raw_window": 17,
+            "window": 24
+          }
+        }
+      },
+      "return_to_anchor_delay": 2,
+      "seed": 27011
+    },
+    {
+      "adaptation_first_20_rewards": {
+        "archive": {
+          "B": 9,
+          "return_A": 8
+        },
+        "cumulative": {
+          "B": 6,
+          "return_A": 13
+        },
+        "frozen": {
+          "B": 5,
+          "return_A": 13
+        },
+        "raw_window": {
+          "B": 6,
+          "return_A": 6
+        },
+        "window": {
+          "B": 9,
+          "return_A": 5
+        }
+      },
+      "adaptation_rewards": {
+        "archive": {
+          "A": 141,
+          "B": 60,
+          "return_A": 63
+        },
+        "cumulative": {
+          "A": 141,
+          "B": 28,
+          "return_A": 68
+        },
+        "frozen": {
+          "A": 141,
+          "B": 22,
+          "return_A": 68
+        },
+        "raw_window": {
+          "A": 82,
+          "B": 28,
+          "return_A": 31
+        },
+        "window": {
+          "A": 140,
+          "B": 74,
+          "return_A": 59
+        }
+      },
+      "archive_switch_details": [
+        {
+          "step": 204,
+          "to": "recent"
+        },
+        {
+          "step": 229,
+          "to": "anchor"
+        },
+        {
+          "step": 238,
+          "to": "recent"
+        },
+        {
+          "step": 275,
+          "to": "anchor"
+        },
+        {
+          "step": 284,
+          "to": "recent"
+        },
+        {
+          "step": 309,
+          "to": "anchor"
+        },
+        {
+          "step": 318,
+          "to": "recent"
+        },
+        {
+          "step": 327,
+          "to": "anchor"
+        },
+        {
+          "step": 345,
+          "to": "recent"
+        },
+        {
+          "step": 356,
+          "to": "anchor"
+        },
+        {
+          "step": 365,
+          "to": "recent"
+        },
+        {
+          "step": 386,
+          "to": "anchor"
+        },
+        {
+          "step": 396,
+          "to": "recent"
+        },
+        {
+          "step": 414,
+          "to": "anchor"
+        },
+        {
+          "step": 431,
+          "to": "recent"
+        }
+      ],
+      "checkpoints": {
+        "archive": "3858cdd5097ed602c75269343730feccd106c1627a846c21693d976c621351d6",
+        "cumulative": "56354bef06ce270c6dc13f37eb2c14f4bdcc7d81934fe831ef19d2ae1c446999",
+        "frozen": "33d92da8158db04d4fdf46cf0ce9e0c5905eef75a9894ccbf429da9af6061c50",
+        "raw_window": "1b0aa4b37c4b2ef993cc86e8506d8a620b265f41cb694afff9db23e0a176a812",
+        "window": "5a3cde77c6c5cc7538cd4329912fc6a5c8723d0d7a46bcca5c29fd11d5ec9c5b"
+      },
+      "families": {
+        "A": {
+          "archive_active": "anchor",
+          "archive_switches": 0,
+          "episodes": 40,
+          "successes": {
+            "archive": 27,
+            "available_oracle": 36,
+            "cumulative": 27,
+            "frozen": 27,
+            "raw_window": 12,
+            "window": 27
+          }
+        },
+        "B": {
+          "archive_active": "recent",
+          "archive_switches": 7,
+          "episodes": 40,
+          "successes": {
+            "archive": 33,
+            "available_oracle": 38,
+            "cumulative": 8,
+            "frozen": 4,
+            "raw_window": 16,
+            "window": 33
+          }
+        },
+        "return_A": {
+          "archive_active": "recent",
+          "archive_switches": 15,
+          "episodes": 40,
+          "successes": {
+            "archive": 25,
+            "available_oracle": 34,
+            "cumulative": 25,
+            "frozen": 25,
+            "raw_window": 16,
+            "window": 25
+          }
+        }
+      },
+      "return_to_anchor_delay": 7,
+      "seed": 27017
+    }
+  ],
+  "schema": "developmental-ai.nonstationary-event-value-benchmark/v1"
+}

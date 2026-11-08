@@ -1,0 +1,107 @@
+{
+  "schema": "developmental-ai-archive-consistency-protocol/v1",
+  "created": "2026-10-22",
+  "freeze": "Protocol and seeds committed before consistency-gated learner implementation and tests.",
+  "scientific_question": "Does internally cross-validated archive eligibility mitigate contaminated mixed-rule memory chunks during fast A->B->A recovery?",
+  "simulator": "Unchanged engineered two-numeric-observation ObservableWorld route vs route-reversed, not unfamiliar-family generalization.",
+  "train": [
+    {
+      "stage": "A",
+      "domain": "route",
+      "start": 80000,
+      "count": 160
+    },
+    {
+      "stage": "B",
+      "domain": "route-reversed",
+      "start": 81000,
+      "count": 160
+    },
+    {
+      "stage": "return_A",
+      "domain": "route",
+      "start": 82000,
+      "count": 48
+    }
+  ],
+  "checkpoints": {
+    "B": [
+      0,
+      4,
+      8,
+      12,
+      24,
+      48,
+      160
+    ],
+    "return_A": [
+      0,
+      4,
+      8,
+      12,
+      24,
+      48
+    ]
+  },
+  "evaluation": {
+    "test_split": "test",
+    "test_starts": {
+      "B": 90000,
+      "return_A": 91000
+    },
+    "test_episodes_per_stage_and_checkpoint": 30
+  },
+  "cohorts": {
+    "development": [
+      132003,
+      132021,
+      132039
+    ],
+    "additional": [
+      133001,
+      133017,
+      133041
+    ]
+  },
+  "interventions": "External independent seeded random first-action simulated actor provides all TRAIN outcomes; actor-caused harm counted once, no learner-initiated training actions.",
+  "candidate_method": {
+    "archive_chunks": 64,
+    "internal_cross_validation": "Train one 5NN model on first 32 events and evaluate the other 32; reverse and average 64 held-out event log-likelihoods. Exclude a complete archive chunk when mean held-out log likelihood is below -1.5.",
+    "scoring_tail": 4,
+    "recent_candidate": "8 events immediately before the scoring tail; scoring tail never enters any candidate model.",
+    "scoring": "Mean log likelihood from event feedback with 0.05 Laplace smoothing; tie break favors earliest archive, no source phase or domain labels.",
+    "near_tie_recent_preference": "If recent candidate is within 0.75 total log-likelihood points of best candidate, prefer recent candidate. This is an engineered recency bias with possible forgetting regressions.",
+    "chunk_quarantine": "Quarantine is selection-only. No events or previous successful experiments deleted; candidates can be reconsidered at later checkpoints.",
+    "checkpoint": "Replay-exact versioned SHA256 with bounded 1000-sample event history; independent read-only tests after restart."
+  },
+  "methods": [
+    "consistent_retrieval",
+    "fast_retrieval",
+    "fixed_12_retrieval",
+    "recent_8_knn",
+    "recent_32_knn",
+    "cumulative_knn",
+    "frozen_A_knn",
+    "untrained_random",
+    "always_abstain",
+    "privileged_oracle"
+  ],
+  "report": [
+    "successful_test_episodes",
+    "harmful_test_actions",
+    "test_abstentions",
+    "quarantined_archive_indices",
+    "selected_candidate",
+    "source_actor_training_harm",
+    "restart_identity"
+  ],
+  "acceptance": "Improve B48 against fast retrieval and protect return-A 48 from wrong archive without materially degrading B12, B160 or return-A 4/8. Compare to strong recent-8 baseline; no blanket claim of superiority if it wins.",
+  "limitations": [
+    "Same two rules/engineered feature descriptors",
+    "Six new seeds inspected after evaluation, never claim continued blindness",
+    "Out-of-sample internal CV is NOT source authenticity",
+    "Untrusted colluding observations can still be internally consistent",
+    "Some physical action consequences remain hazardous despite simulation-only boundaries",
+    "Not AthenZ/Synveil or autonomous goals, remain optional draft"
+  ]
+}

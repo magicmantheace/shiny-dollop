@@ -1,0 +1,149 @@
+{
+  "blind": false,
+  "eval": "test/99200..99239",
+  "fit": "train/88500..88859",
+  "learned_pair_slots_are_aligned_by_design": true,
+  "protocol": "benchmarks/raw_token_transfer_protocol.json",
+  "rows": [
+    {
+      "correct_cue_selections": {
+        "correct_cue": 40,
+        "decoded_oracle_rule": 36,
+        "identity": 10,
+        "learned_raw": 36,
+        "literal": 8,
+        "random": 4,
+        "unsupervised": 36
+      },
+      "identity_reward_counts": {
+        "src_0": [
+          14,
+          68
+        ],
+        "src_1": [
+          17,
+          74
+        ],
+        "src_2": [
+          14,
+          77
+        ],
+        "src_3": [
+          14,
+          67
+        ],
+        "src_4": [
+          13,
+          74
+        ]
+      },
+      "learned_record_digest": "b98be30581a079ed26e4bb46b5369520e2b577f7e452df28b9d7907f1a0f1d47",
+      "positive_training_episodes": 72,
+      "seed": 72019,
+      "tasks": {
+        "correct_cue": 33,
+        "decoded_oracle_rule": 30,
+        "identity": 9,
+        "learned_raw": 30,
+        "literal": 7,
+        "random": 3,
+        "unsupervised": 30
+      },
+      "unsupervised_permutation_equals_hidden": true
+    },
+    {
+      "correct_cue_selections": {
+        "correct_cue": 40,
+        "decoded_oracle_rule": 38,
+        "identity": 5,
+        "learned_raw": 37,
+        "literal": 5,
+        "random": 11,
+        "unsupervised": 38
+      },
+      "identity_reward_counts": {
+        "src_0": [
+          15,
+          62
+        ],
+        "src_1": [
+          12,
+          81
+        ],
+        "src_2": [
+          13,
+          60
+        ],
+        "src_3": [
+          17,
+          85
+        ],
+        "src_4": [
+          14,
+          72
+        ]
+      },
+      "learned_record_digest": "a64f24559edb9c7a9a60f46d154f70a96492c572d556b65602d57749d80f06c2",
+      "positive_training_episodes": 71,
+      "seed": 83003,
+      "tasks": {
+        "correct_cue": 36,
+        "decoded_oracle_rule": 34,
+        "identity": 5,
+        "learned_raw": 33,
+        "literal": 5,
+        "random": 11,
+        "unsupervised": 34
+      },
+      "unsupervised_permutation_equals_hidden": true
+    },
+    {
+      "correct_cue_selections": {
+        "correct_cue": 40,
+        "decoded_oracle_rule": 38,
+        "identity": 10,
+        "learned_raw": 37,
+        "literal": 10,
+        "random": 7,
+        "unsupervised": 38
+      },
+      "identity_reward_counts": {
+        "src_0": [
+          22,
+          77
+        ],
+        "src_1": [
+          14,
+          72
+        ],
+        "src_2": [
+          6,
+          66
+        ],
+        "src_3": [
+          14,
+          73
+        ],
+        "src_4": [
+          17,
+          72
+        ]
+      },
+      "learned_record_digest": "1f176bf8b0f464ec418b2bfdafd89481e80f6035c270da1579fdbacd27ace23c",
+      "positive_training_episodes": 73,
+      "seed": 94009,
+      "tasks": {
+        "correct_cue": 39,
+        "decoded_oracle_rule": 37,
+        "identity": 9,
+        "learned_raw": 36,
+        "literal": 9,
+        "random": 7,
+        "unsupervised": 37
+      },
+      "unsupervised_permutation_equals_hidden": true
+    }
+  ],
+  "schema": "developmental-ai.raw-token-transfer-benchmark/v1",
+  "train_reward_only": true
+}

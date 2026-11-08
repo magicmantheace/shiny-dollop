@@ -1,0 +1,43 @@
+{
+  "schema": "developmental-ai.quarantined-c-adaptation-protocol/v1",
+  "created": "2026-10-21",
+  "status": "recorded before candidate implementation or new cohort testing",
+  "goal": "Offline sandbox C memory acquisition and staged manual approval, with old A/B replay and non-regression gates",
+  "data": "Training A=train 0..79, B=train 300..379 (prior inspected). Candidate C=train 600..679 (80 unfiltered novel-first episodes in simulator, public numeric descriptors/outcomes only). All 6 seeds previously inspected; no fresh holdouts.",
+  "validation": "TRAIN 1200..1223 (24 each A/B/C per seed) disjoint from training/test, paired before/after checks. Tests may simulate approval, but runtime default remains untouched.",
+  "test": "TEST 9300..9359 A/B/C, 60 episodes per seed and 3+3 preinspected cohorts; never describe as blind. Additional C-only baseline, old abstaining sentinel, raw no-memory learner, privileged true-hazard oracle.",
+  "candidate": "After two existing public probes, continue old known context policy in A/B. On previously unseen C, optionally apply isolated C risk filter ONLY after explicit approved=True and exact receipt digest. No self-approval or external actions.",
+  "metrics": [
+    "success",
+    "spoilage",
+    "stalled",
+    "training_exposure",
+    "probe_count",
+    "approval_state",
+    "checkpoint_replay",
+    "A_B_retention",
+    "validation_regression",
+    "source_immutability"
+  ],
+  "manual_review_gate": [
+    "No more than 0 spoilage and at least 24/24 completions per A,B,C validation set",
+    "Training-derived C risk candidates exactly one",
+    "No old A/B source history changed",
+    "Explicit caller approval boolean and matching review receipt digest",
+    "Failed/unused candidate discarded; no direct change to other model defaults"
+  ],
+  "nonclaims": [
+    "C mapping is entirely hand-constructed in the same deterministic cargo simulator",
+    "Descriptors stable two-byte hashes of hidden action identity",
+    "C training is 80 episodes; improvement is supervised-by-experience within-family adaptation, not zero-shot generalization",
+    "Separate public histories known to harness; intervention may be unsafe in other worlds",
+    "This does not constitute actual human approval or proven real-world safety",
+    "All six seeds and task families are preinspected; not scientific blind evaluation"
+  ],
+  "preserve": [
+    "previous protocol and benchmarks unchanged",
+    "main unmodified",
+    "AthenZ/Synveil integration postponed",
+    "draft PR remains draft"
+  ]
+}

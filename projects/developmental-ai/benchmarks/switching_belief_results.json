@@ -1,0 +1,329 @@
+{
+  "calibration": 8,
+  "hazard_candidates": [
+    0.0,
+    0.01,
+    0.04,
+    0.1,
+    0.2
+  ],
+  "iterations": 2,
+  "kind": "inspected-development-not-blind",
+  "notes": "Known 9/11 ring and hardcoded two-landmark spacing; simulator changes noise/layout at steps 12 and 24, without sending transition/regime labels to filters. Fitting and hazard selection use separate train samples. Benchmark uses hidden position only for Brier. No blind seed, no new model trained during stream, no automatic rollout.",
+  "partitions": {
+    "discovery_validation": "train/10000+",
+    "fit": "train/0+",
+    "hazard_selection": "train/40000+",
+    "stationary_test": "test/86000+",
+    "switch_test": "test/85000+"
+  },
+  "rounds": 1,
+  "rows": [
+    {
+      "calibration_receipt_digest": "31dd0912527fb54cfafe03ea71527eac3caac12212d952bbf68407cc6a6cc54a",
+      "evaluation": {
+        "stationary": {
+          "selected_switching": {
+            "abstention": 0.876157,
+            "brier": 0.563459,
+            "nll": 1.505184,
+            "phase_abstention": [
+              0.878472,
+              0.885417,
+              0.864583
+            ],
+            "phase_brier": [
+              0.516729,
+              0.586415,
+              0.587232
+            ]
+          },
+          "stationary_mixture": {
+            "abstention": 0.342593,
+            "brier": 0.549695,
+            "nll": 1.503832,
+            "phase_abstention": [
+              0.59375,
+              0.295139,
+              0.138889
+            ],
+            "phase_brier": [
+              0.499721,
+              0.551832,
+              0.597532
+            ]
+          }
+        },
+        "switching": {
+          "selected_switching": {
+            "abstention": 0.809028,
+            "brier": 0.698743,
+            "nll": 1.63185,
+            "phase_abstention": [
+              0.690972,
+              0.857639,
+              0.878472
+            ],
+            "phase_brier": [
+              0.481131,
+              0.89817,
+              0.716929
+            ]
+          },
+          "stationary_mixture": {
+            "abstention": 0.322917,
+            "brier": 0.741227,
+            "nll": 1.653765,
+            "phase_abstention": [
+              0.357639,
+              0.315972,
+              0.295139
+            ],
+            "phase_brier": [
+              0.478471,
+              1.024473,
+              0.720738
+            ]
+          }
+        }
+      },
+      "hazard_calibration": [
+        {
+          "hazard": 0.0,
+          "mean_nll": 1.596877
+        },
+        {
+          "hazard": 0.01,
+          "mean_nll": 1.580483
+        },
+        {
+          "hazard": 0.04,
+          "mean_nll": 1.572521
+        },
+        {
+          "hazard": 0.1,
+          "mean_nll": 1.571951
+        },
+        {
+          "hazard": 0.2,
+          "mean_nll": 1.578903
+        }
+      ],
+      "proposal_two_models": true,
+      "proposal_validation": {
+        "candidate": -1.624745,
+        "delta": 0.019698,
+        "single": -1.644443
+      },
+      "seed": 17,
+      "selected_hazard": 0.1
+    },
+    {
+      "calibration_receipt_digest": "041931e3147eb124790308f21cd89d8ff408f58a9e52c43f2bbb462eb1cad2dc",
+      "evaluation": {
+        "stationary": {
+          "selected_switching": {
+            "abstention": 0.0,
+            "brier": 0.470187,
+            "nll": 1.517498,
+            "phase_abstention": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "phase_brier": [
+              0.451877,
+              0.419158,
+              0.539525
+            ]
+          },
+          "stationary_mixture": {
+            "abstention": 0.0,
+            "brier": 0.470187,
+            "nll": 1.517498,
+            "phase_abstention": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "phase_brier": [
+              0.451877,
+              0.419158,
+              0.539525
+            ]
+          }
+        },
+        "switching": {
+          "selected_switching": {
+            "abstention": 0.0,
+            "brier": 0.776528,
+            "nll": 1.566595,
+            "phase_abstention": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "phase_brier": [
+              0.547745,
+              1.120257,
+              0.661583
+            ]
+          },
+          "stationary_mixture": {
+            "abstention": 0.0,
+            "brier": 0.776528,
+            "nll": 1.566595,
+            "phase_abstention": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "phase_brier": [
+              0.547745,
+              1.120257,
+              0.661583
+            ]
+          }
+        }
+      },
+      "hazard_calibration": [
+        {
+          "hazard": 0.0,
+          "mean_nll": 1.614929
+        },
+        {
+          "hazard": 0.01,
+          "mean_nll": 1.614929
+        },
+        {
+          "hazard": 0.04,
+          "mean_nll": 1.614929
+        },
+        {
+          "hazard": 0.1,
+          "mean_nll": 1.614929
+        },
+        {
+          "hazard": 0.2,
+          "mean_nll": 1.614929
+        }
+      ],
+      "proposal_two_models": false,
+      "proposal_validation": {
+        "candidate": -1.667921,
+        "delta": -0.00771,
+        "single": -1.66021
+      },
+      "seed": 23,
+      "selected_hazard": 0.0
+    },
+    {
+      "calibration_receipt_digest": "49df8ae9d859a2fe91992df491fa2790e74eab5bc7ec2c7c54ebe3a18505fd76",
+      "evaluation": {
+        "stationary": {
+          "selected_switching": {
+            "abstention": 0.825231,
+            "brier": 0.61252,
+            "nll": 1.494828,
+            "phase_abstention": [
+              0.84375,
+              0.836806,
+              0.795139
+            ],
+            "phase_brier": [
+              0.556463,
+              0.60982,
+              0.671276
+            ]
+          },
+          "stationary_mixture": {
+            "abstention": 0.416667,
+            "brier": 0.582581,
+            "nll": 1.490271,
+            "phase_abstention": [
+              0.59375,
+              0.409722,
+              0.246528
+            ],
+            "phase_brier": [
+              0.552546,
+              0.552776,
+              0.64242
+            ]
+          }
+        },
+        "switching": {
+          "selected_switching": {
+            "abstention": 0.87963,
+            "brier": 0.689218,
+            "nll": 1.518496,
+            "phase_abstention": [
+              0.826389,
+              0.916667,
+              0.895833
+            ],
+            "phase_brier": [
+              0.594137,
+              0.749612,
+              0.723903
+            ]
+          },
+          "stationary_mixture": {
+            "abstention": 0.396991,
+            "brier": 0.743512,
+            "nll": 1.527035,
+            "phase_abstention": [
+              0.534722,
+              0.350694,
+              0.305556
+            ],
+            "phase_brier": [
+              0.574775,
+              0.887823,
+              0.767937
+            ]
+          }
+        }
+      },
+      "hazard_calibration": [
+        {
+          "hazard": 0.0,
+          "mean_nll": 1.698747
+        },
+        {
+          "hazard": 0.01,
+          "mean_nll": 1.669898
+        },
+        {
+          "hazard": 0.04,
+          "mean_nll": 1.646995
+        },
+        {
+          "hazard": 0.1,
+          "mean_nll": 1.63915
+        },
+        {
+          "hazard": 0.2,
+          "mean_nll": 1.642617
+        }
+      ],
+      "proposal_two_models": true,
+      "proposal_validation": {
+        "candidate": -1.613034,
+        "delta": 0.017862,
+        "single": -1.630896
+      },
+      "seed": 41,
+      "selected_hazard": 0.1
+    }
+  ],
+  "schema": "switching-belief/v1",
+  "seeds": [
+    17,
+    23,
+    41
+  ],
+  "test": 24,
+  "train": 48,
+  "validation": 16
+}

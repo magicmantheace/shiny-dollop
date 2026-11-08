@@ -1,0 +1,102 @@
+{
+  "blind": false,
+  "calibration_is_supervised": true,
+  "calibration_split": "train/70000+",
+  "new_domain_public_pair_calibration": 48,
+  "rows": [
+    {
+      "adapter_digest": "69ec79b32898ad153f0aec57f425e0bdeefbe47d017ae75a01cf2b6a6fd44e51",
+      "alignment": {
+        "contexts": [
+          "lunar",
+          "solar"
+        ],
+        "reliable_sources": {
+          "lunar": "foreign-47",
+          "solar": "foreign-28"
+        },
+        "source_roles": {
+          "foreign-13": "N",
+          "foreign-28": "B",
+          "foreign-47": "A",
+          "foreign-66": "N",
+          "foreign-91": "N"
+        }
+      },
+      "scores": {
+        "adapted": 34,
+        "first": 5,
+        "last": 14,
+        "oracle": 34,
+        "paired_lookup": 34,
+        "random": 2,
+        "wrong_context": 0
+      },
+      "seed": 17431
+    },
+    {
+      "adapter_digest": "e2ceece35f0753cee6be39119e542e580eaf813078b9d28aaa3d0181105ec180",
+      "alignment": {
+        "contexts": [
+          "lunar",
+          "solar"
+        ],
+        "reliable_sources": {
+          "lunar": "foreign-28",
+          "solar": "foreign-91"
+        },
+        "source_roles": {
+          "foreign-13": "N",
+          "foreign-28": "A",
+          "foreign-47": "N",
+          "foreign-66": "N",
+          "foreign-91": "B"
+        }
+      },
+      "scores": {
+        "adapted": 37,
+        "first": 6,
+        "last": 11,
+        "oracle": 37,
+        "paired_lookup": 37,
+        "random": 10,
+        "wrong_context": 0
+      },
+      "seed": 24869
+    },
+    {
+      "adapter_digest": "415d895b292feb99ee407f55cd9ab0ceac20386bf6328fe030672f5a5179b5ba",
+      "alignment": {
+        "contexts": [
+          "lunar",
+          "solar"
+        ],
+        "reliable_sources": {
+          "lunar": "foreign-28",
+          "solar": "foreign-13"
+        },
+        "source_roles": {
+          "foreign-13": "B",
+          "foreign-28": "A",
+          "foreign-47": "N",
+          "foreign-66": "N",
+          "foreign-91": "N"
+        }
+      },
+      "scores": {
+        "adapted": 39,
+        "first": 8,
+        "last": 8,
+        "oracle": 39,
+        "paired_lookup": 39,
+        "random": 11,
+        "wrong_context": 0
+      },
+      "seed": 37021
+    }
+  ],
+  "schema": "developmental-ai.grounded-aliases-benchmark/v1",
+  "test_episodes_per_seed": 40,
+  "test_split": "test/97000+",
+  "train_gate_episodes": 1800
+}

@@ -1,0 +1,199 @@
+{
+  "data_partitions": {
+    "closed_loop_navigation": "test/30000+",
+    "model_fitting": "train/0+",
+    "passive_probe": "test/22000+",
+    "probe_priors": "test/19000+"
+  },
+  "fit_episodes_per_model": 90,
+  "iterations": 6,
+  "kind": "inspected-development-not-blind",
+  "navigation_episodes": 60,
+  "notes": "Models are pre-fitted in known regime groups (not true-position supervised). The mixture never sees the regime or positions; benchmark reads truth for metrics. Bayesian mixture assumes one regime per episode. Oracle has true physics parameters, not true live position. Seeds previously inspected; not blind.",
+  "probe_episodes": 40,
+  "rows": [
+    {
+      "regimes": {
+        "changed": {
+          "navigation_success": {
+            "correct_known_model": 0.15,
+            "mixture": 0.13333,
+            "physics_oracle": 0.51667,
+            "probe_informed_mixture": 0.15,
+            "wrong_known_model": 0.13333
+          },
+          "passive_probe": {
+            "correct_model_brier": 0.76271,
+            "credible80_coverage": 0.80833,
+            "episodes": 40,
+            "mixture_brier": 0.83131,
+            "mixture_observation_log_loss": 1.62593,
+            "mixture_top1": 0.23125,
+            "mixture_true_probability": 0.19606,
+            "model_abstained_at_end": 39,
+            "model_correct_at_end": 0,
+            "physics_oracle_brier": 0.62505,
+            "steps": 480,
+            "wrong_model_brier": 0.952
+          },
+          "probe_priors": {
+            "changed": 0.38669,
+            "original": 0.61331
+          }
+        },
+        "original": {
+          "navigation_success": {
+            "correct_known_model": 0.86667,
+            "mixture": 0.73333,
+            "physics_oracle": 0.91667,
+            "probe_informed_mixture": 0.86667,
+            "wrong_known_model": 0.15
+          },
+          "passive_probe": {
+            "correct_model_brier": 0.50633,
+            "credible80_coverage": 0.9625,
+            "episodes": 40,
+            "mixture_brier": 0.54919,
+            "mixture_observation_log_loss": 1.61897,
+            "mixture_top1": 0.63333,
+            "mixture_true_probability": 0.37685,
+            "model_abstained_at_end": 26,
+            "model_correct_at_end": 14,
+            "physics_oracle_brier": 0.43625,
+            "steps": 480,
+            "wrong_model_brier": 0.82136
+          },
+          "probe_priors": {
+            "changed": 0.062662,
+            "original": 0.937338
+          }
+        }
+      },
+      "seed": 1009
+    },
+    {
+      "regimes": {
+        "changed": {
+          "navigation_success": {
+            "correct_known_model": 0.11667,
+            "mixture": 0.11667,
+            "physics_oracle": 0.53333,
+            "probe_informed_mixture": 0.1,
+            "wrong_known_model": 0.11667
+          },
+          "passive_probe": {
+            "correct_model_brier": 0.72513,
+            "credible80_coverage": 0.8625,
+            "episodes": 40,
+            "mixture_brier": 0.77303,
+            "mixture_observation_log_loss": 1.7375,
+            "mixture_top1": 0.33125,
+            "mixture_true_probability": 0.22683,
+            "model_abstained_at_end": 37,
+            "model_correct_at_end": 1,
+            "physics_oracle_brier": 0.58095,
+            "steps": 480,
+            "wrong_model_brier": 0.94116
+          },
+          "probe_priors": {
+            "changed": 0.509278,
+            "original": 0.490722
+          }
+        },
+        "original": {
+          "navigation_success": {
+            "correct_known_model": 0.88333,
+            "mixture": 0.88333,
+            "physics_oracle": 0.88333,
+            "probe_informed_mixture": 0.88333,
+            "wrong_known_model": 0.21667
+          },
+          "passive_probe": {
+            "correct_model_brier": 0.51933,
+            "credible80_coverage": 0.97708,
+            "episodes": 40,
+            "mixture_brier": 0.57319,
+            "mixture_observation_log_loss": 1.5489,
+            "mixture_top1": 0.59792,
+            "mixture_true_probability": 0.35255,
+            "model_abstained_at_end": 20,
+            "model_correct_at_end": 20,
+            "physics_oracle_brier": 0.44744,
+            "steps": 480,
+            "wrong_model_brier": 0.87503
+          },
+          "probe_priors": {
+            "changed": 0.044246,
+            "original": 0.955754
+          }
+        }
+      },
+      "seed": 1013
+    },
+    {
+      "regimes": {
+        "changed": {
+          "navigation_success": {
+            "correct_known_model": 0.16667,
+            "mixture": 0.1,
+            "physics_oracle": 0.63333,
+            "probe_informed_mixture": 0.13333,
+            "wrong_known_model": 0.11667
+          },
+          "passive_probe": {
+            "correct_model_brier": 0.75642,
+            "credible80_coverage": 0.85833,
+            "episodes": 40,
+            "mixture_brier": 0.82599,
+            "mixture_observation_log_loss": 1.73048,
+            "mixture_top1": 0.24167,
+            "mixture_true_probability": 0.20405,
+            "model_abstained_at_end": 29,
+            "model_correct_at_end": 10,
+            "physics_oracle_brier": 0.56234,
+            "steps": 480,
+            "wrong_model_brier": 0.98865
+          },
+          "probe_priors": {
+            "changed": 0.547272,
+            "original": 0.452728
+          }
+        },
+        "original": {
+          "navigation_success": {
+            "correct_known_model": 0.81667,
+            "mixture": 0.8,
+            "physics_oracle": 0.75,
+            "probe_informed_mixture": 0.81667,
+            "wrong_known_model": 0.11667
+          },
+          "passive_probe": {
+            "correct_model_brier": 0.54148,
+            "credible80_coverage": 0.95,
+            "episodes": 40,
+            "mixture_brier": 0.57961,
+            "mixture_observation_log_loss": 1.53459,
+            "mixture_top1": 0.54167,
+            "mixture_true_probability": 0.35983,
+            "model_abstained_at_end": 22,
+            "model_correct_at_end": 18,
+            "physics_oracle_brier": 0.48515,
+            "steps": 480,
+            "wrong_model_brier": 0.89086
+          },
+          "probe_priors": {
+            "changed": 0.067449,
+            "original": 0.932551
+          }
+        }
+      },
+      "seed": 1031
+    }
+  ],
+  "schema": "mixture-navigation/v1",
+  "seeds": [
+    1009,
+    1013,
+    1031
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "schema": "developmental-ai.fast-shock-switch-protocol/v1",
+  "date": "2026-10-22",
+  "status": "Frozen before new learner, benchmark harness, tests or target scoring; do not tune after seeing either cohort without new registered test",
+  "question": "Can an archive-surprise trigger paired with a rapidly fitted last-eight-event policy improve B4/B8 early reversal adaptation over the earlier 12+4 held-out selector, while preserving return-to-A recovery?",
+  "generator": "Reuse same_schema_switch_benchmark SameSchemaWorld with EXACT unchanged inlet/outlet features in A->reversed B->A. Same deliberate hand-authored span-band physics and return inversion, no regime label in learner. New developer-selected seeds and held-out indices, not independently authored tasks.",
+  "train": "240 original A first-action observed outcomes (train 1000..1239), then 64 inverted B outcomes (2000..2063), then 48 original A outcomes (3000..3047). Every observation acquired by independent seeded random actor, 1 simulated action per disposable episode, count its harmful actions once; no learner training actions.",
+  "new_model": {
+    "name": "FastShockMemory",
+    "source_anchor": "Oldest 192 examples; never mutate",
+    "surprise": "Compute anchor p(observed class|feature span) on last 4 public events; a 'mismatch' when probability < 0.125. If 2+ mismatches in last 4, use most recent 8 observations. If exactly one of last four mismatches, use recent8 only if 3+ mismatches in latest 8. If 0 in last 4, anchor. This uses no explicit switch labels.",
+    "fast_candidate": "Fit on last 8 observed outcomes INCLUDING observations used for shock detection. This deliberate in-sample selection is an optimism/overfit risk and must be disclosed; compare with disjoint held-out selector and recent8 baseline.",
+    "no_abstention": "Do not silently mark skipped tasks as successes. An always-abstain comparison measures the cost of avoiding harm. This candidate attempts actions, with no deployment safety claims.",
+    "restart": "Event-sourced replay-only SHA256 checkpoint and strict schema; no action authority, hidden seed/band/regime metadata, or actor action handle stored."
+  },
+  "cohorts": {
+    "development": [
+      182003,
+      182021,
+      182039
+    ],
+    "additional": [
+      183001,
+      183017,
+      183041
+    ]
+  },
+  "checkpoints": {
+    "B": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      12,
+      16,
+      24,
+      32,
+      48,
+      64
+    ],
+    "return_A": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      12,
+      16,
+      24,
+      48
+    ]
+  },
+  "test": {
+    "split": "test",
+    "B_index_start": 80000,
+    "return_A_index_start": 90000,
+    "episodes_per_seed_per_checkpoint": 30,
+    "same_test_episodes_across_checkpoints": true
+  },
+  "baselines": [
+    "fast_shock",
+    "legacy_disjoint_12plus4",
+    "recent8",
+    "recent32",
+    "frozen_A",
+    "cumulative_range",
+    "untrained_random",
+    "always_abstain",
+    "privileged_oracle"
+  ],
+  "metrics": [
+    "task_successes",
+    "harmful_TEST_actions",
+    "abstentions_as_failures",
+    "training_actor_harm",
+    "selected_archive_vs_recent",
+    "checkpoint_exact_replay"
+  ],
+  "acceptance": "At B8, new selector should outperform previous disjoint selector and preferably match recent-eight within 20/180 successes. Return-A4 should reach >=170/180 without extra source evidence. Any harm cost or regression at later checkpoints is an explicit negative. Report all baseline comparisons.",
+  "nonclaims": [
+    "Hand-specified surprise threshold and numeric span, not independent causal discovery",
+    "Recent8 candidate fitted on validation events, so no honest disjoint predictive comparison",
+    "Same simulator, chosen seeds, balanced action options, deterministic outcomes; not unknown-domain or safe real-world transfer",
+    "Source events can be fabricated, hashes do not authenticate sources",
+    "Blindness false immediately after all frozen runs",
+    "No AthenZ/Synveil, PR merge, default promotion, executable external actions or roadmap changes"
+  ]
+}

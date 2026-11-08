@@ -1,0 +1,35 @@
+{
+  "schema": "developmental-ai.repeated-reversal-protocol/v1",
+  "status": "frozen; implementation and results pending",
+  "goal": "Test whether archived reward-based event preferences recover after repeated unannounced reversals, compared with recent-window and cumulative-count controls",
+  "training": "Use existing source_bursts training namespace and fitted segmenter; do not inspect evaluation rewards to tune",
+  "phases": [
+    "original",
+    "reversed",
+    "original",
+    "reversed",
+    "original",
+    "unchanged-control"
+  ],
+  "metrics": [
+    "per-phase reward",
+    "archive reidentification accuracy",
+    "adaptation delay after each reversal",
+    "false switches in unchanged control",
+    "checkpoint replay integrity"
+  ],
+  "baselines": [
+    "32-reward sliding window",
+    "cumulative counts",
+    "frozen-original",
+    "privileged current-goal reference"
+  ],
+  "rules": [
+    "No privileged phase labels to learner",
+    "No changing evaluation protocol after observing results",
+    "Use previously inspected cohorts as exploratory, not blind",
+    "No promotion to default or external execution",
+    "Preserve V2A then overlapping V2B"
+  ],
+  "state": "No experimental outcomes claimed"
+}

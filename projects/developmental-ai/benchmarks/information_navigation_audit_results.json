@@ -1,0 +1,257 @@
+{
+  "indices": {
+    "evaluation": "test/18000+",
+    "fit": "train/0+",
+    "policy_selection": "train/7000+"
+  },
+  "kind": "inspected-development-not-blind",
+  "model_fit_iterations": 5,
+  "model_fit_train_histories": 65,
+  "note": "True positions used by scorer only. Control uses engineered Bayes filter, not a learned planning policy. Chosen weight uses training navigation feedback; test data never choose weights. Every seed already inspected historically.",
+  "rows": [
+    {
+      "regimes": {
+        "changed": {
+          "chosen_weight": 0.0,
+          "legacy": {
+            "brier": 0.83473,
+            "cred80_covered": 0.80946,
+            "p_true": 0.18627,
+            "steps": 45.31667,
+            "success": 0.1
+          },
+          "physics_oracle_information": {
+            "brier": 0.55652,
+            "cred80_covered": 0.92378,
+            "p_true": 0.43697,
+            "steps": 29.01667,
+            "success": 0.58333
+          },
+          "physics_oracle_legacy": {
+            "brier": 0.55652,
+            "cred80_covered": 0.92378,
+            "p_true": 0.43697,
+            "steps": 29.01667,
+            "success": 0.58333
+          },
+          "selected_information": {
+            "brier": 0.83473,
+            "cred80_covered": 0.80946,
+            "p_true": 0.18627,
+            "steps": 45.31667,
+            "success": 0.1
+          },
+          "tune_success": {
+            "0.0": 0.2,
+            "0.5": 0.2,
+            "1.5": 0.2
+          }
+        },
+        "original": {
+          "chosen_weight": 0.0,
+          "legacy": {
+            "brier": 0.55782,
+            "cred80_covered": 0.96149,
+            "p_true": 0.36443,
+            "steps": 31.08333,
+            "success": 0.5
+          },
+          "physics_oracle_information": {
+            "brier": 0.39526,
+            "cred80_covered": 0.91909,
+            "p_true": 0.61041,
+            "steps": 16.96667,
+            "success": 0.76667
+          },
+          "physics_oracle_legacy": {
+            "brier": 0.39526,
+            "cred80_covered": 0.91909,
+            "p_true": 0.61041,
+            "steps": 16.96667,
+            "success": 0.76667
+          },
+          "selected_information": {
+            "brier": 0.55782,
+            "cred80_covered": 0.96149,
+            "p_true": 0.36443,
+            "steps": 31.08333,
+            "success": 0.5
+          },
+          "tune_success": {
+            "0.0": 0.4,
+            "0.5": 0.4,
+            "1.5": 0.4
+          }
+        }
+      },
+      "seed": 1009
+    },
+    {
+      "regimes": {
+        "changed": {
+          "chosen_weight": 0.5,
+          "legacy": {
+            "brier": 0.71507,
+            "cred80_covered": 0.87514,
+            "p_true": 0.25985,
+            "steps": 39.36667,
+            "success": 0.25
+          },
+          "physics_oracle_information": {
+            "brier": 0.57814,
+            "cred80_covered": 0.89706,
+            "p_true": 0.44739,
+            "steps": 29.2,
+            "success": 0.6
+          },
+          "physics_oracle_legacy": {
+            "brier": 0.57669,
+            "cred80_covered": 0.89787,
+            "p_true": 0.44877,
+            "steps": 29.08333,
+            "success": 0.61667
+          },
+          "selected_information": {
+            "brier": 0.71586,
+            "cred80_covered": 0.87298,
+            "p_true": 0.25942,
+            "steps": 39.36667,
+            "success": 0.25
+          },
+          "tune_success": {
+            "0.0": 0.04,
+            "0.5": 0.08,
+            "1.5": 0.08
+          }
+        },
+        "original": {
+          "chosen_weight": 0.0,
+          "legacy": {
+            "brier": 0.50043,
+            "cred80_covered": 0.95181,
+            "p_true": 0.4242,
+            "steps": 22.16667,
+            "success": 0.73333
+          },
+          "physics_oracle_information": {
+            "brier": 0.43535,
+            "cred80_covered": 0.89308,
+            "p_true": 0.59391,
+            "steps": 16.15,
+            "success": 0.83333
+          },
+          "physics_oracle_legacy": {
+            "brier": 0.43535,
+            "cred80_covered": 0.89308,
+            "p_true": 0.59391,
+            "steps": 16.15,
+            "success": 0.83333
+          },
+          "selected_information": {
+            "brier": 0.50043,
+            "cred80_covered": 0.95181,
+            "p_true": 0.4242,
+            "steps": 22.16667,
+            "success": 0.73333
+          },
+          "tune_success": {
+            "0.0": 0.84,
+            "0.5": 0.8,
+            "1.5": 0.8
+          }
+        }
+      },
+      "seed": 1013
+    },
+    {
+      "regimes": {
+        "changed": {
+          "chosen_weight": 0.0,
+          "legacy": {
+            "brier": 0.78538,
+            "cred80_covered": 0.84048,
+            "p_true": 0.20972,
+            "steps": 44.83333,
+            "success": 0.11667
+          },
+          "physics_oracle_information": {
+            "brier": 0.66898,
+            "cred80_covered": 0.88727,
+            "p_true": 0.36532,
+            "steps": 36.45,
+            "success": 0.4
+          },
+          "physics_oracle_legacy": {
+            "brier": 0.66898,
+            "cred80_covered": 0.88727,
+            "p_true": 0.36532,
+            "steps": 36.45,
+            "success": 0.4
+          },
+          "selected_information": {
+            "brier": 0.78538,
+            "cred80_covered": 0.84048,
+            "p_true": 0.20972,
+            "steps": 44.83333,
+            "success": 0.11667
+          },
+          "tune_success": {
+            "0.0": 0.12,
+            "0.5": 0.12,
+            "1.5": 0.12
+          }
+        },
+        "original": {
+          "chosen_weight": 0.0,
+          "legacy": {
+            "brier": 0.55511,
+            "cred80_covered": 0.91402,
+            "p_true": 0.41007,
+            "steps": 26.75,
+            "success": 0.6
+          },
+          "physics_oracle_information": {
+            "brier": 0.38754,
+            "cred80_covered": 0.89626,
+            "p_true": 0.63725,
+            "steps": 14.76667,
+            "success": 0.85
+          },
+          "physics_oracle_legacy": {
+            "brier": 0.38754,
+            "cred80_covered": 0.89626,
+            "p_true": 0.63725,
+            "steps": 14.76667,
+            "success": 0.85
+          },
+          "selected_information": {
+            "brier": 0.55511,
+            "cred80_covered": 0.91402,
+            "p_true": 0.41007,
+            "steps": 26.75,
+            "success": 0.6
+          },
+          "tune_success": {
+            "0.0": 0.8,
+            "0.5": 0.8,
+            "1.5": 0.8
+          }
+        }
+      },
+      "seed": 1031
+    }
+  ],
+  "schema": "information-navigation/v1",
+  "seeds": [
+    1009,
+    1013,
+    1031
+  ],
+  "test_episodes": 60,
+  "tuning_episodes": 25,
+  "weight_candidates": [
+    0.0,
+    0.5,
+    1.5
+  ]
+}

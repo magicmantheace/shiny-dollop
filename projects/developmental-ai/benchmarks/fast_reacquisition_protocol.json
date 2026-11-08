@@ -1,0 +1,122 @@
+{
+  "schema": "developmental-ai.fast-reacquisition-protocol/v1",
+  "created": "2026-10-22",
+  "commit_order": "This protocol is committed before the new adaptive learner, evaluation harness, or focused tests.",
+  "question": "Can surprise-sensitive, evidence-grounded retrieval react earlier than a 12-observation fixed gate and still learn a new reversed rule without phase labels?",
+  "simulator": "Unchanged ObservableWorld two-number route / route-reversed simulator; engineered features and rules explicitly NOT evidence of unfamiliar-family generalization.",
+  "training": [
+    {
+      "stage": "A",
+      "domain": "route",
+      "split": "train",
+      "indices": [
+        60000,
+        60159
+      ],
+      "observations": 160
+    },
+    {
+      "stage": "B",
+      "domain": "route-reversed",
+      "split": "train",
+      "indices": [
+        61000,
+        61159
+      ],
+      "observations": 160
+    },
+    {
+      "stage": "return_A",
+      "domain": "route",
+      "split": "train",
+      "indices": [
+        62000,
+        62047
+      ],
+      "observations": 48
+    }
+  ],
+  "checkpoints": {
+    "B": [
+      0,
+      4,
+      8,
+      12,
+      24,
+      48,
+      160
+    ],
+    "return_A": [
+      0,
+      4,
+      8,
+      12,
+      24,
+      48
+    ]
+  },
+  "evaluation": {
+    "split": "test",
+    "B": [
+      70000,
+      70029
+    ],
+    "return_A": [
+      71000,
+      71029
+    ],
+    "episodes_per_checkpoint_per_seed": 30,
+    "read_only": true,
+    "random_baseline": "Independent seeded random TEST action policy, not used to gather training outcomes; shares test tasks with all methods."
+  },
+  "cohorts": {
+    "development": [
+      122003,
+      122021,
+      122039
+    ],
+    "additional": [
+      123001,
+      123017,
+      123041
+    ]
+  },
+  "source_actor": "Independent deterministic random first-action observer, one action per training episode; every harmful action counted once regardless of number of checkpoints or baseline methods. Test policies never choose data-acquisition actions.",
+  "methods": [
+    "fast_retrieval",
+    "fixed_12_retrieval",
+    "recent_8_knn",
+    "recent_32_knn",
+    "cumulative_knn",
+    "frozen_A_knn",
+    "untrained_random",
+    "always_abstain",
+    "privileged_oracle"
+  ],
+  "fast_retrieval": {
+    "selection_tail": 4,
+    "candidates": "All chronologically complete 64-observation nonoverlapping archive blocks that END BEFORE the last 4 scoring events, plus a recent 8-observation candidate from the 8 events immediately prior to those scoring events",
+    "scoring": "Mean log likelihood over the last four observed feedback events with 0.05 Laplace smoothing; no hidden regime or phase labels; k=5 numeric nearest-neighbor outcome estimator.",
+    "tie_break": "Choose archived candidate before recent candidate; among archives choose earliest index.",
+    "checkpoints": "Replay full ordered observed event log, SHA256 integrity, reconstructed decisions after restart.",
+    "evidence_limitations": "Recent candidate can be noisy or misleading, and last-four evidence can be too small to detect a change. Selection thresholds are hand-designed and no uncertainty guarantee is claimed."
+  },
+  "test_metrics": [
+    "successes",
+    "harmful_test_actions",
+    "abstentions",
+    "selected_source_by_checkpoint",
+    "actor_training_actions_and_harm",
+    "memory_checkpoint_identity"
+  ],
+  "frozen_acceptance": "Fast retrieval should improve return-A at <=8 new observations over fixed-12 and cumulative baselines, and improve B at 12 or 24 over fixed-12, without losing more than 5 percentage points at B160. All improvements measured with identical seeds, training data, and evaluation tasks. Preserve failures even if thresholds fail.",
+  "boundaries": [
+    "No privileged dynamics to learner",
+    "No intentional real-world exploration",
+    "No new action authority",
+    "No AthenZ/Synveil integration",
+    "No default controller promotion",
+    "Both cohorts inspected when evaluated",
+    "Repeated test tasks across checkpoints are not independent samples"
+  ]
+}

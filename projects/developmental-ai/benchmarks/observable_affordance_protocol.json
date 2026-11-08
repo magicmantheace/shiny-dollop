@@ -1,0 +1,71 @@
+{
+  "schema": "developmental-ai.observable-affordance-transfer-protocol/v1",
+  "date": "2026-10-21",
+  "frozen_before_implementation": true,
+  "goal": "Learn public numeric feature -> observed consequence from source family, transfer to target without target training and with new opaque action handles.",
+  "families": {
+    "source": "collect, 10 actions, progress goal 3",
+    "target": "route, 12 actions, progress goal 4",
+    "negative": "route-reversed, same target but invert which public features mean harmful/productive"
+  },
+  "environment": "Every episode generates fresh random opaque action handles independent of numeric 2-feature public physical measurement x,y each in 0..8. Ordinary rule good if y>=x+2, harmful if x>=y+2, else neutral; reversed target flips good and harm. Guaranteed >=5 productive and >=3 harmful options per episode. Engineered and simple.",
+  "policy_input": "Only public action handles, paired numeric measurements, progress/damage sensor changes and goal/budget; no hidden action classes, domain ID, recipes or simulator identity hashes.",
+  "train": {
+    "source_only": true,
+    "episodes": 80,
+    "split": "train",
+    "indices": [
+      0,
+      79
+    ],
+    "behavior": "unfiltered random policy",
+    "learning_target": "public action features and observed before/after sensor deltas"
+  },
+  "evaluation": {
+    "cohorts": {
+      "development": [
+        71001,
+        71013,
+        71031
+      ],
+      "reserved": [
+        81001,
+        81013,
+        81031
+      ]
+    },
+    "split": "test",
+    "indices": [
+      12000,
+      12059
+    ],
+    "episodes_per_seed": 60,
+    "target_training": 0,
+    "methods": [
+      "numeric_nearest_neighbor",
+      "untrained_novel",
+      "untrained_random",
+      "feature_shuffle",
+      "privileged_rule_oracle"
+    ],
+    "metrics": [
+      "success",
+      "harmful_sensor_changes",
+      "stalled",
+      "steps",
+      "source_training_samples"
+    ],
+    "worlds": [
+      "collect",
+      "route",
+      "route-reversed"
+    ]
+  },
+  "limitations": [
+    "Training/worlds share engineered feature-to-effect law; this is NOT learned natural perception or causal semantics.",
+    "Public action features are hand-designed useful priors but NOT hashes of action name or stable per-kind IDs.",
+    "Shifted rule and ablation must be reported even if candidate fails.",
+    "Reserved seeds are inspected after execution; no after-the-fact cherry-picking.",
+    "No real-world actions, promotion, OS integration, or claim of self-awareness."
+  ]
+}

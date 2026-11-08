@@ -1,0 +1,58 @@
+{
+  "schema": "developmental-ai.temporal-correspondence-protocol/v1",
+  "status": "precommitted_before_any_new_test_evaluation",
+  "goal": "Compare normalized probabilistic marginalization over unknown insertions against existing max-path monotone alignment",
+  "training": {
+    "namespace": "train",
+    "start": 89400,
+    "episodes_per_seed": 240,
+    "model": "existing unsupervised public-stream token permutation; no reward or privileged mapping"
+  },
+  "test": {
+    "namespace": "test",
+    "start": 99700,
+    "episodes_per_seed": 40
+  },
+  "cohorts": {
+    "development": [
+      43103,
+      50021,
+      61031
+    ],
+    "additional_previously_inspected": [
+      72019,
+      83003,
+      94009
+    ]
+  },
+  "observation_family": "unaligned_stream.stream; preserve original generator, insert 2..4 unmarked extra symbols in each stream",
+  "model_design": {
+    "fixed_latent_correspondences": 8,
+    "emission_match_likelihood": 0.75,
+    "emission_mismatch_likelihood": 0.08333333333333333,
+    "noise_likelihood": 0.25,
+    "score": "log average likelihood ratio over every monotone 8-pair correspondence; sum-product DP with normalized alignment count; expose posterior uncertainty only as diagnostic"
+  },
+  "baselines": [
+    "old unsupervised max-path alignment with same fitted token permutation",
+    "reward-trained unaligned scorer from same training episodes",
+    "source identity learner",
+    "privileged hidden-token cipher scored by new likelihood",
+    "privileged correct candidate"
+  ],
+  "primary": "number of successful occluded-navigation tasks out of 40 per seed",
+  "secondary": [
+    "correct candidate selections",
+    "posterior separation of first and second choice",
+    "deterministic numerical agreement with brute-force enumeration",
+    "input validation, checkpoint integrity and no evaluation updates"
+  ],
+  "restrictions": [
+    "Do not change old tests or benchmarks",
+    "No true cipher, position, or correct cue in online inference",
+    "Any new hyperparameter must be frozen here before test eval, do not tune after result",
+    "Not an independent blind holdout; prior seeds examined",
+    "Model may be pure unsupervised postselector and should not be described as learned temporal structure",
+    "No default promotion on losses/ties, no privileges or AthenZ/Synveil runtime dependencies"
+  ]
+}
