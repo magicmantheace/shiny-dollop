@@ -10,6 +10,8 @@ Tailscale IP, and exposes a JSON API:
   GET  /v1/jobs                       list recent jobs
   GET  /v1/jobs/{id}                  job state + incremental output
   POST /v1/jobs/{id}/cancel           terminate a running job
+  POST /v1/wol                        send a Wake-on-LAN magic packet
+                                      from this machine
   POST /v1/processes                  spawn a detached process (with
                                       "gui": true + "executable"/"args":
                                       launch a GUI app directly, no shell)
@@ -266,6 +268,64 @@ def pid_alive(pid: int) -> bool:
     except OSError:
         return False
     return True
+
+
+# ---------------------------------------------------------------------------
+# Wake-on-LAN
+# ---------------------------------------------------------------------------
+
+_MAC_RE = re.compile(r"^[0-9A-Fa-f]{2}([:-]?[0-9A-Fa-f]{2}){5}$")
+_WOL_DEFAULT_BROADCAST = "255.255.255.255"
+_WOL_DEFAULT_PORT = 9
+
+
+def normalize_mac(value) -> str:
+    """Canonical 'AA:BB:CC:DD:EE:FF' form of a MAC address.
+
+    Accepts colon, dash, or bare hex forms in any case; anything
+    else is a ValueError (the route turns it into a 400).
+    """
+    if not isinstance(value, str) or not _MAC_RE.match(value.strip()):
+        raise ValueError(f"invalid MAC address: {value!r}")
+    digits = re.sub(r"[^0-9A-Fa-f]", "", value).upper()
+    return ":".join(digits[i:i + 2] for i in range(0, 12, 2))
+
+
+def build_magic_packet(mac: str) -> bytes:
+    """The 102-byte magic packet: 6 x 0xFF, then the MAC 16 times."""
+    raw = bytes.fromhex(normalize_mac(mac).replace(":", ""))
+    return b"\xff" * 6 + raw * 16
+
+
+def validate_wol_payload(payload: dict) -> tuple[str, str, int]:
+    """Return (mac, broadcast, port) for a /v1/wol request body."""
+    mac = normalize_mac(payload.get("mac"))
+    broadcast = payload.get("broadcast") or _WOL_DEFAULT_BROADCAST
+    if not isinstance(broadcast, str):
+        raise ValueError("broadcast must be an IP address string")
+    try:
+        socket.inet_aton(broadcast)
+    except OSError:
+        raise ValueError(
+            f"invalid broadcast address: {broadcast!r}") from None
+    port = payload.get("port", _WOL_DEFAULT_PORT)
+    if isinstance(port, bool) or not isinstance(port, int) \
+            or not 0 < port < 65536:
+        raise ValueError("port must be an integer in 1..65535")
+    return mac, broadcast, port
+
+
+def send_magic_packet(mac: str, broadcast: str, port: int) -> dict:
+    """Send one magic packet by UDP broadcast from this machine."""
+    packet = build_magic_packet(mac)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.sendto(packet, (broadcast, port))
+    finally:
+        sock.close()
+    return {"mac": mac, "broadcast": broadcast, "port": port,
+            "bytes": len(packet)}
 
 
 def kill_tree(proc: subprocess.Popen) -> None:
@@ -1802,7 +1862,7 @@ def capability_lists() -> tuple[list[str], list[str]]:
         "exec", "jobs", "processes", "sessions",
         "files.list", "files.get", "files.put", "files.range",
         "files.chunked", "files.tree", "files.ops", "files.hash",
-        "audit.tail", "update.stage",
+        "audit.tail", "update.stage", "wol",
     ]
     limited: list[str] = []
     if IS_WINDOWS:
@@ -1963,6 +2023,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return self._handle_job_get(job_match.group(1), parsed)
         if method == "POST" and job_match and job_match.group(2) == "cancel":
             return self._handle_job_cancel(job_match.group(1))
+        if method == "POST" and route == "/v1/wol":
+            return self._handle_wol()
         if method == "POST" and route == "/v1/processes":
             return self._handle_process_spawn()
         if method == "GET" and route == "/v1/processes":
@@ -2144,6 +2206,18 @@ class BridgeHandler(BaseHTTPRequestHandler):
             f"job {job_id} cancel", {"job_id": job_id}
 
     # -- detached processes -----------------------------------------------------------
+    def _handle_wol(self):
+        payload = self._read_json_body()
+        # ValueError from validation becomes a 400 in the router.
+        mac, broadcast, port = validate_wol_payload(payload)
+        try:
+            result = send_magic_packet(mac, broadcast, port)
+        except OSError as exc:
+            return 500, {"error": f"wake-on-LAN send failed: {exc}"}, \
+                f"wol send failed -> {mac}", {}
+        return 200, result, \
+            f"wol magic packet -> {mac} via {broadcast}:{port}", {}
+
     def _handle_process_spawn(self):
         payload = self._read_json_body()
         record = spawn_detached(self.core, payload)

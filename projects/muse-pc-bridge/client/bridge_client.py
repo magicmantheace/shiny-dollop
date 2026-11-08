@@ -209,6 +209,21 @@ class Client:
         return self.job_wait(job["job_id"], timeout=wait_timeout)
 
     # ------------------------------------------------------------------
+    # Wake-on-LAN
+    # ------------------------------------------------------------------
+    def wol(self, mac: str, broadcast: str | None = None,
+            port: int | None = None) -> dict:
+        """Ask the agent to send a Wake-on-LAN magic packet from the
+        PC (for waking OTHER machines on its LAN — the agent cannot
+        wake the PC it runs on)."""
+        payload: dict = {"mac": mac}
+        if broadcast:
+            payload["broadcast"] = broadcast
+        if port is not None:
+            payload["port"] = port
+        return self.request("POST", "/v1/wol", payload)
+
+    # ------------------------------------------------------------------
     # Detached processes
     # ------------------------------------------------------------------
     def process_spawn(self, command: str | None = None,
@@ -502,6 +517,13 @@ def main(argv: list[str] | None = None) -> int:
     p_gui.add_argument("executable")
     p_gui.add_argument("gui_args", nargs=argparse.REMAINDER,
                        help="arguments for the executable")
+    p_wol = sub.add_parser(
+        "wol", help="send a Wake-on-LAN magic packet from the PC")
+    p_wol.add_argument("mac")
+    p_wol.add_argument("--broadcast", default=None,
+                       help="broadcast address (default 255.255.255.255)")
+    p_wol.add_argument("--port", type=int, default=None,
+                       help="UDP port (default 9)")
     sub.add_parser("processes", help="list detached processes")
     p_proc = sub.add_parser("process", help="inspect a detached process")
     p_proc.add_argument("process_id")
@@ -586,6 +608,9 @@ def main(argv: list[str] | None = None) -> int:
             print_json(client.process_spawn(
                 gui=True, executable=args.executable,
                 args=args.gui_args, cwd=args.cwd))
+        elif args.command == "wol":
+            print_json(client.wol(args.mac, broadcast=args.broadcast,
+                                  port=args.port))
         elif args.command == "processes":
             print_json(client.processes_list())
         elif args.command == "process":
