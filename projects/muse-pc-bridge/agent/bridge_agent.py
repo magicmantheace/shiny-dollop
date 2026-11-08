@@ -692,6 +692,29 @@ def _unlock_file(fh) -> None:
         pass
 
 
+_AUDIT_PATH_LOCKS: dict[str, threading.Lock] = {}
+_AUDIT_PATH_LOCKS_GUARD = threading.Lock()
+
+
+def _audit_lock_for(audit_path: Path) -> threading.Lock:
+    """The process-local audit lock for a log path, SHARED by every
+    core writing to that path. Two cores in one process (the test
+    fixtures run the agent and the helper as two servers in one
+    process) must not rely on the file lock alone: Windows
+    byte-range locks do not conflict between handles of the SAME
+    process, and closing any handle to a file drops that process's
+    byte-range locks on it — either would silently reopen the
+    rotation race. Keyed by the resolved path so differently
+    spelled references to one log still share the lock."""
+    key = str(Path(audit_path).resolve())
+    with _AUDIT_PATH_LOCKS_GUARD:
+        lock = _AUDIT_PATH_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _AUDIT_PATH_LOCKS[key] = lock
+        return lock
+
+
 @contextmanager
 def _audit_file_lock(audit_path: Path):
     """Serialize one audit append (+ its rotation) across processes.
@@ -701,12 +724,14 @@ def _audit_file_lock(audit_path: Path):
     only its own writers, so two cores could both decide to rotate
     from the same stale file state and shift the archives twice,
     discarding entries that should have been retained (Codex PR #47
-    finding). This lock lives in a sidecar file (audit log name +
-    ".lock") because rotation renames the log itself; the sidecar
-    name never changes. Acquisition failure never takes auditing
-    down with it: on OSError the caller proceeds unlocked, with a
-    stderr warning — the uncoordinated behaviour is the fallback,
-    never a crash and never a silently dropped entry.
+    finding). Within one process the writers share a threading lock
+    (see _audit_lock_for); this is the cross-process layer. It lives
+    in a sidecar file (audit log name + ".lock") because rotation
+    renames the log itself; the sidecar name never changes.
+    Acquisition failure never takes auditing down with it: on
+    OSError the caller proceeds unlocked, with a stderr warning —
+    the uncoordinated behaviour is the fallback, never a crash and
+    never a silently dropped entry.
     """
     lock_path = audit_path.with_name(audit_path.name + ".lock")
     fh = None
@@ -764,7 +789,10 @@ class BridgeCore:
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.audit_path = Path(cfg["audit_log"])
         self.started_at = time.time()
-        self._audit_lock = threading.Lock()
+        # Shared with every other core writing to the same log in
+        # this process (see _audit_lock_for) — a private lock per
+        # core left the rotation race open between co-hosted cores.
+        self._audit_lock = _audit_lock_for(self.audit_path)
         # auth rate limiting (per source IP)
         self._auth_lock = threading.Lock()
         self._auth_failures: dict[str, deque] = {}
@@ -827,10 +855,13 @@ class BridgeCore:
         line = json.dumps(record, ensure_ascii=False)
         try:
             with self._audit_lock:
-                # The session helper appends to this same log from
-                # another process with its own threading lock; the
-                # file lock is what makes rotation + append atomic
-                # across BOTH writers (see _audit_file_lock).
+                # The session helper appends to this same log (in
+                # production from another process). _audit_lock is
+                # shared per log path within this process, and the
+                # file lock below coordinates across processes;
+                # together they make rotation + append atomic
+                # across BOTH writers (see _audit_lock_for and
+                # _audit_file_lock).
                 with _audit_file_lock(self.audit_path):
                     self.audit_path.parent.mkdir(
                         parents=True, exist_ok=True)

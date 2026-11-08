@@ -16,9 +16,16 @@ decision lands mid-rotation, and asserts that every entry a correct
 serialized run retains is still on disk afterwards. A second test
 pins the plain sequential sharing behaviour.
 
-Windows cross-process behaviour of the underlying file lock is
-owner-PC verification, listed in docs/TEST_PLAN.md; these tests
-prove the coordination logic where the suite runs.
+Coordination is two layers: a per-path threading lock shared by
+every core in the process (Windows byte-range locks do not
+conflict between handles of one process, and the first version of
+this fix — file lock only — still lost an archive in the owner-PC
+suite run for exactly that reason), and an OS file lock on a
+sidecar for the cross-process case. These tests prove the
+coordination end to end where the suite runs; the production
+split (agent process vs helper process) exercises the file-lock
+layer, and the owner-PC run of this same test file is recorded in
+docs/TEST_PLAN.md.
 """
 
 from __future__ import annotations
