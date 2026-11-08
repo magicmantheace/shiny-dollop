@@ -751,3 +751,49 @@ elevated shell; verify the core on 8765; start the avatar task
 to attach + register the helper; verify display-state freshness
 and brokered desktop routes) is a separate owner-accompanied
 step — see `docs/TEST_PLAN.md` for the verification split.
+
+---
+
+**Codex PR #47 second re-review fixes (2026-11-08, evening):**
+Codex's review of the re-review fix round left two more
+findings; both verified real against `dfc6227` and fixed, with
+regression tests written first and demonstrated failing pre-fix.
+(P2, commit `206e2f7`) `_status_obj()` merged helper-owned
+processes through the listing's 5 s fetch synchronously, so a
+helper that stays registered and heartbeating but stops
+answering HTTP stalled `/v1/status` for 5 s — past the avatar
+readers' 1.5 s and the supervisor health check's 3 s, whose
+failure after an update triggers rollback of a healthy update.
+The regression stub (accepts connections, never answers,
+heartbeat keeps the registration fresh) measured status at
+**5.01 s pre-fix**. The status path now uses its own bounded
+merge (`_helper_processes_for_status`): a fresh-enough
+last-known merge (2 s) is served with no network call, a failed
+fetch backs off 1 s rather than stalling every poll, and a cold
+fetch is bounded at 0.75 s; the plain listing keeps its 5 s
+budget and refreshes the cache, and the merge when the helper
+answers is unchanged. (P2, commit `6fbdd3d`) Opening the avatar
+launcher twice started two session helpers whose heartbeats
+overwrote the one `session-helper.json` while their process
+registries diverged, so brokered processes 404'd or vanished
+depending on whose heartbeat landed last. `SessionHelper.start()`
+now claims an OS exclusive lock on
+`state/session-helper-owner.lock` BEFORE loading anything, held
+until `stop()` and released by process death (no stale-lock
+janitor); a second start raises `HelperOwnershipError`. The GUI
+attach path (`supervisor_gui.start_attach_helper`) applies the
+agent's own liveness test first: a live registration is reused
+and no second helper starts; a stale one never blocks. **VM
+suite: 160 tests, OK (skipped=3). Owner-PC suite (checkout
+fast-forwarded to `6fbdd3d` as a bridge job; production NOT
+restarted — uptime continuous through pull and run; Windows,
+Python 3.14.2): 160 tests, OK (skipped=8).** The switch
+choreography above remains valid unchanged against the new
+code: no step's mechanics changed — the status checks the
+verification leans on are now deadline-safe even with a hung
+helper, and at the attach step the stopped avatar's helper has
+released its ownership with the window (so the re-opened avatar
+starts a fresh helper), while a somehow-still-live helper would
+now be reused instead of fought over. The checkout is staged at
+`6fbdd3d` for the re-issued switch; production still executes
+its previously loaded code until then.

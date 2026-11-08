@@ -185,7 +185,22 @@ hosted by the avatar process in the owner's logon session:
   the helper's records (tagged `via: session-helper`), so a
   brokered process stays discoverable after its spawn response is
   gone; a registered helper that does not answer degrades the
-  merge to local-only rather than failing the request;
+  merge to local-only rather than failing the request. The two
+  merges are budgeted differently: the listing fetches generously
+  (5 s), while `/v1/status` — whose readers time out at 1.5 s
+  (avatar) and 3 s (the supervisor's update health check, whose
+  failure can roll back a healthy update) — serves a fresh-enough
+  last-known merge (2 s), backs off briefly after a failed fetch,
+  and otherwise makes one sub-second (0.75 s) fetch attempt, so a
+  live-but-hung helper can never make a healthy agent look dead;
+- exactly one helper owns a state directory: `SessionHelper`
+  holds an OS exclusive lock on `state/session-helper-owner.lock`
+  for its lifetime (released on stop or process death), a second
+  start against the same directory is refused, and an attaching
+  avatar window reuses a live registration instead of starting a
+  rival helper — two helpers would overwrite the one registration
+  while their process registries diverged, losing brokered
+  processes;
 - with no helper registered, a session-0 agent answers these
   routes **501** with the reason, rather than touching the wrong
   desktop; an agent already in the interactive session (console /

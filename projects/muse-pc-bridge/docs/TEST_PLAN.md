@@ -58,6 +58,8 @@ PC during install verification.
 | `tests/test_v1_session_broker.py` (11) | the session broker: desktop-route whitelist matrix (exec/status/files/sessions/WoL/update all excluded); the helper server 404s non-desktop routes, 501s desktop routes honestly off Windows, still enforces auth; registration lifecycle (fresh registry with port/pid/session, removed on stop); **a real main server proxies a GUI spawn → inspect → kill to a real helper, the record living with the helper, and both sides audit with `via` markers (`session-broker` / `session-helper`)**; a stale registration or `session_broker: false` means local service; **a session-0 agent (session probe patched to 0) refuses desktop routes 501 without a helper and proxies them with one**; the helper starts no second UAC watch (watch starts counted via the entry point; the monitor loop itself is a no-op off Windows); **the listing merge (Codex PR #47 re-review): a brokered spawn appears in the main agent's `GET /v1/processes` (tagged `via: session-helper`) and in `/v1/status` process counts, kill through the main agent is reflected in both, and the listing/counts degrade to local-only when the helper stops** |
 | `tests/test_v1_audit_coordination.py` (2) | audit coordination across two cores sharing ONE log (Codex PR #47 re-review): two `BridgeCore` instances append in strict alternation with entries in order; **the rotation race — the log + archives are primed with sentinel entries, the cap is derived from measured on-disk sizes so exactly one of two concurrent appends may rotate, and the first writer is parked between its rotation size check and the renames until the second writer has fully rotated and appended; every entry a serialized run retains (all but the oldest archive) must survive**. The cap deliberately comes from measured sizes: a line occupies one more byte on disk on Windows than POSIX (text-mode CRLF) while the core accounts `len(line)+1`, and an arithmetic cap made the second append rotate legitimately on Windows |
 | `tests/test_script_encoding.py` (2) | every shipped `.ps1`/`.cmd` file is **pure ASCII bytes** -- Windows PowerShell 5.1 reads a BOM-less `.ps1` as ANSI, so a UTF-8 em dash decodes to bytes including a stray `"` and the whole file fails to parse (the `bridge-core.ps1` install failure on the owner's PC, 2026-11-08). The scan must find the scripts (incl. `bridge-core.ps1`) and every byte must be < 128 |
+| `tests/test_v1_status_helper_timeout.py` (2) | **status-probe deadlines vs a hung helper (Codex PR #47 re-review)**: a raw TCP listener accepts connections and never answers while a heartbeat thread keeps its registration fresh (the real failure shape — heartbeat and request handling are separate threads); `/v1/status` must answer **well inside the supervisor health check's 3 s** (asserted < 2 s), twice in a row, with local process counts intact; `GET /v1/processes` still returns the local listing. Pre-fix, status took **5.01 s** (the listing's fetch budget, synchronous in `_status_obj`) |
+| `tests/test_v1_helper_ownership.py` (5) | **single-helper ownership of the state dir (Codex PR #47 re-review)**: a second `SessionHelper` against the same state dir is refused (`HelperOwnershipError`) and the first helper's registration is untouched; `supervisor_gui.start_attach_helper` reuses a live registration (returns None, registration unchanged) and a process spawned through the surviving helper stays visible via the main agent by id and in the listing; a stale registration does not block attach; a stopped owner frees the state dir for the next helper |
 
 ### Verified so far
 
@@ -322,6 +324,47 @@ PC during install verification.
   in-process layer; the cross-process layer is exercised by the
   activation verification below, not by the suite), and the boot
   topology activation itself — see "What the tests cannot prove".
+
+- 2026-11-08 (Codex PR #47 second re-review fixes, VM + owner's
+  PC): Codex's review of the re-review fix round left two more
+  findings; both verified real against the code and fixed, each
+  with regression tests written first and demonstrated failing on
+  the pre-fix code. (P2) `/v1/status` merged helper processes
+  through the listing's 5 s fetch synchronously, so a helper that
+  stays registered and heartbeating but stops answering HTTP
+  stalled status for 5 s — past the avatar readers' 1.5 s and the
+  supervisor health check's 3 s, whose failure after an update
+  triggers rollback of a healthy update. The status path now has
+  its own bounded merge: a fresh-enough last-known merge (2 s) is
+  served without touching the network, a failed fetch backs off
+  for 1 s instead of stalling every poll, and a cold fetch is
+  bounded at 0.75 s; the plain listing keeps its 5 s budget and
+  refreshes the cache, and the merge behaviour when the helper
+  answers is unchanged. The new deadline test measured status at
+  **5.01 s pre-fix** against a hung-helper stub (accepts, never
+  answers, heartbeat keeps the registration fresh) and inside
+  2 s post-fix. (P2) Opening the avatar launcher twice started
+  two session helpers whose heartbeats overwrote the one
+  registration while their process registries diverged, so
+  brokered processes 404'd or vanished; `SessionHelper.start()`
+  now claims an OS exclusive lock on
+  `state/session-helper-owner.lock` before loading anything,
+  held until `stop()` and released by process death (no
+  stale-lock janitor), and a second start is refused with
+  `HelperOwnershipError`. The GUI attach path applies the agent's
+  own liveness test first — a live registration is reused, a
+  stale one never blocks. **Full suite on the VM: 160 tests, OK
+  (3 skips). Owner-PC run (checkout fast-forwarded to `6fbdd3d`
+  through the production bridge as a job; production 1.1.0 in
+  the avatar form was NOT restarted — its uptime ran
+  continuously through the pull and the run; Windows,
+  Python 3.14.2): 160 tests, OK (8 skips)** — the 8 skips are
+  the platform-mirror tests. Still unproven: the ownership lock
+  under the real two-PROCESS split on Windows (both suites
+  exercise it between two helpers in one process; the
+  cross-process case is the owner opening the launcher twice,
+  which the staged core-switch verification covers), and the
+  boot topology activation itself.
 
 ## What the tests cannot prove
 
