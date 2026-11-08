@@ -159,6 +159,35 @@ retrying without that flag when the job refuses. Records and
 responses carry `"gui": true/false`. A command string is not
 accepted in GUI mode — it cannot be split into argv safely.
 
+### Session broker (v1.1, Codex-fix)
+Desktop routes — `GET /v1/screenshot`, `POST /v1/input`,
+`POST /v1/uia`, `GET|POST /v1/clipboard`, GUI-mode process spawns
+and the process records they own — act on the **interactive**
+desktop. An agent in Windows session 0 (the SYSTEM boot core) must
+not serve them locally: it would capture and inject into the
+services desktop. Instead it **brokers** them to the session
+helper (`agent/session_helper.py`), a loopback-only HTTP server
+hosted by the avatar process in the owner's logon session:
+
+- the helper serves ONLY the desktop routes (everything else
+  404s), with the same token, and registers itself in
+  `state/session-helper.json` (port, pid, session id, 5 s
+  heartbeat); the agent trusts only a fresh registration with a
+  live pid outside session 0;
+- the agent forwards the request verbatim and returns the
+  helper's response; **both sides audit** — the agent's entry is
+  marked `"via": "session-broker"`, the helper's (same audit log)
+  `"via": "session-helper"`;
+- GUI process records live with the helper (its own registry under
+  `state/session-helper/`); inspect/kill for an id the agent does
+  not own are brokered too;
+- with no helper registered, a session-0 agent answers these
+  routes **501** with the reason, rather than touching the wrong
+  desktop; an agent already in the interactive session (console /
+  avatar own-form) serves them directly, as before. Config
+  `"session_broker": false` disables brokering. `/v1/status`
+  reports `session_helper: {registered, session_id}`.
+
 ### Wake-on-LAN (v1.1)
 `POST /v1/wol` with `{"mac": "AA:BB:CC:DD:EE:FF", "broadcast":
 "192.168.1.255", "port": 9}` (broadcast/port optional; defaults

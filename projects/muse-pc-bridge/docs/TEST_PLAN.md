@@ -54,7 +54,8 @@ PC during install verification.
 | `tests/test_v1_gui_spawn.py` (9) | detached GUI launch: `{"gui": true, "executable", "args"}` spawns the executable directly and the registry tracks its real, live pid (the pid's own cmdline is the spawned program, not a wrapper); client-library round trip; missing/nonexistent `executable` → 400; bad `args` (string, non-string list, object) → 400; bad `cwd` → 400; the `gui` flag persists in `state/processes.json` and survives a record restore; a restored record (no Popen handle) reports liveness by OS pid; shell spawn still works and reports `gui: false` |
 | `tests/test_v1_wol.py` (12, 2 environment-skipped) | magic-packet layout (102 bytes: 6×0xFF + MAC×16); MAC normalization (colon/dash/bare/lowercase) and rejection of garbage; payload validation incl. defaults (255.255.255.255:9) and bad port/broadcast rejection; the route with the sender stubbed (validation → sender called with canonical values → result returned → audit line written with the MAC, status 200); auth required (401 both ways); `wol` in status capabilities; the standalone `scripts/wol-send.py` produces byte-identical packets. **Live delivery tests** (agent → UDP listener on loopback receives the exact packet; client-library live send) run only where the environment permits outbound UDP — the build VM's sandbox refuses ALL UDP sends (EPERM, verified for plain loopback with no broadcast flag), so they skip there with the reason stated |
 | `tests/test_v1_uac.py` (7) | monitor transitions with a stubbed probe: appear (snapshot `active` + ISO `since`), steady state (no duplicate transition, stable `since`), clear; exactly one `uac_prompt_shown` and one `uac_prompt_cleared` audit event, the cleared event carrying the waited seconds, and no credential strings anywhere in the events; a raising probe reads as no prompt; poll-interval config hardening (junk → 2.0 default, floor 0.5 s); the real probe returns False off Windows; `/v1/status` carries `uac_prompt: {active: false, since: null}` by default and flips when the core monitor transitions |
-| `tests/test_v1_boot_core.py` (12) | the supervisor core publishes `display-state.json` itself: working / idle / agent-down-too-long → alert states resolved from stubbed signals; write-on-change only (identical bytes incl. `since` on a repeat publish); the real run loop with a fake agent publishes and settles to idle; `choose_gui_mode` — attach when our agent answers, foreign when another agent answers, own immediately when nothing answers (no pointless wait, incl. when a core reports steady "running" but the agent is gone), attach after retries while a core reports a transient state, own after retries when it never answers; `--headless` stdio guard redirects pythonw-style None streams to `supervisor-core.log`; a real `supervisor.py --headless` subprocess starts its fake agent and reports `running` |
+| `tests/test_v1_boot_core.py` (18) | the supervisor core publishes `display-state.json` itself: working / idle / agent-down-too-long → alert states resolved from stubbed signals; write-on-change only (identical bytes incl. `since` on a repeat publish); **a label-only change (alert reason: agent down → UAC waiting) republishes with the original `since`**; the real run loop with a fake agent publishes and settles to idle; `choose_gui_mode` — attach when our agent answers, foreign when another agent answers, own immediately when nothing answers and no live core is evidenced (no status file / "stopped" / stale timestamp with a dead pid), **wait while a core may be alive (fresh status — including steady "running", which the supervisor writes before the agent binds — or a live agent_pid), then attach when the agent starts answering**, own after the bounded wait when it never answers; **stop-request file: a running supervisor consumes it and stops gracefully (status "stopped", no restart, file consumed), and a stale file is cleared at startup**; `--headless` stdio guard redirects pythonw-style None streams to `supervisor-core.log`; a real `supervisor.py --headless` subprocess starts its fake agent and reports `running` |
+| `tests/test_v1_session_broker.py` (9) | the session broker: desktop-route whitelist matrix (exec/status/files/sessions/WoL/update all excluded); the helper server 404s non-desktop routes, 501s desktop routes honestly off Windows, still enforces auth; registration lifecycle (fresh registry with port/pid/session, removed on stop); **a real main server proxies a GUI spawn → inspect → kill to a real helper, the record living with the helper, and both sides audit with `via` markers (`session-broker` / `session-helper`)**; a stale registration or `session_broker: false` means local service; **a session-0 agent (session probe patched to 0) refuses desktop routes 501 without a helper and proxies them with one**; the helper starts no second UAC watch (watch starts counted via the entry point; the monitor loop itself is a no-op off Windows) |
 
 ### Verified so far
 
@@ -236,6 +237,27 @@ PC during install verification.
   sleeping machine; the SYSTEM boot task starting the core before
   logon and the avatar attaching on the real desktop. Nothing was
   deployed to the owner's PC.
+- 2026-11-08 (Codex PR #47 fixes, Muse's Linux VM, Python 3.12):
+  Codex reviewed `12efcdb` and left four findings (3 P1, 1 P2); all
+  four were verified real against the code and fixed. (1) The
+  SYSTEM boot core lives in session 0, so desktop routes served
+  locally would act on the wrong desktop — the agent now brokers
+  them to an interactive **session helper** hosted by the avatar
+  (new `agent/session_helper.py`, desktop-routes-only, loopback,
+  same token, shared audit log) and answers an honest 501 for them
+  from session 0 when no helper is registered. (2) `choose_gui_mode`
+  treated a fresh "running" supervisor status as "core gone" and
+  could race a second supervisor onto the port — it now waits while
+  a core may be alive (fresh status or live agent_pid) and answers
+  "own" immediately only for stopped/stale/absent evidence. (3) The
+  management scripts' stop killed processes outright, bypassing the
+  audited agent shutdown — they now drop a **stop-request file**
+  the supervisor consumes for a graceful stop, with the process
+  sweep kept only as a 20 s fallback. (4) Display-state publishing
+  compared only the state, leaving a stale label when the alert
+  reason changed — it now compares state+art+label and republishes,
+  preserving `since`. **Full suite on the VM: 147 tests, OK
+  (3 skips)** — the same three skips as the 132 run.
 
 ## What the tests cannot prove
 
@@ -282,6 +304,13 @@ These require the owner's PC and are **not** claimed by any VM test:
   the avatar attaching at logon (and its close leaving the core
   running), and rollback to the logon form. Script/code + VM tests
   only; activation is a separate owner-approved step.
+- **v1.1 session broker on real Windows**: the SYSTEM core
+  brokering desktop routes to the avatar's session helper —
+  screenshot/content, input, clipboard and GUI launch acting on the
+  owner's real desktop through the core's port — plus the honest
+  501 for desktop routes before logon (no helper yet). The VM
+  proves the proxy, whitelist, registry and audit mechanics with
+  both servers on loopback; it cannot prove session behaviour.
 
 ## Owner-PC verification checklist (part of install)
 

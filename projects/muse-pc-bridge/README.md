@@ -59,7 +59,8 @@ and token to Muse **out-of-band** — never via git.
 | --- | --- |
 | `agent/bridge_agent.py` | the server (runs on the PC) |
 | `agent/supervisor.py` | supervisor core (auto-restart, staged-update apply + health check + auto-rollback, publishes `display-state.json`): visible-console form, or `--headless` boot-core form under pythonw |
-| `agent/supervisor_gui.py` | avatar-display form: floating window — Muse's avatar animated by real bridge activity, colour-key transparent so only the character shows on the desktop; owns its supervisor (closing the window is the kill switch) or **attaches display-only** to a running core (closing it then leaves the bridge running, and the menu says so) |
+| `agent/supervisor_gui.py` | avatar-display form: floating window — Muse's avatar animated by real bridge activity, colour-key transparent so only the character shows on the desktop; owns its supervisor (closing the window is the kill switch) or **attaches display-only** to a running core (closing it then leaves the bridge running, and the menu says so); in attach mode it also hosts the session helper |
+| `agent/session_helper.py` | interactive session helper: loopback-only server (same token) serving ONLY the desktop routes from inside the owner's logon session, so a session-0 boot core can broker screenshot/input/UIA/clipboard/GUI-launch to the real desktop; registers in `state/session-helper.json` with a heartbeat |
 | `agent/display_state.py` | pure signal→display-state mapping for the avatar (idle / working / session / connecting / celebrate / alert; an active UAC prompt maps to alert with label "Approval needed at PC") |
 | `agent/assets/avatar/` | avatar animation loops, one full-frame transparent GIF per display state |
 | `agent/bridge_update.py` | self-update mechanics (bundle verify, staged apply, rollback) |
@@ -155,3 +156,14 @@ the boot-task activation. **Not deployed** — production still runs
 the pre-v1.1 build; deploying and activating the boot core are
 separate owner-approved steps. See the 2026-11-08 v1.1 entry in
 `docs/MUSE_HANDOFF.md` and the checklists in `docs/TEST_PLAN.md`.
+
+**Codex-fix follow-up (2026-11-08, same branch):** Codex's review
+of the v1.1 PR found four real defects, all fixed. The boot core
+runs in session 0, so desktop routes are now **brokered to a
+session helper** in the owner's logon session (and answer an
+honest 501 before logon instead of touching the wrong desktop);
+the avatar's attach decision no longer races a starting core;
+the management scripts stop the bridge through an **audited
+graceful stop-request** instead of killing processes; and
+display-state publishing follows label changes, not just state
+changes. **VM suite: 147 tests, OK (3 skips).**

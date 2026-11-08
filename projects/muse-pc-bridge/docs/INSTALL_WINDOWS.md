@@ -189,6 +189,7 @@ until you do this.
 | --- | --- | --- | --- |
 | Machine boot | **Core**: `supervisor.py --headless` (pythonw) → agent | `Muse PC Bridge (core)` (new) | SYSTEM |
 | User logon | **Avatar**: `supervisor_gui.py`, attaches display-only to the core | `Muse PC Bridge (avatar)` (existing) | the user |
+| User logon | **Session helper**: hosted by the avatar process; serves the desktop routes on loopback for the core to broker to | (inside the avatar process) | the user |
 | — (rollback) | Console supervisor form | `Muse PC Bridge (supervised)` (existing, currently disabled) | the user |
 
 The core does no GUI work. `display-state.json` is published by
@@ -198,6 +199,23 @@ agent: closing it leaves the bridge running (its menu reads
 "Close avatar (bridge keeps running)"). If the avatar starts and
 no core answers, it falls back to running its own supervisor,
 exactly as before v1.1.
+
+**Desktop routes in this topology** (screenshot, input, UIA,
+clipboard, GUI launch): the core runs in session 0, whose desktop
+is not yours, so it never serves these itself. While the avatar
+is running, its session helper serves them in your session and
+the core brokers requests to it transparently (same port, same
+token; both sides audit). Before logon — or after you close the
+avatar — no helper is registered and those routes answer an
+honest 501 saying so; everything else (exec, files, jobs, WoL,
+UAC status) works from the core at any time. Set
+`"session_broker": false` in `config.json` to disable brokering.
+
+Stopping is audited: `bridge-core.ps1 -Action stop` (and
+`bridge-service.ps1 -Action stop`) first ask the supervisor for a
+graceful shutdown via a stop-request file, so the audit log gains
+its `server_stop` entry; a direct process kill is only the
+fallback if the supervisor does not answer within 20 s.
 
 ### Activation (owner, interactive, in order)
 
@@ -251,6 +269,16 @@ are shared by all forms and are not touched by any of this.
    `processes` shows it alive with `gui: true` and the app's own
    pid, and `processes <id> kill` closes it. This replaces the old
    exec + Start-Process workaround.
+5. **Session broker (boot topology only)**: with the core running
+   and nobody logged on, `status` answers but a screenshot request
+   returns 501 (no helper yet). Log on (the avatar starts and
+   registers its helper): the same screenshot now succeeds and
+   shows the real desktop, `status` reports
+   `"session_helper": {"registered": true, ...}`, and the audit
+   log shows the request twice — the core's entry marked
+   `via: session-broker` and the helper's `via: session-helper`.
+   A GUI spawn through the core likewise opens its window on the
+   real desktop.
 3. **Wake-on-LAN, from the PC**: note another LAN machine's MAC
    (`ipconfig /all` on it), power it down with WoL enabled in its
    BIOS, then `client\bridge_client.py wol <MAC> --broadcast
