@@ -1,0 +1,16 @@
+{
+  "schema": "synveil.native-joined-image/v1",
+  "target": "x86_64-synveil-linux-gnu",
+  "boot_target": "qemu",
+  "image_sha256": "c7d48cbff31b052e01cdfd444fa65e7d9a02e287013f4a8dbfcb3e089dc0b012",
+  "native_app_sha256": "d047df0db74496557fd98aba8275fc265608a803e1df396015dd963f50f8438a",
+  "update_gui_sha256": "eae265618bd41fac5e2d812fa24f916ea6db4afaf8c4b2c619da4dfdd82caad7",
+  "files_window_sha256": "653d2994d23c5b6c6b44ca5c6782497d1379d299cc3f0d5baa4693616ad66f21",
+  "component_assets_sha256": "da6207fbae17ee7a4b7e03a812f8d2571390d3e0ae03e0fc23d591b74ba67688",
+  "esp_size_mb": 256,
+  "state_size_mb": 128,
+  "state_partuuid": "7c9e2d41-8b3a-4f5e-a6d1-2e8c4b7f9053",
+  "authenticated": true,
+  "persistent": true,
+  "physical_boot_validated": false
+}
