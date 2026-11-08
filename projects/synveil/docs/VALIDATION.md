@@ -1424,3 +1424,31 @@ synctl 10; full veil-core + synctl suites 213 passed).
 Evidence: `docs/validation/observe-history-bb422ea/`. No
 aggregation or storage slice and no physical hardware
 validation are claimed.
+
+## Wine proof slice (Windows compatibility) — native validation (2026-11-08)
+
+The first proof slice of the accepted Windows compatibility
+design (`docs/WINDOWS_COMPAT_DESIGN.md`) was validated
+natively with `tests/smoke-native-wine.py` (marker
+`SYNVEIL_WINE_QEMU_PASS`, passed on attempt 1) on the proof
+image sha256
+`d4bfb12ff6eb62c1c0abc963d5f65f79cacf263870893c557620a555e148206c`.
+The sealed distribution Wine (`10.0~repack-6`, win64,
+staged by `tools/distro_wine.py` from the pinned snapshot;
+the seal records `winewayland=present` and the stage build
+fails without it) launched its bundled `notepad.exe` with a
+fresh tmpfs prefix: the Notepad window rendered through
+`winewayland.drv` as a managed window of the S4 shell
+(task buttons 2 → 4), and text typed through the input
+channel landed in the edit area (pixel diff 536; status
+bar Ln 1, Col 19). The first gate runs found the import
+closure alone insufficient — Wine's by-name session
+programs, wine.inf ServiceDll set, driver imports, the
+apiset schema and the out-of-tree `zlib1.dll` complete the
+module set at `b8c10f0`. Evidence:
+`docs/validation/wine-proof-b8c10f0/`. Proven: Wine runs
+and a Win32 GUI program renders + takes input under the
+custom shell. Not claimed: Direct3D/3D, 32-bit execution,
+prefix persistence, Start-menu presence, third-party
+applications, performance, or physical hardware
+validation.

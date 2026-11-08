@@ -1,0 +1,24 @@
+{
+  "schema": "synveil.wine-acceptance/v1",
+  "image_sha256": "d4bfb12ff6eb62c1c0abc963d5f65f79cacf263870893c557620a555e148206c",
+  "wine_version": "10.0~repack-6",
+  "winewayland": {
+    "drv": "usr/lib/x86_64-linux-gnu/wine/x86_64-windows/winewayland.drv",
+    "present": true,
+    "unix": "usr/lib/x86_64-linux-gnu/wine/x86_64-unix/winewayland.so"
+  },
+  "passed": true,
+  "physical_hardware_tested": false,
+  "attempts": 1,
+  "notepad_rect": [
+    513,
+    61,
+    731,
+    498
+  ],
+  "task_buttons_before": 2,
+  "task_buttons_with_notepad": 4,
+  "typed_pixel_diff": 536,
+  "prefix_path": "/tmp/wineprefix.MoNnlX",
+  "failures": []
+}

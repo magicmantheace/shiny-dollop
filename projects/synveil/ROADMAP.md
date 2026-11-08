@@ -608,6 +608,13 @@ Potential autonomy modes:
 - [ ] event subscriptions
 - [ ] plugin isolation model
 - [ ] compatibility policy
+  (Windows lane: design accepted 2026-11-07 in
+  `docs/WINDOWS_COMPAT_DESIGN.md`; first proof slice —
+  sealed distribution Wine running its bundled Notepad
+  through winewayland.drv on the custom shell — passed
+  QEMU acceptance 2026-11-08, see
+  `docs/validation/wine-proof-b8c10f0/`. Direct3D, 32-bit,
+  persistence and Start-menu presence remain open.)
 
 ## Phase 14 — Multi-architecture and maturity
 

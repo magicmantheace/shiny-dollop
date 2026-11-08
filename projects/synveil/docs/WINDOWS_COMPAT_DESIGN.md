@@ -171,3 +171,23 @@ answers, verbatim in substance:
    Start-menu entry in the proof slice; a marker-gated
    entry following the Files/Updates pattern belongs to a
    later product slice.
+
+## Proof outcome (2026-11-08)
+
+The first proof slice above is **demonstrated at QEMU
+scope**: `SYNVEIL_WINE_QEMU_PASS` on the proof image
+(sha256 `d4bfb12f…8206c`), evidence in
+`docs/validation/wine-proof-b8c10f0/`. The sealed Wine
+10.0 (win64) ran its bundled Notepad through
+`winewayland.drv` on the S4 shell with a fresh tmpfs
+prefix, rendered as a managed window, and accepted typed
+input. One build lesson is recorded in the evidence: an
+import-only PE closure is insufficient — the session's
+by-name programs, the wine.inf ServiceDll set, driver
+imports, `apisetschema.dll` and the out-of-tree
+`zlib1.dll` are all part of the runtime module set.
+Everything outside the proof's scope stays as the owner
+answers left it: Direct3D awaits its own Mesa/Vulkan
+decision, prefix persistence stays tied to the storage
+roadmap, Start-menu presence is a later marker-gated
+slice, and 32-bit support is not claimed.
