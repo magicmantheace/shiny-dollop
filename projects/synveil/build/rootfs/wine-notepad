@@ -37,5 +37,13 @@ export WINEPREFIX
 echo "$WINEPREFIX" > /var/tmp/wineprefix.path
 
 $WINE wineboot --init >/dev/null 2>&1
+# zlib1.dll is an out-of-tree import (Debian ships it via the
+# mingw runtime package, not as a Wine builtin): the loader
+# finds it in the module directory for loader-started
+# processes, but server-started processes (start.exe) search
+# the prefix's system32 only and fail without it there.
+# Present it in system32, as a Windows install would.
+cp /usr/lib/x86_64-linux-gnu/wine/x86_64-windows/zlib1.dll \
+   "$WINEPREFIX/drive_c/windows/system32/zlib1.dll" 2>/dev/null
 $WINE reg add 'HKCU\Software\Wine\Drivers' /v Graphics /d wayland /f >/dev/null 2>&1
 exec $WINE notepad.exe

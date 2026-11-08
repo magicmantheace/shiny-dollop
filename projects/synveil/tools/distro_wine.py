@@ -52,6 +52,7 @@ import json
 import lzma
 import os
 from pathlib import Path
+import re
 import shutil
 import struct
 import subprocess
@@ -99,6 +100,31 @@ ELF_ROOTS = (
 PE_ROOTS = (
     "notepad.exe", "wineboot.exe", "services.exe", "reg.exe",
     "winewayland.drv",
+)
+# Programs Wine launches BY NAME during prefix creation and
+# session startup — nothing imports them, so an import-only
+# closure drops them and the session degrades (start.exe and
+# rundll32.exe fail with c0000135; worse, a missing builtin
+# DLL is silently replaced by an all-stub placeholder whose
+# exports abort as "unimplemented function" when called —
+# observed in the guest at shell32.SHGetFolderPathW and on
+# the host at newdev.UpdateDriverForPlugAndPlayDevicesA).
+PE_SESSION_PROGRAMS = (
+    "start.exe", "explorer.exe", "winedevice.exe",
+    "svchost.exe", "rpcss.exe", "plugplay.exe", "conhost.exe",
+    "rundll32.exe", "control.exe", "msiexec.exe",
+    "winebrowser.exe", "winemenubuilder.exe", "cmd.exe",
+)
+# DLLs Wine loads by name at runtime during startup/session
+# (device setup, shell folders, themes, DWM probes): rooted
+# when the tree carries them.
+PE_SESSION_DLLS = (
+    "newdev.dll", "cfgmgr32.dll", "shfolder.dll",
+    "uxtheme.dll", "dwmapi.dll",
+    # The API-set schema: imports naming api-ms-win-* are
+    # resolved from apisetschema.dll at load time; without it
+    # every apiset load fails with c000000f.
+    "apisetschema.dll",
 )
 WAYLAND_DRV = WIN64_WINDOWS + "/winewayland.drv"
 WAYLAND_UNIX = WIN64_UNIX + "/winewayland.so"
@@ -343,6 +369,71 @@ def _pe_imports(path):
     return names
 
 
+def _pe_forwarders(path):
+    """DLL names this PE file's exports forward to (an export
+    whose RVA lands inside the export directory is a forwarder
+    string `DLL.function`; the runtime must load that DLL).
+    None when not a PE image."""
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return None
+    if len(data) < 0x40 or data[:2] != b"MZ":
+        return None
+    pe_off = struct.unpack_from("<I", data, 0x3C)[0]
+    if data[pe_off:pe_off + 4] != b"PE\0\0":
+        return None
+    coff = pe_off + 4
+    sections = struct.unpack_from("<H", data, coff + 2)[0]
+    opt_size = struct.unpack_from("<H", data, coff + 16)[0]
+    opt = coff + 20
+    magic = struct.unpack_from("<H", data, opt)[0]
+    if magic == 0x20B:
+        dirs = opt + 112
+    elif magic == 0x10B:
+        dirs = opt + 96
+    else:
+        return None
+    sec_off = opt + opt_size
+    spans = []
+    for i in range(sections):
+        base = sec_off + i * 40
+        vsize, vaddr, raw_size, raw_ptr = struct.unpack_from(
+            "<IIII", data, base + 8)
+        spans.append((vaddr, max(vsize, raw_size), raw_ptr))
+
+    def rva_to_off(rva):
+        for vaddr, span, raw_ptr in spans:
+            if vaddr <= rva < vaddr + span:
+                return raw_ptr + (rva - vaddr)
+        return None
+
+    exp_rva, exp_size = struct.unpack_from("<II", data, dirs)
+    if not exp_rva:
+        return []
+    exp_off = rva_to_off(exp_rva)
+    if exp_off is None:
+        return []
+    n_funcs = struct.unpack_from("<I", data, exp_off + 20)[0]
+    funcs_rva = struct.unpack_from("<I", data, exp_off + 28)[0]
+    funcs_off = rva_to_off(funcs_rva)
+    if funcs_off is None:
+        return []
+    out = []
+    for index in range(n_funcs):
+        frva = struct.unpack_from(
+            "<I", data, funcs_off + index * 4)[0]
+        if exp_rva <= frva < exp_rva + exp_size:
+            foff = rva_to_off(frva)
+            if foff is None:
+                continue
+            end = data.find(b"\0", foff)
+            target = data[foff:end].decode("ascii", "replace")
+            if "." in target:
+                out.append(target.rsplit(".", 1)[0] + ".dll")
+    return out
+
+
 def prune(raw, staging, readelf):
     """Copy the payload subset of raw into staging."""
     if staging.exists():
@@ -392,27 +483,63 @@ def prune(raw, staging, readelf):
     for path in windows.iterdir():
         if path.is_file():
             pe_by_name[path.name.lower()] = path
-    queue = [pe_by_name[name] for name in PE_ROOTS
-             if name in pe_by_name]
-    missing_roots = [name for name in PE_ROOTS
+    queue = [pe_by_name[name] for name in
+             PE_ROOTS + PE_SESSION_PROGRAMS if name in pe_by_name]
+    missing_roots = [name for name in
+                     PE_ROOTS + PE_SESSION_PROGRAMS
                      if name not in pe_by_name]
     if missing_roots:
         raise ValueError("PE closure roots missing from libwine: "
                          + ", ".join(missing_roots))
+    queue += [pe_by_name[name] for name in PE_SESSION_DLLS
+              if name in pe_by_name]
+    # Service DLLs: wine.inf registers svchost-hosted services
+    # whose ServiceDll values name DLLs loaded by name at
+    # service start (wevtsvc, qmgr, ...). Derive the set from
+    # the pinned wine.inf rather than hand-listing it.
+    inf = raw / "usr/share/wine/wine.inf"
+    if inf.is_file():
+        for line in inf.read_text(errors="replace").splitlines():
+            if "ServiceDll" not in line:
+                continue
+            match = re.search(r"%11%\\([A-Za-z0-9_.\-]+\.dll)",
+                              line)
+            if match and match.group(1).lower() in pe_by_name:
+                queue.append(pe_by_name[match.group(1).lower()])
+    # Drivers join the WALK, not just the keep set: their own
+    # imports must close too (ndis.sys needs iphlpapi.dll).
+    # .drv: graphics/printer/audio drivers are loaded by name
+    # from the registry. .sys: winedevice loads kernel drivers
+    # by service name (mountmgr, nsiproxy, ...).
+    for path in windows.iterdir():
+        if path.is_file() and path.suffix.lower() in (".drv", ".sys"):
+            queue.append(path)
+    # A few closure imports live outside the wine tree in the
+    # Debian layout: user32.dll imports zlib1.dll, which the
+    # closure's libz-mingw-w64 package installs under the
+    # mingw runtime dir. A real install presents it in the
+    # module directory; stage it there.
+    mingw_lib = raw / "usr/x86_64-w64-mingw32/lib"
+    mingw_by_name = {}
+    if mingw_lib.is_dir():
+        for path in mingw_lib.iterdir():
+            if path.is_file():
+                mingw_by_name[path.name.lower()] = path
+    placements = {}
     while queue:
         path = queue.pop()
         if path in keep:
             continue
         keep.add(path)
-        for imported in _pe_imports(path) or []:
+        deps = list(_pe_imports(path) or [])
+        deps += _pe_forwarders(path) or []
+        for imported in deps:
             target = pe_by_name.get(imported.lower())
             if target is not None and target not in keep:
                 queue.append(target)
-    # Every driver (.drv) ships: drivers are loaded by name from
-    # the registry (graphics, printer, audio), not via imports.
-    for path in windows.iterdir():
-        if path.is_file() and path.suffix.lower() == ".drv":
-            keep.add(path)
+            elif target is None and imported.lower() in mingw_by_name:
+                placements[imported.lower()] = \
+                    mingw_by_name[imported.lower()]
     # Data trees wholesale (minus docs/man/info/locale): the
     # share/wine tree carries wine.inf (prefix creation reads
     # it), the NLS tables and the Wine fonts; share/fonts the
@@ -455,6 +582,13 @@ def prune(raw, staging, readelf):
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.symlink_to(path.readlink())
                 copied += 1
+    # Out-of-tree imports (zlib1.dll) placed into the module
+    # directory, as a real install presents them.
+    for name, source in sorted(placements.items()):
+        dest = staging / WIN64_WINDOWS / name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, dest)
+        copied += 1
     return copied
 
 

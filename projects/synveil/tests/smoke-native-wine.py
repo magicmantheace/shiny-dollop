@@ -453,14 +453,19 @@ def boot_and_wine(work: Path, secret: str, out: Path) -> bool:
                         frame_dir = Path(tempfile.mkdtemp(
                             prefix="synveil-wine-frame-"))
                         w, h, data = patient_frame(qmp, frame_dir, 1)
-                        WINE_FACTS["task_buttons_before"] = len(
-                            task_buttons(w, h, data))
                         tx, ty = weston_smoke.terminal_point(w, h, data)
                         weston_smoke.pointer(qmp, w, h, tx, ty,
                                              button=True)
                         weston_smoke.pointer(qmp, w, h, tx, ty,
                                              button=False)
-                        time.sleep(0.5)
+                        # Let the desktop settle, then count the
+                        # task buttons from a fresh frame: the
+                        # first post-login frame can precede the
+                        # panel's first render and undercount.
+                        time.sleep(1.5)
+                        w, h, data = patient_frame(qmp, frame_dir, 1)
+                        WINE_FACTS["task_buttons_before"] = len(
+                            task_buttons(w, h, data))
                         # The line's sacrificial echo segment
                         # absorbs any characters a just-focused
                         # terminal eats (fixture pattern, see
@@ -473,9 +478,9 @@ def boot_and_wine(work: Path, secret: str, out: Path) -> bool:
                     note("wine launcher typed; waiting for notepad")
                     # Prefix creation + wineboot + first window
                     # under TCG: poll frames for the Notepad
-                    # client rectangle for up to ~3 minutes.
+                    # client rectangle for up to ~5 minutes.
                     rect = None
-                    launch_deadline = time.monotonic() + 180
+                    launch_deadline = time.monotonic() + 300
                     while time.monotonic() < launch_deadline:
                         time.sleep(5)
                         try:
