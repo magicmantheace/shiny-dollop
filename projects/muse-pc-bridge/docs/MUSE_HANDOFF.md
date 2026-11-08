@@ -685,4 +685,12 @@ bytes including a stray `"`, cascading into "Missing closing
 dashes (21 total); all replaced with `--`, files now byte-pure
 ASCII. `tests/test_script_encoding.py` guards this (fails on the
 pre-fix files, passes now). Suite: **149 tests, OK (skipped=3)**
-on the VM. Owner-PC parser proof appended below once run.
+on the VM. **Owner-PC proof (same day, via the live bridge,
+parse-only, non-elevated):** the PC checkout pulled the fix
+(`c7b93bd` -> `c6c816c`, fast-forward) and Windows PowerShell's
+own parser (`Parser::ParseFile`) reported **0 parse errors** for
+each of `bridge-core.ps1`, `bridge-service.ps1`,
+`install-autostart.ps1`, and `agent/helpers/uia.ps1`; a byte scan
+on the PC confirmed **0 non-ASCII bytes** in all 8 shipped
+scripts (`.ps1` + `.cmd`). Production was not restarted. The
+install itself remains the owner's interactive run.
