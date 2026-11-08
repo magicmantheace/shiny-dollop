@@ -297,11 +297,13 @@ AB_COMMANDS = {
     # exits, later keystrokes echo into a readerless pty,
     # and the login never relocks).
     # Before the first query the line waits (bounded) for
-    # the fixture core's socket to exist: the fixed 8 s
-    # sleep alone lost a race under TCG load once — synctl
-    # ran before the core had bound, failed ENOENT, and
-    # h0 came back empty while h1/h2 were fine.
-    "observe-history": "echo synveil-history-run; SYNVEIL_OBSERVE_HISTORY=1 /usr/sbin/veil-core --socket /var/tmp/o.sock & sleep 8; for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do if [ -S /var/tmp/o.sock ]; then break; fi; sleep 1; done; /usr/bin/synctl --socket /var/tmp/o.sock --json observe-history > /var/tmp/h0.json 2> /var/tmp/h0.err; sleep 12 & echo $! > /var/tmp/p.pid; sleep 8; /usr/bin/synctl --socket /var/tmp/o.sock --json observe-history > /var/tmp/h1.json 2> /var/tmp/h1.err; sleep 10; /usr/bin/synctl --socket /var/tmp/o.sock --json observe-history > /var/tmp/h2.json 2> /var/tmp/h2.err; sync; kill %1",
+    # the fixture core's socket file to exist: the fixed
+    # 8 s sleep alone lost a race under TCG load once —
+    # synctl ran before the core had bound, failed ENOENT,
+    # and h0 came back empty while h1/h2 were fine. The
+    # wait uses `test -e ... && break`, not [ ... ]: the
+    # typist's character map has no bracket keys.
+    "observe-history": "echo synveil-history-run; SYNVEIL_OBSERVE_HISTORY=1 /usr/sbin/veil-core --socket /var/tmp/o.sock & sleep 8; for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do test -e /var/tmp/o.sock && break; sleep 1; done; sleep 1; /usr/bin/synctl --socket /var/tmp/o.sock --json observe-history > /var/tmp/h0.json 2> /var/tmp/h0.err; sleep 12 & echo $! > /var/tmp/p.pid; sleep 8; /usr/bin/synctl --socket /var/tmp/o.sock --json observe-history > /var/tmp/h1.json 2> /var/tmp/h1.err; sleep 10; /usr/bin/synctl --socket /var/tmp/o.sock --json observe-history > /var/tmp/h2.json 2> /var/tmp/h2.err; sync; kill %1",
     # Wine proof (WINDOWS_COMPAT_DESIGN proof slice): launch
     # the sealed Wine's bundled notepad via the image's
     # launcher (fresh tmpfs prefix, win64, wayland driver
