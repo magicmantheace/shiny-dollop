@@ -306,6 +306,28 @@ Layer 3 — segmentation bake-off + stage (PC GPU + VM):
   preflight + 10 geodesic/exemption + 4 label-veto + registry
   update).
 
+## Verified on the build VM — 2026-11-07 (P2 local UI)
+
+- Unit tests: **92/92 pass** (`python3 -m pytest tests/`): the 79
+  pre-P2 tests plus 13 new UI tests pinning the catalog data layer
+  (rigged/prop summaries incl. the P0 entry's bones fallback for
+  the missing `provenance.rigged` flag, preview-path traversal and
+  non-PNG rejection), the run validation (argv mirrors the CLI
+  flags; invalid specs raise and spawn nothing), and the HTTP
+  surface (index page, catalog endpoint, 404s, traversal 404,
+  invalid run POST → 400) against the real server on an ephemeral
+  port with fixture catalogs.
+- Live server smoke (this VM): `asset_builder.py ui` served the
+  real catalog — all four assets with correct rigged flags, bone
+  counts (14/13/0/15) and preview counts; the ember-dragon detail
+  endpoint returned sha256 MATCH against the on-disk GLB; a preview
+  render fetched as image/png (363,713 bytes); index returned 200.
+- Honest scope: the UI itself is verified; a pipeline run launched
+  FROM the UI was not executed end-to-end (its GPU stages are the
+  already-proven CLI path — the UI spawns that CLI verbatim — but
+  the spawn-from-browser flow has only the validation tests and the
+  run-tracking code behind it, no live run).
+
 ## Not yet verified
 
 - TRELLIS's proper textured export — blocked on the

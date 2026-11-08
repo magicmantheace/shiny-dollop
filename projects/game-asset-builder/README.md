@@ -76,6 +76,19 @@ their own parts (P3-SAM's known weakness). Ember Dragon and
 Treasure Chest untouched, byte-identical. Suite 79/79. Details in
 `docs/MUSE_HANDOFF.md`.**
 
+**P2 UI update (2026-11-07): a simple local UI over the catalog and
+pipeline** (branch `game-asset-builder/p2-ui`, stacked on the P2
+cleanup branch). `python3 asset_builder.py ui` serves a stdlib-only
+single-page UI on localhost (default port 8770): catalog cards for
+every asset (rig/prop, bones, clips, counts, preview renders, GLB
+presence) with an on-demand sha256 verify against the catalog entry;
+the stage registry and doctor report; and a run form that launches
+the existing CLI as a subprocess — GPU stages still dispatch to the
+owner's PC through the bridge, using the server process's
+environment for the token. No dependencies, no build step, binds
+127.0.0.1 by default. Suite 92/92; details in
+`docs/MUSE_HANDOFF.md`.**
+
 A fully local, no-API pipeline that builds game assets — creatures included —
 on the owner's own hardware:
 
@@ -124,4 +137,6 @@ cloud-generated reference Pip the owner already has.
   **Done 2026-11-06** (see the P2 cleanup status note above;
   branch `game-asset-builder/p2-cleanup`).
 - **P2** — a simple local UI over the catalog and pipeline.
+  **Done 2026-11-07** (see the P2 UI status note above;
+  branch `game-asset-builder/p2-ui`).
 - **P3** — hand-off integrations (animation studio library, Godot projects).

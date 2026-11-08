@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game Asset Builder — local UI</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: system-ui, sans-serif; margin: 0; background: #16181d;
+         color: #e6e6e6; }
+  header { padding: 16px 20px 8px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 24px 20px 8px; }
+  .sub { color: #9aa3b2; font-size: 13px; }
+  .grid { display: grid; gap: 12px; padding: 0 20px;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  .card { background: #1f2229; border: 1px solid #2c3038; border-radius: 8px;
+          padding: 12px; }
+  .card img { width: 100%; height: 180px; object-fit: contain;
+              background: #101216; border-radius: 4px; }
+  .card h3 { margin: 8px 0 2px; font-size: 15px; }
+  .facts { font-size: 12.5px; color: #c6cbd4; line-height: 1.5; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 9px;
+           font-size: 11px; background: #2c3038; margin-right: 4px; }
+  .ok { background: #1d4d2b; } .bad { background: #5a2323; }
+  .chip { display: inline-block; padding: 0 6px; border: 1px solid #3a3f4a;
+          border-radius: 4px; font-size: 11px; margin: 0 2px 2px 0; }
+  table { border-collapse: collapse; margin: 0 20px; font-size: 13px; }
+  td, th { border: 1px solid #2c3038; padding: 5px 9px; text-align: left; }
+  form { margin: 0 20px; background: #1f2229; border: 1px solid #2c3038;
+         border-radius: 8px; padding: 12px; max-width: 640px; }
+  form label { display: block; font-size: 12.5px; margin: 8px 0 2px;
+               color: #c6cbd4; }
+  form input[type=text], form input[type=number], form select {
+    width: 100%; box-sizing: border-box; padding: 6px; background: #101216;
+    color: #e6e6e6; border: 1px solid #3a3f4a; border-radius: 4px; }
+  form .row { display: flex; gap: 14px; flex-wrap: wrap; }
+  form .row label { display: inline-flex; gap: 5px; align-items: center; }
+  button { background: #31572c; color: #fff; border: 0; border-radius: 5px;
+           padding: 7px 14px; cursor: pointer; font-size: 13px; }
+  button.secondary { background: #2c3038; }
+  pre { background: #101216; border: 1px solid #2c3038; border-radius: 6px;
+        padding: 8px; margin: 6px 20px; font-size: 11.5px; overflow-x: auto;
+        max-height: 220px; overflow-y: auto; white-space: pre-wrap; }
+  .err { color: #ff9c9c; font-size: 13px; margin: 6px 20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Game Asset Builder</h1>
+  <div class="sub" id="doctor">loading machine report…</div>
+  <div class="sub">Local UI over the catalog and pipeline. GPU stages run on
+    the owner's PC via the bridge, using this server process's environment.
+    Everything here is local — no APIs, per the project's founding rules.</div>
+</header>
+
+<h2>Catalog</h2>
+<div class="grid" id="catalog"></div>
+
+<h2>Pipeline stages</h2>
+<table id="stages"><thead><tr><th>#</th><th>Stage</th><th>Kind</th>
+  <th>Device</th><th>Process</th><th>What it does</th></tr></thead>
+  <tbody></tbody></table>
+
+<h2>Start a run</h2>
+<form id="runform">
+  <label>Concept image (path on this machine)
+    <input type="text" id="f-concept" required></label>
+  <label>Asset name
+    <input type="text" id="f-name" required></label>
+  <label>Rig template
+    <select id="f-template">
+      <option>winged-creature</option><option>quadruped</option>
+      <option>biped</option>
+    </select></label>
+  <label>Facing correction (rotate Z)
+    <select id="f-rotate"><option>0</option><option>90</option>
+      <option>180</option><option>270</option></select></label>
+  <label>Target verts (rigged) / prop target verts
+    <span class="row">
+      <input type="number" id="f-target" value="50000" style="width:130px">
+      <input type="number" id="f-proptarget" value="30000" style="width:130px">
+    </span></label>
+  <div class="row">
+    <label><input type="checkbox" id="f-prop"> Prop (unrigged)</label>
+    <label><input type="checkbox" id="f-ears"> Ears</label>
+    <label><input type="checkbox" id="f-noarms"> No arms</label>
+    <label><input type="checkbox" id="f-resume"> Resume</label>
+  </div>
+  <p><button type="submit">Run pipeline</button></p>
+  <div class="err" id="runerr"></div>
+</form>
+
+<h2>Runs started from this UI</h2>
+<div id="runs"><div class="sub" style="margin:0 20px">none yet</div></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
+  (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+async function loadDoctor() {
+  const d = await (await fetch("/api/doctor")).json();
+  const gpu = d.gpu ? esc(d.gpu) : "no GPU on this machine (GPU stages run on the PC)";
+  $("doctor").textContent =
+    `python ${d.python} · ${d.platform} · GPU: ${gpu} · blender: ${d.blender || "not found"}`;
+}
+
+async function loadCatalog() {
+  const assets = await (await fetch("/api/catalog")).json();
+  $("catalog").innerHTML = assets.map((a) => {
+    const img = a.previews.length
+      ? `<img src="/api/preview/${a.slug}/${encodeURIComponent(a.previews[0])}" alt="">`
+      : "";
+    const glb = !a.glb_present
+      ? `<span class="badge bad">GLB not on this machine</span>`
+      : a.glb_size_ok
+        ? `<span class="badge ok">GLB present, size matches</span>`
+        : `<span class="badge bad">GLB size differs</span>`;
+    const rig = a.rigged
+      ? `<span class="badge">${esc(a.rig_template || "rigged")} · ${a.bone_count} bones</span>`
+      : `<span class="badge">prop (unrigged)</span>`;
+    const chips = a.actions.map((x) => `<span class="chip">${esc(x)}</span>`).join("");
+    return `<div class="card">${img}<h3>${esc(a.name)}</h3>
+      <div class="facts">${rig} ${glb}<br>
+      ${a.counts.verts ?? "?"} verts · ${a.counts.faces ?? "?"} faces ·
+      ${(a.bytes / 1048576).toFixed(1)} MB<br>
+      clips: ${chips || "none"}<br>
+      sha256 ${esc(a.sha256_short)}… <span id="verify-${a.slug}"></span><br>
+      <button class="secondary" onclick="verify('${a.slug}')">Verify sha256</button>
+      </div></div>`;
+  }).join("") || `<div class="sub" style="margin:0 20px">catalog is empty</div>`;
+}
+
+async function verify(slug) {
+  const el = $("verify-" + slug);
+  el.textContent = "checking…";
+  const d = await (await fetch("/api/catalog/" + slug)).json();
+  el.textContent = d.verification.sha256_match
+    ? "— sha256 MATCH" : "— sha256 MISMATCH";
+}
+
+async function loadStages() {
+  const stages = await (await fetch("/api/stages")).json();
+  document.querySelector("#stages tbody").innerHTML = stages.map((s) =>
+    `<tr><td>${s.index}</td><td>${esc(s.name)}</td><td>${esc(s.kind)}</td>
+     <td>${esc(s.device)}</td>
+     <td>${s.isolated_process ? "isolated" : "in-process"}</td>
+     <td>${esc(s.summary)}</td></tr>`).join("");
+}
+
+$("runform").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  $("runerr").textContent = "";
+  const spec = {
+    concept: $("f-concept").value, name: $("f-name").value,
+    template: $("f-template").value, rotate_z: Number($("f-rotate").value),
+    target_verts: Number($("f-target").value),
+    prop_target_verts: Number($("f-proptarget").value),
+    prop: $("f-prop").checked, ears: $("f-ears").checked,
+    no_arms: $("f-noarms").checked, resume: $("f-resume").checked,
+  };
+  const resp = await fetch("/api/runs", {method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(spec)});
+  const body = await resp.json();
+  if (!resp.ok) { $("runerr").textContent = body.error || "run failed to start"; return; }
+  pollRuns();
+});
+
+async function pollRuns() {
+  const runs = await (await fetch("/api/runs")).json();
+  if (!runs.length) return;
+  $("runs").innerHTML = runs.map((r) =>
+    `<pre><strong>${esc(r.name || r.id)}</strong> — ${esc(r.state)}` +
+    (r.exit_code !== null ? ` (exit ${r.exit_code})` : "") +
+    `\n${esc(r.output_tail.join("\n"))}</pre>`).join("");
+  if (runs.some((r) => r.state === "running")) setTimeout(pollRuns, 2000);
+  else loadCatalog();
+}
+
+loadDoctor(); loadCatalog(); loadStages(); pollRuns();
+</script>
+</body>
+</html>

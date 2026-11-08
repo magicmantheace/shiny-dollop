@@ -329,5 +329,42 @@ Next:
    hands-dominance cost of fine arm labels (0.78) could be
    revisited if a future asset's hands matter more.
 
+## P2 local UI — BUILT AND VM-VERIFIED (2026-11-07, branch game-asset-builder/p2-ui, stacked on p2-cleanup)
+
+Owner approved starting P2 (and P3) on 2026-11-07. Scope per the
+README slice list: "a simple local UI over the catalog and
+pipeline." Built stdlib-only, matching the CLI's discipline:
+
+- `ui/catalog_data.py` — the data layer: catalog summaries (the
+  rigged flag reads `provenance.rigged`, falling back to the bone
+  list for the P0 ember-dragon entry, which predates the flag),
+  full entry detail with a live sha256 verification (the catalog
+  module's own `verify_entry`), the stage registry as data, the
+  doctor report as data, and a traversal-guarded preview path
+  (bare `*.png` basenames inside `outputs/<slug>/renders/` only).
+- `ui/runs.py` — run management: validates a run request into the
+  exact CLI argv (invalid specs raise before anything spawns) and
+  tracks the spawned `asset_builder.py run` subprocess in memory
+  (state, exit code, output tail). The durable record stays the
+  pipeline's own manifest + catalog entry, as with a CLI run. The
+  subprocess inherits the server's environment, which is how the
+  bridge token reaches the GPU stages.
+- `ui/server.py` + `ui/index.html` — ThreadingHTTPServer on
+  127.0.0.1:8770 (flags on the new `asset_builder.py ui` command):
+  catalog cards with preview renders and per-asset sha256 verify,
+  stages table, doctor line, run form, run status polling. No
+  auth — localhost-only local tool; do not rebind it outward.
+- Verified (VM): suite 92/92 (13 new tests); live smoke served
+  the real catalog and returned sha256 MATCH for the ember
+  dragon through the API. NOT done: an end-to-end pipeline run
+  launched from the browser (the spawn path is the proven CLI
+  verbatim; only its validation/tracking is new-tested).
+
+Next:
+1. P3 (same owner approval): engine hand-offs — Godot + three.js
+   export/playback verification; the studio library export.
+2. Owner decisions unchanged: merges of PR #38, the p2-cleanup
+   PR, and this slice's PR are the owner's call.
+
 Boundaries: no cloud fallback exists or may be added; weights and outputs
 never enter git; GPU claims only from PC runs; merges are the owner's call.
