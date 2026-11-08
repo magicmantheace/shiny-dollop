@@ -1,24 +1,36 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MPL-2.0
 """Build the Wine proof image: the joined baseline rootfs plus
-the sealed distribution-Wine payload and the proof launcher.
+the sealed distribution-Wine payload, the sealed Mesa +
+Vulkan graphics payload (ADR 0027), and the proof launchers.
 
 Style follows the A/B browser proof (tools/native_ab.py): the
-baseline rootfs is copied, the sealed payload is overlaid file
-by file (sha256-verified, never replacing a differing baseline
-file), the ELF link closure of everything added is checked on
-the host, and the result is packed into the same UKI + GPT
-image shape the joined build produces (build.sh kernel +
-image). There is deliberately no A/B overlay, no publisher
-key, and no Start-menu entry: the accepted design scopes this
-slice to proving that the sealed Wine runs a bundled Win32 GUI
-program under the shell, with Start-menu presence later and
-marker-gated (docs/WINDOWS_COMPAT_DESIGN.md).
+baseline rootfs is copied, each sealed payload is overlaid
+file by file (sha256-verified, never replacing a differing
+baseline file), the ELF link closure of everything added is
+checked on the host, and the result is packed into the same
+UKI + GPT image shape the joined build produces (build.sh
+kernel + image). There is deliberately no A/B overlay, no
+publisher key, and no Start-menu entry: the accepted design
+scopes this slice to proving that the sealed Wine runs a
+bundled Win32 GUI program under the shell, with Start-menu
+presence later and marker-gated (docs/WINDOWS_COMPAT_DESIGN.md).
 
-The image carries the marker /etc/synveil/wine (the future
-gate for session presence) and the launcher
-/usr/libexec/synveil/wine-notepad. Proof prefixes live on
-tmpfs; nothing about the prefix persists.
+The graphics payload is the prerequisite for any Direct3D
+path under Wine: Mesa's software stack (lavapipe Vulkan ICD,
+llvmpipe GL) staged by tools/distro_graphics.py. The image
+carries the guest probe /usr/libexec/synveil/gfx-probe
+(compiled here from src/graphics-probe/gfx-probe.c), which
+initializes Vulkan and EGL/GL against the payload and
+reports GFX_* lines; staging it proves the payload is
+present and initializes in the guest under QEMU/TCG
+software rendering — never Direct3D, real-GPU behaviour,
+or performance.
+
+The image carries the markers /etc/synveil/wine and
+/etc/synveil/graphics (future gates for session presence)
+and the launcher /usr/libexec/synveil/wine-notepad. Proof
+prefixes live on tmpfs; nothing about the prefix persists.
 """
 import argparse
 import hashlib
@@ -31,6 +43,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
+import distro_graphics_assets as gfx_assets
 import distro_wine_assets as assets
 import native_joined as joined
 
@@ -74,13 +87,44 @@ def wine_stage():
     return staging, entries, receipt
 
 
+def graphics_stage():
+    """Verify the distro-graphics stage's identity and return
+    (staging_tree, assets, validation_receipt): the stage is
+    only ever consumed through its sealed, digest-verified
+    asset list (tools/distro_graphics.py)."""
+    gout = ROOT / "out" / "distro-graphics"
+    receipt = json.loads(joined.regular(gout / "validation.json").read_text())
+    if (receipt.get("schema") != "synveil.distro-graphics-stage/v1" or
+            receipt.get("target") != joined.ffi.TARGET):
+        raise ValueError("distro graphics stage identity mismatch")
+    staging = gout / "staging"
+    entries = json.loads(joined.regular(gout / "assets.json").read_text())
+    if gfx_assets.seal_digest(entries) != receipt.get("assets_sha256"):
+        raise ValueError("distro graphics seal digest mismatch")
+    if not gfx_assets.verified(staging, entries):
+        raise ValueError("distro graphics staging does not match its seal")
+    return staging, entries, receipt
+
+
 def copy_wine_asset(source, destination, name, identity):
     """Sealed-payload copy with the standing rule: never replace
     a file the baseline rootfs already owns unless the bytes are
     identical. Packaged modes are applied from the seal."""
+    return copy_payload_asset(source, destination, name, identity,
+                              assets.allowed, "wine")
+
+
+def copy_graphics_asset(source, destination, name, identity):
+    """The copy_wine_asset rule, for the graphics payload."""
+    return copy_payload_asset(source, destination, name, identity,
+                              gfx_assets.allowed, "graphics")
+
+
+def copy_payload_asset(source, destination, name, identity,
+                       allowed, label):
     relative = Path(name)
-    if not assets.allowed(name):
-        raise ValueError("forbidden wine asset")
+    if not allowed(name):
+        raise ValueError(f"forbidden {label} asset")
     target = destination / relative
     parent = destination
     for part in relative.parts[:-1]:
@@ -147,8 +191,38 @@ def check_link_closure(rootfs, tools, added):
     return checked
 
 
+def compile_gfx_probe(rootfs, tools):
+    """Compile the graphics probe (src/graphics-probe/gfx-probe.c)
+    for the guest, the native_joined way: the target compiler
+    against the sealed native-dependency staging sysroot, with
+    the binary proven to target the native glibc."""
+    weston = joined.weston
+    alias = weston.OUT / "build/staging"
+    if not alias.is_dir() or \
+            not alias.resolve().is_relative_to(weston.OUT.resolve()):
+        raise ValueError("private native dependency sysroot missing")
+    staging = alias.resolve()
+    output = rootfs / "usr/libexec/synveil/gfx-probe"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    run([tools["gcc"], "--sysroot=" + str(staging), "-std=c11",
+         "-Wall", "-Wextra", "-Werror",
+         ROOT / "src/graphics-probe/gfx-probe.c",
+         "-ldl", "-o", output])
+    header = subprocess.check_output(
+        [str(tools["readelf"]), "-h", str(output)], text=True)
+    program = subprocess.check_output(
+        [str(tools["readelf"]), "-l", str(output)], text=True)
+    if "Advanced Micro Devices X86-64" not in header or \
+            "/lib64/ld-linux-x86-64.so.2" not in program:
+        raise ValueError("graphics probe did not link to native "
+                         "target glibc")
+    output.chmod(0o755)
+    return output
+
+
 def build():
     staging, entries, receipt = wine_stage()
+    gfx_staging, gfx_entries, gfx_receipt = graphics_stage()
     baseline_rootfs = ROOT / "out" / "native-joined" / "work" / "rootfs"
     if not (baseline_rootfs / "usr/sbin/veil-core").is_file():
         raise ValueError("joined baseline rootfs missing; "
@@ -170,6 +244,17 @@ def build():
             added.append(name)
     closure_files = check_link_closure(rootfs, tools, added)
 
+    gfx_counts = {"copied": 0, "identical": 0}
+    gfx_added = []
+    for name, identity in sorted(gfx_entries.items()):
+        outcome = copy_graphics_asset(gfx_staging, rootfs, name,
+                                      identity)
+        gfx_counts[outcome] += 1
+        if outcome == "copied" and identity["kind"] == "file":
+            gfx_added.append(name)
+    gfx_closure_files = check_link_closure(rootfs, tools, gfx_added)
+    compile_gfx_probe(rootfs, tools)
+
     launcher = rootfs / "usr/libexec/synveil/wine-notepad"
     shutil.copyfile(ROOT / "build/rootfs/wine-notepad", launcher)
     launcher.chmod(0o755)
@@ -177,6 +262,9 @@ def build():
     marker = config / "wine"
     marker.write_text("")
     marker.chmod(0o644)
+    gfx_marker = config / "graphics"
+    gfx_marker.write_text("")
+    gfx_marker.chmod(0o644)
 
     # Directory and file modes must not depend on the builder's
     # umask (the joined build's normalization).
@@ -224,6 +312,20 @@ def build():
         "assets_copied": counts["copied"],
         "assets_identical_to_baseline": counts["identical"],
         "link_closure_files_checked": closure_files,
+        "graphics": {
+            "stage_schema": gfx_receipt["schema"],
+            "stage_validation_sha256": sha256(
+                ROOT / "out" / "distro-graphics" / "validation.json"),
+            "mesa_version": gfx_receipt["mesa_version"],
+            "payload_files": gfx_receipt["payload_files"],
+            "payload_bytes": gfx_receipt["payload_bytes"],
+            "assets_copied": gfx_counts["copied"],
+            "assets_identical_to_baseline": gfx_counts["identical"],
+            "link_closure_files_checked": gfx_closure_files,
+            "software_drivers": gfx_receipt["software_drivers"],
+            "probe": "usr/libexec/synveil/gfx-probe",
+            "decision": "ADR 0027 (owner, 2026-11-07)",
+        },
         "image_sha256": sha256(image),
         "image_bytes": image.stat().st_size,
         "esp_size_mb": ESP_SIZE_MB,
@@ -235,7 +337,9 @@ def build():
     print("SYNVEIL_WINE_PROOF_BUILT_NOT_BOOT_VALIDATED")
     print(f"image_mb={proof['image_bytes'] // 1048576} "
           f"assets_copied={counts['copied']} "
-          f"closure_checked={closure_files}")
+          f"closure_checked={closure_files} "
+          f"gfx_copied={gfx_counts['copied']} "
+          f"gfx_closure_checked={gfx_closure_files}")
 
 
 def main():
