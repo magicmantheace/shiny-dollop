@@ -210,6 +210,21 @@ fn op_new(galaxy: &Galaxy, req: &Value) -> Value {
         Ok(None) => 42,
         Err(e) => return error_value(&e),
     };
+    // Overwriting an existing campaign must be an explicit, deliberate
+    // act: without "overwrite": true an occupied save path is refused,
+    // so no caller can silently destroy a campaign by reusing a name.
+    let overwrite = match req.get("overwrite") {
+        Some(v) => match v.as_bool() {
+            Ok(b) => b,
+            Err(e) => return error_value(&format!("field \"overwrite\": {e}")),
+        },
+        None => false,
+    };
+    if !overwrite && Path::new(&save).exists() {
+        return error_value(&format!(
+            "save already exists: {save} — refusing to overwrite an existing campaign (pass \"overwrite\": true to replace it)"
+        ));
+    }
     let now = now_unix(req);
     let campaign = match Campaign::new_default(galaxy, seed) {
         Ok(c) => c,
@@ -245,9 +260,19 @@ fn op_load(galaxy: &Galaxy, req: &Value) -> Value {
     };
     let day_before = campaign.day();
     let before = snapshot_json(&campaign);
-    let elapsed = match override_days {
-        Some(d) => d,
-        None => now.saturating_sub(saved_at) / 86_400,
+    // Wall-clock catch-up consumes whole days only, but the envelope
+    // anchor advances by exactly the consumed days — never to `now` —
+    // so the unconsumed partial day stays banked toward the next day
+    // instead of being discarded (DESIGN §2: full catch-up; a save
+    // loaded after T must equal an uninterrupted run at T). With an
+    // explicit override there is no wall-clock remainder to preserve,
+    // so the anchor restarts at `now` as before.
+    let (elapsed, anchor) = match override_days {
+        Some(d) => (d, now),
+        None => {
+            let days = now.saturating_sub(saved_at) / 86_400;
+            (days, saved_at + days * 86_400)
+        }
     };
     if elapsed > 0 {
         campaign.advance(galaxy, elapsed);
@@ -257,7 +282,7 @@ fn op_load(galaxy: &Galaxy, req: &Value) -> Value {
             .filter(|e| e.day > day_before && e.day <= campaign.day())
             .map(|e| event_json(galaxy, e))
             .collect();
-        if let Err(e) = write_envelope(Path::new(&save), now, &campaign) {
+        if let Err(e) = write_envelope(Path::new(&save), anchor, &campaign) {
             return error_value(&e);
         }
         let day_after = campaign.day();
