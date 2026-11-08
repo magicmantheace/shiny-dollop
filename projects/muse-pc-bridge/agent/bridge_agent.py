@@ -299,6 +299,17 @@ def pid_alive(pid: int) -> bool:
 
 HELPER_REGISTRY_NAME = "session-helper.json"
 HELPER_FRESH_S = 20.0        # heartbeat is 5 s; 20 s of silence = gone
+# The /v1/status merge of helper-owned processes is bounded by its
+# READERS' deadlines, not the listing's: avatar status readers time
+# out at 1.5 s and the supervisor's update health check at 3 s, so
+# a live-but-hung helper must never stall status past them (Codex
+# PR #47 finding). The status path therefore fetches with a
+# sub-second timeout, serves a fresh-enough last-known merge
+# without touching the network, and backs off briefly after a
+# failed fetch — see BridgeHandler._helper_processes_for_status.
+HELPER_STATUS_TIMEOUT_S = 0.75   # one status-path fetch attempt
+HELPER_MERGE_CACHE_S = 2.0       # a merge this fresh is served as-is
+HELPER_MERGE_RETRY_S = 1.0       # min gap between failed status fetches
 
 
 def current_session_id() -> int | None:
@@ -679,6 +690,38 @@ def _lock_file_exclusive(fh) -> bool:
     return True
 
 
+def _try_lock_file_exclusive(fh) -> bool:
+    """Non-blocking variant of _lock_file_exclusive: True when the
+    lock was taken, False when another holder (process or open file
+    description) already has it. Used for ownership claims that
+    must fail fast rather than queue (the session helper's
+    state-dir ownership). On a platform with no lock primitive at
+    all, returns True — the caller proceeds unguarded rather than
+    never starting (the session-helper registration freshness
+    check remains as the sequential guard there)."""
+    if IS_WINDOWS:
+        import msvcrt
+        fh.seek(0, os.SEEK_END)
+        if fh.tell() == 0:
+            fh.write(b"\0")
+            fh.flush()
+        fh.seek(0)
+        try:
+            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+        except OSError:
+            return False
+        return True
+    try:
+        import fcntl
+    except ImportError:
+        return True
+    try:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return False
+    return True
+
+
 def _unlock_file(fh) -> None:
     try:
         if IS_WINDOWS:
@@ -807,6 +850,14 @@ class BridgeCore:
         self._sessions_lock = threading.Lock()
         self.uploads: dict[str, "Upload"] = {}
         self._uploads_lock = threading.Lock()
+        # Last-known merge of session-helper-owned process records,
+        # for the deadline-bound /v1/status path: (monotonic
+        # fetched-at, registration port, records) plus the last
+        # failed fetch (monotonic, port). See
+        # BridgeHandler._helper_processes_for_status.
+        self._helper_merge_lock = threading.Lock()
+        self._helper_merge_cache: tuple[float, int, list] | None = None
+        self._helper_merge_failed: tuple[float, int] | None = None
         # UAC consent-prompt monitor (polled by a thread started in
         # create_server; inert off Windows).
         self.uac = UacMonitor(self)
@@ -2624,6 +2675,58 @@ class BridgeHandler(BaseHTTPRequestHandler):
             f"{route} via session helper (port {reg['port']})", \
             {"extra": {"via": "session-broker"}}
 
+    def _fetch_helper_processes(self, reg: dict,
+                                timeout_s: float) -> list[dict] | None:
+        """One bounded fetch of the helper's process listing.
+
+        Returns the merged records (tagged via=session-helper), or
+        None when the helper did not answer within timeout_s —
+        unreachable, hung, or a bad payload. Callers decide what a
+        failure means; the distinction from an empty list matters
+        (a live helper with no processes is a success)."""
+        url = f"http://127.0.0.1:{reg['port']}/v1/processes"
+        req = urllib.request.Request(
+            url, headers={"Authorization": f"Bearer {self.core.token}"},
+            method="GET")
+        try:
+            with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+                obj = json.loads(resp.read().decode("utf-8"))
+        except (urllib.error.URLError, OSError, UnicodeDecodeError,
+                json.JSONDecodeError):
+            return None
+        procs = obj.get("processes") if isinstance(obj, dict) \
+            else None
+        if not isinstance(procs, list):
+            return None
+        merged = []
+        for item in procs:
+            if isinstance(item, dict):
+                item = dict(item)
+                item.setdefault("via", "session-helper")
+                merged.append(item)
+        return merged
+
+    def _note_helper_merge(self, reg: dict,
+                           records: list[dict] | None) -> None:
+        """Record a helper-merge outcome for the status path."""
+        core = self.core
+        with core._helper_merge_lock:
+            if records is None:
+                core._helper_merge_failed = (time.monotonic(),
+                                             reg["port"])
+            else:
+                core._helper_merge_cache = (time.monotonic(),
+                                            reg["port"], records)
+                core._helper_merge_failed = None
+
+    def _cached_helper_merge(self, reg: dict) -> list[dict] | None:
+        """The last-known merge for THIS registration, if any."""
+        with self.core._helper_merge_lock:
+            cache = self.core._helper_merge_cache
+        if cache is not None and cache[1] == reg["port"]:
+            return cache[2]
+        return None
+
     def _helper_processes(self) -> list[dict]:
         """Process records owned by the registered session helper.
 
@@ -2635,33 +2738,58 @@ class BridgeHandler(BaseHTTPRequestHandler):
         PR #47 finding). Records are tagged via=session-helper.
         Returns [] when no helper is registered or it does not
         answer — a listing must never fail because the helper is
-        gone; the local records are still the truth locally.
+        gone; the local records are still the truth locally. The
+        listing keeps the generous fetch budget; /v1/status uses
+        _helper_processes_for_status instead (see there why).
         """
         core = self.core
         reg = core.session_helper_registration()
         if reg is None:
             return []
-        url = f"http://127.0.0.1:{reg['port']}/v1/processes"
-        req = urllib.request.Request(
-            url, headers={"Authorization": f"Bearer {core.token}"},
-            method="GET")
-        try:
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                obj = json.loads(resp.read().decode("utf-8"))
-        except (urllib.error.URLError, OSError, UnicodeDecodeError,
-                json.JSONDecodeError):
+        records = self._fetch_helper_processes(reg, timeout_s=5)
+        self._note_helper_merge(reg, records)
+        if records is not None:
+            return records
+        cached = self._cached_helper_merge(reg)
+        return cached if cached is not None else []
+
+    def _helper_processes_for_status(self) -> list[dict]:
+        """The helper merge for /v1/status, bounded by its readers.
+
+        Avatar status readers time out at 1.5 s and the
+        supervisor's update health check at 3 s — a helper that is
+        alive but hung must not make a healthy agent look dead to
+        them (it once could: status shared the listing's 5 s fetch
+        synchronously — Codex PR #47 finding). So this path serves
+        a fresh-enough cached merge without touching the network,
+        backs off briefly after a failed fetch instead of stalling
+        every poll, and otherwise makes ONE fetch attempt with a
+        sub-second timeout. Worst case the status counts lag the
+        helper's registry by a few seconds; the degradation stays
+        local to the counts — status itself always answers.
+        """
+        core = self.core
+        reg = core.session_helper_registration()
+        if reg is None:
             return []
-        procs = obj.get("processes") if isinstance(obj, dict) \
-            else None
-        if not isinstance(procs, list):
-            return []
-        merged = []
-        for item in procs:
-            if isinstance(item, dict):
-                item = dict(item)
-                item.setdefault("via", "session-helper")
-                merged.append(item)
-        return merged
+        now = time.monotonic()
+        with core._helper_merge_lock:
+            cache = core._helper_merge_cache
+            failed = core._helper_merge_failed
+        if cache is not None and cache[1] == reg["port"] \
+                and now - cache[0] < HELPER_MERGE_CACHE_S:
+            return cache[2]
+        if failed is not None and failed[1] == reg["port"] \
+                and now - failed[0] < HELPER_MERGE_RETRY_S:
+            cached = self._cached_helper_merge(reg)
+            return cached if cached is not None else []
+        records = self._fetch_helper_processes(
+            reg, timeout_s=HELPER_STATUS_TIMEOUT_S)
+        self._note_helper_merge(reg, records)
+        if records is not None:
+            return records
+        cached = self._cached_helper_merge(reg)
+        return cached if cached is not None else []
 
     # -- status ------------------------------------------------------------------
     def _status_obj(self) -> dict:
@@ -2676,8 +2804,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
             procs_total = len(core.processes)
         # Helper-owned (brokered) processes count too: without them
         # the avatar reported idle while a GUI app it brokered was
-        # still running.
-        helper_procs = self._helper_processes()
+        # still running. The merge goes through the deadline-bound
+        # status path, never the listing's 5 s fetch.
+        helper_procs = self._helper_processes_for_status()
         procs_total += len(helper_procs)
         procs_alive += sum(1 for p in helper_procs if p.get("alive"))
         with core._sessions_lock:
