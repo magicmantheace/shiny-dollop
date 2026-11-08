@@ -538,7 +538,13 @@ fn validate_observe_result(result: &Value) -> io::Result<()> {
 /// cumulative counters. The sampler object must account for
 /// every retained event: the events array plus the count
 /// the producer trimmed from this response equals the
-/// ring's retained count.
+/// ring's retained count. The aggregates object must
+/// account the same way for its buckets: known metric/unit
+/// pairs only, minute-aligned bucket starts strictly
+/// increasing per series, every bucket carrying at least
+/// one sample with mean at most max, and the carried
+/// buckets plus the response-trimmed count equal to the
+/// store's retained count.
 fn validate_history_result(result: &Value) -> io::Result<()> {
     let invalid = || {
         io::Error::new(
@@ -609,6 +615,98 @@ fn validate_history_result(result: &Value) -> io::Result<()> {
             }
         }
     }
+    let aggregates = result.get("aggregates").ok_or_else(invalid)?;
+    let bucket_ms = aggregates
+        .get("bucket_ms")
+        .and_then(Value::as_u64)
+        .filter(|width| *width > 0)
+        .ok_or_else(invalid)?;
+    if aggregates
+        .get("buckets_per_series")
+        .and_then(Value::as_u64)
+        .is_none_or(|bound| bound == 0)
+        || aggregates
+            .get("dropped_buckets")
+            .and_then(Value::as_u64)
+            .is_none()
+        || aggregates
+            .get("omitted_series")
+            .and_then(Value::as_u64)
+            .is_none()
+    {
+        return Err(invalid());
+    }
+    let retained_buckets = aggregates
+        .get("retained_buckets")
+        .and_then(Value::as_u64)
+        .ok_or_else(invalid)?;
+    let omitted_buckets = aggregates
+        .get("response_omitted_buckets")
+        .and_then(Value::as_u64)
+        .ok_or_else(invalid)?;
+    let series = aggregates
+        .get("series")
+        .and_then(Value::as_array)
+        .ok_or_else(invalid)?;
+    let mut carried_buckets = 0u64;
+    for entry in series {
+        let unit = match entry.get("metric").and_then(Value::as_str) {
+            Some("cpu.busy") => "basis_points",
+            Some("memory.used") => "bytes",
+            Some("disk.throughput.bps" | "net.throughput.bps") => "bytes_per_second",
+            _ => return Err(invalid()),
+        };
+        if entry.get("unit").and_then(Value::as_str) != Some(unit) {
+            return Err(invalid());
+        }
+        let name = entry
+            .get("name")
+            .and_then(Value::as_str)
+            .ok_or_else(invalid)?;
+        if name.is_empty() {
+            return Err(invalid());
+        }
+        let buckets = entry
+            .get("buckets")
+            .and_then(Value::as_array)
+            .ok_or_else(invalid)?;
+        if buckets.is_empty() {
+            return Err(invalid());
+        }
+        let mut previous_start: Option<u64> = None;
+        for bucket in buckets {
+            let start = bucket
+                .get("start_unix_ms")
+                .and_then(Value::as_u64)
+                .ok_or_else(invalid)?;
+            if start % bucket_ms != 0 || previous_start.is_some_and(|previous| start <= previous) {
+                return Err(invalid());
+            }
+            previous_start = Some(start);
+            if bucket
+                .get("samples")
+                .and_then(Value::as_u64)
+                .is_none_or(|samples| samples == 0)
+            {
+                return Err(invalid());
+            }
+            let mean = bucket
+                .get("mean")
+                .and_then(Value::as_u64)
+                .ok_or_else(invalid)?;
+            let max = bucket
+                .get("max")
+                .and_then(Value::as_u64)
+                .ok_or_else(invalid)?;
+            if mean > max {
+                return Err(invalid());
+            }
+            carried_buckets += 1;
+        }
+    }
+    if retained_buckets != carried_buckets + omitted_buckets {
+        return Err(invalid());
+    }
     Ok(())
 }
 
@@ -619,7 +717,7 @@ fn print_help() {
          Commands:\n\
            status          Query veil-core deterministic service status\n\
            observe         Read bounded kernel resource and process counters\n\
-           observe-history Read lifecycle events from the core's history sampler (ADR 0026)"
+           observe-history Read lifecycle events and 1-minute metric aggregates from the core's history sampler (ADR 0026)"
     );
 }
 
@@ -678,6 +776,36 @@ mod tests {
                         "user_ticks": 3, "system_ticks": 1}},
                 },
             ],
+            "aggregates": {
+                "bucket_ms": 60000,
+                "buckets_per_series": 60,
+                "retained_buckets": 3,
+                "dropped_buckets": 0,
+                "omitted_series": 0,
+                "response_omitted_buckets": 0,
+                "series": [
+                    {
+                        "metric": "cpu.busy",
+                        "unit": "basis_points",
+                        "name": "aggregate",
+                        "buckets": [
+                            {"start_unix_ms": 1700000040000u64,
+                             "samples": 12, "mean": 2000, "max": 3000},
+                            {"start_unix_ms": 1700000100000u64,
+                             "samples": 4, "mean": 1000, "max": 1500},
+                        ],
+                    },
+                    {
+                        "metric": "disk.throughput.bps",
+                        "unit": "bytes_per_second",
+                        "name": "sda",
+                        "buckets": [
+                            {"start_unix_ms": 1700000040000u64,
+                             "samples": 12, "mean": 150, "max": 900},
+                        ],
+                    },
+                ],
+            },
         });
         assert!(validate_history_result(&valid).is_ok());
         // A disabled sampler with an empty ring is valid.
@@ -692,6 +820,15 @@ mod tests {
                 "response_omitted_events": 0,
             },
             "events": [],
+            "aggregates": {
+                "bucket_ms": 60000,
+                "buckets_per_series": 60,
+                "retained_buckets": 0,
+                "dropped_buckets": 0,
+                "omitted_series": 0,
+                "response_omitted_buckets": 0,
+                "series": [],
+            },
         });
         assert!(validate_history_result(&disabled).is_ok());
     }
@@ -710,6 +847,15 @@ mod tests {
                     "response_omitted_events": omitted,
                 },
                 "events": events,
+                "aggregates": {
+                    "bucket_ms": 60000,
+                    "buckets_per_series": 60,
+                    "retained_buckets": 0,
+                    "dropped_buckets": 0,
+                    "omitted_series": 0,
+                    "response_omitted_buckets": 0,
+                    "series": [],
+                },
             })
         };
         let event = |sequence: u64, kind: &str| {
@@ -743,6 +889,118 @@ mod tests {
         let mut wrong_schema = base(json!([]), 0, 0);
         wrong_schema["schema"] = json!("synveil.observe/v1");
         assert!(validate_history_result(&wrong_schema).is_err());
+        // Aggregates: a missing object is refused.
+        let mut no_aggregates = base(json!([]), 0, 0);
+        no_aggregates.as_object_mut().unwrap().remove("aggregates");
+        assert!(validate_history_result(&no_aggregates).is_err());
+        let with_series = |series: Value, retained: u64, omitted: u64| {
+            let mut doc = base(json!([]), 0, 0);
+            doc["aggregates"]["series"] = series;
+            doc["aggregates"]["retained_buckets"] = json!(retained);
+            doc["aggregates"]["response_omitted_buckets"] = json!(omitted);
+            doc
+        };
+        let bucket = |start: u64, samples: u64, mean: u64, max: u64| {
+            json!({"start_unix_ms": start, "samples": samples,
+                   "mean": mean, "max": max})
+        };
+        let series = |metric: &str, unit: &str, buckets: Value| {
+            json!({"metric": metric, "unit": unit, "name": "sda",
+                   "buckets": buckets})
+        };
+        // Bucket accounting must balance.
+        assert!(
+            validate_history_result(&with_series(
+                json!([series(
+                    "cpu.busy",
+                    "basis_points",
+                    json!([bucket(0, 1, 1, 1)])
+                )]),
+                2,
+                0
+            ))
+            .is_err()
+        );
+        // Unknown metrics and mismatched units are refused.
+        assert!(
+            validate_history_result(&with_series(
+                json!([series(
+                    "cpu.steal",
+                    "basis_points",
+                    json!([bucket(0, 1, 1, 1)])
+                )]),
+                1,
+                0
+            ))
+            .is_err()
+        );
+        assert!(
+            validate_history_result(&with_series(
+                json!([series("cpu.busy", "bytes", json!([bucket(0, 1, 1, 1)]))]),
+                1,
+                0
+            ))
+            .is_err()
+        );
+        // Unaligned starts, empty buckets, zero samples and
+        // mean above max are refused.
+        assert!(
+            validate_history_result(&with_series(
+                json!([series(
+                    "cpu.busy",
+                    "basis_points",
+                    json!([bucket(30_000, 1, 1, 1)])
+                )]),
+                1,
+                0
+            ))
+            .is_err()
+        );
+        assert!(
+            validate_history_result(&with_series(
+                json!([series("cpu.busy", "basis_points", json!([]))]),
+                0,
+                0
+            ))
+            .is_err()
+        );
+        assert!(
+            validate_history_result(&with_series(
+                json!([series(
+                    "cpu.busy",
+                    "basis_points",
+                    json!([bucket(0, 0, 0, 0)])
+                )]),
+                1,
+                0
+            ))
+            .is_err()
+        );
+        assert!(
+            validate_history_result(&with_series(
+                json!([series(
+                    "cpu.busy",
+                    "basis_points",
+                    json!([bucket(0, 1, 5, 4)])
+                )]),
+                1,
+                0
+            ))
+            .is_err()
+        );
+        // Bucket starts must strictly increase per series.
+        assert!(
+            validate_history_result(&with_series(
+                json!([series(
+                    "cpu.busy",
+                    "basis_points",
+                    json!([bucket(60_000, 1, 1, 1), bucket(60_000, 1, 1, 1)])
+                )]),
+                2,
+                0
+            ))
+            .is_err()
+        );
     }
 
     #[test]

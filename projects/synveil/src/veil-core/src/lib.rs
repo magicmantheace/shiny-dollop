@@ -210,7 +210,12 @@ fn observe_history(request: Request) -> Response {
 /// ring) and the trim is counted in
 /// `sampler.response_omitted_events`. Events are
 /// sequence-ordered, so removing from the front preserves
-/// order and keeps the newest window.
+/// order and keeps the newest window. The aggregate buckets
+/// ride in the same response under the same discipline:
+/// once no events remain to trim, the globally oldest
+/// bucket is dropped from the response (never from the
+/// store) and counted in
+/// `aggregates.response_omitted_buckets`.
 fn fit_history_response(response: &mut Response) -> Result<(), ProtocolError> {
     loop {
         match encode_line(response) {
@@ -226,22 +231,80 @@ fn fit_history_response(response: &mut Response) -> Result<(), ProtocolError> {
                     }
                     _ => false,
                 };
-                if !removed {
+                if removed {
+                    let Some(omitted) = result
+                        .get_mut("sampler")
+                        .and_then(|sampler| sampler.get_mut("response_omitted_events"))
+                        .and_then(|value| value.as_u64())
+                        .and_then(|count| count.checked_add(1))
+                    else {
+                        return Err(error);
+                    };
+                    result["sampler"]["response_omitted_events"] = json!(omitted);
+                    continue;
+                }
+                if !trim_oldest_aggregate_bucket(result) {
                     return Err(error);
                 }
-                let Some(omitted) = result
-                    .get_mut("sampler")
-                    .and_then(|sampler| sampler.get_mut("response_omitted_events"))
-                    .and_then(|value| value.as_u64())
-                    .and_then(|count| count.checked_add(1))
-                else {
-                    return Err(error);
-                };
-                result["sampler"]["response_omitted_events"] = json!(omitted);
             }
             Err(error) => return Err(error),
         }
     }
+}
+
+/// Drop the globally oldest aggregate bucket from a
+/// response copy (the store is untouched): the series whose
+/// first bucket starts earliest loses that bucket, and a
+/// series left empty leaves the response with it. The trim
+/// is counted in `aggregates.response_omitted_buckets`.
+/// Returns false when no bucket can be removed.
+fn trim_oldest_aggregate_bucket(result: &mut Value) -> bool {
+    let Some(aggregates) = result.get_mut("aggregates") else {
+        return false;
+    };
+    let Some(series) = aggregates.get_mut("series").and_then(Value::as_array_mut) else {
+        return false;
+    };
+    let mut target: Option<usize> = None;
+    let mut oldest = u64::MAX;
+    for (index, entry) in series.iter().enumerate() {
+        if let Some(start) = entry
+            .get("buckets")
+            .and_then(Value::as_array)
+            .and_then(|buckets| buckets.first())
+            .and_then(|bucket| bucket.get("start_unix_ms"))
+            .and_then(Value::as_u64)
+            && start < oldest
+        {
+            oldest = start;
+            target = Some(index);
+        }
+    }
+    let Some(index) = target else {
+        return false;
+    };
+    let became_empty = match series[index]
+        .get_mut("buckets")
+        .and_then(Value::as_array_mut)
+    {
+        Some(buckets) => {
+            buckets.remove(0);
+            buckets.is_empty()
+        }
+        None => false,
+    };
+    if became_empty {
+        series.remove(index);
+    }
+    let Some(omitted) = aggregates
+        .get_mut("response_omitted_buckets")
+        .and_then(|value| value.as_u64())
+        .and_then(|count| count.checked_add(1))
+    else {
+        return false;
+    };
+    aggregates["response_omitted_buckets"] = json!(omitted);
+    true
 }
 
 fn status(request: Request) -> Response {
@@ -544,6 +607,89 @@ mod tests {
         assert_eq!(retained + omitted, 300);
         // The retained window is the newest events.
         assert_eq!(result["events"][0]["sequence"], omitted);
+    }
+
+    #[test]
+    fn observe_history_trims_oldest_aggregate_buckets_to_fit_the_wire_limit() {
+        // Two series with fat buckets and no events: the fit
+        // must fall through to bucket trimming, oldest first
+        // across series, and account for every dropped bucket.
+        let bucket = |start: u64| {
+            json!({
+                "start_unix_ms": start,
+                "samples": 12,
+                "mean": 1,
+                "max": 2,
+                "filler": "x".repeat(150),
+            })
+        };
+        let series = |name: &str, starts: &[u64]| {
+            json!({
+                "metric": "disk.throughput.bps",
+                "unit": "bytes_per_second",
+                "name": name,
+                "buckets": starts.iter().map(|start| bucket(*start)).collect::<Vec<_>>(),
+            })
+        };
+        let starts_a: Vec<u64> = (0..200).map(|index| index * 60_000).collect();
+        let starts_b: Vec<u64> = (0..200).map(|index| 30_000 + index * 60_000).collect();
+        let mut response = Response::success(
+            "history-trim-buckets",
+            json!({
+                "schema": "synveil.observe-history/v1",
+                "sampler": {
+                    "enabled": true,
+                    "cadence_ms": 5000,
+                    "ring_capacity": 1024,
+                    "retained_events": 0,
+                    "dropped_events": 0,
+                    "response_omitted_events": 0,
+                },
+                "events": [],
+                "aggregates": {
+                    "bucket_ms": 60000,
+                    "buckets_per_series": 60,
+                    "retained_buckets": 400,
+                    "dropped_buckets": 0,
+                    "omitted_series": 0,
+                    "response_omitted_buckets": 0,
+                    "series": [series("sda", &starts_a), series("sdb", &starts_b)],
+                },
+            }),
+        );
+        fit_history_response(&mut response).unwrap();
+        let encoded = encode_line(&response).unwrap();
+        assert!(encoded.len() <= veil_protocol::MAX_MESSAGE_BYTES + 1);
+        let result = response.result.as_ref().unwrap();
+        let aggregates = &result["aggregates"];
+        let retained: u64 = aggregates["series"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry["buckets"].as_array().unwrap().len() as u64)
+            .sum();
+        let omitted = aggregates["response_omitted_buckets"].as_u64().unwrap();
+        assert!(retained < 400);
+        assert_eq!(retained + omitted, 400);
+        // The retained buckets are the newest: the two
+        // series' starts interleave every 30 s (0, 30000,
+        // 60000, ...), so after `omitted` oldest-first trims
+        // the earliest surviving start is exactly the
+        // (omitted)-th merged start.
+        let earliest = aggregates["series"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|entry| {
+                entry["buckets"]
+                    .as_array()
+                    .unwrap()
+                    .first()
+                    .map(|bucket| bucket["start_unix_ms"].as_u64().unwrap())
+            })
+            .min()
+            .unwrap();
+        assert_eq!(earliest, omitted * 30_000);
     }
 
     #[test]
