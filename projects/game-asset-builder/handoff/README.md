@@ -84,9 +84,12 @@ chrome --headless=new --use-angle=swiftshader-webgl \
 
 The page loads the GLB with GLTFLoader, plays every clip through
 an AnimationMixer, and reports per-clip duration plus the maximum
-bone world-position delta between t=0 and mid-clip as JSON in the
-dumped DOM (`<pre id="result">`). Software WebGL (SwiftShader) is
-enough — the check exercises loading, skinning and animation, not
-rendering quality. `threejs/run_verify.mjs` automates the four
-catalogued assets end to end (localhost server + one Chrome run
-per asset): `node run_verify.mjs <harness-dir>`.
+bone world-position delta between t=0 and mid-clip as JSON in its
+result element. Software WebGL (SwiftShader) is enough — the check
+exercises loading, skinning and animation, not rendering quality.
+`threejs/run_verify.mjs` automates the four catalogued assets end
+to end: it serves the folder locally, drives Chrome through the
+DevTools protocol, and polls the result element until each page's
+own verification finishes (`node run_verify.mjs <harness-dir>`).
+(`--dump-dom` is not usable for this: it snapshots the DOM while
+the GLB load is still in flight.)

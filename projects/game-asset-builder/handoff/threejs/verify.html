@@ -15,10 +15,8 @@
   ?glb=<file.glb>&clips=idle,hop&bones=14
   For a prop pass clips= (empty) and bones=0.
   The verdict lands in the page's result element as JSON and in
-  the title. Headless run (owner's PC, Chrome):
-    chrome --headless=new --use-angle=swiftshader-webgl
-      --enable-unsafe-swiftshader --timeout=60000 --dump-dom
-      "http://127.0.0.1:<port>/verify.html?glb=..."
+  the title. Drive it with run_verify.mjs (DevTools protocol —
+  --dump-dom snapshots too early, while the load is in flight).
 -->
 <script type="importmap">
 {"imports": {

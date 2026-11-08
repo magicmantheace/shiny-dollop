@@ -328,12 +328,61 @@ Layer 3 — segmentation bake-off + stage (PC GPU + VM):
   the spawn-from-browser flow has only the validation tests and the
   run-tracking code behind it, no live run).
 
+## Verified — 2026-11-07 (P3 engine hand-offs: export + playback)
+
+Exporters (VM):
+
+- Suite **101/101** (9 new hand-off tests): exports copy only
+  catalog-verified bytes (a tampered GLB is refused before and
+  after copying), the Godot wrapper references the documented
+  `res://assets/<slug>/` path, the three.js manifest/snippet carry
+  the real clips and bones, and the studio record obeys the intake
+  rules (candidate status, GAB rig_id — never `studio_humanoid_v1`,
+  id/URI patterns from the studio's schema).
+- All four catalogued assets exported to all three targets.
+  The four studio records were additionally validated against the
+  animation studio's actual `schemas/asset.schema.json` with
+  jsonschema — all VALID. (The studio export was run against a
+  scratch asset root; writing into the studio's live store and its
+  register/promote flow remain the studio side's step.)
+
+Godot playback (owner's PC, Godot 4.7.2 console, headless):
+
+- Scratch project from `handoff/godot/`: `--import` exit 0, then
+  `verify_handoff.gd` — **GODOT_VERIFY_DONE ok=true**, exit 0.
+  Every wrapper scene instanced; skeleton bone sets equal the
+  catalog's; every clip exists and moves the skeleton (bone global
+  poses, t=0 vs mid-clip): Ember Dragon hop 1.25 s Δ0.085 /
+  idle 4.79 s Δ0.0062; Snow Goblin wave 2.42 s Δ1.69 / idle
+  Δ0.035; Triceratops bounce Δ0.096 / idle Δ0.156; Treasure Chest
+  confirmed static (mesh, 0 bones, 0 animations).
+
+three.js playback (owner's PC, Chrome headless + SwiftShader,
+three 0.180.0):
+
+- `handoff/threejs/run_verify.mjs` — **THREE_VERIFY_DONE ok=true**,
+  exit 0. GLTFLoader + AnimationMixer: bone counts match the
+  catalog (14/13/15/0); every clip plays with world-space bone
+  motion: dragon hop Δ0.074 / idle Δ0.0029; goblin wave Δ0.70 /
+  idle Δ0.017; triceratops bounce Δ0.030 / idle Δ0.040; chest
+  static. Clip durations agree with Godot's to the digit
+  (1.25 / 4.7917 / 2.4167 s) — the same baked clips, two engines.
+
+Harness defects found and fixed during this proof (all in the
+verification tooling, none in the shipped assets): the Godot
+script's first mesh check searched by node NAME (`find_child`)
+where glTF mesh nodes carry asset names — replaced with a
+type-walk; three ≥ 0.170 splits its module build, so
+`three.core.js` must sit beside `three.module.js` or the import
+graph 404s silently; Chrome `--dump-dom` snapshots while the GLB
+load is still in flight (with and without virtual-time budgets),
+so the driver polls the result element over the DevTools
+protocol instead.
+
 ## Not yet verified
 
 - TRELLIS's proper textured export — blocked on the
   `diff_gaussian_rasterization` CUDA build on the PC.
-- The catalogued GLB in a game engine (Godot/three.js playback of the
-  baked clips) — verified in Blender only; engine hand-off is P3.
 - The rig template on non-dragonoid winged creatures (the template's
   proportions were exercised on two Hunyuan outputs with similar
   anatomy: Pip and the Ember Dragon).
@@ -359,10 +408,18 @@ Layer 3 — segmentation bake-off + stage (PC GPU + VM):
   the Layer-2 stack rather than failing.
 - The label-aware veto on the winged-creature template
   (unexercised), and separation's coincident-vertex seams under
-  engine rendering (Blender-verified only, like everything else
-  pre-P3).
-- GLB playback of the P1 assets in a game engine — same P3 caveat
-  as P0; Blender-verified only.
+  engine RENDERING: P3 proved engine playback by sampling bone
+  poses (Godot headless, three.js under SwiftShader) — no pixels
+  were rendered in either engine, so seam behaviour under a real
+  renderer is still open.
+- Engine playback scope, stated plainly: all four catalogued
+  assets play in Godot 4.7.2 (headless console import + pose
+  sampling) and in three.js 0.180 (Chrome headless, software
+  WebGL). Not covered: visual/rendered output in either engine,
+  the Godot editor GUI import path, a shipped-game integration,
+  and the animation studio's register/promote flow (the P3 studio
+  export is files in its intake format, status candidate —
+  promotion is the studio's own gated process and was not run).
 - The cleanup's debris-shell rule (< 0.5% of the largest shell) on a
   mesh whose small shells are real anatomy (detached eyes, teeth,
   held props): unexercised — on both current meshes the dropped
