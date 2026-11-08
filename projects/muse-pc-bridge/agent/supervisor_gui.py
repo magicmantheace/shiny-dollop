@@ -28,6 +28,14 @@ controls / scripts/bridge-core.ps1 -Action stop). If something that
 is NOT a muse-pc-bridge agent answers on the configured port, the
 window refuses to start rather than fight over it.
 
+In attach mode this process also hosts the interactive SESSION
+HELPER (session_helper.py): the core may be running in session 0
+(the SYSTEM boot form), where screenshot/input/clipboard/GUI-launch
+would act on the wrong desktop — the agent brokers those routes to
+the helper, which lives here in the owner's session. The helper
+stops when the window closes; the core keeps running and its
+desktop routes answer 501 until an avatar (and helper) runs again.
+
 Usage:
   pythonw supervisor_gui.py [--config C:\\path\\config.json]
                             [--install-root C:\\path\\projects\\muse-pc-bridge]
@@ -49,6 +57,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import bridge_update  # noqa: E402
 import display_state  # noqa: E402
+import session_helper  # noqa: E402
 from supervisor import Supervisor  # noqa: E402
 
 POLL_MS = 600
@@ -66,11 +75,62 @@ def _agent_dir() -> Path:
     return Path(__file__).resolve().parent
 
 
-# Supervisor states that mean a core may be mid-start/restart: worth
-# a short wait for the agent to answer before falling back to
-# starting a supervisor of our own (the logon/boot race).
-_CORE_TRANSIENT_STATES = {"starting", "restarting", "update_applied",
-                          "update_healthy", "running_after_rollback"}
+# How long a supervisor status file stays credible evidence that a
+# core is alive: the supervisor writes it at every transition, and
+# the longest silent stretch in a live run is the restart backoff
+# (30 s max) plus a health-check window (20 s) — 90 s covers both
+# with margin. Older than that, the file is a leftover from a dead
+# run and proves nothing.
+_CORE_STATUS_FRESH_S = 90.0
+
+
+def _pid_alive(pid) -> bool:
+    """Cross-platform liveness for the status file's agent_pid."""
+    if not isinstance(pid, int) or pid <= 0:
+        return False
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(0x1000, False, pid)
+            if not handle:
+                return False
+            try:
+                code = ctypes.c_ulong(0)
+                ok = kernel32.GetExitCodeProcess(
+                    handle, ctypes.byref(code))
+                return bool(ok) and code.value == 259  # STILL_ACTIVE
+            finally:
+                kernel32.CloseHandle(handle)
+        except Exception:
+            return False
+    try:
+        import os
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def _core_may_be_alive(state_dir: Path, *, now: float,
+                       pid_alive=_pid_alive) -> bool:
+    """Evidence that a supervisor still owns the agent and may yet
+    bring it to answering: any status but a terminal "stopped",
+    backed by a LIVE agent_pid or a FRESH status timestamp.
+
+    "running" counts: the supervisor writes it the moment it spawns
+    the agent, before the agent has bound its socket — treating it
+    as "core gone" raced a second supervisor onto the same port at
+    exactly the logon/boot overlap this topology creates."""
+    sup = bridge_update._read_json(
+        state_dir / "supervisor-status.json") or {}
+    if not sup or sup.get("state") == "stopped":
+        return False
+    if pid_alive(sup.get("agent_pid")):
+        return True
+    updated = sup.get("updated_at")
+    return isinstance(updated, (int, float)) \
+        and now - float(updated) <= _CORE_STATUS_FRESH_S
 
 
 def fetch_agent_status(config_path: Path) -> dict | None:
@@ -99,32 +159,38 @@ def is_bridge_agent(status: dict | None) -> bool:
 
 
 def choose_gui_mode(config_path: Path, state_dir: Path, *,
-                    fetch=fetch_agent_status, attempts: int = 20,
+                    fetch=fetch_agent_status, attempts: int = 90,
                     interval_s: float = 0.5,
-                    sleep=time.sleep) -> tuple[str, dict | None]:
+                    sleep=time.sleep, now=time.time,
+                    pid_alive=_pid_alive) -> tuple[str, dict | None]:
     """Decide how this window should run.
 
     Returns ("attach", status) when a muse-pc-bridge agent already
     answers, ("foreign", status) when something else answers on the
-    port, or ("own", None) when nothing answers and no core looks
-    mid-start — the historical behaviour of running our own
-    supervisor. While a core reports a transient supervisor state
-    (starting/restarting/updating), the probe retries briefly: at
-    logon the boot core may simply not be up yet.
+    port, or ("own", None) when nothing answers and no live core
+    owns the agent — the historical behaviour of running our own
+    supervisor. While a core may still be alive (fresh supervisor
+    status or a live agent_pid — see _core_may_be_alive), the probe
+    retries: at logon the boot core may still be starting or
+    restarting its agent, and starting a second supervisor against
+    the same port and state files is the failure this wait exists
+    to prevent. With no live-core evidence (no status file, a
+    "stopped" one, or a stale leftover) the answer is "own"
+    immediately — no pointless logon delay.
     """
     status = fetch(config_path)
     if status is not None:
         return ("attach", status) if is_bridge_agent(status) \
             else ("foreign", status)
-    sup = bridge_update._read_json(
-        state_dir / "supervisor-status.json") or {}
-    if sup.get("state") in _CORE_TRANSIENT_STATES:
-        for _ in range(attempts):
-            sleep(interval_s)
-            status = fetch(config_path)
-            if status is not None:
-                return ("attach", status) if is_bridge_agent(status) \
-                    else ("foreign", status)
+    for _ in range(attempts):
+        if not _core_may_be_alive(state_dir, now=now(),
+                                  pid_alive=pid_alive):
+            break
+        sleep(interval_s)
+        status = fetch(config_path)
+        if status is not None:
+            return ("attach", status) if is_bridge_agent(status) \
+                else ("foreign", status)
     return ("own", None)
 
 
@@ -446,8 +512,27 @@ def main(argv: list[str] | None = None) -> int:
         # agent: display-only. Closing the window leaves it running.
         print("[supervisor-gui] Attaching to the running bridge core; "
               "this window is display-only.", flush=True)
+        # Host the interactive session helper from this (user
+        # session) process, so the core can broker desktop routes
+        # here. Failure to start it must not block the avatar — the
+        # core then answers 501 for desktop routes, honestly.
+        helper = None
+        try:
+            helper = session_helper.SessionHelper(
+                args.config, state_dir).start()
+            print(f"[supervisor-gui] Session helper registered on "
+                  f"127.0.0.1:{helper.port} for desktop brokering.",
+                  flush=True)
+        except Exception as exc:  # never block the window on it
+            print(f"[supervisor-gui] WARNING: session helper failed "
+                  f"to start ({exc}); desktop routes will answer "
+                  f"501 via the core.", flush=True)
         window = AvatarWindow(None, args.config, state_dir)
-        window.run()
+        try:
+            window.run()
+        finally:
+            if helper is not None:
+                helper.stop()
         return 0
     supervisor = Supervisor(args.install_root, args.config, state_dir)
     thread = threading.Thread(target=supervisor.run, daemon=True,

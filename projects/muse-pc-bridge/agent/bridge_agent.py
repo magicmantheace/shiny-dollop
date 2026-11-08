@@ -79,6 +79,8 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.error
+import urllib.request
 import uuid
 import zlib
 from collections import deque
@@ -112,6 +114,8 @@ DEFAULT_CONFIG = {
     "job_history_limit": 100,              # finished jobs retained in memory
     "job_output_cap_bytes": 8 * 1024 * 1024,  # per-stream capture cap per job
     "session_idle_timeout_s": 1800,
+    "session_broker": True,              # proxy desktop routes to the
+                                         # interactive session helper
     "uac_poll_interval_s": 2.0,          # UAC consent prompt polling
     "auth_fail_limit": 5,                  # failures inside the window ...
     "auth_fail_window_s": 60,              # ... trigger a temporary block
@@ -245,21 +249,25 @@ def pid_alive(pid: int) -> bool:
     if pid <= 0:
         return False
     if IS_WINDOWS:
-        import ctypes
-        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
-        _declare_process_signatures(kernel32)
-        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-        STILL_ACTIVE = 259
-        handle = kernel32.OpenProcess(
-            PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
-        if not handle:
-            return False
         try:
-            code = ctypes.c_ulong(0)
-            ok = kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
-            return bool(ok) and code.value == STILL_ACTIVE
-        finally:
-            kernel32.CloseHandle(handle)
+            import ctypes
+            kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+            _declare_process_signatures(kernel32)
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            STILL_ACTIVE = 259
+            handle = kernel32.OpenProcess(
+                PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+            if not handle:
+                return False
+            try:
+                code = ctypes.c_ulong(0)
+                ok = kernel32.GetExitCodeProcess(handle,
+                                                 ctypes.byref(code))
+                return bool(ok) and code.value == STILL_ACTIVE
+            finally:
+                kernel32.CloseHandle(handle)
+        except Exception:
+            return False
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -269,6 +277,78 @@ def pid_alive(pid: int) -> bool:
     except OSError:
         return False
     return True
+
+
+# ---------------------------------------------------------------------------
+# Interactive-session broker (v1.1 topology fix)
+#
+# Desktop-class operations — screen capture, input injection, UI
+# automation, the clipboard, launching a GUI window — act on the
+# INTERACTIVE user's desktop. An agent running as SYSTEM under the
+# boot task lives in session 0, whose desktop is not the owner's:
+# serving those routes locally there would silently capture/inject
+# into the wrong desktop. So in the boot topology the agent PROXIES
+# desktop routes to a small helper server that the avatar process
+# hosts inside the interactive session (agent/session_helper.py),
+# and — when no helper is registered — answers an honest 501 for
+# them instead of touching session 0's desktop. The helper registers
+# itself in <state_dir>/session-helper.json with a heartbeat; only a
+# fresh registration with a live pid is trusted.
+# ---------------------------------------------------------------------------
+
+HELPER_REGISTRY_NAME = "session-helper.json"
+HELPER_FRESH_S = 20.0        # heartbeat is 5 s; 20 s of silence = gone
+
+
+def current_session_id() -> int | None:
+    """This process's Windows session id, or None off Windows /
+    when it cannot be determined. Session 0 is the non-interactive
+    services session."""
+    if not IS_WINDOWS:
+        return None
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        session_id = ctypes.c_ulong(0)
+        ok = kernel32.ProcessIdToSessionId(
+            os.getpid(), ctypes.byref(session_id))
+        return int(session_id.value) if ok else None
+    except Exception:
+        return None
+
+
+def read_session_helper(state_dir: Path, *,
+                        now: float | None = None) -> dict | None:
+    """The session helper's live registration, or None.
+
+    A registration counts only when it is fresh (heartbeat within
+    HELPER_FRESH_S), names a live pid, and does not claim session 0
+    (a helper in the services session is no better than the agent
+    itself). Anything else — missing file, stale heartbeat, dead
+    pid — means there is no helper to broker through.
+    """
+    now = time.time() if now is None else now
+    try:
+        reg = json.loads(
+            (Path(state_dir) / HELPER_REGISTRY_NAME).read_text(
+                encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(reg, dict):
+        return None
+    port = reg.get("port")
+    pid = reg.get("pid")
+    updated = reg.get("updated_at")
+    if not isinstance(port, int) or not 0 < port < 65536:
+        return None
+    if not isinstance(pid, int) or not pid_alive(pid):
+        return None
+    if not isinstance(updated, (int, float)) \
+            or now - float(updated) > HELPER_FRESH_S:
+        return None
+    if reg.get("session_id") == 0:
+        return None
+    return reg
 
 
 # ---------------------------------------------------------------------------
@@ -621,8 +701,44 @@ class BridgeCore:
         # UAC consent-prompt monitor (polled by a thread started in
         # create_server; inert off Windows).
         self.uac = UacMonitor(self)
+        # True when this core belongs to the interactive session
+        # helper (agent/session_helper.py) rather than the main
+        # agent: helpers serve desktop routes directly and never
+        # broker onward.
+        self.is_helper = bool(cfg.get("session_helper"))
         self._load_processes()
         self._load_uploads()
+
+    # -- interactive-session broker --------------------------------------
+    def session_helper_registration(self) -> dict | None:
+        """The live session-helper registration to broker desktop
+        routes through, or None. Helpers never broker, and the
+        broker can be switched off in config."""
+        if self.is_helper or not self.cfg.get("session_broker", True):
+            return None
+        return read_session_helper(self.state_dir)
+
+    def desktop_unavailable_reason(self) -> str | None:
+        """Why desktop routes cannot be served right now, or None
+        when they can (directly, or via the session helper).
+
+        Only one case blocks: this agent is in Windows session 0
+        (the SYSTEM boot core) and no interactive session helper is
+        registered. Serving capture/input/clipboard/GUI-launch from
+        session 0 would act on the wrong desktop, so the routes
+        answer 501 with this reason instead. (Off Windows the
+        session id is None, which never equals 0 — no block.)
+        """
+        if self.is_helper:
+            return None
+        if self.session_helper_registration() is not None:
+            return None
+        if current_session_id() != 0:
+            return None
+        return ("desktop features need the interactive session: this "
+                "agent is running in session 0 (boot core) and no "
+                "session helper is registered — log on so the avatar "
+                "starts the helper, or use a logon form of the bridge")
 
     # -- audit -------------------------------------------------------------
     def audit(self, entry: dict) -> None:
@@ -2067,20 +2183,31 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _body_bytes(self, limit: int) -> bytes:
+        """The request body, read at most once: the session broker
+        peeks at the body to decide routing (GUI spawns), and the
+        route handler then reads the same bytes from this cache."""
+        cached = getattr(self, "_cached_body", None)
+        if cached is None:
+            length = int(self.headers.get("Content-Length") or 0)
+            if length > limit:
+                raise ValueError(
+                    f"request body too large ({length} > {limit})")
+            cached = self.rfile.read(length) if length else b""
+            self._cached_body = cached
+        if len(cached) > limit:
+            raise ValueError(
+                f"request body too large ({len(cached)} > {limit})")
+        return cached
+
     def _read_json_body(self) -> dict:
-        length = int(self.headers.get("Content-Length") or 0)
-        if length > MAX_BODY_BYTES:
-            raise ValueError("request body too large")
-        raw = self.rfile.read(length) if length else b""
+        raw = self._body_bytes(MAX_BODY_BYTES)
         if not raw:
             return {}
         return json.loads(raw.decode("utf-8"))
 
     def _read_raw_body(self, limit: int) -> bytes:
-        length = int(self.headers.get("Content-Length") or 0)
-        if length > limit:
-            raise ValueError(f"request body too large ({length} > {limit})")
-        return self.rfile.read(length) if length else b""
+        return self._body_bytes(limit)
 
     def _authorized(self) -> bool:
         header = self.headers.get("Authorization") or ""
@@ -2112,6 +2239,11 @@ class BridgeHandler(BaseHTTPRequestHandler):
             entry["output_sha256"] = output_sha256
         if extra:
             entry.update(extra)
+        if getattr(self.server, "is_helper", False):
+            # This request was served by the interactive session
+            # helper (brokered here by the main agent, which writes
+            # its own entry marked via=session-broker).
+            entry.setdefault("via", "session-helper")
         self.core.audit(entry)
 
     # -- routing ---------------------------------------------------------------
@@ -2129,6 +2261,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def _dispatch(self, method: str) -> None:
         started = time.monotonic()
+        self._cached_body = None
         parsed = urlparse(self.path)
         route = parsed.path
         if not route.startswith("/v1/"):
@@ -2177,6 +2310,47 @@ class BridgeHandler(BaseHTTPRequestHandler):
         upload_match = re.fullmatch(
             r"/v1/file/upload/([0-9a-f]+)(?:/(complete))?", route)
         chunk_match = re.fullmatch(r"/v1/file/upload/([0-9a-f]+)/(\d+)", route)
+
+        # -- interactive-session broker (desktop routes) ----------------
+        # Screenshot / input / UIA / clipboard act on the interactive
+        # desktop: broker them to the session helper when one is
+        # registered, and refuse them (501) from session 0 without
+        # one. GUI spawns and helper-owned process records follow
+        # the same rule. Everything else is served locally as usual.
+        desktop_direct = (
+            (method == "GET" and route == "/v1/screenshot")
+            or (method == "POST" and route == "/v1/input")
+            or (method == "POST" and route == "/v1/uia")
+            or (route == "/v1/clipboard" and method in ("GET", "POST")))
+        if desktop_direct:
+            body = self._body_bytes(MAX_BODY_BYTES) \
+                if method in ("POST", "PUT") else None
+            proxied = self._broker_or_block(method, route, parsed, body)
+            if proxied is not None:
+                return proxied
+        if method == "POST" and route == "/v1/processes":
+            raw = self._body_bytes(MAX_BODY_BYTES)
+            try:
+                peek = json.loads(raw.decode("utf-8")) if raw else {}
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                peek = {}
+            if isinstance(peek, dict) and peek.get("gui") is True:
+                proxied = self._broker_or_block(
+                    method, route, parsed, raw)
+                if proxied is not None:
+                    return proxied
+        if proc_match and ((method == "GET" and not proc_match.group(2))
+                           or (method == "POST"
+                               and proc_match.group(2) == "kill")):
+            with core._processes_lock:
+                known_locally = proc_match.group(1) in core.processes
+            if not known_locally:
+                reg = core.session_helper_registration()
+                if reg is not None:
+                    body = self._body_bytes(MAX_BODY_BYTES) \
+                        if method in ("POST", "PUT") else None
+                    return self._proxy_request(
+                        method, route, parsed, body, reg)
 
         if method == "GET" and route == "/v1/status":
             obj = self._status_obj()
@@ -2274,6 +2448,56 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return self._handle_update_stage()
         return 404, {"error": "not found"}, "no route", {}
 
+    # -- session broker ---------------------------------------------------
+    def _broker_or_block(self, method: str, route: str, parsed,
+                         body: bytes | None):
+        """Route a desktop request: proxy it to the session helper
+        when one is registered, raise PlatformUnavailable when this
+        agent is in session 0 without one, or return None to serve
+        it locally (this agent IS in the interactive session)."""
+        core = self.core
+        reg = core.session_helper_registration()
+        if reg is not None:
+            return self._proxy_request(method, route, parsed, body, reg)
+        reason = core.desktop_unavailable_reason()
+        if reason is not None:
+            raise PlatformUnavailable(reason)
+        return None
+
+    def _proxy_request(self, method: str, route: str, parsed,
+                       body: bytes | None, reg: dict):
+        """Forward a desktop route to the interactive session helper
+        and return its response verbatim. The helper re-checks the
+        same token itself; both sides audit the request (this side
+        marks its entry via=session-broker)."""
+        url = f"http://127.0.0.1:{reg['port']}{route}"
+        if parsed.query:
+            url += f"?{parsed.query}"
+        headers = {"Authorization": f"Bearer {self.core.token}"}
+        data = None
+        if method in ("POST", "PUT"):
+            data = body if body is not None else b""
+            headers["Content-Type"] = \
+                self.headers.get("Content-Type") or "application/json"
+        req = urllib.request.Request(url, data=data, headers=headers,
+                                     method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=70) as resp:
+                status, raw = resp.status, resp.read()
+        except urllib.error.HTTPError as exc:
+            status, raw = exc.code, exc.read()
+        except (urllib.error.URLError, OSError) as exc:
+            raise PlatformUnavailable(
+                f"session helper registered but not answering: {exc}")
+        try:
+            obj = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            obj = {"error": "session helper returned a non-JSON response"}
+            status = 502
+        return status, obj, \
+            f"{route} via session helper (port {reg['port']})", \
+            {"extra": {"via": "session-broker"}}
+
     # -- status ------------------------------------------------------------------
     def _status_obj(self) -> dict:
         core = self.core
@@ -2315,6 +2539,11 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "processes_tracked": procs_total,
             "sessions_open": sessions_open,
             "uac_prompt": core.uac.snapshot(),
+            "session_helper": {
+                "registered":
+                    core.session_helper_registration() is not None,
+                "session_id": current_session_id(),
+            },
             "disk": disk,
             "audit_log": str(core.audit_path),
             "audit_bytes": audit_bytes,
@@ -2904,8 +3133,11 @@ def create_server(cfg: dict) -> ThreadingHTTPServer:
     core.log_start()
     threading.Thread(target=_session_reaper, args=(core,), daemon=True,
                      name="session-reaper").start()
-    threading.Thread(target=_uac_watch, args=(core,), daemon=True,
-                     name="uac-watch").start()
+    if not cfg.get("session_helper"):
+        # The session helper shares the audit log but must not run a
+        # second UAC watch: one prompt would be audited twice.
+        threading.Thread(target=_uac_watch, args=(core,), daemon=True,
+                         name="uac-watch").start()
     return server
 
 

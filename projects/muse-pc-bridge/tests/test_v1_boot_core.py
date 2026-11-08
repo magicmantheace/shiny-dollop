@@ -122,6 +122,32 @@ class DisplayPublishingTests(FakeProjectMixin, unittest.TestCase):
         second = (state / "display-state.json").read_text(encoding="utf-8")
         self.assertEqual(first, second)  # same content incl. "since"
 
+    def test_label_change_republishes_with_same_since(self):
+        # Regression (Codex, PR #47): two alert reasons share the
+        # "alert" state. When the reason changes — agent down, then
+        # back with a UAC prompt waiting — the published LABEL must
+        # follow even though the state did not change, and "since"
+        # must stay at when the alert began.
+        sup, state = self.make_supervisor()
+        sup._fetch_agent_status = lambda: None
+        sup._agent_down_since = time.time() - 100
+        sup._publish_display_state()
+        first = json.loads((state / "display-state.json").read_text(
+            encoding="utf-8"))
+        self.assertEqual(first["state"], "alert")
+        self.assertEqual(first["label"], "Agent not responding")
+        sup._fetch_agent_status = lambda: {
+            "jobs_running": 0, "sessions_open": 0, "processes_alive": 0,
+            "uac_prompt": {"active": True}}
+        sup._publish_display_state()
+        second = json.loads((state / "display-state.json").read_text(
+            encoding="utf-8"))
+        self.assertEqual(second["state"], "alert")
+        self.assertEqual(second["label"], "Approval needed at PC")
+        self.assertEqual(second["since"], first["since"])
+        self.assertGreaterEqual(second["updated_at"],
+                                first["updated_at"])
+
     def test_run_loop_publishes_with_fake_agent(self):
         tmp, install, config, state = self.make_project()
         self.addCleanup(tmp.cleanup)
@@ -154,6 +180,86 @@ class DisplayPublishingTests(FakeProjectMixin, unittest.TestCase):
             thread.join(timeout=15)
 
 
+class StopRequestTests(FakeProjectMixin, unittest.TestCase):
+    """The management scripts' graceful stop: a stop-request file
+    in the state dir stops the supervisor through its normal path
+    (agent stopped gracefully, status "stopped", no restart), where
+    killing the processes would have bypassed the audited agent
+    shutdown (Codex, PR #47)."""
+
+    def make_running_supervisor(self):
+        tmp, install, config, state = self.make_project()
+        self.addCleanup(tmp.cleanup)
+        sup = supervisor_mod.Supervisor(
+            install, config, state, restart_base_delay=0.2,
+            restart_max_delay=1.0, health_timeout_s=4.0,
+            health_interval_s=0.2)
+        thread = threading.Thread(target=sup.run, daemon=True)
+        thread.start()
+        deadline = time.time() + 20
+        while time.time() < deadline:
+            path = state / "supervisor-status.json"
+            if path.exists():
+                try:
+                    status = json.loads(path.read_text(encoding="utf-8"))
+                except json.JSONDecodeError:
+                    status = None
+                if status and status.get("state") == "running":
+                    return sup, thread, state
+            time.sleep(0.1)
+        sup.stop()
+        thread.join(timeout=15)
+        self.fail("supervisor never reached running")
+
+    def test_stop_request_stops_supervisor_without_restart(self):
+        sup, thread, state = self.make_running_supervisor()
+        (state / supervisor_mod.STOP_REQUEST_NAME).write_text(
+            "{}", encoding="utf-8")
+        thread.join(timeout=15)
+        self.assertFalse(thread.is_alive(),
+                         "supervisor ignored the stop request")
+        status = json.loads((state / "supervisor-status.json").read_text(
+            encoding="utf-8"))
+        self.assertEqual(status["state"], "stopped")
+        self.assertEqual(sup.restarts, 0)
+        # The request was consumed, not left lying around.
+        self.assertFalse(
+            (state / supervisor_mod.STOP_REQUEST_NAME).exists())
+
+    def test_stale_stop_request_is_cleared_at_startup(self):
+        tmp, install, config, state = self.make_project()
+        self.addCleanup(tmp.cleanup)
+        (state / supervisor_mod.STOP_REQUEST_NAME).write_text(
+            "{}", encoding="utf-8")
+        sup = supervisor_mod.Supervisor(
+            install, config, state, restart_base_delay=0.2,
+            restart_max_delay=1.0, health_timeout_s=4.0,
+            health_interval_s=0.2)
+        thread = threading.Thread(target=sup.run, daemon=True)
+        thread.start()
+        try:
+            deadline = time.time() + 20
+            state_seen = None
+            while time.time() < deadline:
+                path = state / "supervisor-status.json"
+                if path.exists():
+                    try:
+                        state_seen = json.loads(
+                            path.read_text(encoding="utf-8")).get("state")
+                    except json.JSONDecodeError:
+                        state_seen = None
+                    if state_seen == "running":
+                        break
+                time.sleep(0.1)
+            self.assertEqual(state_seen, "running")
+            self.assertTrue(thread.is_alive())
+            self.assertFalse(
+                (state / supervisor_mod.STOP_REQUEST_NAME).exists())
+        finally:
+            sup.stop()
+            thread.join(timeout=15)
+
+
 class ChooseGuiModeTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -164,14 +270,20 @@ class ChooseGuiModeTests(unittest.TestCase):
         self.config.write_text("{}", encoding="utf-8")
         self.sleeps = []
 
-    def write_supervisor_status(self, state):
+    def write_supervisor_status(self, state, *, updated_at=None,
+                                  agent_pid=None):
+        obj = {"state": state,
+               "updated_at": time.time() if updated_at is None
+               else updated_at}
+        if agent_pid is not None:
+            obj["agent_pid"] = agent_pid
         (self.state / "supervisor-status.json").write_text(
-            json.dumps({"state": state}), encoding="utf-8")
+            json.dumps(obj), encoding="utf-8")
 
-    def choose(self, fetch):
+    def choose(self, fetch, **kw):
         return supervisor_gui.choose_gui_mode(
             self.config, self.state, fetch=fetch, attempts=3,
-            interval_s=0.01, sleep=self.sleeps.append)
+            interval_s=0.01, sleep=self.sleeps.append, **kw)
 
     def test_attach_when_our_agent_answers(self):
         mode, found = self.choose(lambda _p: {"agent": "muse-pc-bridge"})
@@ -188,13 +300,44 @@ class ChooseGuiModeTests(unittest.TestCase):
         self.assertEqual((mode, found), ("own", None))
         self.assertEqual(self.sleeps, [])  # no pointless waiting
 
-    def test_own_immediately_when_core_reports_running(self):
-        # "running" is steady state, not a start in progress: if the
-        # agent does not answer, the core is gone — no retry window.
-        self.write_supervisor_status("running")
+    def test_own_immediately_when_core_reports_stopped(self):
+        self.write_supervisor_status("stopped")
         mode, _ = self.choose(lambda _p: None)
         self.assertEqual(mode, "own")
         self.assertEqual(self.sleeps, [])
+
+    def test_own_immediately_when_running_status_is_stale(self):
+        # A "running" file from a dead run (old timestamp, no live
+        # pid) is a leftover, not a live core: no waiting.
+        self.write_supervisor_status(
+            "running", updated_at=time.time() - 3600)
+        mode, _ = self.choose(lambda _p: None)
+        self.assertEqual(mode, "own")
+        self.assertEqual(self.sleeps, [])
+
+    def test_attach_while_core_reports_running_and_agent_starts(self):
+        # Regression (Codex, PR #47): the supervisor writes
+        # "running" the moment it spawns the agent, BEFORE the
+        # agent binds its socket. A fresh "running" must be waited
+        # out, not treated as "core gone" — the old behaviour raced
+        # a second supervisor onto the same port at logon.
+        self.write_supervisor_status("running")
+        answers = [None, {"agent": "muse-pc-bridge"}]
+        mode, _ = self.choose(lambda _p: answers.pop(0))
+        self.assertEqual(mode, "attach")
+        self.assertEqual(len(self.sleeps), 1)
+
+    def test_waits_on_live_agent_pid_despite_old_status(self):
+        # The supervisor only writes its status at transitions, so
+        # a healthy long-running core's file can be old; a live
+        # agent_pid is the stronger evidence.
+        self.write_supervisor_status(
+            "running", updated_at=time.time() - 3600, agent_pid=4242)
+        answers = [None, {"agent": "muse-pc-bridge"}]
+        mode, _ = self.choose(lambda _p: answers.pop(0),
+                              pid_alive=lambda pid: pid == 4242)
+        self.assertEqual(mode, "attach")
+        self.assertEqual(len(self.sleeps), 1)
 
     def test_attach_after_retry_while_core_is_starting(self):
         self.write_supervisor_status("starting")

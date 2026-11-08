@@ -56,6 +56,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bridge_update  # noqa: E402
 import display_state  # noqa: E402
 
+# A management script (scripts/bridge-core.ps1 / bridge-service.ps1
+# -Action stop) drops this file into the state dir to ask the
+# supervisor for a GRACEFUL stop: the supervisor stops the agent
+# through its normal audited path (server_stop is written) instead
+# of the script killing processes outright. The supervisor deletes
+# any stale file at startup, so a request only counts when it is
+# written while this supervisor is running.
+STOP_REQUEST_NAME = "stop-request.json"
+
 
 def _agent_dir() -> Path:
     return Path(__file__).resolve().parent
@@ -83,7 +92,7 @@ class Supervisor:
         self._fast_crashes = 0
         self._last_status: dict | None = None
         # display-state publishing (see _publish_display_state)
-        self._display_state: str | None = None
+        self._display_key: tuple | None = None
         self._display_since: float = 0.0
         self._agent_down_since: float | None = None
 
@@ -194,6 +203,13 @@ class Supervisor:
         change. Same inputs and mapping the avatar window uses; the
         supervisor owns the file so it stays fresh with no window
         open (headless core) exactly as with one (either GUI form).
+
+        "Change" means the whole view — state, art AND label. Two
+        alert reasons share the alert state (a down agent vs a UAC
+        prompt waiting); comparing only the state would leave the
+        stale label in the file after the reason changed. ``since``
+        still tracks when the STATE began, so a label-only change
+        republishes with the original ``since``.
         """
         agent = self._fetch_agent_status()
         if agent is None:
@@ -205,9 +221,12 @@ class Supervisor:
         update = bridge_update.update_status(self.state_dir)
         view = display_state.resolve_display(
             sup, agent, update, down_since=self._agent_down_since)
-        if view["state"] != self._display_state:
-            self._display_state = view["state"]
-            self._display_since = time.time()
+        key = (view["state"], view["art"], view["label"])
+        if key != self._display_key:
+            if self._display_key is None \
+                    or view["state"] != self._display_key[0]:
+                self._display_since = time.time()
+            self._display_key = key
             try:
                 bridge_update._write_json(
                     self.state_dir / "display-state.json",
@@ -226,6 +245,26 @@ class Supervisor:
                 pass
             self._sleep(1.0)
 
+    # -- stop requests ------------------------------------------------------
+    def _check_stop_request(self) -> bool:
+        """Consume a management stop request, if one was dropped
+        into the state dir while this supervisor is running. The
+        request routes through the same graceful path as stop():
+        the agent gets its graceful signal, so its shutdown is
+        audited (server_stop) instead of bypassed by a kill."""
+        path = self.state_dir / STOP_REQUEST_NAME
+        if not path.exists():
+            return False
+        try:
+            path.unlink()
+        except OSError:
+            pass
+        print("[supervisor] stop requested via "
+              f"{STOP_REQUEST_NAME}; stopping gracefully.",
+              flush=True)
+        self._stop = True
+        return True
+
     # -- main loop ------------------------------------------------------------
     def stop(self) -> None:
         self._stop = True
@@ -233,10 +272,19 @@ class Supervisor:
 
     def run(self) -> int:
         self.state_dir.mkdir(parents=True, exist_ok=True)
+        # A stop request only counts when written while THIS
+        # supervisor runs; clear any stale file from a previous run
+        # so an old request can't stop a fresh start.
+        try:
+            (self.state_dir / STOP_REQUEST_NAME).unlink()
+        except OSError:
+            pass
         self._write_status("starting")
         threading.Thread(target=self._display_loop, daemon=True,
                          name="display-state").start()
         while not self._stop:
+            if self._check_stop_request():
+                break
             applied = None
             pending = bridge_update._read_json(
                 self.state_dir / "update-pending.json")
@@ -297,12 +345,16 @@ class Supervisor:
             code = child.poll()
             if code is not None:
                 return code
+            if self._check_stop_request():
+                break
             time.sleep(0.1)
         return child.poll()
 
     def _sleep(self, seconds: float) -> None:
         deadline = time.monotonic() + seconds
         while not self._stop and time.monotonic() < deadline:
+            if self._check_stop_request():
+                break
             time.sleep(0.1)
 
 
