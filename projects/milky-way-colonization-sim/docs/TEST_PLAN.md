@@ -92,14 +92,19 @@ violations are impossible by construction: the AI dispatches
 through the same core commands that refuse them, and the S3 tests
 pin surveyed+claimed ownership of every AI colony).
 
-- Seed 42, 12 AI + player, 300 years: completes; 893 colonized /
-  1,782 claimed / 1,813 surveyed galaxy-wide; player 94 colonies;
-  contacts 0, disputes 0 (frontiers do not meet at default density).
-- Seed 42, 39 AI + player, 300 years (~8 min wall on this VM):
-  contacts emerge ~year 150–200 (2 pairs by year 300); first claim
-  dispute by year 300.
+- Seed 42, 12 AI + player, 300 years: completes, no crashes;
+  589 colonized / 2,049 claimed / 2,447 surveyed galaxy-wide;
+  player 64 colonies; contacts 1 (first contact at year 215);
+  disputes 3 open by year 300.
+- Seed 42, 39 AI + player, 300 years (~14 min wall on this VM):
+  1,104 colonized / 3,188 claimed / 3,895 surveyed galaxy-wide;
+  player 64 colonies; contacts 1 (first contact at year 215);
+  disputes 3 open by year 300.
 - Determinism: repeated identical 2-year runs produce byte-identical
   yearly output and final state hashes.
+- (Figures corrected 2026-11-08: an earlier draft of this section
+  cited numbers read from in-flight runs; the figures above are
+  from the completed run logs.)
 
 ### Not run / unverified for S3
 

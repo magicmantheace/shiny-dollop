@@ -94,12 +94,16 @@ and still passing.
 
 **Long-run behaviour (release sim-cli, real 113,393-star table,
 seed 42; evidence for §10's headless-campaign verification):**
-- 13 civs × 300 years: completes deterministically, no crashes;
-  893 systems colonized galaxy-wide (player 94), 1,782 claimed.
-  No contact in 300 years at the default count — homes sit
-  250–1,000 ly apart and 300-year frontiers (~200 ly) do not meet.
-- 40 civs × 300 years: first contact emerges around year 150–200;
-  2 contact pairs and the first claim dispute by year 300.
+- 13 civs × 300 years: completes, no crashes; 589 systems
+  colonized galaxy-wide (player 64), 2,049 claimed, 2,447
+  surveyed. Contact comes late at the default count — homes sit
+  250–1,000 ly apart — but it comes: first contact at year 215,
+  and 3 claim disputes open by year 300.
+- 40 civs × 300 years: 1,104 colonized, 3,188 claimed, 3,895
+  surveyed; first contact also at year 215 (1 contact pair by
+  year 300), 3 disputes open by year 300.
+  (Long-run figures corrected 2026-11-08 to the completed run
+  logs; an earlier draft cited in-flight numbers.)
 - Two of the twelve seed-42 AI civs stall at 2–4 colonies: their
   home neighbourhoods have no prudently-reachable unsurveyed stars
   under the S1 fuel numbers. Recorded as an emergent outcome of the
