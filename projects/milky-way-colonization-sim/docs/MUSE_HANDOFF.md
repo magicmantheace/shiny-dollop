@@ -1,5 +1,127 @@
 # MUSE_HANDOFF — Milky Way Colonization Simulator
 
+State as of **2026-11-08**, end of slice S3 (built and VM-verified;
+see the verified/unverified split at the end of the S3 section).
+Branch `milky-way-colonization-sim/s3-ai-races`, based on the S2
+foundation tip; PR #29 (foundation) merged to `main` on 2026-11-07,
+so the S3 draft PR targets `main` (never auto-merge).
+
+## What S3 delivered
+
+**Authorization and the §10 gate.** Adam, 2026-11-07 (direction pick
+"4A"): start S3 now. DESIGN §10 makes S3's start conditional on the
+S2 verification gate — Adam playing a real session on his PC. **Adam
+explicitly waived that gate as a precondition on 2026-11-07.** The
+waiver starts the work; it does not complete the gate: no owner play
+session has happened yet, and S2/S3 interactive play feel remains
+unverified (see the split below). S3's own §10 verification —
+"headless multi-civ campaigns (all-AI, 300 years, no crashes)" — is
+met on this VM (below); its "Adam-facing contact/diplomacy play"
+half is the same still-open owner gate.
+
+**The core (`sim/`) — multi-civilization generalization.**
+- `Campaign` holds `civs: Vec<Civilization>` (index = id; civ 0 is
+  the player). Ships carry an owner; colonies pay their owner;
+  claims are per-civ. Every S1 command gained a civ-parameterized
+  form (`claim_system_for`, `dispatch_ship_for`, …); the player
+  wrappers keep the exact S1 signatures, and a zero-AI campaign is
+  **hash-identical** to the S1/S2 solo game, including under the
+  scripted policy (test-pinned).
+- **Placement (§6.1/§6.2, `race.rs`):** seeded species names and
+  personality vectors (expansion / aggression / trade affinity /
+  xenophobia / honour) drawn from six archetypes with jitter.
+  Homeworlds are real G/K/M catalog stars within 1,000 ly of Sol,
+  habitability ≥ 40 (guaranteed ≥ 60 via the flagged
+  `homeworld_named` adjustment — the design's "first lie", recorded
+  on the profile), local density within 0.4–2.5× the regional
+  median, minimum pairwise spacing 250 ly with a documented
+  relaxation ladder for galaxies that cannot satisfy it. Default
+  12 AI + player; setup accepts 4–40 civilizations total (§11.3).
+  Every civ starts identically provisioned; the player still starts
+  at Sol (§11.7 ruling).
+- **Fog of war is per-civilization** (`surveyed_by` sets). The AI
+  plans only from its own surveyed systems — no back door: it calls
+  the same public commands, pays the same costs, and its dispatches
+  are refused by the same fuel rules.
+- **AI planning (`ai.rs`):** a monthly planner inside the daily
+  advance (so chunking invariance and catch-up equivalence hold by
+  construction): refuel → specialize → build → claim/contest →
+  dispatch, personality-weighted (claim/credit reserves scale with
+  expansion; only aggression ≥ 0.55 contests claims). Surveyors
+  only hop when they can provably get home: outbound leg + the
+  shortest hop-by-hop return path (one shared Dijkstra return-cost
+  field per civ per month) must fit the fuel aboard.
+- **Contact & diplomacy (§6.3, `diplomacy.rs`):** surveying a system
+  another civ holds — or arriving at one — records first contact
+  (idempotent, both directions). Opinions are a pure function of
+  state: disposition from the observer's personality, a penalty per
+  open dispute, border friction from colony proximity; dispute
+  tension grows monthly with the challenger's aggression. The
+  diplomacy view counts only colonies the observer has surveyed —
+  no omniscience. Disputes are opened by the new `contest_claim`
+  command; in S3 they are records with opinion effects — settling
+  them (cede/swap/pay), treaties, trade and war are S4/S5 per §10.
+  The §6.3 translation delay is deferred with the S4 treaty set.
+- **Save format v2.** v1 (S1/S2) saves are rejected with an explicit
+  "unsupported save version 1" error — S2 saves do not carry into
+  S3 builds. The state hash covers the full multi-civ state.
+- **Perf:** `Galaxy` gained a spatial grid (`stars_within`), which
+  also replaced the per-call 113k-star scan behind neighbor lookups.
+  Solo speed is unchanged (~0.5 s per 2 years, release, this VM);
+  a 13-civ campaign runs ≈ 0.4–1.3 s/year.
+
+**The bridge (`bridge/`) — player perspective.** `new` accepts
+`ai_races` (absent = the exact S2 solo behavior); the setup response
+names the AI civs but **never their home systems** (an early draft
+leaked them; removed and test-pinned). Exec gains `contest`. The
+view shows only the player's ships and surveyed systems; a
+`civilizations` roster lists the player plus **contacted** civs
+with opinion breakdowns both ways and open disputes; a `galaxy`
+block carries map-wide totals. Event visibility: your events
+always; contact/dispute events involving you always; foreign
+presence events only in systems you have surveyed; foreign internal
+events never. Catch-up snapshots gained the galaxy totals, so the
+"while you were away" review (§11.1) reports AI expansion, new
+contacts and new disputes alongside your own deltas.
+
+**The viewer (`viewer/`).** Menu gains the AI-race count (0–39,
+default 12). New **Diplomacy** overlay (contacted civs, opinion
+components, dispute tension). **Contest Claim** button on foreign
+claims in the system panel. Event log names actors ("First contact
+— A × B"); the catch-up modal adds the galaxy section. New
+`--verify-s3` headless mode; `--verify` and `--verify-s2` unchanged
+and still passing.
+
+**Long-run behaviour (release sim-cli, real 113,393-star table,
+seed 42; evidence for §10's headless-campaign verification):**
+- 13 civs × 300 years: completes deterministically, no crashes;
+  893 systems colonized galaxy-wide (player 94), 1,782 claimed.
+  No contact in 300 years at the default count — homes sit
+  250–1,000 ly apart and 300-year frontiers (~200 ly) do not meet.
+- 40 civs × 300 years: first contact emerges around year 150–200;
+  2 contact pairs and the first claim dispute by year 300.
+- Two of the twelve seed-42 AI civs stall at 2–4 colonies: their
+  home neighbourhoods have no prudently-reachable unsurveyed stars
+  under the S1 fuel numbers. Recorded as an emergent outcome of the
+  §6.1 density band + fuel rules, not patched over in S3; a balance
+  question for Adam (ship range vs placement density), not a defect
+  claim either way.
+
+**Verified (this VM, 2026-11-08, final code):** pipeline tests
+22/22; sim tests 28/28 (incl. zero-AI ≡ solo hash equality,
+per-civ fog, disputes, v1-save rejection, and **catch-up
+equivalence with AI active**: advance 5 y → save/load → hash equal;
+10 y total ≡ uninterrupted); bridge tests 20/20 (incl. bridge-level
+catch-up equivalence with AI active and the no-leak perspective
+rules); Godot `--verify`, `--verify-s2`, `--verify-s3` all-pass.
+**Unverified:** interactive play feel and the owner-PC play session
+(S2 gate, waived as a precondition, still unmet); windowed Godot
+interaction with the new diplomacy UI; overnight real-clock
+catch-up; the Windows export build / `sim-bridge.exe` on Windows;
+FPS on Adam's RTX 3060 (owner-hardware gate, as always).
+
+---
+
 State as of **2026-11-06**, end of slice S2 (built and VM-verified;
 Adam's owner-PC play session is the slice's remaining gate).
 Branch `milky-way-colonization-sim/foundation`, tracked by draft

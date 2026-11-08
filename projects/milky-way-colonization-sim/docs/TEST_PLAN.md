@@ -1,8 +1,120 @@
 # TEST_PLAN — Milky Way Colonization Simulator
 
-What was actually run, with results. Last updated 2026-11-06 (S2).
+What was actually run, with results. Last updated 2026-11-08 (S3).
 Nothing in this file is aspirational: every claim below was executed
-on this VM during the S0/S1/S2 builds.
+on this VM during the S0/S1/S2/S3 builds.
+
+## S3 — AI races, first contact, disputes
+
+All runs below were executed on this VM on 2026-11-08 against the
+final S3 code (branch `milky-way-colonization-sim/s3-ai-races`).
+
+### Sim tests (Rust, `sim/`)
+
+```
+cd sim && cargo test          # debug profile
+```
+
+Result: **28 passed, 0 failed** (8 unit + 13 S1 integration +
+7 S3 integration in `sim/tests/s3.rs`), exit 0. The S1 suites pass
+unmodified — solo behavior is preserved by construction.
+
+- **Placement:** same seed → identical placement; 12 AI civs placed
+  with pairwise spacing ≥ 200 ly on the synthetic galaxy; every civ
+  provisioned identically (15,000 credits, homeworld colony,
+  surveyor + colony ship); personalities inside 0..=1.
+- **Zero-AI ≡ solo:** `new_game(0 AI)` state hash equals the S1
+  `new_default` hash at day 0 **and** after 365 scripted-policy days.
+- **Per-civ fog:** an AI civ has surveyed only its own home at
+  day 0; the player likewise.
+- **AI expansion + catch-up equivalence (headline):** 12 AI civs on
+  the synthetic galaxy — advance 1,825 days → save → load → state
+  hash **equal**; advance to 3,650 days → hash **equal** to the
+  uninterrupted run. After 10 years the galaxy holds more colonies
+  than the 13 homeworlds, and every AI colony sits in a system its
+  owner surveyed and claimed (the AI plays by the rules).
+- **First contact:** surveying a foreign home system records the
+  contact pair and emits exactly one `FirstContact` event.
+- **Disputes:** contest error order pinned (unsurveyed → not
+  foreign-held → duplicate); a contested claim opens a dispute,
+  drops the holder's opinion of the challenger below zero via the
+  dispute component, and tension grows over 365 days.
+- **Save v2:** a hand-built v1 byte string is rejected with
+  "unsupported save version 1".
+
+### Bridge tests (Rust, `bridge/`)
+
+```
+cd bridge && cargo test       # debug profile
+```
+
+Result: **20 passed, 0 failed** (7 unit + 9 S2 integration +
+4 S3 integration in `bridge/tests/s3.rs`), exit 0.
+
+- **Setup without leaks:** `new` with `ai_races: 3` — the setup
+  block names 3 AI civs and contains no home-system field; the view
+  roster is the player alone; the galaxy block counts 4 civs and 4
+  colonies; the player sees exactly 2 ships and 1 system.
+- **Solo default unchanged:** `new` without `ai_races` returns a
+  null setup block and the S2 solo view.
+- **Catch-up equivalence with AI active (headline):** a 4-civ
+  campaign advanced 730 days by exec vs the same save loaded with
+  a 730-day elapsed override — **identical state hash**; both paths
+  advanced a further ~7.3 years remain identical, with galaxy
+  colonies beyond the 4 homeworlds (AI expanded during catch-up).
+- **Diplomacy view + event filter:** on a crafted campaign with a
+  recorded contact and an open dispute, the roster gains the met
+  civ with a negative dispute opinion component and live tension;
+  `first_contact` / `claim_contested` events reach the player with
+  civ names; the same window's foreign `ship_built` /
+  `ship_refuelled` / `specialization_set` events do not.
+
+### Godot headless verifies (viewer, Godot 4.7.2, real table)
+
+```
+godot --headless --path viewer -- --verify
+godot --headless --path viewer -- --verify-s2 --bridge=<release sim-bridge>
+godot --headless --path viewer -- --verify-s3 --bridge=<release sim-bridge>
+```
+
+Results: `--verify` all-pass (S0 regression); `--verify-s2`
+all-pass (S2 regression); **`--verify-s3` all-pass**:
+`setup ai=12 homes_hidden=true` · `perspective roster=1
+galaxy_civs=13 ships=2 surveyed=1` · `advance day=365
+galaxy_surveyed=53 player_surveyed=1` · `contest
+refused_cleanly=true` · `catchup galaxy_fields=true`.
+
+### Headless long-run campaigns (release `sim-cli`, real table)
+
+DESIGN §10's S3 verification asks for headless multi-civ campaigns
+(300 years, no crashes, no civ breaking the fuel rules — fuel-rule
+violations are impossible by construction: the AI dispatches
+through the same core commands that refuse them, and the S3 tests
+pin surveyed+claimed ownership of every AI colony).
+
+- Seed 42, 12 AI + player, 300 years: completes; 893 colonized /
+  1,782 claimed / 1,813 surveyed galaxy-wide; player 94 colonies;
+  contacts 0, disputes 0 (frontiers do not meet at default density).
+- Seed 42, 39 AI + player, 300 years (~8 min wall on this VM):
+  contacts emerge ~year 150–200 (2 pairs by year 300); first claim
+  dispute by year 300.
+- Determinism: repeated identical 2-year runs produce byte-identical
+  yearly output and final state hashes.
+
+### Not run / unverified for S3
+
+- Interactive play: the S2 owner-PC play session (DESIGN §10 gate)
+  was **waived by Adam on 2026-11-07 as a precondition for starting
+  S3** — it has still not happened; play feel and Adam-facing
+  contact/diplomacy play are unverified.
+- Windowed Godot interaction with the diplomacy overlay / contest
+  button (headless verify covers the bridge contract and script
+  compilation, not clicking).
+- Overnight real-clock catch-up (the elapsed-override path is
+  test-proven; a real overnight wall-clock run is not).
+- Windows export build and `sim-bridge.exe` execution on Windows.
+- FPS on Adam's RTX 3060 — owner-hardware measurement only, per
+  project rules.
 
 ## S2 — bridge + Godot game frontend
 
