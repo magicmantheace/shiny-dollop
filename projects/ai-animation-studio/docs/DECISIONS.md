@@ -89,3 +89,28 @@ scene `timing` object and speak `duration_ms` (wire bounds 100–60000 ms);
 exported settings, overridable per scene. Suite 49/49 and headless probe
 scenes (delay, explicit duration, both clamps, both scene overrides)
 verified the computed times; see `docs/TEST_PLAN.md`.
+
+## ADR-010: Procedural generators must be byte-deterministic across platforms (2026-11-07)
+
+**Accepted (owner direction 2026-11-07: the real fix, not per-platform
+hashes).** A generated asset's pinned SHA-256 (ADR-008) is only
+meaningful if the generator reproduces the same bytes on every
+platform. The lantern generator (F5.3) did not: CPython's `math.sin` /
+`math.cos` delegate to the platform C library, whose last-bit rounding
+differs between libcs (glibc vs the Windows CRT). The generator's flat
+normals subtract nearly equal sines, so the affected components are
+pure libm rounding noise (~1e-16, true value ~0) and the GLB hashed
+differently on the owner's Windows PC than on the Linux VM — the
+promotion hash gate refused it by hash. Generators therefore must not
+let platform-libm results reach the output bytes: trigonometry (and
+any other non-correctly-rounded libm function) is computed in pure
+Python over +, -, * and / — IEEE 754 correctly rounded operations that
+return identical bits everywhere. `math.sqrt` remains allowed: IEEE
+754 mandates its correct rounding and both libcs honour that. The
+lantern generator now implements this (deterministic-trigonometry
+section in `tools/generate_lantern.py`); its output hash changed once,
+to the platform-independent value pinned in
+`examples/lantern_procedural_catalog.json` and as a literal in
+`tests/test_create_promote.py`, and was verified byte-identical on
+Linux and on the owner's Windows PC (see
+`docs/IMPLEMENTATION_STATUS.md`, lantern determinism section).

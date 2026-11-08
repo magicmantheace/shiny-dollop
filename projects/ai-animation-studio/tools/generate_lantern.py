@@ -4,12 +4,21 @@
 Builds a minimal, valid binary glTF (GLB) of a small tavern lantern —
 hexagonal frame (base, six pillars, top cap, knob), an emissive core
 and a tube handle — from fixed geometry constants, Python stdlib only.
-The output is byte-identical on every run: no timestamps, no random
-seeds, no environment input; vertex data is packed from the same float
-computations and the JSON chunk is serialized with fixed separators.
-That determinism is what lets the asset catalog pin a SHA-256 for the
-generated file (examples/lantern_procedural_catalog.json) and the
-ADR-008 promotion gates verify it, exactly like a hand-authored asset.
+The output is byte-identical on every run AND on every platform: no
+timestamps, no random seeds, no environment input; vertex data is
+packed from the same float computations and the JSON chunk is
+serialized with fixed separators. "Every platform" is load-bearing:
+CPython's math.sin / math.cos delegate to the platform C library,
+whose last-bit rounding differs between libcs (glibc vs the Windows
+CRT), and the ADR-008 hash gate caught this generator producing a
+different SHA-256 on Windows than on Linux — the hexagon flat normals
+subtract two nearly equal sines, so the residual is pure libm
+rounding noise. The trigonometry below is therefore pure Python over
++, -, * and / (IEEE 754 correctly rounded, identical bits everywhere);
+see ADR-010. That determinism is what lets the asset catalog pin a
+SHA-256 for the generated file
+(examples/lantern_procedural_catalog.json) and the ADR-008 promotion
+gates verify it, exactly like a hand-authored asset.
 
 The lantern is an original procedural model, CC0-1.0 by construction.
 It has no skeleton and no animations: it is a `prop` — scenes attach it
@@ -43,6 +52,72 @@ HANDLE_RADIUS = 0.038
 HANDLE_TUBE = 0.0055
 HANDLE_ARC_STEPS = 12
 HANDLE_SECTION_SIDES = 8
+
+
+# --- Deterministic trigonometry (ADR-010) ---
+# math.sin / math.cos call the platform C library, which does not
+# round the last bit identically across libcs; every other float
+# operation this file needs (+, -, *, / and math.sqrt, whose correct
+# rounding IEEE 754 mandates) is bit-identical on every platform.
+# So sine and cosine are computed here in pure Python: quadrant
+# reduction against a two-part pi/2 (Cody-Waite, so the reduced
+# argument stays accurate), then Taylor polynomials in Horner form.
+# Every operation is correctly rounded, so the results are the same
+# doubles on any IEEE 754 platform, and the geometry built from them
+# packs to the same bytes. Accuracy vs the platform libm is within a
+# couple of ULP over the angles used here (all in [0, 2*pi]) — far
+# below the float32 packing the GLB applies.
+_PI_2_HI = 1.5707963267948966      # double nearest pi/2
+_PI_2_LO = 6.123233995736766e-17   # pi/2 - _PI_2_HI
+
+
+def _reduce_quadrant(x: float):
+    """Split x into (r, q) with x ~= q * (pi/2) + r, r in [-pi/4, pi/4]."""
+    q = math.floor(x / _PI_2_HI + 0.5)
+    r = (x - q * _PI_2_HI) - q * _PI_2_LO
+    return r, q % 4
+
+
+def _sin_poly(r: float) -> float:
+    """Taylor sine for |r| <= pi/4, through r**17 (Horner form)."""
+    r2 = r * r
+    return r * (1.0 + r2 * (-1.0 / 6.0 + r2 * (1.0 / 120.0 + r2 * (
+        -1.0 / 5040.0 + r2 * (1.0 / 362880.0 + r2 * (
+            -1.0 / 39916800.0 + r2 * (1.0 / 6227020800.0 + r2 * (
+                -1.0 / 1307674368000.0 + r2 * (
+                    1.0 / 355687428096000.0)))))))))
+
+
+def _cos_poly(r: float) -> float:
+    """Taylor cosine for |r| <= pi/4, through r**16 (Horner form)."""
+    r2 = r * r
+    return 1.0 + r2 * (-1.0 / 2.0 + r2 * (1.0 / 24.0 + r2 * (
+        -1.0 / 720.0 + r2 * (1.0 / 40320.0 + r2 * (
+            -1.0 / 3628800.0 + r2 * (1.0 / 479001600.0 + r2 * (
+                -1.0 / 87178291200.0 + r2 * (
+                    1.0 / 20922789888000.0))))))))
+
+
+def _sin(x: float) -> float:
+    r, q = _reduce_quadrant(x)
+    if q == 0:
+        return _sin_poly(r)
+    if q == 1:
+        return _cos_poly(r)
+    if q == 2:
+        return -_sin_poly(r)
+    return -_cos_poly(r)
+
+
+def _cos(x: float) -> float:
+    r, q = _reduce_quadrant(x)
+    if q == 0:
+        return _cos_poly(r)
+    if q == 1:
+        return -_sin_poly(r)
+    if q == 2:
+        return -_cos_poly(r)
+    return _sin_poly(r)
 
 
 def _sub(a, b):
@@ -83,7 +158,7 @@ class TriangleSoup:
 
 def _ring_point(radius: float, sides: int, index: int, y: float):
     angle = 2.0 * math.pi * index / sides
-    return (radius * math.cos(angle), y, radius * math.sin(angle))
+    return (radius * _cos(angle), y, radius * _sin(angle))
 
 
 def add_prism(soup: TriangleSoup, radius: float, sides: int,
@@ -129,14 +204,14 @@ def add_handle(soup: TriangleSoup) -> None:
     """
     def ring(t: float):
         angle = math.pi * t
-        center = (HANDLE_RADIUS * math.cos(angle),
-                  HANDLE_CENTER_Y + HANDLE_RADIUS * math.sin(angle), 0.0)
-        radial = (math.cos(angle), math.sin(angle), 0.0)
+        center = (HANDLE_RADIUS * _cos(angle),
+                  HANDLE_CENTER_Y + HANDLE_RADIUS * _sin(angle), 0.0)
+        radial = (_cos(angle), _sin(angle), 0.0)
         points = []
         for k in range(HANDLE_SECTION_SIDES):
             phi = 2.0 * math.pi * k / HANDLE_SECTION_SIDES
-            offset = tuple(HANDLE_TUBE * (math.cos(phi) * radial[d]
-                                          + (math.sin(phi) if d == 2 else 0.0))
+            offset = tuple(HANDLE_TUBE * (_cos(phi) * radial[d]
+                                          + (_sin(phi) if d == 2 else 0.0))
                            for d in range(3))
             points.append(tuple(center[d] + offset[d] for d in range(3)))
         return center, points
@@ -162,9 +237,9 @@ def build_frame() -> TriangleSoup:
     add_prism(soup, HEX_RADIUS, HEX_SIDES, BASE_Y0, BASE_Y1)
     for i in range(HEX_SIDES):
         angle = 2.0 * math.pi * i / HEX_SIDES
-        center = (PILLAR_RADIUS * math.cos(angle),
+        center = (PILLAR_RADIUS * _cos(angle),
                   (PILLAR_Y0 + PILLAR_Y1) / 2.0,
-                  PILLAR_RADIUS * math.sin(angle))
+                  PILLAR_RADIUS * _sin(angle))
         add_box(soup, center,
                 (PILLAR_HALF, (PILLAR_Y1 - PILLAR_Y0) / 2.0, PILLAR_HALF))
     add_prism(soup, HEX_RADIUS, HEX_SIDES, TOP_Y0, TOP_Y1)

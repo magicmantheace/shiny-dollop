@@ -19,6 +19,10 @@ Root `AGENTS.md`, project `AGENTS.md`, `docs/PRODUCT_SPEC.md`, `docs/ARCHITECTUR
 7. Update docs with proven behaviors and start F1 acceptance measurements.
 8. Open/maintain reviewable PR; do not auto-merge or modify other repos.
 
+## Update 2026-11-07 — lantern generator platform determinism (ADR-010)
+
+`tools/generate_lantern.py` no longer uses `math.sin`/`math.cos` (platform libm, last-bit rounding differs glibc vs Windows CRT — it made the GLB hash differ across platforms and the ADR-008 gate refuse the PC-generated file). Sine/cosine are pure Python now; the output is byte-identical on Linux and on the owner's Windows PC (SHA-256 `897850a9…`, 33,148 bytes; proof in `docs/IMPLEMENTATION_STATUS.md`). The catalog pin in `examples/lantern_procedural_catalog.json` was updated once to the new hash; the same hash is pinned as a literal in `tests/test_create_promote.py` alongside a libm-perturbation regression test. Suite 334/334. Any local asset-store copy of the lantern GLB predating this change hashes to the old value — regenerate it with the committed generator before promoting. Future procedural generators must follow ADR-010: no platform-libm results in output bytes.
+
 ## Boundaries
 
 The runtime should never block on the LLM or asset generation. No AthenZ, Developmental-AI, Synveil, Crawl or existing project integrations. Use local/offline defaults. Do not commit model weights or media. Prototype dialogue logs are not speech synthesis. 30 FPS remains an untested goal until measured.
