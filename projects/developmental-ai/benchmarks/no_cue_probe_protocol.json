@@ -1,0 +1,75 @@
+{
+  "schema": "developmental-ai.active-diagnostic-no-cue-protocol/v1",
+  "created": "2026-10-21",
+  "frozen_before_candidate": true,
+  "goal": "Select prior risk history from a first-step public action outcome, with NO simulator-supplied context beacon or runtime phase labels.",
+  "world": "Existing ShiftedCargo A/B descriptor-meaning swap; hidden dynamics unchanged; action handles and sensors rotate each episode.",
+  "source_training": "Independently fitted A and B RiskMemory histories, 80 cargo episodes each from prior protocol. Training harness knows source regimes; runtime controller never sees phase names or a context beacon.",
+  "diagnostic": "At time zero when all public sensors zero, choose one numeric action descriptor with an empirically separable accepted/blocked response in first-step training evidence. Estimate smoothed Bernoulli likelihoods per history using ONLY first logged step and descriptor; require >=2 observed first-step attempts per context and >=0.30 smoothed acceptance gap, or abstain. After one public diagnostic feedback, choose the history with higher likelihood. Diagnostics are active interventions; an action could still be harmful in other systems. No more than one special probe per episode.",
+  "runtime_interface": "only DescribedWorld public frame and public action accepted/blocked feedback; no cue, regime ID, simulator truth/recipes, or hidden action names.",
+  "evaluation": {
+    "phases": [
+      "A",
+      "B",
+      "A_return"
+    ],
+    "split": "test",
+    "indices": {
+      "A": [
+        8700,
+        8759
+      ],
+      "B": [
+        8700,
+        8759
+      ],
+      "A_return": [
+        8800,
+        8859
+      ]
+    },
+    "episodes_per_phase_per_seed": 60,
+    "budget": 18
+  },
+  "seeds": {
+    "development": [
+      51001,
+      51013,
+      51031
+    ],
+    "reserved_inspected": [
+      61001,
+      61013,
+      61031
+    ]
+  },
+  "baselines": [
+    "diagnostic_inference",
+    "context_beacon_upper_reference",
+    "frozen_A_only",
+    "frozen_B_only",
+    "untrained_novel",
+    "wrong_probe_A_fallback",
+    "privileged_risk_oracle"
+  ],
+  "metrics": [
+    "success",
+    "spoilage",
+    "blocked",
+    "attempts",
+    "diagnostic_coverage",
+    "context_selection_accuracy_scoring_only",
+    "abstention",
+    "decision_trace_integrity",
+    "read_only_training_memory"
+  ],
+  "limitations": [
+    "All six seeds were already inspected in previous A-B-A study; NO blind holdout",
+    "Engineered descriptors are stable re-encodings of action identities",
+    "Training harness has already segregated A/B exposures; controller infers only which trained history to use",
+    "One specific known diagnostic on a fixed zero-resource starting state can disclose regime safely here but may be unsafe elsewhere",
+    "Shared deterministic simulator and two known remappings; not unsupervised discovery of wholly novel dynamics",
+    "Comparisons differ in total training episode cost; report them",
+    "Historic benchmarks and default unchanged; do not merge based on simulated results alone"
+  ]
+}

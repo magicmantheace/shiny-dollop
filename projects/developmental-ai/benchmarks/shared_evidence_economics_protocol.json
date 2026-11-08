@@ -1,0 +1,87 @@
+{
+  "schema": "developmental-ai.shared-evidence-economics-protocol/v1",
+  "frozen_on": "2026-10-24",
+  "commitment": "This exact protocol is committed before source changes, evaluation and result inspection. Failure is reported, not optimized by using inspected seeds.",
+  "question": "Can reuse of an already acquired external public-outcome bank across repeated checkpoint scenarios improve selective learning's aggregate acquisition-plus-TEST cost relative to fresh independent witness actions, without concealing upstream actor harm?",
+  "environment": {
+    "world": "Reuse ConditionalWorld private source->conditional->source->xor rules with inlet/outlet public schema, deterministic truthful outcomes and artificially stratified 5 productive/4 harmful/3 neutral candidate actions.",
+    "base_train": "Same independent one-action simulator actor, per seed source240, conditional128, source return64, XOR128. All base actor harm counts once and is common to policies.",
+    "checkpoint_seeds": "Each checkpoint has 16 held-out TEST episodes per seed, reused across checkpoints but never fed into learner. Checkpoints are counterfactual independent scenarios, NOT one continuous real-time learner trajectory.",
+    "arm_A": "Selective without extra evidence: unchanged ValidatedAbstainingMemory.",
+    "arm_B": "Fresh-on-demand independent witness: unchanged WitnessRecoveryMemory, up to four eight-action batches when public predictive adequacy fails; new TRAIN split actor episodes separately generated for EACH stage/checkpoint/seed; count harm per unique acquisition episode.",
+    "arm_C": "Pre-collected shared bank: one unique set of 32 first-action external actor outcomes PER STAGE/SEED (non-source stages only), acquired at that stage's entrance irrespective of whether learner later uses them. This bank is available to each checkpoint scenario; when adequacy is false, offer eight at a time in fixed order through unchanged WitnessRecoveryMemory API, up to 32. NEVER count bank actions repeatedly per checkpoint. Reuse of already-observed events does not make original actor actions passive/free; 32 actions already executed at stage entry.",
+    "actor_episode_indices": "Shared bank: 600000 + stage_number*10000 through +31. Fresh-on-demand: 650000 + stage_number*10000 + checkpoint_ordinal*100 through +31. Split=train. No actor episode index overlaps base TRAIN or TEST.",
+    "test_indices": {
+      "conditional": 410000,
+      "return_source": 420000,
+      "xor": 430000
+    },
+    "outcomes": "Truthful deterministic; no tests of stochastic noise, provenance authenticity or unseen operator invention. Neither evaluated policy initiates training actions."
+  },
+  "policies": [
+    "no_extra_evidence",
+    "fresh_witness",
+    "shared_bank",
+    "always_act_gated",
+    "always_abstain",
+    "frozen_source",
+    "privileged_known_xor",
+    "perfect_action_oracle"
+  ],
+  "cohorts": {
+    "development": [
+      282003,
+      282021,
+      282039
+    ],
+    "additional": [
+      283001,
+      283017,
+      283041
+    ]
+  },
+  "checkpoints": {
+    "conditional": [
+      0,
+      8,
+      16,
+      32,
+      64,
+      96
+    ],
+    "return_source": [
+      0,
+      8,
+      16,
+      32,
+      64
+    ],
+    "xor": [
+      0,
+      8,
+      16,
+      32,
+      64,
+      96
+    ]
+  },
+  "metrics": {
+    "task": "successes, harmful TEST actions, abstained failed tasks and attempts per policy, all checkpoints.",
+    "acquisition": "Unique base actor interventions and harm, shared bank actor interventions/harm counted ONCE per stage/seed even if never accepted, demand witness action harm counted per actual requested stage/seed/checkpoint. Separate consumed share counts from unique sourced counts.",
+    "global_cost": "Across all independent checkpoint scenarios, weighted study loss = 10*(summed harmful TEST actions + unique extra acquisition harmful actions) + (summed failed-by-abstention tasks + unique extra acquisition actions). Base training-actor harm is identical for policies and displayed separately. This is one authored cost convention, not a universally valid risk valuation.",
+    "scopes": "Study-wide cost aggregates TEST episodes across checkpoint scenarios as separate evaluation exposures even though indices repeat. They are not statistically independent, and source-bank costs are counted only once. ALSO report per-checkpoint raw metrics."
+  },
+  "acceptance": [
+    "At conditional32, shared bank policy succeeds on >=25 of 96 TEST tasks.",
+    "At source-return8, shared bank policy succeeds on >=25 of 96 TEST tasks.",
+    "Unique shared-bank acquisition actions across all phases/seeds < unique fresh-on-demand acquisition actions; disclose harm for both.",
+    "Report total authored study loss for all policies, even if shared bank loses. No automatic promotion regardless of which gates pass."
+  ],
+  "limits": [
+    "The shared bank is pre-collected through real external simulator interventions, NOT passive sensing or harmless evidence. Its upfront harm must be counted even when unused.",
+    "The same bank is reused across counterfactual checkpoints but the actual task episodes for checkpoints are repeated. Study-wide loss is an accounting convention, not independent statistical trials or a deployable lifetime.",
+    "Witness interventions and held-out TEST outcomes never leak into policy selection except public actor outcomes collected prior to TEST.",
+    "The model remains incapable of expressing XOR, with fixed inherited uncalibrated adequacy and risk thresholds. False acceptance and harmful actions may remain.",
+    "No external permissions, default controller promotion, integration with AthenZ or Synveil, PR merge or roadmap D1–D10/V2A/V2B reordering."
+  ]
+}

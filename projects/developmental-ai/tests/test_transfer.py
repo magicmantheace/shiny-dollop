@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from pathlib import Path
@@ -50,7 +51,7 @@ class GeneralizationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 TransferBrain(path, seed=999)
             reopened.close()
-            with sqlite3.connect(path) as conn:
+            with closing(sqlite3.connect(path)) as conn:
                 self.assertEqual(conn.execute("SELECT value FROM transfer_metadata "
                                               "WHERE name='trained'").fetchone()[0], '3600')
 

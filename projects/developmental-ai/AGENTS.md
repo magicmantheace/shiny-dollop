@@ -1,3 +1,419 @@
+# Paired public outcome witness verification — 2026-10-22
+
+Research-only `developmental_ai/paired_witness.py` requires
+two signed matching public event histories from **separate
+fixture HMAC-SHA256 keys** before admitting any observations.
+Protocol `benchmarks/paired_witness_protocol.json` frozen
+before implementation. Six now INSPECTED seeds, 60 TEST
+tasks each: paired honest signers **286/360 successes**,
+**4 harmful TEST actions**; forged primary plus honest
+witness **0/360 and 0 harm by 360 abstentions**; missing
+or changed-after-signing witness also all abstain.
+**Both colluding fixture signers** pass all matching MACs
+and achieve **22/360** with **338 damaging TEST actions**,
+the identical outcome of bypassing the gate and trusting a
+single forged corpus. Actor's **319 harmful /1,440 distinct
+training actions** were relabeled as productive; forged
+streams replay SAME actor actions, no double counting.
+Focused run **39772852676** passed 11/11 tests and both
+cohorts. These fixed fixture keys authenticate possession
+only, NOT truthful physical events, real identity,
+independence, consent or robust real-world safety. The
+benchmark can sign both streams by design; physical truth
+flag is always false for the candidate. Full Linux/Windows
+historical run is a separate gate. See
+`docs/PAIRED_WITNESS.md`. Maintain experimental draft PR,
+main/default policies unchanged, no outside actuation or
+AthenZ/Synveil integration, D1/D3/D4 still open; preserve
+V2A before/overlapping V2B ordering.
+
+# Passive evidence quality audit — 2026-10-22
+
+The optional `passive_quality.py` audit uses only public
+numeric action-feature opportunities from **60 independent
+unacted simulation frames per seed** and coarse feature
+coverage. Earlier passive archives remain untouched.
+Precommitted protocol:
+`benchmarks/passive_quality_protocol.json`.
+[Focused run 39722045466] passed 11/11 regression tests
+and both seed cohorts. Across six now INSPECTED seeds:
+random-observer memory completed **269/360** third-rule
+tasks, **4 harmful test actions**; biased-observer memory
+**13/360**, **66 test harms**, but a coverage gate rejected
+all biased datasets and abstained on **360/360** tasks.
+A *coherently falsified* training stream (328 actually damaging
+outcomes rewritten as productive) passed coverage **6/6**
+and replay integrity, but its model completed only
+**33/360** tasks and caused **327 harmful test actions**.
+The forged corpus reuses the original random actor's
+events; the genuinely separate training actors caused
+**328 random + 513 biased = 841** harms in **2,880** action
+events, not zero. No dataset received real source
+authentication. Valid checksum or covariate coverage
+CANNOT prove public physical sensor changes truly happened.
+The first focused run expected exactly 60 falsifications
+on a seed with only 58 harmful outcomes; this was
+corrected to frozen **up to 60** requirement without
+changing seeds/method. Full historical CI is separate.
+See `docs/PASSIVE_QUALITY.md`. This is NOT deployable
+safety, independent physics learning or D1/D3/D4.
+Keep experimental PR draft/unmerged, main and defaults
+unchanged, no AthenZ/Synveil work; preserve V2A/V2B order.
+
+# Passive outcome learning on the third numeric rule — 2026-10-21
+
+Optional `developmental_ai/passive_outcome_learning.py` accepts only
+already-executed *public before/action/after transitions* from
+independent simulated actors. It never chooses an action to
+collect its own training data. A synthetic random actor
+provided 240 third-rule events per seed across six now
+INSPECTED seeds. Raw five-nearest-neighbor model trained
+on those observations completed **253/360** held-out third-rule
+tasks, with **10 harmful TEST actions**; conservative
+filter completed **160/360** with the **same 10 harms**.
+A 24-event filtered learner completed **22/360**. A biased
+old-normal-policy actor produced only **13 productive events**
+of 1,440 events, and its guarded passive learner completed
+**0/360**. The frozen old normal and reversed memories
+remained at 0/360 with 293 and 296 harms respectively.
+Passive data does NOT mean harmless data collection: random
+actor incurred **302 harmful actions in 1,440 recorded events**,
+and separate biased actor **450/1,440**. The random24 prefix
+is a subset (34 harmful events already counted in the
+random240 total). The observer and learner are both only
+simulated and no human consent/provenance verification exists.
+The archive is replayable by SHA-256 but not authenticated.
+[Focused CI 39718642738] passed **11/11** tests and both
+three-seed cohorts; final full historical regression is
+a separate gate. Frozen protocol
+`benchmarks/passive_outcome_protocol.json`,
+full report `docs/PASSIVE_OUTCOME_LEARNING.md`.
+This is NOT zero-shot unknown law competence, risk-free
+learning, independent world transfer, general self-developed
+intelligence or D1/D3/D4 completion. No automatic policy
+promotion. Keep PR draft, main untouched, AthenZ/Synveil
+integration deferred and V2A then V2B ordering unchanged.
+
+# Absolute outcome adequacy: noisy and never-trained third feature rule — 2026-10-21
+
+Optional `developmental_ai/absolute_adequacy.py` and
+`novel_feature_world.py` retain original two engineered numeric
+outcome models. An eight-probe public-only offline calibration
+compares per-window **absolute** predictive fit (mean negative
+log likelihood threshold 1.2) plus previous relative margin.
+One new simulator rule makes near-diagonal features productive,
+a rule neither source model has been trained on; known normal/
+reversed regimes have hash-deterministic 10% neutralizing noise.
+Frozen protocol `benchmarks/absolute_adequacy_protocol.json`
+was committed before candidate code. On six now-INSPECTED
+seeds, adequacy gate scored noisy normal **202/360**, reversed
+**151/360**, third **0/360** with all 6 unknown contexts
+identified and **0 harmful third-world test actions**.
+Relative-only control scored 244/360, 222/360, 0/360,
+but caused **192 harmful test actions** in the third world.
+Absolute gate made **3/12 false unknown decisions** on known
+noisy worlds. **56/144 calibration actions damaged disposable
+simulators**, including 16/48 against the unfamiliar rule.
+Third-rule oracle is 360/360, showing tasks are feasible, but
+candidate **does not learn** the third rule and only abstains.
+Focused GitHub CI 39717495708 passed 8/8 and both seed cohorts.
+See `docs/ABSOLUTE_ADEQUACY.md`. This is NOT safe exploration,
+blind naturalistic transfer, general cognition or D3/D4.
+Preserve all original tests; keep PR draft, main/default
+unchanged and Synveil/AthenZ integration deferred.
+
+# Two-window confirmation evidence (2026-10-21)
+
+The optional `two_window_confirmation.py` experiment is
+simulation-only and cannot be promoted automatically. Preserve
+`benchmarks/two_window_confirmation_protocol.json`, its six
+already inspected seeds, and the original single/fixed-12 calibration
+benchmarks. The new public-observation-only test compares first4,
+two-window agreement, last4, pooled8, abstention and private oracle
+on stationary rules and both four-step rule-change directions.
+Full scores over 360 tasks per condition: first4 stationary
+360/360 each but switched 0/360 each with **720 test damages**;
+agreement8 stationary normal 360/360, reversed 300/360,
+switched 0/360 each with zero *test* damage; recent8 stationary
+normal 360/360, reversed 300/360, switched 300/360 and 360/360
+with zero *test* damage; pooled8 switched 0/360 and 240/360
+with **60** test damages. Across all six seeds and four worlds,
+four-probe strategy costs 96 disposable probes/**32 calibration harms**,
+all eight-probe strategies 192/**58** harms. Do not hide abstentions
+as completed tasks or simulator-only probe harms. Stable numerical
+features, engineered reversal and two candidate models do not
+demonstrate generic causal discovery or safe active exploration.
+Results are post-hoc and D1/D3/D4 remain OPEN; keep historic
+transfer, V2A/V2B and AthenZ/Synveil separation intact.
+See `docs/TWO_WINDOW_CONFIRMATION.md`.
+
+# Numeric consequence reversal calibration — 2026-10-21
+
+The optional `observable_reversal_calibration.py` experiment fits an
+engineered-feature source model from 80 normal `collect` episodes
+and a separate reversed-rule model from 80 `route-reversed` episodes.
+It selects between these **already trained** models using the public
+effects of 12 disposable training-namespace interventions, with an
+explicit minimum evidence/margin abstention criterion and exact
+replay checks. On six INSPECTED seeds (test indices 14000..14059),
+both normal and reversed test worlds reached **360/360** completions
+and 0 *test* damage, but **56/144 calibration interventions damaged
+the simulated rehearsal worlds**. The deliberately wrong-calibration
+control caused **720/720 test failures and damaging actions**, and
+abstention avoided harm but completed no tasks. Frozen protocol:
+`benchmarks/observable_reversal_calibration_protocol.json`;
+full report: `docs/OBSERVABLE_REVERSAL_CALIBRATION.md`.
+
+The numeric features and physics are engineered, all seeds inspected;
+this is NOT blind cross-domain generalization, real-world safe
+experimentation, automatically learned new causal dynamics or
+authenticated model promotion. Preserve original numeric affordance
+negative results, rerun nine focused tests, both calibration cohorts,
+full Linux/Windows unit tests and original frozen transfer benchmark.
+Keep experimental PR draft, main/defaults/real actions unchanged,
+AthenZ/Synveil integration deferred, D1/D3/D4 open and V2A/V2B order.
+
+# Numeric public-feature transfer research — October 21, 2026
+
+A new isolated `observable_affordances.py` experiment no longer
+hashes simulator-private action names into stable identity codes:
+instead each fresh per-episode action has two **engineered public
+physical measurements**. A 5-nearest-neighbor model learns
+measurement → progress/damage from 80 unfiltered source tasks per
+seed, then faces a new generated task family with 0 target
+training. **Both families deliberately share a simple fixed
+feature law**. On 6 inspected seeds numeric model completed
+collect **360/360**, route **360/360**, while untrained route
+was **31/360** and shuffled-feature route **16/360**. When
+the feature law is reversed, numeric policy fails **0/360**
+and incurs **360 damage actions**. Preserve this severe
+negative result, all stronger controls, seed cohorts and
+the original transfer/legacy benchmarks. Neither artificial
+feature correlations nor near-perfect toy scores establish
+independent semantic understanding, robust safety or D3/D4.
+Run `tests.test_observable_affordances` and both
+`benchmarks.observable_affordance_benchmark` cohorts,
+plus full Linux and Windows validation. All seeds are now
+inspected. Do not merge/promote the experimental branch,
+modify AthenZ/Synveil or authorize external actions.
+See `docs/OBSERVABLE_AFFORDANCE_TRANSFER.md`.
+
+# Verified quarantined C study — 2026-10-21
+
+The optional quarantined C candidate passed its **dedicated** two-cohort
+GitHub benchmark at source commit `8d76bc2`. Six INSPECTED seeds
+scored `staged_C` A/B/C **360/360 each**, 0 spoilage/stalls;
+old sentinel A/B 360/360 but C 0/360; **C-only memory**
+A/B 0/360 (442 accepted spoilage actions across A+B (221 per environment)), C 360/360;
+untrained novel A/B/C 138/360 each; privileged oracle 360/360 each.
+This study used **80 C simulator episodes per seed** plus prior A/B
+training and per-seed separate 24/24 A/B/C *train-validation* gates.
+All six `approved=True` calls were **simulated harness inputs**,
+not actual owner permission. No production promotion occurred.
+The task remains one deterministic hand-authored cargo world with
+simulator-hashed stable numeric action IDs. Hence this is NOT
+zero-shot C, independent transfer, safe novel action discovery,
+real authenticated autonomy, or D3/D4 completion. See
+`docs/QUARANTINED_C_ADAPTATION.md`. Preserve every frozen
+benchmark/negative control and keep PR draft/unmerged.
+
+# Quarantined C adaptation (2026-10-21)
+
+Quarantined, simulation-only `developmental_ai/quarantined_c.py`
+stores a new C `RiskMemory` from **80 separate C training
+episodes**, after the dual-sentinel controller correctly flagged all
+360 C episodes as unknown while completing 0 C goals. The code
+rehearses 24 **disjoint train-namespace** A/B/C episodes per seed,
+rejecting any C risk candidate that overlaps known risks or fails a
+24/24 goal, zero-spoilage, zero-stall criterion. Receipt review,
+single-use explicit approval and stale-memory checks are sandbox
+programming constructs, NOT verified human authorization. Test
+`approved=True` only represents a simulated caller. All three
+environments retain engineered two-byte action identity descriptors,
+one deterministic cargo simulator, and already-inspected cohorts.
+Do NOT call this independent generalization or D3/D4 completion,
+do not auto-promote or deploy, do not alter AthenZ/Synveil.
+See `docs/QUARANTINED_C_ADAPTATION.md`. Dedicated workflow
+`quarantined-c-validation.yml` checks complete cohorts;
+historical full CI and test suite must remain intact.
+
+The optional `prerequisite_recovery.py` is a **post-hoc, engineered
+handoff** to the old `OutcomeSkills.choose` policy after new action effects
+are observed. It is not a corrected causal learner, independent transfer, or
+proof of lifelong learning. Retain the severe 1-episode regression and
+earlier raw-prober negative results. On changes, run
+`tests.test_prerequisite_recovery`, both cohorts of
+`benchmarks.prerequisite_recovery_benchmark`, the full repository tests,
+the original transfer benchmark and focused Windows checks. Checkpoint
+source boundaries must replay exactly; no default-model promotion or
+AthenZ/Synveil work. See `docs/PREREQUISITE_RECOVERY.md`.
+
+# Unknown-regime stress audit (2026-10-21)
+
+The latest *experimental* no-cue learner correctly selected A/B histories
+from one public intervention on all six **inspected** seeds: 360/360 per
+A→B→A stage, compared to 147/360 on B for the same probe followed
+by permanently selecting A. This benchmark was green on Linux
+(562/562 tests) and Windows (104/104 focused). This is two-known-
+context retrieval, not autonomous discovery of a new regime.
+
+An omitted strong baseline has now been added: **union of all risk codes
+flagged by either historical memory**, with no diagnostic or regime
+choice. A third, **never-trained mapping C** swaps signatures for the
+harmful action and a necessary *fuel* action (not the harmless wash
+distractor). The current study is post-hoc, keeps all pre-inspected
+seeds, and compares no-cue inference, union-risk, frozen A/B, novel
+and privileged hazard oracle, with spoilage/stalls measured.
+Its protocol was committed first at
+`benchmarks/unseen_regime_protocol.json`. See
+`docs/UNSEEN_REGIME_AUDIT.md`. The union is NOT generally safe,
+and cannot recognize newly harmful meanings absent from memories.
+
+Do not claim independent generalization, automatic novelty detection,
+causal safety, retained skill discovery or D3/D4 milestone completion.
+Keep all baselines, negative outcomes, default policies and
+AthenZ/Synveil integrations unchanged. Validate full Linux/Windows
+tests, historical transfer, and both
+`benchmarks.unseen_regime_benchmark` inspected cohorts.
+
+# Latest retained context-indexed learning experiment (2026-10-21)
+
+A new optional A→B→A descriptor-remapping study has two
+replayable `RiskMemory` stores and a publicly supplied, perfectly
+distinguishing two-number context beacon. The generator keeps cargo
+physics the same but swaps numeric identities of a harmless and a
+harmful action. **Both prior memories are trained separately**, each on
+80 cargo episodes, and a context nearest-neighbor lookup picks a store.
+This is **memory retrieval with an engineered cue**, NOT latent change
+detection, autonomous regime discovery or independent transfer.
+The protocol at `benchmarks/contextual_affordance_protocol.json`
+was frozen first. On six now-inspected seeds, exact A→B→A results
+were **360/360 in each stage** versus changed-B frozen A-only
+**128/360**, untrained **130/360**, and ambiguous-cue **128/360**.
+The first development run was blocked by a two-byte hash collision
+on frozen seed 51013; it was repaired deterministically within the
+optional simulator instead of changing seeds. All previous physics,
+experimental protocols and default policies were untouched.
+See `docs/CONTEXTUAL_AFFORDANCE.md`.
+
+Run `tests.test_contextual_affordance`, both
+`benchmarks.contextual_affordance_benchmark` cohorts, full unit
+suite and unchanged three-seed historical transfer regression on
+changes. Never claim blind generalization, statistically reliable
+real-world safety, user consent, self-development or automatic policy
+promotion. Keep AthenZ/Synveil integration deferred.
+
+# Current evidence: stable affordance-memory experiment (2026-10-21)
+
+`affordance_memory.py` adds optional *engineered stable two-byte numeric
+action descriptors* to unchanged `OpaqueWorld` cargo and relay. A
+`RiskMemory` model replays exactly 80 cargo training episodes and
+identifies observational failure-associated features from public actions,
+numeric sensor deltas and terminal outcome. The code/benchmark protocol
+was committed first (`benchmarks/affordance_protocol.json`). This is
+**within-family cargo adaptation**, NOT independent semantic inference:
+descriptors are simulator-created, seed/family-scoped re-encodings of
+hidden action identities. On six now-inspected seeds, trained cargo
+360/360 versus fixed novel 136/360, shuffled-descriptor 136/360,
+cyclic 134/360 and privileged risk oracle 360/360. Relay retention
+remained 360/360 but fixed methods were already at ceiling. A
+causally confounded risk association is not guaranteed safe outside
+this fixed simulator. No promotion/merge by default.
+
+Keep both cohorts, strong controls, training budget, descriptors and
+historical protocols fixed; run `tests.test_affordance_memory`,
+`benchmarks.affordance_benchmark` (development AND reserved), full
+suite and original three-seed transfer before changing. Preserve negative
+results and make no AthenZ/Synveil integration edits. Details:
+`docs/AFFORDANCE_MEMORY.md`.
+
+# Latest cross-dynamics result — 2026-10-20
+
+`developmental_ai/opaque_causal.py` and
+`benchmarks.opaque_causal_benchmark` use different hand-coded hidden
+relay/cargo dynamics, per-episode rotated anonymous action handles and
+sensor channels, a common **engineered** numeric observation contract,
+and a relay-only learned choice among three prewritten exploration
+strategies. The protocol at `benchmarks/opaque_causal_protocol.json`
+was committed before model execution. Both seed groups are now
+**inspected**; they must not be presented as fresh blind holdouts.
+The strategy selector chose fixed `novel` on all six seeds: cargo
+147/360 versus cyclic 145/360, random 82/360, privileged oracle
+360/360. This is NOT evidence of meaningful semantic generalization;
+irreversible spoilage explains most failures. Preserve all controls,
+report both source/target families and all seeds, and run
+`tests.test_opaque_causal` and both cohorts plus the full and frozen
+transfer suites on changes. No AthenZ/Synveil integration.
+
+Historical notes in this file about GitHub Actions startup failure are
+outdated: the isolated fallback-policy branch has had fully successful
+Linux/Windows CI. **Only claim success for the exact current commit**.
+
+# Critical development override — 2026-10-20
+
+**Standalone learning first.** This directive supersedes earlier instructions
+that would prioritize AthenZ, Synveil, integration plumbing, IPC, synthetic
+adapters, UI work, or unrelated infrastructure. Preserve functioning
+integration code and leave its existing PR unmerged, but do not implement or
+complete integrations unless separately authorized. Do not modify AthenZ
+or Synveil repositories in this development phase.
+
+Every development pass should attempt multiple meaningful, related
+implementation tasks where possible. Measure improvements over strong
+baselines, with unchanged historical protocols and explicit negative results.
+Priority order: (1) generalization beyond a single simulator family,
+(2) long-term experiential/semantic/procedural memory, (3) continual
+learning and retention, (4) learned reusable skills and composition,
+(5) bounded autonomous simulated goals, (6) sample/compute efficiency.
+
+The optional `benchmarks.continual_skill_benchmark` is a later
+development-only target-adaptation/retention follow-up. It **does train** on
+the nominally unseen delivery task before reporting later success and thus
+cannot be called zero-shot transfer. Source-trained agents have 80 extra
+source episodes relative to the matched target-only training control. Preserve
+the earlier 0/360 unadapted delivery result. Report the complete learning
+curve, the return-to-assembly check, action cost, reference oracle, unchanged
+source control, and full checkpoint replay. See
+`docs/CONTINUAL_SKILL_RETENTION.md` and run both cohorts plus its focused
+tests when changing this experiment. Do not portray the shared glyph action
+ontology, repeated test indices, or inspected cohorts as blind independent
+task-family generalization.
+
+The optional `prerequisite_probing.py` and
+`benchmarks.prerequisite_probing_benchmark` use **observational** failed/
+successful action contexts; singleton fact-set differences are *suggestive*,
+not verified causal prerequisites. The tool must never access simulator
+`RECIPES` or private state, promote itself as default, or authorize actions.
+Preserve the prior zero-shot protocol and negative results. The additional
+development study showed raw probing 40/180 at zero target training but 0/180
+after 4 or 20 target episodes while the existing controller reached 180/180
+at those stages, in an isolated local reproduction. The train-only
+validation-selected controller retains the existing policy when new
+learning regresses; this is **not** independent generalization or proved
+safe lifelong learning. Run its focused tests, both six-seed development
+cohorts, full suite, and historical transfer benchmark before merging.
+See `docs/PREREQUISITE_PROBING.md`. Private Actions are still blocked
+before any jobs start; never claim full validation or merge readiness.
+
+The new optional `outcome_skills.py` experiment has **engineered shared
+glyphs and fact semantics**; its assembly success and delivery failures do
+NOT close D3 or D4. Run `tests.test_outcome_skills` and
+`benchmarks.outcome_skills_benchmark` on both documented cohorts if you
+modify it. Document each phase of evaluation as development, supplemental
+inspected, or genuinely independent. See `docs/OUTCOME_SKILLS.md`.
+
+Do not automatically promote policy or weight changes. Staged candidates
+must be reviewed and approved. `policy_review.py` is a research-stage
+regression gate, not a guarantee of safe lifelong learning. Require
+restart/corruption regression tests for schema changes and run the **full**
+test suite plus unchanged original transfer benchmark before merging.
+Both current Linux and Windows Actions jobs fail before executing any
+steps; this is **not a passing CI signal**. A local scoped test does not
+establish full repository validation. Preserve V2A (computational affect)
+before and overlapping V2B (virtual home) in the longer roadmap.
+
+---
+
 # Worker instructions
 
 **Purpose:** Build a verifiable local-first learning engine for the independent-twin research program, due 2029-02-09. Own simulations, policies, procedural memory, reproducible evaluation, and tested integration APIs only.

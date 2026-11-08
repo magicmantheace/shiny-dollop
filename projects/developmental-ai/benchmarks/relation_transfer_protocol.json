@@ -1,0 +1,88 @@
+{
+  "schema": "developmental-ai.relation-transfer-protocol/v1",
+  "frozen_on": "2026-10-22",
+  "commit_order": "Frozen before learner, simulator, tests or target scoring",
+  "question": "Can learning an anonymous numeric relation in a two-field source assist zero-shot behavior in unseen three/four-field target vocabularies, relative to simple fixed heuristics, random and target-only baselines?",
+  "learner": "Learn smoothed outcome counts P(progress,damage,neutral) conditioned on the source-example range max(features.values)-min(features.values), then reuse on unknown feature-key signatures without target feedback. Max-minus-min representation is ENGINEERED, not learned.",
+  "simulator": {
+    "source": "basin, two public integer sensors inlet/outlet",
+    "target1": "lattice, three public sensors north/charge/plume",
+    "target2": "prism, four public sensors flux/tone/vapor/texture",
+    "negative": "counterphase, three public sensors keel/wisp/coil and inverted progress versus damage",
+    "shared_rule": "Per seed latent band center in {2,4,6} fixed by seeded generator, not shown to learner. Productive if observed value range is center or center+1; damaging if range <= center-2 or range >= center+3; other values neutral. Counterphase swaps productive and damaging.",
+    "interface": "All worlds have public progress/damage counters and an episode list of anonymous IDs plus observed numeric feature dictionaries, no family label, hidden rule, center or stable ID. Source and two transfer tasks share deliberately authored latent mechanics, NOT independently discovered physics.",
+    "candidate_sampling": "Precisely 5 productive, 4 damaging, 3 neutral unique candidate actions per episode by simulation-only balancing; never exposed to learner. Episodes end on one damaging action or reaching the goal."
+  },
+  "training": {
+    "source": "basin TRAIN indices 1000..1239, 240 independent first-action observed events",
+    "targets": "lattice 2000..2063, prism 3000..3063, counterphase 4000..4063; each target evaluated after 0,8,24,64 new independent first-action observed outcomes",
+    "actor": "Independent seeded random first action. Count damage from every TRAIN action once, separately from read-only test harms. No learner-issued training actions."
+  },
+  "evaluation": {
+    "split": "test",
+    "start": 50000,
+    "episodes_per_family_per_seed": 40,
+    "checkpoints": [
+      0,
+      8,
+      24,
+      64
+    ],
+    "same_test_episodes_repeated": true
+  },
+  "cohorts": {
+    "development": [
+      152003,
+      152021,
+      152039
+    ],
+    "additional": [
+      153001,
+      153017,
+      153041
+    ]
+  },
+  "comparators": [
+    "transfer_range",
+    "source_frozen_range",
+    "target_only_range",
+    "raw_schema_memory",
+    "max_span_fixed",
+    "fixed_band_4",
+    "min_span_fixed",
+    "untrained_random",
+    "always_abstain",
+    "privileged_oracle"
+  ],
+  "metrics": [
+    "successes",
+    "harmful_test_actions",
+    "test_abstentions",
+    "mean_attempts",
+    "source_actor_training_harm",
+    "target_actor_training_harm",
+    "checkpoint_replay",
+    "source_retention",
+    "adverse_negative_transfer"
+  ],
+  "acceptance": "At zero target feedback, transferred learner should beat source-frozen exact-schema and random on lattice/prism, and improve over at least one fixed heuristic. Disclose stronger fixed heuristics and negative transfer on counterphase even if goals fail.",
+  "constraints": [
+    "No privileged rule/seed band/family name passed to learner",
+    "No target feedback before zero-shot checkpoint",
+    "No TEST events in training",
+    "No default promotion",
+    "No GitHub PR merge",
+    "No AthenZ/Synveil integrations",
+    "No real-world actuation",
+    "Preserve earlier negative findings"
+  ],
+  "nonclaims": [
+    "Shared band physics deliberately authored, not independent unknown laws",
+    "Range feature engineering built in; no autonomous relation discovery",
+    "Balanced candidates simplify simulations",
+    "Strong zero-shot is limited to shared mathematical invariant",
+    "Source observational data may be forged; digests do not authenticate origin",
+    "Developer seed cohorts are not independent third-party blind holdout",
+    "Keep D1-D10 and V2A/V2B roadmap order"
+  ]
+}

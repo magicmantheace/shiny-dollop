@@ -1,0 +1,109 @@
+{
+  "schema": "developmental-ai.same-schema-switch-protocol/v1",
+  "frozen_on": "2026-10-22",
+  "ordering": "Commit before implementation, tests, and target scoring; keep failure cases and do not tune after inspected results without a new protocol.",
+  "question": "Can a public-outcome learner detect reversal and reversion in the same unchanging sensor schema using predictive evidence, without explicit regime labels, manual change-point hints, or using held-out test outcomes to fit?",
+  "dynamics": "Use existing authored basin two-variable max-minus-min band mechanics. A: original progress/damage labels. B: swap progress and damage, same feature keys inlet/outlet, same action identifiers and public schema, identical hidden per-seed band. Return A: original rules again. This is NOT independent generalization or a naturally arising real-world shift.",
+  "train": [
+    {
+      "stage": "A",
+      "start_index": 1000,
+      "episodes": 240,
+      "physics": "original"
+    },
+    {
+      "stage": "B",
+      "start_index": 2000,
+      "episodes": 64,
+      "physics": "reversed"
+    },
+    {
+      "stage": "return_A",
+      "start_index": 3000,
+      "episodes": 48,
+      "physics": "original"
+    }
+  ],
+  "simulation": "One independent random first-action simulator actor per disposable train episode. All observed samples have identical feature key signatures; no phase name, world field, hidden range band, episode index or simulator state allowed in learner memory.",
+  "checkpoints": {
+    "B": [
+      0,
+      4,
+      8,
+      12,
+      16,
+      24,
+      48,
+      64
+    ],
+    "return_A": [
+      0,
+      4,
+      8,
+      12,
+      16,
+      24,
+      48
+    ]
+  },
+  "evaluation": {
+    "split": "test",
+    "test_index_start": {
+      "B": 60000,
+      "return_A": 70000
+    },
+    "episodes_per_checkpoint_seed": 30,
+    "repeats_same_test_indices_across_checkpoints": true,
+    "held_out_no_training": true
+  },
+  "cohorts": {
+    "development": [
+      172003,
+      172021,
+      172039
+    ],
+    "additional": [
+      173001,
+      173017,
+      173041
+    ]
+  },
+  "candidate": {
+    "original": "Frozen source archive learned from first 192 events, as a manually chosen source-anchoring prior. Remaining 48 original training observations also stay in memory.",
+    "recent": "Last 12 feedback events excluding latest 4 evaluation events (a rolling window trained on data disjoint from scoring events), when total event count >=208. Candidate is initially contaminated after a shift.",
+    "scoring": "Sum smoothed class log-likelihood over last 4 feedback events; original vs recent, tie favors original. Same feature set for all events; this method never receives a stage label.",
+    "abstention": "If the selected candidate's mean feedback log likelihood is worse than -1.5, abstain from the read-only proposed TEST action; an abstention is a failed task and is not counted as success. May miss damaging switches if evidence sparse.",
+    "training": "Scores and candidate models are reconstructed strictly from append-only public examples, checkpointed and validated by SHA256 record, no deletion or promoted default."
+  },
+  "methods": [
+    "adaptive_same_schema",
+    "frozen_A",
+    "cumulative_range",
+    "recent_8_range",
+    "recent_32_range",
+    "untrained_random",
+    "always_abstain",
+    "privileged_oracle",
+    "old_feature_signature_gate"
+  ],
+  "metrics": [
+    "successes",
+    "harmful_test_actions",
+    "abstentions",
+    "selected_source_or_recent",
+    "heldout_log_evidence",
+    "external_actor_training_harm",
+    "checkpoint_roundtrip",
+    "old_skill_recovery"
+  ],
+  "acceptance": "An adaptive method should improve over frozen_A/cumulative in reversed B by 16/24 observations while recovering original A by 4/8/16 observations. Compare recent-eight and recent-32; preserve misses, abstentions and possible negative transfer. No full success claim based on abstaining.",
+  "hard_limits": [
+    "No hidden phase or physics provided to model",
+    "Same exact keys across phases",
+    "Do not interpret one rule reversal as full generalization",
+    "Simulated source feedback can be forged, sha digest does not authenticate",
+    "No default controller promotion or merge",
+    "No real-world actuation or AthenZ/Synveil integration",
+    "Preserve D1-D10 and V2A/V2B sequencing"
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "schema": "developmental-ai.passive-evidence-quality-protocol/v1",
+  "date": "2026-10-22",
+  "precommitted_before_candidate": true,
+  "goal": "Audit numeric feature-coverage bias and plausibly forged public outcomes without assuming replay integrity proves authenticity. Test the impact on a passive learner.",
+  "world": "Same engineer-designed NovelFeatureWorld third_rule. No new independent physics and no hidden world label shown to learner.",
+  "seeds": {
+    "development": [
+      97001,
+      97019,
+      97037
+    ],
+    "reserved": [
+      98003,
+      98017,
+      98041
+    ]
+  },
+  "training": {
+    "random": {
+      "split": "train",
+      "indices": [
+        4000,
+        4239
+      ],
+      "episodes": 240,
+      "actor": "independent public uniform action selection"
+    },
+    "biased": {
+      "split": "train",
+      "indices": [
+        4300,
+        4539
+      ],
+      "episodes": 240,
+      "actor": "previous trained normal-outcome learner, action chosen from public frame only"
+    },
+    "forged": "Clone random corpus. For at most 60 earliest harmful action outcomes per seed, replace the public post-action sensor transition with a consistent fabricated productive one (the forged after-frame is recomposed from public before/actions/tick). The underlying actor still caused real simulation damage. Preserve both true actor harms and count of falsifications, never treat fakes as reality."
+  },
+  "opportunity_reference": {
+    "split": "train",
+    "indices": [
+      4600,
+      4659
+    ],
+    "episodes": 60,
+    "no_action": true,
+    "measure": "public action-feature menus only, disjoint from observation and test streams"
+  },
+  "audit": {
+    "coarse_bins": "x >= y+2, y >= x+2, abs(x-y)<2; generic public partitions, not hidden labels",
+    "minimum_samples_per_populated_bin": 12,
+    "minimum_coverage_share": 0.15,
+    "zero_action_authority": true,
+    "report_origin_authenticated": false,
+    "coverage_gate": "Reject unsupported/imbalanced archives but never assert true origin or safety.",
+    "malicious_consistency": "A forged coherent before/after event may pass exact replay and coverage even after its record digest is recomputed. This expected inability is a central negative result."
+  },
+  "evaluation": {
+    "split": "test",
+    "indices": [
+      24000,
+      24059
+    ],
+    "episodes_per_seed": 60,
+    "rule": "third_rule"
+  },
+  "methods": [
+    "raw_random240",
+    "coverage_gated_random240",
+    "raw_biased240",
+    "coverage_gated_biased240",
+    "raw_forged240",
+    "coverage_gated_forged240",
+    "always_abstain",
+    "privileged_oracle"
+  ],
+  "metrics": [
+    "train_actor_damage",
+    "data_forged_count",
+    "forged_data_inferred_harm",
+    "coverage_bins",
+    "reference_opportunity_bins",
+    "dataset_coverage_acceptance",
+    "source_authentication_status",
+    "test_success",
+    "test_harm",
+    "test_stalled",
+    "test_abstentions",
+    "memory_immutability",
+    "replay_integrity"
+  ],
+  "controls": [
+    "Data acquisition controlled by independent benchmark actor; learner issues zero training interventions",
+    "No selection based on test outcomes",
+    "All evaluation policies see identical test episodes within each seed",
+    "The forged data transformation is deliberately strong and adversarial; not independent natural corruption",
+    "The source archive has no actual cryptographic identity proof or independent witness",
+    "Reserved cohort may not be called blind after first run; no result-driven threshold or seed changes",
+    "Do not change earlier passive study, its indices, tests or conclusions",
+    "No GitHub merge or default policy promotion, AthenZ/Synveil integration deferred"
+  ]
+}

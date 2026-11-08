@@ -1,0 +1,124 @@
+{
+  "schema": "developmental-ai.variable-affordance-protocol/v1",
+  "created": "2026-10-22",
+  "freeze": "Commit before implementation; both cohorts become inspected when evaluated.",
+  "question": "Can one persistent, feature-schema-agnostic outcome learner acquire skills in a new independently coded transition family from observed effects and retain its earlier learned families, without receiving a family label or privileged action meanings?",
+  "simulators": [
+    {
+      "name": "quarry",
+      "feature_keys": [
+        "grade",
+        "moisture"
+      ],
+      "physics": "progress if grade>=moisture+3; damage if moisture>=grade+3; otherwise neutral",
+      "target": 3
+    },
+    {
+      "name": "coolant",
+      "feature_keys": [
+        "flow",
+        "heat",
+        "seal"
+      ],
+      "physics": "progress if flow>=5 and seal>=5 and heat<=5; damage if heat>=7 and seal<=3; otherwise neutral",
+      "target": 4
+    },
+    {
+      "name": "relay",
+      "feature_keys": [
+        "phase",
+        "pulse",
+        "shield",
+        "noise"
+      ],
+      "physics": "progress if phase%3==pulse%3 and shield>=noise; damage if pulse>=7 and shield<noise; otherwise neutral",
+      "target": 2
+    }
+  ],
+  "features": "Each action reveals only its own integer 0..9 readings under previously unknown string keys and a per-episode opaque random ID; the learner is given neither simulator family name nor hidden rule. A shared public progress/damage outcome is computed from after-before sensors. Feature names are engineered observation vocabulary and make schema identification possible; the tasks share a developer-written interface and objectives.",
+  "training": [
+    {
+      "family": "quarry",
+      "split": "train",
+      "first_index": 1000,
+      "n": 180
+    },
+    {
+      "family": "coolant",
+      "split": "train",
+      "first_index": 2000,
+      "n": 180
+    },
+    {
+      "family": "relay",
+      "split": "train",
+      "first_index": 3000,
+      "n": 160
+    }
+  ],
+  "training_actor": "Independent seeded random actor executes ONE first action in each disposable simulated episode; action consequences may be harmful and must be reported. No learner actions to collect training data.",
+  "checkpoints_relay_target_observations": [
+    0,
+    16,
+    48,
+    160
+  ],
+  "evaluation": {
+    "split": "test",
+    "start_index": 40000,
+    "episodes_per_family_per_seed_per_checkpoint": 40,
+    "same_test_indices_across_checkpoints": true,
+    "read_only": true
+  },
+  "cohorts": {
+    "development": [
+      142003,
+      142021,
+      142039
+    ],
+    "additional": [
+      143001,
+      143017,
+      143041
+    ]
+  },
+  "methods": [
+    "schema_memory",
+    "target_only",
+    "recent_48",
+    "source_frozen",
+    "untrained_random",
+    "always_abstain",
+    "privileged_oracle"
+  ],
+  "schema_memory": "Persistent capacity<=1000, learns 5-nearest-neighbor observed outcome conditional on EXACT discovered feature-key signature. Standard Euclidean squared numeric distance; unknown signatures return priors (no action names). Records all ordered validated public outcomes, integrity-checked versioned replay.",
+  "target_only": "Relearn only from relay target events, excluding original quarry/coolant knowledge.",
+  "recent_48": "Only latest 48 events across all environments.",
+  "source_frozen": "Quarry/coolant training only, no relay feedback.",
+  "outcome_scoring": "Choose action with maximal 3*estimated_progress -10*estimated_damage. Equal scores broken by opaque handle ID. Unknown schema has score 0, i.e. deterministic but uninformed; this is not safe abstention.",
+  "metrics": [
+    "test_completions",
+    "harmful_test_actions",
+    "test_abstentions",
+    "training_actor_harm",
+    "per-schema_memory_sizes",
+    "sequential_revisit_retention",
+    "full_checkpoint_restart"
+  ],
+  "acceptance": "Relay learning should measurably improve from zero-target-observation checkpoint relative to frozen source and untrained random, and quarry/coolant revisit should remain comparable to their pre-relay performance, without misrepresenting zero-shot transfer.",
+  "nonclaims": [
+    "The three physical rules, numbers and synthetic feature names are authored by the same development effort; not independently administered holdout.",
+    "Known numeric values are privileged engineering affordance descriptors, not inferred real-world physics.",
+    "Exact feature-key gating is a handcrafted inductive bias; no semantic alignment across vocabularies is learned.",
+    "Target feedback required, so good relay performance is adaptation, not zero-shot generalization.",
+    "An independent simulator actor incurs real simulated harm; no safe causal exploration is shown.",
+    "Cryptographic hashes provide internal replay, not source authentication.",
+    "The data are simulation-only with no AthenZ or Synveil integration and no action authority."
+  ],
+  "preserve": [
+    "existing NumericOutcomeMemory and optional retrieval learner unchanged",
+    "all previously reported negative findings",
+    "D1-D10 and V2A/V2B roadmap",
+    "draft unmerged PR"
+  ]
+}

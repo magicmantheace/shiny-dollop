@@ -1,0 +1,115 @@
+name: Standalone learning validation
+
+on:
+  push:
+    branches:
+      - "priority/**"
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  linux-full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile Python sources
+        run: python -m compileall -q developmental_ai benchmarks tests
+      - name: Full repository unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Historical transfer regression (unchanged 3-seed protocol)
+        run: python -m benchmarks.transfer_benchmark --seeds 17 23 41 --train-episodes 5000 --test-episodes 300
+      - name: Symbolic skill reuse - development cohort
+        run: python -m benchmarks.outcome_skills_benchmark --cohort dev
+      - name: Symbolic skill reuse - inspected additional cohort
+        run: python -m benchmarks.outcome_skills_benchmark --cohort additional
+      - name: Sequential skill learning and retention - development
+        run: python -m benchmarks.continual_skill_benchmark --cohort dev
+      - name: Sequential skill learning and retention - inspected additional
+        run: python -m benchmarks.continual_skill_benchmark --cohort additional
+      - name: Observational prerequisite probing - development
+        run: python -m benchmarks.prerequisite_probing_benchmark --cohort dev
+      - name: Observational prerequisite probing - inspected additional
+        run: python -m benchmarks.prerequisite_probing_benchmark --cohort additional
+      - name: Prerequisite recovery comparison - development
+        run: python -m benchmarks.prerequisite_recovery_benchmark --cohort dev
+      - name: Prerequisite recovery comparison - inspected additional
+        run: python -m benchmarks.prerequisite_recovery_benchmark --cohort additional
+      - name: Opaque numeric cross-dynamics - development
+        run: python -m benchmarks.opaque_causal_benchmark --cohort development
+      - name: Opaque numeric cross-dynamics - reserved
+        run: python -m benchmarks.opaque_causal_benchmark --cohort reserved
+      - name: Stable numeric affordance memory - development
+        run: python -m benchmarks.affordance_benchmark --cohort development
+      - name: Stable numeric affordance memory - reserved
+        run: python -m benchmarks.affordance_benchmark --cohort reserved
+      - name: Context-dependent action meaning A-B-A - development
+        run: python -m benchmarks.contextual_affordance_benchmark --cohort development
+      - name: Context-dependent action meaning A-B-A - reserved
+        run: python -m benchmarks.contextual_affordance_benchmark --cohort reserved
+      - name: Cue-free diagnostic A-B-A - inspected development
+        run: python -m benchmarks.no_cue_probe_benchmark --cohort development
+      - name: Cue-free diagnostic A-B-A - inspected additional
+        run: python -m benchmarks.no_cue_probe_benchmark --cohort inspected-additional
+      - name: Unseen mapping C and union-risk control - inspected development
+        run: python -m benchmarks.unseen_regime_benchmark --cohort development
+      - name: Unseen mapping C and union-risk control - inspected additional
+        run: python -m benchmarks.unseen_regime_benchmark --cohort inspected-additional
+      - name: Two-sentinel known/unknown guard - inspected development
+        run: python -m benchmarks.dual_sentinel_benchmark --cohort development
+      - name: Two-sentinel known/unknown guard - inspected additional
+        run: python -m benchmarks.dual_sentinel_benchmark --cohort inspected-additional
+      - name: Public nonidentity-feature transfer - development
+        run: python -m benchmarks.observable_affordance_benchmark --cohort development
+      - name: Public nonidentity-feature transfer - reserved
+        run: python -m benchmarks.observable_affordance_benchmark --cohort reserved
+      - name: Offline public-outcome reversal calibration - inspected development
+        run: python -m benchmarks.observable_reversal_calibration_benchmark --cohort development
+      - name: Offline public-outcome reversal calibration - inspected additional
+        run: python -m benchmarks.observable_reversal_calibration_benchmark --cohort inspected-additional
+      - name: Sequential probe budget audit - inspected development
+        run: python -m benchmarks.sequential_probe_benchmark --cohort development
+      - name: Sequential probe budget audit - inspected additional
+        run: python -m benchmarks.sequential_probe_benchmark --cohort inspected-additional
+      - name: Two-window contradiction guard - inspected development
+        run: python -m benchmarks.two_window_confirmation_benchmark --cohort development
+      - name: Two-window contradiction guard - inspected additional
+        run: python -m benchmarks.two_window_confirmation_benchmark --cohort inspected-additional
+      - name: Absolute adequacy and unseen third rule - development
+        run: python -m benchmarks.absolute_adequacy_benchmark --cohort development
+      - name: Absolute adequacy and unseen third rule - reserved
+        run: python -m benchmarks.absolute_adequacy_benchmark --cohort reserved
+      - name: Passive third-rule outcome learning - development
+        run: python -m benchmarks.passive_outcome_benchmark --cohort development
+      - name: Passive third-rule outcome learning - reserved
+        run: python -m benchmarks.passive_outcome_benchmark --cohort reserved
+      - name: Passive evidence bias and forgery audit - development
+        run: python -m benchmarks.passive_quality_benchmark --cohort development
+      - name: Passive evidence bias and forgery audit - reserved
+        run: python -m benchmarks.passive_quality_benchmark --cohort reserved
+      - name: Paired signed outcome witnesses - development
+        run: python -m benchmarks.paired_witness_benchmark --cohort development
+      - name: Paired signed outcome witnesses - reserved
+        run: python -m benchmarks.paired_witness_benchmark --cohort reserved
+
+  windows-policy:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Policy review and original learner regression
+        run: python -m unittest tests.test_policy_review tests.test_outcome_skills tests.test_continual_skill_benchmark tests.test_prerequisite_probing tests.test_prerequisite_recovery tests.test_opaque_causal tests.test_affordance_memory tests.test_contextual_affordance tests.test_no_cue_diagnostic tests.test_unseen_regime tests.test_dual_sentinel tests.test_quarantined_c tests.test_observable_affordances tests.test_observable_reversal_calibration tests.test_sequential_probe tests.test_two_window_confirmation tests.test_absolute_adequacy tests.test_passive_outcome tests.test_passive_quality tests.test_paired_witness tests.test_regime_retrieval tests.test_fast_reacquisition tests.test_archive_consistency tests.test_variable_affordance tests.test_relation_transfer tests.test_relation_conflict tests.test_same_schema_switch tests.test_fast_shock tests.test_adaptive_horizon tests.test_multi_switch tests.test_stochastic_prequential tests.test_regret_switch tests.test_cross_rule tests.test_composed_feature tests.test_gated_composition tests.test_validated_abstention tests.test_independent_witness tests.test_shared_evidence_economics tests.test_transfer tests.test_organism -v

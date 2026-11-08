@@ -1,0 +1,104 @@
+{
+  "schema": "developmental-ai.composed-feature-discovery-protocol/v1",
+  "frozen_on": "2026-10-23",
+  "registration": "Commit this frozen protocol before implementing new learner, benchmark, tests or inspecting held-out TEST results. Failed preregistered outcomes must remain visible; changes require new seeds and a new protocol.",
+  "question": "Can a small, GENERATIVE arithmetic grammar construct predictive feature programs absent from the prior fixed span/checksum/ordered menu using only sequential public feedback, distinguish two unfamiliar nonlinear rules, and recover the earlier source rule?",
+  "world": {
+    "public": "Use CrossRuleWorld-style inlet/outlet integer 0..9, anonymous actions, budget 6, goal 3, hidden action allocation five productive, four damaging, three neutral. Same public feature names in all worlds. Guarantee is artificially favorable and must be stated.",
+    "source": "Use previous authored seed-band source law based on abs(a-b) for first 240 TRAIN observations and 64 later return-source observations.",
+    "target_product": "Private NEW nonlinear law: r=(a*b+a+seed_private_salt)%7; r=0,1 progress, r=2,3,4 damage, r=5,6 neutral. This exact expression is not hardcoded as named candidate in learner. Simulator only.",
+    "target_square": "Private second NEW nonlinear law: r=(a*a+b+seed_private_salt)%5; r=0,1 progress, r=2,3 damage, r=4 neutral. This exact expression is not hardcoded as named candidate in learner. Simulator only.",
+    "sequence": [
+      "source TRAIN indices 1000..1239, 240 examples",
+      "product target TRAIN indices 2000..2127, 128 examples",
+      "source return TRAIN indices 3000..3063, 64 examples",
+      "square target TRAIN indices 4000..4127, 128 examples"
+    ],
+    "actor": "External seeded random actor performs one action and records public features+progress/damage in each separate TRAIN task; source harm counted exactly once; learner never performs data-acquisition interventions.",
+    "outcomes": "Deterministic actual outcomes and truthful public reports for this isolated representation experiment; prior stochastic outcome/noisy-report failures persist.",
+    "test": "Disjoint TEST indices from TRAIN but reused across checkpoints and methods. 16 tasks per seed/checkpoint."
+  },
+  "candidate": {
+    "name": "ComposedFeatureMemory",
+    "source": "Frozen first-192 source span bucket model trained on public outcome data.",
+    "generative_grammar": "Take alphabetically sorted inputs a,b. Leaf terms: a,b. Nonlinear terms generated as all degree-two products of leaf inputs (a*a, a*b, b*b) via nested 'multiply' operator. Compose exactly one of these nonlinear terms and one of a,b via 'add' operator. Linear operand coefficients in {1,2}; nonlinear coefficients in {1,2}. Reduce with 'modulo' in {5,7}. Generated combinations: 3*2*2*2*2=48 quadratic programs. Include older span, checksum and ordered prewritten transforms only as controls; they are not permitted to help construction of target quadratic features. No explicit product-target or square-target expression in learner.",
+    "complexity": "No fitted arbitrary neural network or unrestricted code generation. Fixed search space 48 quadratic compositions+frozen span+recent span+old checksum+old ordered; descriptions must admit hand-authored grammar contains both target expressions (so bounded search rather than unconstrained invention).",
+    "statistic": "For each bucket in residue range, learn progress/damage/neutral frequencies with Laplace alpha=0.25. No private seed salt or regime labels observed by learner.",
+    "prequential": "Use last 12 public outcomes as scoring tail. At each outcome index i train every candidate model on last up to 24 events strictly BEFORE i, excluding scored example. Score sum log P(observed class) with complexity penalty 0.25 total for each quadratic candidate, 0 for fixed choices. Exact ties favor frozen archive, recent span, older fixed transforms, then candidate enumeration order.",
+    "action": "Use highest-scoring hypothesis with current last 32 feedback rows for decision-time action scoring 3*P(progress)-10*P(damage). Source archive uses earliest192. No abstention in candidate; count harmful TEST actions separately, abstain baseline counts failure.",
+    "persistence": "Append-only original public numeric records validated by existing strict same-schema helper, MAX_SAMPLES bounds, SHA256 exact replay. Selected candidate identified by generic grammar AST only, not external world name."
+  },
+  "frozen_seeds": {
+    "development": [
+      242003,
+      242021,
+      242039
+    ],
+    "additional": [
+      243001,
+      243017,
+      243041
+    ]
+  },
+  "checkpoints": {
+    "product": [
+      0,
+      4,
+      8,
+      16,
+      32,
+      64,
+      96,
+      128
+    ],
+    "return_source": [
+      0,
+      4,
+      8,
+      16,
+      32,
+      64
+    ],
+    "square": [
+      0,
+      4,
+      8,
+      16,
+      32,
+      64,
+      96,
+      128
+    ]
+  },
+  "test_start": {
+    "product": 260000,
+    "return_source": 270000,
+    "square": 280000
+  },
+  "test_episodes_per_seed_checkpoint": 16,
+  "comparators": [
+    "composed_grammar",
+    "prior_fixed_library",
+    "frozen_source",
+    "recent8_span",
+    "recent32_span",
+    "recent32_product_privileged",
+    "recent32_square_privileged",
+    "privileged_action_oracle",
+    "untrained_random",
+    "always_abstain"
+  ],
+  "gates": [
+    "At product64 and square64 target >=60/96 successful TEST tasks (six seeds*16) and at return_source16 >=60/96. Report at product8,16,32,96,128 and square same even when failed.",
+    "Compare to old fixed library and span-only; disclose grammar's true target formula is expressible within generated space and target world samples are stratified.",
+    "Count source actor acquisition harm, candidate TEST harm, abstentions and selected program shapes and verify no TRAIN/test contamination.",
+    "No learner promotion or merge based solely on passing gates."
+  ],
+  "limitations": [
+    "The true quadratic formulas are *not* supplied as finished named hypotheses, but are reachable within a small hand-designed grammar; this is bounded program selection/composition, not unconstrained causal invention.",
+    "Both novel physics rules remain authored by the experimenter; no independently sampled open-domain physical law.",
+    "Deterministic feedback/no noise, artificial productive action allocation, static 2-feature integer schema, source trustworthy only within benchmark.",
+    "No calibrated harmful-action uncertainty or safe first-contact, no real-world action permissions.",
+    "No cross-project integration with AthenZ/Synveil, default controller changes, PR merge or active D1–D10 and V2A/V2B roadmap changes."
+  ]
+}

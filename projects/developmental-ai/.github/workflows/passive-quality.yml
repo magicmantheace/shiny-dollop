@@ -1,0 +1,67 @@
+name: Passive evidence quality (focused)
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/passive_quality.py"
+      - "benchmarks/passive_quality_protocol.json"
+      - "benchmarks/passive_quality_benchmark.py"
+      - "tests/test_passive_quality.py"
+      - ".github/workflows/passive-quality.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  passive-evidence-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run bias/forgery and immutable-evidence tests
+        run: python -m unittest tests.test_passive_quality -v
+      - name: Development cohort
+        run: python -m benchmarks.passive_quality_benchmark --cohort development > quality-development.json
+      - name: Reserved cohort
+        run: python -m benchmarks.passive_quality_benchmark --cohort reserved > quality-reserved.json
+      - name: Preserve ALL outcomes and correct actor harm attribution
+        run: |
+          python - <<'PY'
+          import json
+          policies=("raw_random240","coverage_gated_random240",
+                    "raw_biased240","coverage_gated_biased240",
+                    "raw_forged240","coverage_gated_forged240",
+                    "always_abstain","privileged_oracle")
+          for path in ("quality-development.json","quality-reserved.json"):
+              data=json.load(open(path,encoding="utf-8"))
+              print(path)
+              for origin in ("random","biased","forged"):
+                  checks=[r["evidence_audit"][origin] for r in data["rows"]]
+                  print(origin,"coverage_passed:",[r["coverage_passed"] for r in checks],
+                        "authenticated:",[r["origin_authenticated"] for r in checks])
+              print("actual_actor_harm:", {
+                  actor:sum(r["actual_actor_harm"][actor] for r in data["rows"])
+                  for actor in ("random","biased")})
+              print("forgery_count:",sum(r["falsified_outcomes"] for r in data["rows"]))
+              print("falsified_record_harm:",sum(r["recorded_harm_in_forged_dataset"]
+                                                 for r in data["rows"]))
+              for policy in policies:
+                  group=[r["scores"][policy] for r in data["rows"]]
+                  print(policy,json.dumps({
+                      field:sum(r[field] for r in group)
+                      for field in ("successes","hurt","stalled","abstained")},
+                      sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: passive-evidence-quality-full-tables
+          path: |
+            quality-development.json
+            quality-reserved.json
+          retention-days: 14

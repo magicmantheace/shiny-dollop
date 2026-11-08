@@ -1,0 +1,58 @@
+name: Variable schema outcome learning (focused)
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/observable_affordances.py"
+      - "benchmarks/variable_affordance_protocol.json"
+      - "benchmarks/variable_affordance_benchmark.py"
+      - "tests/test_variable_affordance.py"
+      - ".github/workflows/variable-affordance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unknown-schema-learning:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate persistent learner, replay and historical models
+        run: python -m unittest tests.test_variable_affordance tests.test_regime_retrieval tests.test_fast_reacquisition tests.test_archive_consistency tests.test_observable_affordances -v
+      - name: Frozen development cohort
+        run: python -m benchmarks.variable_affordance_benchmark --cohort development > variable-development.json
+      - name: Frozen additional cohort
+        run: python -m benchmarks.variable_affordance_benchmark --cohort additional > variable-additional.json
+      - name: Report distinct family results, old-task retention and source harm
+        run: |
+          python - <<'PY'
+          import json
+          for filename in ("variable-development.json","variable-additional.json"):
+              data=json.load(open(filename,encoding="utf-8"))
+              print(filename,"blind:",data["blind"],"learner_training_actions:",data["learner_training_actions"])
+              for family in ("quarry","coolant","relay"):
+                  counts=[row["actor_costs"][family] for row in data["rows"]]
+                  print("training",family,{k:sum(c[k] for c in counts)
+                        for k in ("observations","harmful","productive","neutral")})
+                  for n in (0,16,48,160):
+                      print("EVAL",family,"target_observations",n)
+                      for method in ("schema_memory","target_only","recent_48","source_frozen",
+                                     "untrained_random","always_abstain","privileged_oracle"):
+                          part=[r["checkpoints"][str(n)]["results"][family][method] for r in data["rows"]]
+                          print(method,{k:sum(x[k] for x in part) for k in
+                                        ("successes","hurt","abstained")})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cross-schema-full-learning-and-harm-results
+          path: |
+            variable-development.json
+            variable-additional.json
+          retention-days: 14
