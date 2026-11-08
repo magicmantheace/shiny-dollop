@@ -95,6 +95,13 @@ checkable rather than assumed).
   performance is owner-hardware territory and stays
   labelled unverified, the same line the browser proof
   draws.
+  **Decision made 2026-11-07 (ADR 0027): option (a).** The
+  owner directed the graphics stack be staged via the
+  distro route — `tools/distro_graphics.py` seals Mesa
+  25.0.7 (lavapipe + llvmpipe) from the same pinned
+  snapshot as Wine, woven into the Wine proof image with a
+  guest initialization probe. See "Graphics staging
+  outcome" below.
 
 ### Install / launch model
 
