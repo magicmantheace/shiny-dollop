@@ -1,0 +1,234 @@
+{
+ "entry_version": 1,
+ "name": "Geode Tortoise",
+ "slug": "geode-tortoise",
+ "source_concept": "media-generation-media-generation-geode-tortois-0-497e2cdd-fd90-4ee0-8bb0-23b4691e5dcb.webp",
+ "asset_file": "geode-tortoise.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "0475366d287cbaa7ba0f063b788887aff383087b48dfe1d0775105e3203e95c1",
+ "bytes": 21575096,
+ "counts": {
+  "verts": 46579,
+  "faces": 88766,
+  "raw_mesh_verts": 1279034,
+  "raw_mesh_faces": 1643438
+ },
+ "bones": [
+  "root",
+  "spine",
+  "hips",
+  "neck",
+  "head",
+  "leg.FL",
+  "leg2.FL",
+  "leg.HL",
+  "leg2.HL",
+  "leg.FR",
+  "leg2.FR",
+  "leg.HR",
+  "leg2.HR",
+  "tail.1",
+  "tail.2"
+ ],
+ "actions": [
+  "idle",
+  "run",
+  "shiver",
+  "walk"
+ ],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": true,
+  "rig_template": "quadruped",
+  "signature_clip": "shiver",
+  "weight_method": "bone-heat (automatic weights); geodesic distance veto (factor 0.85, floor 0.19); label-aware veto (P3-SAM parts, 14732 entries vetoed by label); distance rescue on 4172 verts",
+  "segmentation": {
+   "model": "P3-SAM (Tencent Hunyuan3D-Part)",
+   "parts": 8,
+   "proxy_faces": 80929,
+   "islands_relabelled": 92,
+   "separated_verts_added": 2242,
+   "labelled_verts": 46579
+  },
+  "label_map": {
+   "0": {
+    "dominant": "leg2.HR",
+    "allowed": [
+     "head",
+     "leg.HR",
+     "leg2.HR",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FL",
+     "leg.HL",
+     "leg2.FL",
+     "leg2.FR",
+     "leg2.HL"
+    ]
+   },
+   "1": {
+    "dominant": "leg2.HL",
+    "allowed": [
+     "head",
+     "leg.HL",
+     "leg2.HL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FL",
+     "leg2.FL",
+     "leg2.FR",
+     "leg2.HR"
+    ]
+   },
+   "2": {
+    "dominant": "leg.HL",
+    "allowed": [
+     "head",
+     "hips",
+     "leg.FR",
+     "leg.HL",
+     "leg.HR",
+     "leg2.HL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FL",
+     "leg2.FL",
+     "leg2.FR",
+     "leg2.HR"
+    ]
+   },
+   "3": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "hips",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FL",
+     "leg.HL",
+     "leg2.FL",
+     "leg2.FR",
+     "leg2.HL",
+     "leg2.HR"
+    ]
+   },
+   "4": {
+    "dominant": "leg.FL",
+    "allowed": [
+     "head",
+     "leg.FL",
+     "leg.FR",
+     "leg2.FL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.HL",
+     "leg2.FR",
+     "leg2.HL",
+     "leg2.HR"
+    ]
+   },
+   "5": {
+    "dominant": "leg2.FL",
+    "allowed": [
+     "head",
+     "leg.FL",
+     "leg2.FL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.HL",
+     "leg2.FR",
+     "leg2.HL",
+     "leg2.HR"
+    ]
+   },
+   "6": {
+    "dominant": "leg2.FR",
+    "allowed": [
+     "head",
+     "leg.FR",
+     "leg2.FR",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FL",
+     "leg.HL",
+     "leg2.FL",
+     "leg2.HL",
+     "leg2.HR"
+    ]
+   },
+   "7": {
+    "dominant": "leg.FL",
+    "allowed": [
+     "head",
+     "leg.FL",
+     "leg.FR",
+     "leg.HR",
+     "leg2.FL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.HL",
+     "leg2.FR",
+     "leg2.HL",
+     "leg2.HR"
+    ]
+   }
+  },
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ },
+ "clips": {
+  "idle": {
+   "frames": 115,
+   "fps": 24,
+   "seconds": 4.79
+  },
+  "run": {
+   "frames": 24,
+   "fps": 24,
+   "seconds": 1.0
+  },
+  "shiver": {
+   "frames": 38,
+   "fps": 24,
+   "seconds": 1.58
+  },
+  "walk": {
+   "frames": 48,
+   "fps": 24,
+   "seconds": 2.0
+  }
+ }
+}
