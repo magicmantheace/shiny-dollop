@@ -130,8 +130,8 @@ three.js playback of the new clips verified on the build VM
 full numbers and the honest limits (procedural gaits, no IK) in
 `docs/TEST_PLAN.md`.**
 
-**P5 update (2026-11-09): the campfire creatures pack — in
-progress** (branch `game-asset-builder/p5-campfire-creatures`,
+**P5 update (2026-11-09): the campfire creatures pack — DONE,
+6 of 8** (branch `game-asset-builder/p5-campfire-creatures`,
 stacked on the P4 branch). Eight whimsical smashup creatures
 commissioned for the campfire wallpaper. New rig templates landed
 first: `winged-quadruped` (quadruped + wing pair + optional
@@ -139,16 +139,25 @@ ear/antenna bones) and `snail` (legless body chain + eye stalks +
 shell bone; locomotion is an undulation `glide`, showcase is
 `retract`), plus a per-creature SIGNATURES registry in the animate
 stage (`fan`, `headturn`, `bounce`, `scream`, `bow`, `shiver`,
-`wiggle`). **Moth-Hart** (deer + moth, winged-quadruped, signature
-`fan`) is built, catalogued, and verified end to end — 21 bones,
-idle 4.79 s / fan 2.79 s / walk 2.0 s / run 1.0 s, catalog sha256
-MATCH, three.js playback verified (quarter-cycle deltas: fan
-0.666, run 0.308, walk 0.170). The remaining seven (Toasty,
-Lantern Snail, Ember Owl-Cat, Geode Tortoise, Axolotl-Capybara,
-Mandrake Toddler, Crow Postman) have reference art ready but are
-**not built**: the build VM lost its Tailscale route to the PC
-bridge after a reboot on 2026-11-09, and every GPU stage waits on
-that route returning. Suite **134/134**. Full record in
+`wiggle`). **Built, catalogued, and verified end to end**
+(catalog-verify MATCH + three.js playback with bone deltas for
+every one): **Moth-Hart** (winged-quadruped + ears, `fan`, 21
+bones), **Toasty** (biped, `bounce`, 11 bones), **Lantern Snail**
+(snail, `retract`, 9 bones), **Axolotl-Capybara** (quadruped,
+`wiggle`, 15 bones), **Geode Tortoise** (quadruped, `shiver`, 15
+bones), **Crow Postman** (biped, `bow`, 11 bones). **Two honest
+failures, not catalogued:** the **Ember Owl-Cat** (paint stage
+non-terminating across two attempts — unbounded memory growth,
+killed at 2h33m and ~60 min) and the **Mandrake Toddler** (retry
+paint died mid-bake without a traceback after its first attempt
+was killed on a memory criterion the pack's own evidence later
+disproved — both failures are written up in their
+`outputs/<slug>/attempt1-texture-note.txt`). The pack's main
+operational finding: the paint bake's ~17.7 GB private-memory
+plateau is its fixed footprint on large meshes, not a runaway;
+the completed paints ran 763–2,524 runner-seconds, the tortoise
+at 1,643,448 faces the longest legitimate paint in project
+history. Suite **134/134**. Full record in
 `docs/MUSE_HANDOFF.md` and `docs/TEST_PLAN.md`.**
 
 A fully local, no-API pipeline that builds game assets — creatures included —
@@ -210,7 +219,8 @@ cloud-generated reference Pip the owner already has.
   branch `game-asset-builder/p4-game-animations`).
 - **P5** — campfire creatures pack: eight smashup creatures on two
   new rig templates (winged-quadruped, snail) with per-creature
-  signature clips. **In progress 2026-11-09** — Moth-Hart done and
-  verified; the other seven await the PC bridge route (see the P5
-  status note above; branch
+  signature clips. **Done 2026-11-09, 6 of 8** — six built,
+  catalogued and verified; the Ember Owl-Cat and Mandrake Toddler
+  failed at the texture stage and are catalogued as failures, not
+  assets (see the P5 status note above; branch
   `game-asset-builder/p5-campfire-creatures`).

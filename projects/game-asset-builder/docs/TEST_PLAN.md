@@ -461,7 +461,9 @@ Infrastructure tests: `tests/test_p5_campfire.py` (21 tests —
 snail + winged-quadruped templates, signature registry and
 recipe selection, session-0 bridge transport). Full suite
 **134 passed** (pytest), including the UI catalog test updated
-to the five-asset catalog.
+to the ten-asset catalog (the P5 completion added toasty,
+lantern-snail, axolotl-capybara, geode-tortoise, crow-postman
+with bone counts).
 
 Moth-Hart (winged-quadruped, `--ears`, signature `fan`) — full
 pipeline, all stages on the owner's PC / build VM as designed:
@@ -501,13 +503,119 @@ pipeline, all stages on the owner's PC / build VM as designed:
   under erosion); segmentation + separation produced four
   separately weighted legs anyway.
 
-Not verified for P5: the other seven creatures (Toasty,
-Lantern Snail, Ember Owl-Cat, Geode Tortoise,
-Axolotl-Capybara, Mandrake Toddler, Crow Postman) — reference
-art exists, builds are blocked on the PC bridge route (lost
-after a build-VM reboot 2026-11-09; see MUSE_HANDOFF).
-Godot playback of the Moth-Hart, and the snail template on a
-real mesh, are likewise still open.
+The remaining five builds ran 2026-11-09 after the bridge
+route was rebuilt; all stages on the owner's PC / build VM as
+designed, single-flight throughout. Per creature (three.js =
+the project harness page, mid-cycle / quarter-cycle max bone
+deltas; renders = rest + signature, eyeballed):
+
+- **Toasty** (biped, `bounce`): mesh exit 0, 332.32 s
+  (498,688 raw verts); texture exit 0, runner 1,573.17 s
+  (762,980 verts / 997,542 faces; peak VRAM 12,045 MiB);
+  segment exit 0, 219.01 s (7 parts). Rig 11 bones, coverage
+  1.0; torso arm share 0.104, head zone 0.998, hands tip
+  0.803, feet zone 0.390 (weak, disclosed). Clips: bounce
+  1.25 s, idle 4.79 s, walk 1.5 s, run 1.0 s. GLB 21,960,832
+  bytes, sha256 `62289b927b6c161b968726fb8455987de5ca397a3947f812f93de719c59d043e`, catalog-verify **MATCH**. three.js
+  ok=true; quarter deltas bounce 0.270 / run 0.183 / walk
+  0.152 / idle 0.009; mid 0.055 / 0.067 / 0.030 / 0.002.
+  Renders clean; the bounce-peak frame splays the fused
+  bottom rim (fused-mass class); a mid-body texture seam is
+  visible. Verdict: **RIGGABLE**.
+- **Lantern Snail** (snail, `retract`): mesh exit 0, 353.37 s
+  (769,509 verts / 988,234 faces); texture exit 0, runner
+  948.83 s. Rig 9 bones, coverage 1.0; head tip 0.959, shell
+  zone 0.747, distance rescue 3,351, label veto 0. Clips:
+  glide 3.0 s, idle 4.79 s, retract 3.21 s. GLB 21,410,520
+  bytes, sha256 `240dbfafbdfded9a255b9ea441904979051aba284ba73f5d760a59dc5727af14`, catalog-verify **MATCH**; the
+  catalog `material_notes` carry the emissive-shell note.
+  three.js ok=true; mid glide 0.456 / retract 0.264 / idle
+  0.009; quarter 0.166 / 0.264 / 0.053. Disclosed: the
+  retract pose dips the evaluated mesh 0.035 below the
+  ground plane; the head/face reads blobby in renders.
+  Verdict: **RIGGABLE**. (This also closes the earlier open
+  item "the snail template on a real mesh".)
+- **Axolotl-Capybara** (quadruped, `wiggle`): mesh exit 0,
+  295.48 s (548,677 verts / 691,694 faces); texture exit 0,
+  763.33 s — the pack's only end-to-end client run. Rig 15
+  bones, coverage 1.0; feet tip 0.865, head zone 0.658, tail
+  zone 0.389 (thin fin, disclosed), label veto 14,755.
+  Clips: idle 4.79 s, walk 2.0 s, run 1.0 s, wiggle 2.42 s.
+  GLB 19,525,868 bytes, sha256 `7658b7db08dec348fdf04747fd211a53232421bd59e841102548351e96688adc`, catalog-verify
+  **MATCH**. three.js ok=true; mid walk 0.376 / wiggle 0.202
+  / run 0.117 / idle 0.039; quarter run 0.321 / walk 0.194 /
+  wiggle 0.158 / idle 0.020. Renders excellent. Verdict:
+  **RIGGABLE**.
+- **Geode Tortoise** (quadruped, `shiver`): final sample —
+  mesh exit 0, 324.21 s (821,719 verts / **1,643,448 faces**);
+  texture exit 0, runner 2,523.98 s (texture_s 2,399.67 s;
+  1,279,034 textured verts; peak VRAM 12,032 MiB) — the
+  longest legitimate paint in project history, completed
+  under the corrected kill criteria after two earlier
+  attempts were stopped on a memory-level criterion the
+  pack's evidence disproved (full saga in
+  `outputs/geode-tortoise/attempt1-texture-note.txt` and the
+  manifest's `stage_record_note`). Rig 15 bones, coverage
+  1.0; feet tip 1.0, head zone 0.775, tail zone 0.231 (stub
+  tail / shell rear), label veto 14,732. Clips: idle 4.79 s,
+  walk 2.0 s, run 1.0 s, shiver 1.58 s. GLB 21,575,096 bytes,
+  sha256 `0475366d287cbaa7ba0f063b788887aff383087b48dfe1d0775105e3203e95c1`, catalog-verify **MATCH**. three.js
+  ok=true; mid walk 0.374 / run 0.103 / shiver 0.039 / idle
+  0.034; quarter run 0.314 / walk 0.192 / idle 0.017 /
+  shiver 0.014 (the shiver is a high-frequency tremble around
+  neutral, so its bone-position deltas are small by design).
+  Renders: stone shell + amethyst geode, reads exactly as
+  the concept. Verdict: **RIGGABLE**.
+- **Crow Postman** (biped, `bow`): mesh exit 0, 314.45 s
+  (341,956 verts / 684,162 faces); texture exit 0, runner
+  1,230.4 s (texture_s 1,092.48 s; 534,328 verts; peak VRAM
+  11,996 MiB). Rig 11 bones, coverage 1.0; hands tip 0.886,
+  head zone 0.937, feet zone 0.807; weights are the
+  **distance-to-bone fallback** (bone-heat rejected by the
+  skin policy) and torso arm share is 0.60 — coat mass
+  follows the arm bones, disclosed as a quality limit; the
+  bow render is clean (the concept's arms are sleeves fused
+  to the torso). Clips: bow 2.58 s, idle 4.79 s, walk 1.5 s,
+  run 1.0 s. GLB 21,106,560 bytes, sha256 `310942604e8623a07185e6bc03458a83ecf77eb7ca7181304a1d605c2be637a5`,
+  catalog-verify **MATCH**. three.js ok=true; quarter deltas
+  bow 0.189 / run 0.175 / walk 0.142 / idle 0.009; mid bow
+  0.189 / run 0.064 / walk 0.029 / idle 0.002. Renders dark
+  but unmistakable. Verdict: **RIGGABLE** (fallback weights
+  disclosed).
+
+Texture-stage failures, verified as failures (stage logs +
+result files preserved under each `outputs/<slug>/`):
+
+- **Ember Owl-Cat** (winged-creature + `--ears`, `headturn`):
+  mesh exit 0 twice (328.12 s / 646,434 verts; 338.44 s /
+  703,035 verts). Attempt 1's paint grew memory without
+  plateauing and was killed at 2h33m / 8,797 CPU-s; attempt 2
+  was killed at ~60 min on the same growth signature. Not
+  catalogued. Record: `outputs/ember-owl-cat/attempt1-texture-note.txt`.
+- **Mandrake Toddler** (biped, `scream`): mesh exit 0 twice
+  (321.65 s / 676,636 faces; 319.34 s / 710,866 faces).
+  Attempt 1's texture was operator-killed at 701.92 s on the
+  since-disproved memory-level criterion (disclosed in its
+  note as an operator error). The retry's paint died on its
+  own mid-bake under corrected criteria — stage log ends
+  after the input-mesh line, no traceback, no result, no
+  textured GLB. Not catalogued. Record:
+  `outputs/mandrake-toddler/attempt1-texture-note.txt`.
+
+Paint-memory envelope established by the pack (completed
+paints): runner 763–2,524 s; bake private-memory plateau
+~17.2–17.7 GB on large meshes is the fixed pool, not a
+runaway; kill criteria corrected to free RAM < 5 GB /
+private > 26 GB / extreme duration with continued growth.
+
+Not verified for P5: Godot playback of the six new GLBs
+(three.js verification only); campfire-wallpaper roster
+integration (separate step); the Owl-Cat / Mandrake paint
+root cause (unproven — face count excluded as the sole
+cause: 676,636-face Mandrake died while the 691,698-face
+Axolotl-Capybara completed the same night and the
+1,643,448-face Tortoise completed outright); real-GPU frame
+cost of the new creatures in the wallpaper scene.
 
 ## Not yet verified
 

@@ -92,9 +92,17 @@ class CatalogDataTests(unittest.TestCase):
         summaries = {s["slug"]: s for s in catalog_data.list_catalog()}
         self.assertEqual(set(summaries), {"ember-dragon", "snow-goblin",
                                           "treasure-chest", "triceratops",
-                                          "moth-hart"})
+                                          "moth-hart", "toasty",
+                                          "lantern-snail",
+                                          "axolotl-capybara",
+                                          "geode-tortoise", "crow-postman"})
         self.assertEqual(summaries["ember-dragon"]["bone_count"], 14)
         self.assertEqual(summaries["moth-hart"]["bone_count"], 21)
+        self.assertEqual(summaries["toasty"]["bone_count"], 11)
+        self.assertEqual(summaries["lantern-snail"]["bone_count"], 9)
+        self.assertEqual(summaries["axolotl-capybara"]["bone_count"], 15)
+        self.assertEqual(summaries["geode-tortoise"]["bone_count"], 15)
+        self.assertEqual(summaries["crow-postman"]["bone_count"], 11)
         self.assertFalse(summaries["treasure-chest"]["rigged"])
 
     def test_preview_path_rejects_traversal_and_non_png(self):

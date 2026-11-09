@@ -467,7 +467,7 @@ Next:
 Boundaries: no cloud fallback exists or may be added; weights and outputs
 never enter git; GPU claims only from PC runs; merges are the owner's call.
 
-## P5 campfire creatures — PARTIAL (2026-11-09, branch game-asset-builder/p5-campfire-creatures, stacked on P4)
+## P5 campfire creatures — COMPLETE, 6 of 8 (2026-11-09, branch game-asset-builder/p5-campfire-creatures, stacked on P4)
 
 Owner commissioned eight "weird smashup" creatures for the
 campfire wallpaper (2026-11-08): batch 1 = Moth-Hart, Toasty,
@@ -498,49 +498,164 @@ were generated 2026-11-09 in the same recipe).
   fan renders read clean — four distinct legs despite the
   preflight "warn" (leg band fuses in the concept's erosion test;
   segmentation + separation handled it). Verdict: **RIGGABLE**.
-- **The other seven are NOT BUILT — blocked on the PC bridge.**
-  On 2026-11-09 the build VM rebooted and its Tailscale route to
-  the bridge agent stopped passing traffic (proxy accepts then
-  drops connections to the agent; `tailscale status` still says
-  Connected; no approval request was visible from the build
-  side). Every remaining creature needs GPU mesh/texture/segment
-  stages on the PC, so work stops at Moth-Hart until the route is
-  re-established/re-approved from the owner's side. Nothing about
-  the block is in the pipeline or the PC agent (both proven the
-  same evening).
-- **Bookkeeping repairs, recorded in the Moth-Hart manifest +
-  catalog provenance (`stage_record_note`)**: a `--resume`
-  relaunch overwrote the manifest's detailed mesh record, and the
-  texture stage's post-run result fetch once returned a previous
-  aborted attempt's exit-1 record after the stage had actually
-  completed (exit 0). The textured GLB was fetched manually
-  (sha256-verified) and the pipeline resumed from it; the true
-  mesh/texture records were restored from the stages' own PC
-  result files. The segment record was likewise reconstructed
-  (runner exit 0 / 136.74 s, read live pre-reboot) after the
-  post-reboot relaunch's manifest rewrite dropped it; its outputs
-  on disk are the originals.
+- **The bridge route was rebuilt the same day** (wrapper +
+  tailnet proxy on port 3130; the earlier "blocked" note in this
+  section's first draft was superseded within hours) and the
+  remaining seven were run single-flight under a strict sweep-
+  before-every-run rule. Results:
+- **Toasty — BUILT AND VERIFIED.** Biped, signature `bounce`.
+  Mesh exit 0 (332.32 s; 498,688 raw verts), texture exit 0
+  (runner 1,573.17 s; 762,980 verts / 997,542 faces; peak VRAM
+  12,045 MiB), segment exit 0 (219.01 s; 7 parts). Rig 11 bones,
+  coverage 1.0; torso arm share 0.104, head zone 0.998, hands tip
+  0.803, feet zone 0.390 (weak — disclosed; the fused skirt base
+  gives the feet little distinct mass). Clips: bounce 1.25 s,
+  idle 4.79 s, walk 1.5 s, run 1.0 s. GLB 21,960,832 bytes,
+  sha256 `62289b927b6c161b…`, catalog-verify **MATCH**. three.js
+  ok=true; quarter-cycle deltas bounce 0.270 / run 0.183 / walk
+  0.152 / idle 0.009. Renders read clean; the bounce-peak frame
+  splays the fused bottom rim (fused-mass class) and a mid-body
+  texture seam is visible. Verdict: **RIGGABLE**.
+- **Lantern Snail — BUILT AND VERIFIED.** Snail template, no
+  `--signature` (built-in `retract` showcase; the catalog
+  `material_notes` carry the emissive-shell note). Mesh exit 0
+  (353.37 s; 769,509 verts / 988,234 faces), texture exit 0
+  (runner 948.83 s). Rig 9 bones (root, body.1–3, neck, head,
+  eye.L, eye.R, shell), coverage 1.0; head tip 0.959, shell zone
+  0.747, distance rescue 3,351. Clips: glide 3.0 s, idle 4.79 s,
+  retract 3.21 s. GLB 21,410,520 bytes, sha256 `240dbfafbdfded…`,
+  catalog-verify **MATCH**. three.js ok=true; mid-cycle deltas
+  glide 0.456 / retract 0.264 / idle 0.009. Disclosed: the
+  retract pose dips the evaluated mesh to −0.024 (0.035 below
+  the ground plane) and the head/face reads blobby in renders.
+  Verdict: **RIGGABLE**.
+- **Axolotl-Capybara — BUILT AND VERIFIED.** Quadruped,
+  signature `wiggle`. Mesh exit 0 (295.48 s; 548,677 verts /
+  691,694 faces), texture exit 0 (763.33 s) — the only run of
+  the pack whose pipeline client survived end to end, so its
+  manifest is untouched. Rig 15 bones (incl. tail pair),
+  coverage 1.0; feet tip 0.865, head zone 0.658, tail zone
+  0.389 (the thin tail fin — disclosed), label veto 14,755.
+  Clips: idle 4.79 s, walk 2.0 s, run 1.0 s, wiggle 2.42 s.
+  GLB 19,525,868 bytes, sha256 `7658b7db08dec3…`, catalog-verify
+  **MATCH**. three.js ok=true; quarter deltas run 0.321 / walk
+  0.194 / wiggle 0.158 / idle 0.020. Renders excellent — the
+  axolotl gills and capybara body both read. Verdict:
+  **RIGGABLE**.
+- **Geode Tortoise — BUILT AND VERIFIED.** Quadruped, signature
+  `shiver`. The pack's hardest build (full saga in
+  `outputs/geode-tortoise/attempt1-texture-note.txt`): mesh
+  sample 1 was adopted across a VM reboot; its texture attempt
+  was killed on a memory criterion later disproved; the retry's
+  mesh came back at **1,643,448 faces** and, under corrected
+  criteria, its texture **completed** — runner exit 0,
+  2,523.98 s (texture_s 2,399.67 s; 1,279,034 textured verts),
+  peak VRAM 12,032 MiB, the longest legitimate paint in project
+  history. Rig 15 bones, coverage 1.0; feet tip 1.0, head zone
+  0.775, tail zone 0.231 (stub tail / shell rear), label veto
+  14,732. Clips: idle 4.79 s, walk 2.0 s, run 1.0 s, shiver
+  1.58 s. GLB 21,575,096 bytes, sha256 `0475366d287cbaa7…`,
+  catalog-verify **MATCH**. three.js ok=true; mid walk 0.374 /
+  run 0.103 / shiver 0.039 / idle 0.034. Renders: stone shell
+  with the amethyst geode cluster — reads exactly as the
+  concept. Verdict: **RIGGABLE**.
+- **Crow Postman — BUILT AND VERIFIED.** Biped, signature
+  `bow`. Mesh exit 0 (314.45 s; 341,956 verts / 684,162 faces),
+  texture exit 0 (runner 1,230.4 s; texture_s 1,092.48 s;
+  534,328 verts), peak VRAM 11,996 MiB. Rig 11 bones, coverage
+  1.0; hands tip 0.886, head zone 0.937, feet zone 0.807 —
+  **but** the bone-heat weights were rejected by the skin
+  policy and the rig ships the distance-to-bone fallback;
+  torso arm share is 0.60, so coat mass follows the arm bones
+  (acceptable here: the concept's arms are coat sleeves fused
+  to the torso, and the bow render is clean — disclosed as a
+  quality limit). Clips: bow 2.58 s, idle 4.79 s, walk 1.5 s,
+  run 1.0 s. GLB 21,106,560 bytes, sha256 `310942604e8623…`,
+  catalog-verify **MATCH**. three.js ok=true; quarter deltas
+  bow 0.189 / run 0.175 / walk 0.142 / idle 0.009. Renders are
+  dark (black plumage, navy coat) but unmistakable. Verdict:
+  **RIGGABLE** (fallback weights disclosed).
+- **Ember Owl-Cat — FAILED at the texture stage, NOT
+  catalogued.** Winged-creature + `--ears`, signature
+  `headturn`. Two attempts, both mesh exit 0 (328.12 s /
+  646,434 verts; 338.44 s / 703,035 verts). Attempt 1's paint
+  grew private memory 14.9 → 17.5 GB **without plateauing**
+  and was killed at 2h33m wall / 8,797 CPU-s — 5× the longest
+  completed paint. Attempt 2 showed the same growth signature
+  and was killed at ~60 min (17,565 MB). A postscript in its
+  note records that the memory LEVEL alone was later disproved
+  as a kill criterion; the verdict rests on duration +
+  unbounded growth. Full record:
+  `outputs/ember-owl-cat/attempt1-texture-note.txt`.
+- **Mandrake Toddler — FAILED at the texture stage, NOT
+  catalogued.** Biped, signature `scream`. Attempt 1: mesh
+  exit 0 (321.65 s; 338,370 verts / 676,636 faces); its
+  texture was killed by the operator at 701.92 s at private
+  17,228 MB — a level the tortoise later completed at, so the
+  kill is recorded in its note as an operator error on a
+  since-disproved criterion. Attempt 2 (the one retry): mesh
+  exit 0 (319.34 s; 355,463 verts / 710,866 faces); under
+  corrected criteria the paint **died on its own** mid-bake —
+  the stage log ends immediately after the input-mesh line,
+  no traceback, no result file, no textured GLB. Root cause
+  unproven. Full record:
+  `outputs/mandrake-toddler/attempt1-texture-note.txt`.
+- **The paint-memory finding (the pack's main operational
+  result):** completed paints (runner seconds) — Axolotl-
+  Capybara 763.33, Lantern Snail 948.83, Crow Postman 1,230.4,
+  Toasty 1,573.17, Geode Tortoise 2,523.98. The bake phase's
+  private-memory footprint (~11.6 GB early) rises to a
+  **byte-stable plateau of ~17.2–17.7 GB** on large meshes:
+  that plateau is the bake's fixed pool, NOT a runaway. The
+  true runaway discriminator is unbounded growth + duration
+  many times the envelope (the Owl-Cat). Corrected kill
+  criteria: free RAM < 5 GB, private > 26 GB, or extreme
+  duration with continued growth. Face count alone does not
+  predict failure: the Mandrake died at 676,636 faces while
+  the Axolotl-Capybara completed at 691,698 the same night
+  and the Tortoise at 1,643,448.
+- **Bookkeeping repairs, recorded per-creature in each
+  manifest's `stage_record_note`**: the pattern repeated all
+  pack — a `--resume` relaunch overwrites the manifest's
+  detailed records of stages it skips, and the pipeline client
+  typically dies at the post-stage fetch (bridge job-tracking
+  limit, ~15–23 min into a long stage) while the stage itself
+  completes unharmed on the PC. The standing recovery is:
+  wait for the stage's own result file, fetch result + GLB +
+  log (sha256-verified by the bridge download), `--resume`,
+  then restore the genuine mesh/texture records into the
+  manifest from the stages' own outputs. Applied to Toasty,
+  Lantern Snail, Geode Tortoise (×4 attempts) and Crow
+  Postman; the Moth-Hart instance is the one originally
+  documented here (including a stale exit-1 result read and a
+  reconstructed segment record — runner exit 0 / 136.74 s,
+  read live pre-reboot; its on-disk outputs are the
+  originals). Axolotl-Capybara needed no repair.
 - **Operational lessons (hard-won, 2026-11-08/09)**: (1) a
   pipeline client that dies after dispatching a GPU stage leaves
   the stage RUNNING server-side — check the agent's job/process
   list before re-dispatching, or two paint stages will share one
   GPU and exhaust the PC's RAM (observed: 0.5 GB free of 32 GB;
-  both trees had to be taskkilled). (2) Bridge file reads can
-  return a stale record for minutes after a stage writes its
+  both trees had to be taskkilled). Single-flight is mandatory:
+  sweep the PC (compute-apps + process list) before EVERY run.
+  (2) Bridge file reads can return a stale record for minutes after a stage writes its
   result — when a stage reports failure, re-fetch its result +
   log before re-running anything; the reads self-heal. (3) VM
-  reboots wipe /tmp and kill in-flight clients — keep run
-  scripts/logs in the workspace, and prefer `--resume` +
-  manifest checks over blind relaunches.
-- Suite **134/134** (the UI catalog test now expects five assets
-  incl. moth-hart, bone count 21).
+  reboots wipe /tmp and kill in-flight clients (three this pack)
+  — keep run scripts/logs and lane tooling in the workspace,
+  and prefer `--resume` + manifest checks over blind relaunches.
+  (4) Judge a paint by growth + duration, never by memory level
+  alone (see the paint-memory finding above).
+- Suite **134/134** (the UI catalog test now expects the ten
+  proven assets — the original five plus toasty, lantern-snail,
+  axolotl-capybara, geode-tortoise and crow-postman, with bone
+  counts 11 / 9 / 15 / 15 / 11).
 
-Next when the bridge route returns: run Toasty (biped, signature
-`bounce`) and Lantern Snail (snail template, no `--signature` —
-showcase `retract`; the catalog step adds the emissive shell
-note), then batch 2 in commission order (Ember Owl-Cat =
-winged-creature/`headturn`, Geode Tortoise = quadruped/`shiver`,
-Axolotl-Capybara = quadruped/`wiggle`, Mandrake Toddler =
-biped/`scream`, Crow Postman = biped/`bow`), verify each
-(catalog-verify + three.js deltas), push, and open the single
-draft PR against `game-asset-builder/p4-game-animations`.
+P5 is closed: six creatures catalogued + verified, two failures
+catalogued honestly, draft PR opened against
+`game-asset-builder/p4-game-animations` (not merged — the
+owner's call). Still open beyond P5: Godot playback of the six
+new GLBs (three.js only so far), campfire-wallpaper roster
+integration of the pack (a separate step), and the
+Owl-Cat/Mandrake paint root cause (unproven; face count
+excluded as the sole cause).
