@@ -30,6 +30,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 /* ---------------------------------------------------------- utilities */
@@ -336,13 +337,38 @@ let moonTexHour = -1;
       top: { value: new THREE.Color(0x070d29) },
       mid: { value: new THREE.Color(0x1b2547) },
       horizon: { value: new THREE.Color(0x93502f) },
+      uTime: { value: 0 },
+      uCloud: { value: 0 },
     },
     vertexShader: `varying vec3 vP; void main(){ vP = position;
       gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
     fragmentShader: `varying vec3 vP; uniform vec3 top; uniform vec3 mid; uniform vec3 horizon;
-      void main(){ float h = normalize(vP).y;
+      uniform float uTime; uniform float uCloud;
+      float hash21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float vnoise(vec2 p) {
+        vec2 i = floor(p), f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash21(i), hash21(i + vec2(1, 0)), f.x),
+                   mix(hash21(i + vec2(0, 1)), hash21(i + vec2(1, 1)), f.x), f.y);
+      }
+      float fbm2(vec2 p) {
+        float v = 0.0, a = 0.5;
+        for (int i = 0; i < 4; i++) { v += a * vnoise(p); p *= 2.11; a *= 0.5; }
+        return v;
+      }
+      void main(){ vec3 dir = normalize(vP); float h = dir.y;
         vec3 c = h > 0.22 ? mix(mid, top, smoothstep(0.22, 0.8, h))
                           : mix(horizon, mid, smoothstep(-0.03, 0.22, h));
+        // AAA experiment stage 3: soft procedural clouds, so the
+        // sky stops being a flat gradient card behind the scene.
+        // Wisps on a projected plane, drifting slowly, banded to
+        // the lower sky and tinted by the horizon colour.
+        vec2 cuv = dir.xz / (abs(dir.y) + 0.22) * 1.15 + vec2(uTime * 0.004, 0.0);
+        float cl = fbm2(cuv * 1.6 + fbm2(cuv * 3.1) * 0.7);
+        float cov = smoothstep(0.52, 0.74, cl)
+          * smoothstep(0.015, 0.10, h) * (1.0 - smoothstep(0.38, 0.72, h));
+        vec3 cloudCol = mix(horizon, vec3(1.02, 1.0, 0.98), 0.55);
+        c = mix(c, cloudCol, cov * uCloud * 0.5);
         gl_FragColor = vec4(c, 1.0); }`,
   });
   skyUniforms = skyMat.uniforms;
@@ -450,8 +476,8 @@ const SKY_STOPS = [
   { el: -8,  top: _C(0x060b26), mid: _C(0x16203f), hor: _C(0x3c2c40), fog: _C(0x111a33), fogDen: 0.0135, hs: _C(0x3d5484), hg: _C(0x1e150c), hi: 1.05 },
   { el: 0,   top: _C(0x070d29), mid: _C(0x1b2547), hor: _C(0x93502f), fog: _C(0x131a33), fogDen: 0.0135, hs: _C(0x8fa3cc), hg: _C(0x2e4a2a), hi: 1.15 },
   { el: 6,   top: _C(0x2c4d7d), mid: _C(0x7d90b4), hor: _C(0xe09a52), fog: _C(0x5f6a80), fogDen: 0.009,  hs: _C(0x8093b8), hg: _C(0x2e2415), hi: 1.45 },
-  { el: 18,  top: _C(0x2f6bb8), mid: _C(0x79aede), hor: _C(0xc8dfeb), fog: _C(0x9db8cc), fogDen: 0.0055, hs: _C(0xbfd8f0), hg: _C(0x44543c), hi: 1.7 },
-  { el: 40,  top: _C(0x2a63c4), mid: _C(0x74aae6), hor: _C(0xd2e6f2), fog: _C(0xa8c4d8), fogDen: 0.005,  hs: _C(0xcfe4f4), hg: _C(0x4a5c40), hi: 1.85 },
+  { el: 18,  top: _C(0x38679f), mid: _C(0x84a8c8), hor: _C(0xd3e2e6), fog: _C(0xa7bcc4), fogDen: 0.0055, hs: _C(0xbfd8f0), hg: _C(0x44543c), hi: 1.7 },
+  { el: 40,  top: _C(0x33629f), mid: _C(0x82a9cc), hor: _C(0xd8e4e8), fog: _C(0xb0c2ca), fogDen: 0.005,  hs: _C(0xcfe4f4), hg: _C(0x4a5c40), hi: 1.85 },
 ];
 const _pal = {
   top: new THREE.Color(), mid: new THREE.Color(), hor: new THREE.Color(),
@@ -610,6 +636,11 @@ function updateSky(nowMs) {
   starMat.opacity = 0.9 * THREE.MathUtils.clamp((-1 - sunEl) / 6, 0, 1);
   nightFactor = THREE.MathUtils.clamp((-0.5 - sunEl) / 5, 0, 1);
   fireScale = 0.35 + 0.65 * THREE.MathUtils.clamp((6 - sunEl) / 14, 0, 1);
+  // AAA experiment stage 3: cloud clock + strength for the sky
+  // shader (clouds belong to the lit hours; they are gone by
+  // full night and only embers of them catch the sunset).
+  skyUniforms.uTime.value = perfNow * 0.001;
+  skyUniforms.uCloud.value = THREE.MathUtils.clamp((sunEl + 2.5) / 9, 0, 1);
   for (const f of skyFollowers) f(P, sunEl);
 }
 
@@ -681,13 +712,56 @@ function makeGroundTextures() {
   return { dif, nor };
 }
 
+// AAA experiment stage 3: one shared fine-grain detail map for
+// the environment set (pines, rocks, bushes, wood). The set was
+// flat-shaded untextured primitives — the most "cartoon" part
+// of the scene next to the painted creatures. A near-neutral
+// noise multiply plus smooth shading takes the toy edge off
+// without touching the geometry. Same periodic-noise recipe
+// as the ground's, finer and weaker.
+function makeDetailTexture() {
+  const S = 256;
+  const octaves = [[8, 0.45], [16, 0.3], [32, 0.18], [64, 0.1]];
+  const lattices = octaves.map(([f]) => {
+    const g = new Float32Array(f * f);
+    for (let i = 0; i < g.length; i++) g[i] = Math.random();
+    return g;
+  });
+  const cv = document.createElement('canvas'); cv.width = cv.height = S;
+  const ctx = cv.getContext('2d'); const img = ctx.createImageData(S, S);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    let v = 0;
+    for (let o = 0; o < octaves.length; o++) {
+      const f = octaves[o][0], g = lattices[o];
+      const fx = x / S * f, fy = y / S * f;
+      const x0 = Math.floor(fx) % f, y0 = Math.floor(fy) % f;
+      const x1 = (x0 + 1) % f, y1 = (y0 + 1) % f;
+      let tx = fx - Math.floor(fx), ty = fy - Math.floor(fy);
+      tx = tx * tx * (3 - 2 * tx); ty = ty * ty * (3 - 2 * ty);
+      const a = g[y0 * f + x0], b = g[y0 * f + x1],
+            c = g[y1 * f + x0], d = g[y1 * f + x1];
+      v += ((a + (b - a) * tx) * (1 - ty) + (c + (d - c) * tx) * ty) * octaves[o][1];
+    }
+    const i = (y * S + x) * 4, lum = 224 + (v - 0.5) * 64;
+    img.data[i] = lum * 0.99; img.data[i + 1] = lum;
+    img.data[i + 2] = lum * 0.97; img.data[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(2, 2);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+  return tex;
+}
+const detailTex = makeDetailTexture();
+
 {
   const geo = new THREE.PlaneGeometry(170, 170, 170, 170);
   geo.rotateX(-Math.PI / 2);
   const p = geo.attributes.position;
   const colors = new Float32Array(p.count * 3);
-  const dark = new THREE.Color(0x2e4724), light = new THREE.Color(0x466b31),
-        dry = new THREE.Color(0x5a5c2e), cc = new THREE.Color();
+  const dark = new THREE.Color(0x31482a), light = new THREE.Color(0x496b35),
+        dry = new THREE.Color(0x5e5f35), cc = new THREE.Color();
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), z = p.getZ(i);
     p.setY(i, groundH(x, z));
@@ -714,12 +788,12 @@ function makeGroundTextures() {
   const trunkGeo = new THREE.CylinderGeometry(0.09, 0.14, 1.1, 8);
   const rockGeo = new THREE.DodecahedronGeometry(1, 1);
   const bushGeo = new THREE.IcosahedronGeometry(1, 2);
-  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 1 });
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 1, map: detailTex });
   const pineMat = new THREE.MeshStandardMaterial({
-    color: 0x2f5233, roughness: 1, flatShading: true, vertexColors: true });
+    color: 0x2f5233, roughness: 1, vertexColors: true, map: detailTex });
   const pineFoliageGeo = makePineFoliageGeo();
-  const rockMat = new THREE.MeshStandardMaterial({ color: 0x5d6068, roughness: 0.95, flatShading: true });
-  const bushMat = new THREE.MeshStandardMaterial({ color: 0x243d22, roughness: 1, flatShading: true });
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0x5d6068, roughness: 0.95, map: detailTex });
+  const bushMat = new THREE.MeshStandardMaterial({ color: 0x243d22, roughness: 1, map: detailTex });
 
   function scatterPos(minR, maxR) {
     const a = layoutRand() * Math.PI * 2;
@@ -858,7 +932,7 @@ function updateDressing(t, dt) {
       new THREE.MeshStandardMaterial({ color: 0x33261a, roughness: 1 }), 245);
     const fols = instanced(folGeo,
       new THREE.MeshStandardMaterial({
-        color: 0x2f5233, roughness: 1, flatShading: true, vertexColors: true }), 245);
+        color: 0x2f5233, roughness: 1, vertexColors: true, map: detailTex }), 245);
     let i = 0;
     for (; i < 160; i++) {                 // the distant ring
       const a = layoutRand() * Math.PI * 2;
@@ -898,7 +972,7 @@ function updateDressing(t, dt) {
   /* Two nearer feature trees + a dead snag, hand-placed. */
   {
     const barkMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 1 });
-    const leafMat = new THREE.MeshStandardMaterial({ color: 0x22391f, roughness: 1, flatShading: true });
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x22391f, roughness: 1, map: detailTex });
     // Broad oak, left mid-field.
     const oak = new THREE.Group();
     const otrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.46, 2.3, 10), barkMat);
@@ -922,7 +996,7 @@ function updateDressing(t, dt) {
     pine.add(ptrunk);
     const pfol = new THREE.Mesh(makePineFoliageGeo(),
       new THREE.MeshStandardMaterial({
-        color: 0x2f5233, roughness: 1, flatShading: true, vertexColors: true }));
+        color: 0x2f5233, roughness: 1, vertexColors: true, map: detailTex }));
     pfol.scale.setScalar(1.25);
     pfol.position.y = 1.15;
     pine.add(pfol);
@@ -1039,7 +1113,7 @@ function updateDressing(t, dt) {
      berry mesh shared across all seven). */
   {
     const bushGeo2 = new THREE.IcosahedronGeometry(1, 2);
-    const bushMat2 = new THREE.MeshStandardMaterial({ color: 0x27401f, roughness: 1, flatShading: true });
+    const bushMat2 = new THREE.MeshStandardMaterial({ color: 0x27401f, roughness: 1, map: detailTex });
     const berrySpots = [];
     for (let i = 0; i < 10; i++) {
       const a = layoutRand() * Math.PI * 2;
@@ -1470,7 +1544,7 @@ function resetParticle(sys, p, randomAge) {
   // Stone ring: sixteen individual rocks around the pit, varied
   // in size, shape, tilt and shade (instanced; density pass).
   const stoneGeo = new THREE.DodecahedronGeometry(0.17, 1);
-  const stoneMat = new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true });
+  const stoneMat = new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true, map: detailTex });
   const stones = new THREE.InstancedMesh(stoneGeo, stoneMat, 16);
   stones.frustumCulled = false;
   {
@@ -1493,7 +1567,7 @@ function resetParticle(sys, p, randomAge) {
   fire.add(stones);
   // Log pile: a low teepee of cylinders plus two crossed logs.
   const logGeo = new THREE.CylinderGeometry(0.075, 0.09, 1.15, 10);
-  const logMat = new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 1 });
+  const logMat = new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 1, map: detailTex });
   for (let i = 0; i < 5; i++) {
     const a = (i / 5) * Math.PI * 2;
     const log = new THREE.Mesh(logGeo, logMat);
@@ -2118,6 +2192,27 @@ const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
   0.3, 0.55, 0.9);
 composer.addPass(bloomPass);
+// AAA experiment stage 3: one gentle grade over the whole frame
+// (slight desaturation, a whisper of warmth, a soft vignette).
+// A single filmic pass is what makes the painted creatures and
+// the procedural background feel like one photograph.
+const gradePass = new ShaderPass({
+  uniforms: { tDiffuse: { value: null } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv;
+    void main(){
+      vec4 tex = texture2D(tDiffuse, vUv);
+      vec3 c = tex.rgb;
+      float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      c = mix(vec3(luma), c, 0.93);
+      c *= vec3(1.02, 1.0, 0.98);
+      float d = distance(vUv, vec2(0.5, 0.46));
+      c *= 0.90 + 0.10 * smoothstep(0.95, 0.45, d);
+      gl_FragColor = vec4(c, tex.a);
+    }`,
+});
+composer.addPass(gradePass);
 composer.addPass(new OutputPass());
 
 /* -------------------------------------------------------------- boot */

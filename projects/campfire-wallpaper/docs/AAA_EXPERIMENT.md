@@ -119,3 +119,38 @@ RTX 3060 either way.
   a smooth gradient has no detail for resolution to add.
   Verified in `aaa3-morning` (zero console errors; finer
   foreground grain, most visible at desktop scale).
+
+## Stage 3 — de-cartoon (owner's diagnosis, 2026-11-09)
+
+The owner named the real problem: the background looked out
+of place next to the creatures. Correct — the creatures are
+painted, textured models; the background was flat-shaded,
+untextured primitives in saturated flat colours. Four moves,
+all aimed at the mismatch, none at the creatures:
+
+- **Texture + smooth shading for the environment set.** One
+  shared runtime-generated fine-grain detail map (periodic
+  noise, near-neutral) now multiplies the pines, rocks,
+  bushes, oak leaves, trunks, fire logs, and fire stones, and
+  flatShading came off the foliage/rocks/bushes/leaves so
+  forms shade continuously instead of faceting like paper.
+- **Palette softening.** Day sky stops desaturated toward a
+  deeper, greyer blue; field vertex colours shifted a few
+  points warmer and less saturated.
+- **Clouds.** The sky shader gained soft fbm cloud wisps on a
+  projected plane, drifting slowly, banded to the lower sky,
+  tinted by the horizon colour, present in the lit hours and
+  gone by full night. The flat gradient card was the single
+  most "cartoon" surface in the scene.
+- **One grade over everything.** A final ShaderPass between
+  bloom and output: gentle desaturation (0.93), a whisper of
+  warmth, a soft vignette. One filmic pass over the whole
+  frame is what makes two asset styles read as one image.
+
+Verified in `aaa4-morning` / `aaa4-sunset` (zero console
+errors): the morning scene is visibly less toy-like — living
+sky, softer forms, moodier field; dusk keeps the fire's pop
+against a richer frame. Remaining stylization, honestly: the
+low-poly geometry itself, and the flat ridge backdrops (the
+bright snow band is the most graphic element left). Closing
+those would mean new backdrop art, not more tuning.
