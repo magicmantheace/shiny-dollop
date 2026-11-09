@@ -126,7 +126,7 @@ fn main() {
         }
         if ai_report.is_some() {
             println!(
-                "year={} day={} surveyed={} colonized={} population_millions={:.2} fuel_stock={:.2} credits={:.2} ships={} galaxy_surveyed={} galaxy_colonized={} galaxy_claimed={} contacts={} disputes={}",
+                "year={} day={} surveyed={} colonized={} population_millions={:.2} fuel_stock={:.2} credits={:.2} ships={} galaxy_surveyed={} galaxy_colonized={} galaxy_claimed={} contacts={} disputes={} treaties={} embargoes={} trade_routes={} trade_income_total={:.2} player_research={:.1}",
                 year,
                 campaign.day(),
                 campaign.surveyed_count(),
@@ -139,7 +139,12 @@ fn main() {
                 campaign.total_colonized_count(),
                 campaign.total_claimed_count(),
                 campaign.contacts().len(),
-                campaign.disputes().len()
+                campaign.disputes().len(),
+                campaign.treaties().len(),
+                campaign.embargoes().len(),
+                campaign.trade_routes().len(),
+                campaign.total_trade_income(),
+                campaign.research_points_for(mwcs_sim::PLAYER_CIV)
             );
         } else {
             println!(

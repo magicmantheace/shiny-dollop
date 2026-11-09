@@ -18,6 +18,16 @@
 //! disputes. v1 saves are rejected with an explicit version error —
 //! S3 changed what a campaign *is*, and silently upgrading would
 //! invent AI state the old save never had.
+//!
+//! v3 (S4) appends the diplomacy record after the v2 payload:
+//! per-civilization research points (inside the civilization
+//! record), treaties, embargoes, trade routes with their ledgers,
+//! treaty breaches, pending proposals and their cooldowns, the
+//! route/proposal id counters, and the campaign's all-time trade
+//! income. v2 saves are rejected with the same explicit error:
+//! an S3 campaign has no diplomacy history, and inventing empty
+//! ledgers for one would falsify the reconciliation the trade
+//! ledger exists to provide.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -28,13 +38,14 @@ use crate::profile::{PlanetProfile, PlanetSource, SystemProfile};
 use crate::race::Personality;
 use crate::rng::SeededRng;
 use crate::state::{
-    Campaign, Civilization, Colony, ConstructionProject, Dispute, EventKind, GameEvent, Purpose,
-    Ship, ShipDesign, ShipKind, ShipState, SimError, SimResult, Specialization, SurveyState,
-    SystemState,
+    Campaign, Civilization, Colony, ConstructionProject, Dispute, Embargo, EventKind, GameEvent,
+    PeaceTerms, Proposal, ProposalKind, Purpose, Ship, ShipDesign, ShipKind, ShipState, SimError,
+    SimResult, Specialization, SurveyState, SystemState, TradeRoute, Treaty, TreatyBreach,
+    TreatyKind,
 };
 
 const SAVE_MAGIC: &[u8; 4] = b"MWSS";
-const SAVE_VERSION: u32 = 2;
+const SAVE_VERSION: u32 = 3;
 
 impl Campaign {
     pub fn canonical_bytes(&self) -> Vec<u8> {
@@ -101,6 +112,69 @@ impl Campaign {
 
         w.u32(self.next_ship_id);
         w.u32(self.next_project_id);
+
+        // S4 sections (format v3): the diplomacy record.
+        w.u32(self.treaties.len() as u32);
+        for treaty in &self.treaties {
+            w.u8(treaty.kind.code());
+            w.u32(treaty.parties.0);
+            w.u32(treaty.parties.1);
+            w.u64(treaty.signed_day);
+        }
+        w.u32(self.embargoes.len() as u32);
+        for embargo in &self.embargoes {
+            w.u32(embargo.declarer);
+            w.u32(embargo.target);
+            w.u64(embargo.since_day);
+        }
+        w.u32(self.trade_routes.len() as u32);
+        for route in &self.trade_routes {
+            w.u32(route.id);
+            w.u32(route.civ_a);
+            w.u32(route.civ_b);
+            w.u32(route.system_a);
+            w.u32(route.system_b);
+            w.u32(route.path.len() as u32);
+            for system in &route.path {
+                w.u32(*system);
+            }
+            w.f64(route.path_ly);
+            w.u64(route.established_day);
+            w.f64(route.earned_a);
+            w.f64(route.earned_b);
+            w.f64(route.last_income_a);
+            w.f64(route.last_income_b);
+            w.u32(route.months_active);
+        }
+        w.u32(self.breaches.len() as u32);
+        for breach in &self.breaches {
+            w.u32(breach.breaker);
+            w.u32(breach.other);
+            w.u8(breach.kind.code());
+            w.u64(breach.day);
+        }
+        w.u32(self.proposals.len() as u32);
+        for proposal in &self.proposals {
+            w.u32(proposal.id);
+            w.u32(proposal.from);
+            w.u32(proposal.to);
+            write_proposal_kind(&mut w, &proposal.kind);
+            w.u64(proposal.proposed_day);
+            w.u32(proposal.reasons.len() as u32);
+            for reason in &proposal.reasons {
+                w.string(reason);
+            }
+        }
+        w.u32(self.proposal_cooldowns.len() as u32);
+        for ((lo, hi, code), day) in &self.proposal_cooldowns {
+            w.u32(*lo);
+            w.u32(*hi);
+            w.u8(*code);
+            w.u64(*day);
+        }
+        w.u32(self.next_route_id);
+        w.u32(self.next_proposal_id);
+        w.f64(self.total_trade_income);
         w.bytes
     }
 
@@ -242,6 +316,57 @@ impl<'a> Reader<'a> {
     }
 }
 
+fn write_proposal_kind(w: &mut Writer, kind: &ProposalKind) {
+    match kind {
+        ProposalKind::Treaty(treaty_kind) => {
+            w.u8(0);
+            w.u8(treaty_kind.code());
+        }
+        ProposalKind::Peace(terms) => {
+            w.u8(1);
+            w.u32(terms.cede_to_proposer.len() as u32);
+            for system in &terms.cede_to_proposer {
+                w.u32(*system);
+            }
+            w.u32(terms.cede_to_other.len() as u32);
+            for system in &terms.cede_to_other {
+                w.u32(*system);
+            }
+            w.f64(terms.credits_from_proposer);
+        }
+    }
+}
+
+fn read_proposal_kind(r: &mut Reader<'_>) -> SimResult<ProposalKind> {
+    match r.u8()? {
+        0 => {
+            let code = r.u8()?;
+            let kind = TreatyKind::from_code(code).ok_or_else(|| {
+                SimError::InvalidSave(format!("bad treaty kind {code}"))
+            })?;
+            Ok(ProposalKind::Treaty(kind))
+        }
+        1 => {
+            let read_systems = |r: &mut Reader<'_>| -> SimResult<Vec<u32>> {
+                let count = r.u32()?;
+                let mut out = Vec::with_capacity(count as usize);
+                for _ in 0..count {
+                    out.push(r.u32()?);
+                }
+                Ok(out)
+            };
+            Ok(ProposalKind::Peace(PeaceTerms {
+                cede_to_proposer: read_systems(r)?,
+                cede_to_other: read_systems(r)?,
+                credits_from_proposer: r.f64()?,
+            }))
+        }
+        other => Err(SimError::InvalidSave(format!(
+            "bad proposal kind tag {other}"
+        ))),
+    }
+}
+
 fn ship_kind_code(kind: ShipKind) -> u8 {
     match kind {
         ShipKind::Surveyor => 0,
@@ -315,6 +440,15 @@ fn event_kind_code(kind: EventKind) -> u8 {
         EventKind::SpecializationSet => 11,
         EventKind::FirstContact => 12,
         EventKind::ClaimContested => 13,
+        EventKind::TreatySigned => 14,
+        EventKind::TreatyBroken => 15,
+        EventKind::EmbargoDeclared => 16,
+        EventKind::EmbargoLifted => 17,
+        EventKind::TradeRouteEstablished => 18,
+        EventKind::TradeRouteSevered => 19,
+        EventKind::PeaceSettled => 20,
+        EventKind::TreatyProposed => 21,
+        EventKind::DealRefused => 22,
     }
 }
 
@@ -334,6 +468,15 @@ fn event_kind_from(code: u8) -> SimResult<EventKind> {
         11 => Ok(EventKind::SpecializationSet),
         12 => Ok(EventKind::FirstContact),
         13 => Ok(EventKind::ClaimContested),
+        14 => Ok(EventKind::TreatySigned),
+        15 => Ok(EventKind::TreatyBroken),
+        16 => Ok(EventKind::EmbargoDeclared),
+        17 => Ok(EventKind::EmbargoLifted),
+        18 => Ok(EventKind::TradeRouteEstablished),
+        19 => Ok(EventKind::TradeRouteSevered),
+        20 => Ok(EventKind::PeaceSettled),
+        21 => Ok(EventKind::TreatyProposed),
+        22 => Ok(EventKind::DealRefused),
         other => Err(SimError::InvalidSave(format!("bad event kind {other}"))),
     }
 }
@@ -378,6 +521,8 @@ fn write_civ(w: &mut Writer, civ: &Civilization) {
             w.f64(p.honour);
         }
     }
+    // S4 (format v3): the research stockpile.
+    w.f64(civ.research_points);
 }
 
 fn read_civ(r: &mut Reader<'_>) -> SimResult<Civilization> {
@@ -416,6 +561,7 @@ fn read_civ(r: &mut Reader<'_>) -> SimResult<Civilization> {
         home_system,
         archetype,
         personality,
+        research_points: r.f64()?,
     })
 }
 
@@ -630,6 +776,110 @@ fn read_campaign(r: &mut Reader<'_>) -> SimResult<Campaign> {
         });
     }
 
+    let next_ship_id = r.u32()?;
+    let next_project_id = r.u32()?;
+
+    // S4 sections (format v3).
+    let treaty_count = r.u32()?;
+    let mut treaties = Vec::with_capacity(treaty_count as usize);
+    for _ in 0..treaty_count {
+        let code = r.u8()?;
+        let kind = TreatyKind::from_code(code)
+            .ok_or_else(|| SimError::InvalidSave(format!("bad treaty kind {code}")))?;
+        treaties.push(Treaty {
+            kind,
+            parties: (r.u32()?, r.u32()?),
+            signed_day: r.u64()?,
+        });
+    }
+    let embargo_count = r.u32()?;
+    let mut embargoes = Vec::with_capacity(embargo_count as usize);
+    for _ in 0..embargo_count {
+        embargoes.push(Embargo {
+            declarer: r.u32()?,
+            target: r.u32()?,
+            since_day: r.u64()?,
+        });
+    }
+    let route_count = r.u32()?;
+    let mut trade_routes = Vec::with_capacity(route_count as usize);
+    for _ in 0..route_count {
+        let id = r.u32()?;
+        let civ_a = r.u32()?;
+        let civ_b = r.u32()?;
+        let system_a = r.u32()?;
+        let system_b = r.u32()?;
+        let path_len = r.u32()?;
+        let mut path = Vec::with_capacity(path_len as usize);
+        for _ in 0..path_len {
+            path.push(r.u32()?);
+        }
+        trade_routes.push(TradeRoute {
+            id,
+            civ_a,
+            civ_b,
+            system_a,
+            system_b,
+            path,
+            path_ly: r.f64()?,
+            established_day: r.u64()?,
+            earned_a: r.f64()?,
+            earned_b: r.f64()?,
+            last_income_a: r.f64()?,
+            last_income_b: r.f64()?,
+            months_active: r.u32()?,
+        });
+    }
+    let breach_count = r.u32()?;
+    let mut breaches = Vec::with_capacity(breach_count as usize);
+    for _ in 0..breach_count {
+        let breaker = r.u32()?;
+        let other = r.u32()?;
+        let code = r.u8()?;
+        let kind = TreatyKind::from_code(code)
+            .ok_or_else(|| SimError::InvalidSave(format!("bad treaty kind {code}")))?;
+        breaches.push(TreatyBreach {
+            breaker,
+            other,
+            kind,
+            day: r.u64()?,
+        });
+    }
+    let proposal_count = r.u32()?;
+    let mut proposals = Vec::with_capacity(proposal_count as usize);
+    for _ in 0..proposal_count {
+        let id = r.u32()?;
+        let from = r.u32()?;
+        let to = r.u32()?;
+        let kind = read_proposal_kind(r)?;
+        let proposed_day = r.u64()?;
+        let reason_count = r.u32()?;
+        let mut reasons = Vec::with_capacity(reason_count as usize);
+        for _ in 0..reason_count {
+            reasons.push(r.string()?);
+        }
+        proposals.push(Proposal {
+            id,
+            from,
+            to,
+            kind,
+            proposed_day,
+            reasons,
+        });
+    }
+    let cooldown_count = r.u32()?;
+    let mut proposal_cooldowns = BTreeMap::new();
+    for _ in 0..cooldown_count {
+        let lo = r.u32()?;
+        let hi = r.u32()?;
+        let code = r.u8()?;
+        let day = r.u64()?;
+        proposal_cooldowns.insert((lo, hi, code), day);
+    }
+    let next_route_id = r.u32()?;
+    let next_proposal_id = r.u32()?;
+    let total_trade_income = r.f64()?;
+
     Ok(Campaign {
         galaxy_fingerprint,
         star_count,
@@ -643,9 +893,18 @@ fn read_campaign(r: &mut Reader<'_>) -> SimResult<Campaign> {
         events,
         contacts,
         disputes,
+        treaties,
+        embargoes,
+        trade_routes,
+        breaches,
+        proposals,
+        proposal_cooldowns,
         neighbor_cache: BTreeMap::new(),
-        next_ship_id: r.u32()?,
-        next_project_id: r.u32()?,
+        next_ship_id,
+        next_project_id,
+        next_route_id,
+        next_proposal_id,
+        total_trade_income,
     })
 }
 
@@ -829,5 +1088,20 @@ mod tests {
         let loaded = Campaign::load_bytes(&galaxy, &campaign.save_bytes()).unwrap();
         assert_eq!(campaign.canonical_bytes(), loaded.canonical_bytes());
         assert_eq!(campaign.state_hash(), loaded.state_hash());
+    }
+
+    #[test]
+    fn v2_saves_are_rejected_explicitly() {
+        // The v2 precedent, one generation on: an S3-era save has
+        // no diplomacy record, and S4 refuses to invent one.
+        let galaxy = galaxy();
+        let campaign = Campaign::new_default(&galaxy, 123).unwrap();
+        let mut bytes = campaign.save_bytes();
+        bytes[4..8].copy_from_slice(&2u32.to_le_bytes());
+        let err = Campaign::load_bytes(&galaxy, &bytes).unwrap_err();
+        assert!(
+            err.to_string().contains("unsupported save version 2"),
+            "unexpected error: {err}"
+        );
     }
 }

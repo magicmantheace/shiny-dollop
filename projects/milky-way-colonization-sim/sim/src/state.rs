@@ -14,6 +14,15 @@
 //! galaxy whether the days were played live or applied as offline
 //! catch-up. The S1 public API remains as player-civilization
 //! wrappers over the generalized commands.
+//!
+//! S4 adds the diplomacy depth of design §6.3/§4.3 on top of S3's
+//! contact and dispute records: treaties (trade, gate access,
+//! non-aggression, alliance, research), embargoes, peace settlements
+//! with system cessions, inter-civilization trade routes with a
+//! credit ledger, and a per-civilization research stockpile that
+//! research pacts feed. Deal evaluation lives in `diplomacy.rs` and
+//! is a pure function of state, so every acceptance or refusal comes
+//! with stated, inspectable reasons (§6.2).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -27,6 +36,34 @@ pub const DAYS_PER_MONTH: u64 = 30;
 pub const DAYS_PER_YEAR: u64 = 365;
 pub const PLAYER_CIV: u32 = 0;
 pub const CLAIM_COST_CREDITS: f64 = 25.0;
+
+/// S4 (§6.3): after first contact, full diplomacy waits out a
+/// translation delay — a few months of research-flavoured waiting,
+/// at first contact only.
+pub const TRANSLATION_DAYS: u64 = 90;
+/// S4 (§4.3): one leg of an inter-civilization trade route may span
+/// at most this many light-years. Tankers are implied, not
+/// micro-managed (§4.3), so the leg is a route-layer constant —
+/// twice the colony ship's design range, the longest hull leg in
+/// the game. Gate hops would ignore it, but gate construction is
+/// S5, so no S4 route uses one.
+pub const TRADE_LEG_LY: f64 = 150.0;
+/// S4 (§4.3): monthly income per side of a trade route is
+/// throughput × distance factor × this rate. A balance placeholder
+/// in the same sense as §10's other numbers.
+pub const TRADE_INCOME_RATE: f64 = 0.25;
+/// S4: a research pact pays each partner this fraction of the
+/// *other* partner's monthly research output as bonus points.
+pub const RESEARCH_PACT_BONUS_FRACTION: f64 = 0.30;
+/// S4: an unanswered proposal to the player lapses after this many
+/// days; the proposer then waits out a cooldown before offering
+/// the same instrument again.
+pub const PROPOSAL_TTL_DAYS: u64 = 180;
+pub const PROPOSAL_COOLDOWN_DAYS: u64 = 365;
+/// S4: how many endpoint pairs `suggest_trade_route` path-checks,
+/// best first, before giving up. A perf bound on a heuristic (see
+/// the method's docs); explicit-endpoint commands are unaffected.
+pub const SUGGEST_PATH_CHECK_CAP: usize = 24;
 
 pub type StarId = u32;
 pub type ShipId = u32;
@@ -73,6 +110,23 @@ pub enum SimError {
     NotYourColony(StarId),
     NoForeignClaim(StarId),
     DisputeAlreadyOpen(StarId),
+    UnknownCivilization(u32),
+    NoContact(u32),
+    DiplomacyNotReady {
+        ready_day: u64,
+    },
+    TreatyAlreadyActive,
+    TreatyNotActive,
+    EmbargoAlreadyDeclared,
+    NoEmbargoInForce,
+    ContestBarredByTreaty,
+    TradeAgreementRequired,
+    NoTradePath,
+    TradeRouteAlreadyExists,
+    UnknownTradeRoute(u32),
+    NotRouteParty(u32),
+    UnknownProposal(u32),
+    NotProposalRecipient(u32),
     InvalidSave(String),
     GalaxyMismatch,
 }
@@ -138,6 +192,46 @@ impl fmt::Display for SimError {
             }
             Self::DisputeAlreadyOpen(id) => {
                 write!(f, "a dispute over system {id} is already open for this civilization")
+            }
+            Self::UnknownCivilization(id) => write!(f, "unknown civilization {id}"),
+            Self::NoContact(id) => {
+                write!(f, "no contact with civilization {id} — survey a system they hold first")
+            }
+            Self::DiplomacyNotReady { ready_day } => write!(
+                f,
+                "translation is still in progress — full diplomacy opens on day {ready_day}"
+            ),
+            Self::TreatyAlreadyActive => {
+                write!(f, "a treaty of this kind is already active between these civilizations")
+            }
+            Self::TreatyNotActive => {
+                write!(f, "no treaty of this kind is active between these civilizations")
+            }
+            Self::EmbargoAlreadyDeclared => {
+                write!(f, "an embargo is already in force in that direction")
+            }
+            Self::NoEmbargoInForce => write!(f, "no embargo is in force in that direction"),
+            Self::ContestBarredByTreaty => write!(
+                f,
+                "a non-aggression pact or alliance bars contesting this civilization's claims"
+            ),
+            Self::TradeAgreementRequired => {
+                write!(f, "a trade agreement must be active before a route can open")
+            }
+            Self::NoTradePath => write!(
+                f,
+                "no route path: the two colony networks have no chain of legs within tanker range"
+            ),
+            Self::TradeRouteAlreadyExists => {
+                write!(f, "a trade route already links these two systems")
+            }
+            Self::UnknownTradeRoute(id) => write!(f, "unknown trade route {id}"),
+            Self::NotRouteParty(id) => {
+                write!(f, "civilization {id} is not a party to this trade route")
+            }
+            Self::UnknownProposal(id) => write!(f, "unknown proposal {id}"),
+            Self::NotProposalRecipient(id) => {
+                write!(f, "proposal {id} is not addressed to this civilization")
             }
             Self::InvalidSave(msg) => write!(f, "invalid save: {msg}"),
             Self::GalaxyMismatch => write!(f, "save does not belong to this galaxy table"),
@@ -352,6 +446,35 @@ pub enum EventKind {
     /// S3: `civ` lodged a competing claim against `other_civ`'s
     /// claim on `system` (design §6.3's disputes).
     ClaimContested,
+    /// S4: a treaty was signed between `civ` (the proposer) and
+    /// `other_civ`. The instrument itself lives in the treaty
+    /// record; the event marks the day.
+    TreatySigned,
+    /// S4: `civ` broke a treaty with `other_civ`. The breach is
+    /// remembered (opinion, §6.2) — breaking is an act with a
+    /// reputation.
+    TreatyBroken,
+    /// S4: `civ` declared an embargo on `other_civ`.
+    EmbargoDeclared,
+    /// S4: `civ` lifted its embargo on `other_civ`.
+    EmbargoLifted,
+    /// S4: a trade route opened between `civ` and `other_civ`
+    /// (`system` is `civ`'s endpoint).
+    TradeRouteEstablished,
+    /// S4: a trade route between `civ` and `other_civ` closed —
+    /// severed by a party, or its agreement, path, or an endpoint
+    /// ceased to hold (`system` is `civ`'s endpoint).
+    TradeRouteSevered,
+    /// S4: `civ` and `other_civ` settled their disputes in a peace
+    /// settlement (terms may include system cessions and credits).
+    PeaceSettled,
+    /// S4: `civ` sent `other_civ` a proposal that awaits an answer
+    /// (only ever addressed to the player; AI-to-AI deals resolve
+    /// on the spot).
+    TreatyProposed,
+    /// S4: `other_civ` refused a deal `civ` proposed. The stated
+    /// reasons ride in the command result, not the event.
+    DealRefused,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -380,6 +503,222 @@ pub struct Dispute {
     pub opened_day: u64,
 }
 
+/// The negotiable treaty instruments of design §6.3's diplomacy
+/// set, S4 subset. (Declare war / sue for peace as war acts are S5;
+/// peace *settlements* of disputes are `PeaceTerms` below. Tribute
+/// and demands are credits terms inside a peace settlement.)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum TreatyKind {
+    /// Opens inter-civilization trade routes (§4.3).
+    TradeAgreement,
+    /// Port access: each party's ships may refuel at the other's
+    /// colonies. §5.3's gate-access treaty, in the only form S4 can
+    /// honour — gate *structures* are S5, and this same treaty is
+    /// what will govern their transit then.
+    GateAccess,
+    /// Neither party may contest the other's claims.
+    NonAggressionPact,
+    /// Non-aggression, port access, and integrated markets (trade
+    /// routes between allies carry a throughput bonus). The
+    /// defensive-war meaning arrives with war itself in S5.
+    Alliance,
+    /// A small mutual research bonus while both honour it (§6.3):
+    /// each partner gains a fraction of the other's monthly
+    /// research output as bonus research points.
+    ResearchPact,
+}
+
+impl TreatyKind {
+    /// Stable serialization / map-key code (save format v3).
+    pub fn code(self) -> u8 {
+        match self {
+            Self::TradeAgreement => 0,
+            Self::GateAccess => 1,
+            Self::NonAggressionPact => 2,
+            Self::Alliance => 3,
+            Self::ResearchPact => 4,
+        }
+    }
+
+    pub fn from_code(code: u8) -> Option<Self> {
+        match code {
+            0 => Some(Self::TradeAgreement),
+            1 => Some(Self::GateAccess),
+            2 => Some(Self::NonAggressionPact),
+            3 => Some(Self::Alliance),
+            4 => Some(Self::ResearchPact),
+            _ => None,
+        }
+    }
+
+    /// Short player-facing name.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::TradeAgreement => "trade agreement",
+            Self::GateAccess => "gate-access treaty",
+            Self::NonAggressionPact => "non-aggression pact",
+            Self::Alliance => "alliance",
+            Self::ResearchPact => "research pact",
+        }
+    }
+
+    pub const ALL: [TreatyKind; 5] = [
+        TreatyKind::TradeAgreement,
+        TreatyKind::GateAccess,
+        TreatyKind::NonAggressionPact,
+        TreatyKind::Alliance,
+        TreatyKind::ResearchPact,
+    ];
+}
+
+/// An active treaty between two civilizations. Treaties are
+/// indefinite: they hold until a party breaks one (a breach, with
+/// opinion consequences) or a peace settlement supersedes them.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Treaty {
+    pub kind: TreatyKind,
+    /// The two parties, sorted `(lo, hi)`.
+    pub parties: (u32, u32),
+    pub signed_day: u64,
+}
+
+/// A unilateral embargo (design §6.3's "trade war without
+/// shooting"): `declarer` has closed trade with `target`. While any
+/// embargo stands between a pair, in either direction, no trade
+/// route runs and no new deal is evaluated — and declaring one
+/// terminates the pair's trade agreement on the spot.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Embargo {
+    pub declarer: u32,
+    pub target: u32,
+    pub since_day: u64,
+}
+
+/// An established inter-civilization trade route (§4.3): a named
+/// system of each party, the colony-to-colony path the goods
+/// actually travel (each leg within tanker range), and the credit
+/// ledger — cumulative income earned by each side, which the
+/// monthly settlement extends by exactly throughput × distance
+/// factor × rate.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TradeRoute {
+    pub id: u32,
+    /// Sorted `(lo, hi)`; `system_a` belongs to `civ_a`,
+    /// `system_b` to `civ_b`.
+    pub civ_a: u32,
+    pub civ_b: u32,
+    pub system_a: StarId,
+    pub system_b: StarId,
+    /// Colony systems from `system_a` to `system_b`, inclusive —
+    /// the line drawn on the map.
+    pub path: Vec<StarId>,
+    pub path_ly: f64,
+    pub established_day: u64,
+    /// The ledger: cumulative credits this route has paid each
+    /// side, and the most recent month's payment.
+    pub earned_a: f64,
+    pub earned_b: f64,
+    pub last_income_a: f64,
+    pub last_income_b: f64,
+    pub months_active: u32,
+}
+
+/// The remembered fact that `breaker` broke a treaty of `kind`
+/// with `other` (design §6.2's "broken treaties" opinion
+/// component). Breaches never expire within a campaign: a record
+/// of faithlessness is exactly the kind of thing diplomacy runs on.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TreatyBreach {
+    pub breaker: u32,
+    pub other: u32,
+    pub kind: TreatyKind,
+    pub day: u64,
+}
+
+/// The terms of a peace settlement (design §6.3's claim
+/// recognition / sue-for-peace, dispute scope): cessions are
+/// systems whose *claim* transfers — a colonized system changes
+/// owner with its colony, annexation being a treaty act (§6.4).
+/// Acceptance closes every open dispute between the pair and
+/// lifts any embargo between them.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PeaceTerms {
+    /// Systems the *other* party cedes to the proposer.
+    pub cede_to_proposer: Vec<StarId>,
+    /// Systems the proposer cedes to the other party.
+    pub cede_to_other: Vec<StarId>,
+    /// Credits the proposer pays the other party; negative means
+    /// the other party pays the proposer.
+    pub credits_from_proposer: f64,
+}
+
+impl PeaceTerms {
+    pub fn recognition_only() -> Self {
+        Self {
+            cede_to_proposer: Vec::new(),
+            cede_to_other: Vec::new(),
+            credits_from_proposer: 0.0,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.cede_to_proposer.is_empty()
+            && self.cede_to_other.is_empty()
+            && self.credits_from_proposer == 0.0
+    }
+}
+
+/// What a proposal asks for: a treaty, or a peace settlement on
+/// stated terms.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ProposalKind {
+    Treaty(TreatyKind),
+    Peace(PeaceTerms),
+}
+
+impl ProposalKind {
+    /// Map key component for proposal cooldowns: treaty kinds use
+    /// their own code; peace uses a reserved code.
+    pub fn cooldown_code(&self) -> u8 {
+        match self {
+            Self::Treaty(kind) => kind.code(),
+            Self::Peace(_) => 15,
+        }
+    }
+}
+
+/// A deal offered by one civilization to another that awaits an
+/// answer. Only proposals addressed to the *player* are ever
+/// stored: AI-to-AI offers are evaluated and resolved on the spot,
+/// because an AI's answer is a pure function of state. The stated
+/// reasons the proposer gave are stored verbatim — the player
+/// reads the same numbers the proposer computed.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Proposal {
+    pub id: u32,
+    pub from: u32,
+    pub to: u32,
+    pub kind: ProposalKind,
+    pub proposed_day: u64,
+    pub reasons: Vec<String>,
+}
+
+/// The result of proposing a deal.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DealOutcome {
+    /// The deal was accepted and is in force from today.
+    Signed,
+    /// The other civilization refused; `reasons` are its stated,
+    /// itemized grounds (the §6.2 legibility rule applied to the
+    /// answer itself).
+    Refused { reasons: Vec<String> },
+    /// The offer awaits the player's answer in their proposal
+    /// inbox.
+    Pending { proposal_id: u32 },
+    /// The player declined an offer made to them.
+    Declined,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Civilization {
     pub id: u32,
@@ -392,6 +731,12 @@ pub struct Civilization {
     /// S3: the personality vector for AI civilizations (design
     /// §6.2); `None` for the player.
     pub personality: Option<Personality>,
+    /// S4: accumulated research points. Research-specialized
+    /// colonies produce points monthly; a research pact adds a
+    /// bonus drawn from the partner's output. Points have no
+    /// spending sink until the technology tree lands (§8 is a
+    /// sketch); the stockpile is the pact's honest ledger.
+    pub research_points: f64,
 }
 
 impl Civilization {
@@ -460,8 +805,29 @@ pub struct Campaign {
     pub(crate) contacts: BTreeMap<(u32, u32), u64>,
     /// S3: open claim disputes, in the order they opened.
     pub(crate) disputes: Vec<Dispute>,
+    /// S4: active treaties, in signing order.
+    pub(crate) treaties: Vec<Treaty>,
+    /// S4: embargoes in force, in declaration order.
+    pub(crate) embargoes: Vec<Embargo>,
+    /// S4: established trade routes, in opening order.
+    pub(crate) trade_routes: Vec<TradeRoute>,
+    /// S4: remembered treaty breaches, in the order they happened.
+    pub(crate) breaches: Vec<TreatyBreach>,
+    /// S4: proposals awaiting the player's answer.
+    pub(crate) proposals: Vec<Proposal>,
+    /// S4: per-(pair, instrument) day before which a proposer will
+    /// not re-offer an instrument the player refused or let lapse,
+    /// keyed `(lo, hi, cooldown_code)`.
+    pub(crate) proposal_cooldowns: BTreeMap<(u32, u32, u8), u64>,
     pub(crate) next_ship_id: ShipId,
     pub(crate) next_project_id: u32,
+    pub(crate) next_route_id: u32,
+    pub(crate) next_proposal_id: u32,
+    /// S4: all-time trade income paid out across every route that
+    /// ever ran (both sides). Route ledgers are per-route records
+    /// that close when a route does; this counter is the campaign
+    /// total the long-run reports quote.
+    pub(crate) total_trade_income: f64,
     /// Derived cache (never serialized, rebuilt lazily after load):
     /// stars within `NEIGHBOR_CACHE_RANGE_LY` of a key star, sorted
     /// by `(distance, id)`. It exists so monthly AI planning over a
@@ -505,6 +871,7 @@ impl Campaign {
                 home_system,
                 archetype: None,
                 personality: None,
+                research_points: 0.0,
             },
             SystemProfile::homeworld(),
         );
@@ -548,6 +915,7 @@ impl Campaign {
                 home_system: player_home,
                 archetype: None,
                 personality: None,
+                research_points: 0.0,
             },
             SystemProfile::homeworld(),
         );
@@ -566,6 +934,7 @@ impl Campaign {
                     home_system: spec.home_system,
                     archetype: Some(spec.archetype.to_string()),
                     personality: Some(spec.personality),
+                    research_points: 0.0,
                 },
                 SystemProfile::homeworld_named(format!("{star_name} Prime")),
             );
@@ -621,8 +990,17 @@ impl Campaign {
             events: Vec::new(),
             contacts: BTreeMap::new(),
             disputes: Vec::new(),
+            treaties: Vec::new(),
+            embargoes: Vec::new(),
+            trade_routes: Vec::new(),
+            breaches: Vec::new(),
+            proposals: Vec::new(),
+            proposal_cooldowns: BTreeMap::new(),
             next_ship_id: 1,
             next_project_id: 1,
+            next_route_id: 1,
+            next_proposal_id: 1,
+            total_trade_income: 0.0,
             neighbor_cache: BTreeMap::new(),
         }
     }
@@ -754,6 +1132,151 @@ impl Campaign {
 
     pub fn contacts(&self) -> &BTreeMap<(u32, u32), u64> {
         &self.contacts
+    }
+
+    // ------------------------------------------------------- S4 access
+
+    pub fn treaties(&self) -> &[Treaty] {
+        &self.treaties
+    }
+
+    pub fn embargoes(&self) -> &[Embargo] {
+        &self.embargoes
+    }
+
+    pub fn trade_routes(&self) -> &[TradeRoute] {
+        &self.trade_routes
+    }
+
+    pub fn breaches(&self) -> &[TreatyBreach] {
+        &self.breaches
+    }
+
+    pub fn proposals(&self) -> &[Proposal] {
+        &self.proposals
+    }
+
+    pub fn research_points_for(&self, civ_id: u32) -> f64 {
+        self.civ(civ_id).map(|c| c.research_points).unwrap_or(0.0)
+    }
+
+    pub fn total_trade_income(&self) -> f64 {
+        self.total_trade_income
+    }
+
+    /// The canonical sorted key for a civilization pair.
+    pub(crate) fn pair_key(a: u32, b: u32) -> (u32, u32) {
+        if a < b {
+            (a, b)
+        } else {
+            (b, a)
+        }
+    }
+
+    /// The treaty of `kind` active between the pair, if any.
+    pub fn treaty_between(&self, a: u32, b: u32, kind: TreatyKind) -> Option<&Treaty> {
+        let key = Self::pair_key(a, b);
+        self.treaties
+            .iter()
+            .find(|t| t.parties == key && t.kind == kind)
+    }
+
+    pub fn treaty_active(&self, a: u32, b: u32, kind: TreatyKind) -> bool {
+        self.treaty_between(a, b, kind).is_some()
+    }
+
+    /// All active treaties between the pair, in signing order.
+    pub fn treaties_between(&self, a: u32, b: u32) -> Vec<&Treaty> {
+        let key = Self::pair_key(a, b);
+        self.treaties
+            .iter()
+            .filter(|t| t.parties == key)
+            .collect()
+    }
+
+    /// The embargo `declarer` holds on `target`, if any.
+    pub fn embargo_of(&self, declarer: u32, target: u32) -> Option<&Embargo> {
+        self.embargoes
+            .iter()
+            .find(|e| e.declarer == declarer && e.target == target)
+    }
+
+    /// True when an embargo stands between the pair in either
+    /// direction — trade is closed both ways while one stands.
+    pub fn embargo_between(&self, a: u32, b: u32) -> bool {
+        self.embargo_of(a, b).is_some() || self.embargo_of(b, a).is_some()
+    }
+
+    /// Routes running between the pair (either orientation).
+    pub fn routes_between(&self, a: u32, b: u32) -> Vec<&TradeRoute> {
+        let key = Self::pair_key(a, b);
+        self.trade_routes
+            .iter()
+            .filter(|r| (r.civ_a, r.civ_b) == key)
+            .collect()
+    }
+
+    pub fn trade_route(&self, route_id: u32) -> Option<&TradeRoute> {
+        self.trade_routes.iter().find(|r| r.id == route_id)
+    }
+
+    /// Cumulative trade income `civ_id` has earned across its
+    /// currently open routes (a severed route's ledger closes with
+    /// it; the campaign-wide all-time total is
+    /// `total_trade_income`).
+    pub fn trade_income_of(&self, civ_id: u32) -> f64 {
+        self.trade_routes
+            .iter()
+            .map(|r| {
+                if r.civ_a == civ_id {
+                    r.earned_a
+                } else if r.civ_b == civ_id {
+                    r.earned_b
+                } else {
+                    0.0
+                }
+            })
+            .sum()
+    }
+
+    /// The day full diplomacy (§6.3's translation delay) opens
+    /// between the pair: `None` before first contact.
+    pub fn diplomacy_ready_day(&self, a: u32, b: u32) -> Option<u64> {
+        self.contacted_day(a, b)
+            .map(|day| day + TRANSLATION_DAYS)
+    }
+
+    /// True when the pair has met and the translation delay has run.
+    pub fn diplomacy_open(&self, a: u32, b: u32) -> bool {
+        self.diplomacy_ready_day(a, b)
+            .map(|ready| self.day >= ready)
+            .unwrap_or(false)
+    }
+
+    /// May `civ_id`'s ships refuel at `owner`'s colonies? Their own
+    /// always; a treaty partner's under a gate-access treaty or an
+    /// alliance (§5.3's treaty-gated access, port form).
+    pub fn port_access(&self, civ_id: u32, owner: u32) -> bool {
+        civ_id == owner
+            || self.treaty_active(civ_id, owner, TreatyKind::GateAccess)
+            || self.treaty_active(civ_id, owner, TreatyKind::Alliance)
+    }
+
+    /// This month's research output for a civilization if it were
+    /// settled now: the sum over its Research-specialized colonies.
+    /// Settlement accrues exactly this (times each colony's energy
+    /// efficiency, which the stored colony already carries from the
+    /// last settlement), and deal evaluation quotes it.
+    pub fn research_output_for(&self, civ_id: u32) -> f64 {
+        self.colonies_of(civ_id)
+            .into_iter()
+            .filter_map(|id| self.systems.get(&id).and_then(|s| s.colony.as_ref()))
+            .filter(|c| c.specialization == Some(Specialization::Research))
+            .map(|c| {
+                (c.development as f64 * 1.5 + c.population_millions * 0.004)
+                    * c.energy_efficiency
+            })
+            .sum()
     }
 
     pub fn designs(&self) -> &[ShipDesign] {
@@ -1206,6 +1729,14 @@ impl Campaign {
             .and_then(|s| s.claimed_by)
             .filter(|&h| h != civ_id)
             .ok_or(SimError::NoForeignClaim(system))?;
+        // S4: a non-aggression pact or an alliance is a promise not
+        // to do exactly this. The promise binds even when the claim
+        // is coveted — that is what makes it a promise.
+        if self.treaty_active(civ_id, holder, TreatyKind::NonAggressionPact)
+            || self.treaty_active(civ_id, holder, TreatyKind::Alliance)
+        {
+            return Err(SimError::ContestBarredByTreaty);
+        }
         if self
             .disputes
             .iter()
@@ -1376,8 +1907,10 @@ impl Campaign {
     }
 
     /// `refuel_ship` for the ship's owning civilization: fuel comes
-    /// from a colony of *their own* — drawing on another
-    /// civilization's stocks is trade or treaty business (S4).
+    /// from a colony of *their own* — or, since S4, from a treaty
+    /// partner's colony under a gate-access treaty or an alliance
+    /// (`port_access`): drawing on another civilization's stocks is
+    /// treaty business, and the treaty is the permission.
     pub fn refuel_ship_for(&mut self, civ_id: u32, ship_id: ShipId) -> SimResult<f64> {
         let (system, design_idx, current_fuel, pending) = {
             let ship = self
@@ -1405,18 +1938,18 @@ impl Campaign {
         if wanted <= 1e-9 {
             return Ok(0.0);
         }
-        if self
-            .systems
-            .get(&system)
-            .and_then(|s| s.claimed_by)
-            != Some(civ_id)
+        let colony_owner = self.systems.get(&system).and_then(|s| s.claimed_by);
+        if colony_owner != Some(civ_id)
             && self
                 .systems
                 .get(&system)
                 .map(|s| s.colony.is_some())
                 .unwrap_or(false)
         {
-            return Err(SimError::NotYourColony(system));
+            match colony_owner {
+                Some(owner) if self.port_access(civ_id, owner) => {}
+                _ => return Err(SimError::NotYourColony(system)),
+            }
         }
         let state = self
             .systems
@@ -1529,7 +2062,12 @@ impl Campaign {
         self.process_surveys(galaxy);
         self.process_construction();
         if self.day % DAYS_PER_MONTH == 0 {
-            self.monthly_settlement();
+            let research_outputs = self.monthly_settlement();
+            // S4: trade routes pay out, research pacts pay their
+            // bonus, stale routes close, and unanswered proposals
+            // lapse — all on the same settlement boundary, so
+            // catch-up equivalence (§11.1) covers diplomacy too.
+            self.monthly_diplomacy_settlement(galaxy, &research_outputs);
             // AI civilizations re-plan on the settlement boundary
             // (design §2: AI civs re-plan; §6.5), *after* the same
             // settlement the player experiences, so monthly chunking
@@ -1791,12 +2329,17 @@ impl Campaign {
         }
     }
 
-    fn monthly_settlement(&mut self) {
+    /// Settle one month of colony economy. Returns each
+    /// civilization's research output for the month (S4) so the
+    /// diplomacy settlement can pay research-pact bonuses from the
+    /// same numbers that were just accrued.
+    fn monthly_settlement(&mut self) -> BTreeMap<u32, f64> {
         let system_ids: Vec<StarId> = self.systems.keys().copied().collect();
         let mut abandoned: Vec<(StarId, u32)> = Vec::new();
         // Each colony's income lands in its *owner's* treasury
         // (design §6.5: same economy rules for every civilization).
         let mut credits_delta: BTreeMap<u32, f64> = BTreeMap::new();
+        let mut research_delta: BTreeMap<u32, f64> = BTreeMap::new();
 
         for system in system_ids {
             let Some(state) = self.systems.get_mut(&system) else {
@@ -1888,6 +2431,14 @@ impl Campaign {
             let upkeep = 2.0 + dev * 1.0 + colony.population_millions * 0.004;
             *credits_delta.entry(owner).or_insert(0.0) += income - upkeep;
 
+            // Research (S4): Research-specialized colonies produce
+            // research points. The formula is the one
+            // `research_output_for` quotes between settlements.
+            if spec == Some(Specialization::Research) {
+                *research_delta.entry(owner).or_insert(0.0) +=
+                    (dev * 1.5 + colony.population_millions * 0.004) * efficiency;
+            }
+
             // Population: logistic growth toward a habitability and
             // development carrying capacity when supplied; decline
             // only after a three-month unsupplied buffer period, and
@@ -1918,6 +2469,11 @@ impl Campaign {
                 civ.credits += delta;
             }
         }
+        for (owner, delta) in &research_delta {
+            if let Some(civ) = self.civs.get_mut(*owner as usize) {
+                civ.research_points += delta;
+            }
+        }
         for (system, owner) in abandoned {
             if let Some(state) = self.systems.get_mut(&system) {
                 state.colony = None;
@@ -1930,5 +2486,895 @@ impl Campaign {
                 None,
             );
         }
+        research_delta
+    }
+
+    // ------------------------------------------------------------ S4
+    // Trade & diplomacy depth (design §4.3, §6.3). Every command is
+    // parameterized by the acting civilization, exactly like the
+    // S3 command surface; the player wrappers sit next to the S1
+    // ones above in spirit and are spelled out where the bridge
+    // needs them.
+
+    fn require_civ(&self, civ_id: u32) -> SimResult<()> {
+        if self.civ(civ_id).is_none() {
+            return Err(SimError::UnknownCivilization(civ_id));
+        }
+        Ok(())
+    }
+
+    /// The shared gate for every negotiated instrument: both
+    /// civilizations exist, they are distinct, they have met, and
+    /// the §6.3 translation delay has run.
+    fn require_diplomacy(&self, a: u32, b: u32) -> SimResult<()> {
+        self.require_civ(a)?;
+        self.require_civ(b)?;
+        if a == b {
+            return Err(SimError::UnknownCivilization(a));
+        }
+        if !self.has_contact(a, b) {
+            return Err(SimError::NoContact(b));
+        }
+        if let Some(ready_day) = self.diplomacy_ready_day(a, b) {
+            if self.day < ready_day {
+                return Err(SimError::DiplomacyNotReady { ready_day });
+            }
+        }
+        Ok(())
+    }
+
+    /// Record a signed treaty and its event. Callers have already
+    /// validated and (for AI counterparties) evaluated.
+    fn sign_treaty(&mut self, proposer: u32, other: u32, kind: TreatyKind) {
+        let parties = Self::pair_key(proposer, other);
+        self.treaties.push(Treaty {
+            kind,
+            parties,
+            signed_day: self.day,
+        });
+        self.push_event(
+            EventKind::TreatySigned,
+            None,
+            None,
+            Some(proposer),
+            Some(other),
+        );
+    }
+
+    /// Close every trade route between the pair (the agreement
+    /// that sustained them is gone). Each closure is an event.
+    fn sever_routes_between(&mut self, a: u32, b: u32) {
+        let key = Self::pair_key(a, b);
+        let doomed: Vec<u32> = self
+            .trade_routes
+            .iter()
+            .filter(|r| (r.civ_a, r.civ_b) == key)
+            .map(|r| r.id)
+            .collect();
+        for route_id in doomed {
+            self.close_route(route_id);
+        }
+    }
+
+    /// Remove a route from the state, recording its closure.
+    fn close_route(&mut self, route_id: u32) {
+        if let Some(pos) = self.trade_routes.iter().position(|r| r.id == route_id) {
+            let route = self.trade_routes.remove(pos);
+            self.push_event(
+                EventKind::TradeRouteSevered,
+                Some(route.system_a),
+                None,
+                Some(route.civ_a),
+                Some(route.civ_b),
+            );
+        }
+    }
+
+    /// Propose a treaty to another civilization (player wrapper
+    /// over `propose_treaty_for`).
+    pub fn propose_treaty(
+        &mut self,
+        galaxy: &Galaxy,
+        other: u32,
+        kind: TreatyKind,
+    ) -> SimResult<DealOutcome> {
+        self.propose_treaty_for(PLAYER_CIV, galaxy, other, kind)
+    }
+
+    /// Propose a treaty (design §6.3). When the counterparty is an
+    /// AI civilization it answers on the spot, from the stated-
+    /// reasons evaluation in `diplomacy.rs`. When the counterparty
+    /// is the player (only the AI planner proposes this way), the
+    /// offer lands in the player's proposal inbox with the
+    /// proposer's stated reasons attached.
+    pub fn propose_treaty_for(
+        &mut self,
+        proposer: u32,
+        galaxy: &Galaxy,
+        other: u32,
+        kind: TreatyKind,
+    ) -> SimResult<DealOutcome> {
+        self.require_diplomacy(proposer, other)?;
+        if self.treaty_active(proposer, other, kind) {
+            return Err(SimError::TreatyAlreadyActive);
+        }
+        if other == PLAYER_CIV {
+            // The proposer's own stated reasons for wanting this.
+            let evaluation = self.evaluate_treaty(galaxy, proposer, other, kind);
+            return self.file_proposal(
+                proposer,
+                ProposalKind::Treaty(kind),
+                evaluation.reasons,
+            );
+        }
+        let evaluation = self.evaluate_treaty(galaxy, other, proposer, kind);
+        if evaluation.accept {
+            self.sign_treaty(proposer, other, kind);
+            Ok(DealOutcome::Signed)
+        } else {
+            self.push_event(
+                EventKind::DealRefused,
+                None,
+                None,
+                Some(proposer),
+                Some(other),
+            );
+            Ok(DealOutcome::Refused {
+                reasons: evaluation.reasons,
+            })
+        }
+    }
+
+    /// Propose a peace settlement on stated terms (player wrapper
+    /// over `propose_peace_for`).
+    pub fn propose_peace(
+        &mut self,
+        galaxy: &Galaxy,
+        other: u32,
+        terms: PeaceTerms,
+    ) -> SimResult<DealOutcome> {
+        self.propose_peace_for(PLAYER_CIV, galaxy, other, terms)
+    }
+
+    /// Propose a peace settlement (design §6.3): acceptance closes
+    /// every open dispute between the pair, transfers the ceded
+    /// claims, moves the credits, and lifts any embargo between
+    /// them. AI counterparties evaluate the terms with stated
+    /// reasons; offers to the player go to the inbox.
+    pub fn propose_peace_for(
+        &mut self,
+        proposer: u32,
+        galaxy: &Galaxy,
+        other: u32,
+        terms: PeaceTerms,
+    ) -> SimResult<DealOutcome> {
+        self.require_diplomacy(proposer, other)?;
+        self.validate_peace_terms(proposer, other, &terms)?;
+        if other == PLAYER_CIV {
+            let evaluation = self.evaluate_peace(galaxy, proposer, other, &terms);
+            return self.file_proposal(proposer, ProposalKind::Peace(terms), evaluation.reasons);
+        }
+        let evaluation = self.evaluate_peace(galaxy, other, proposer, &terms);
+        if evaluation.accept {
+            self.apply_peace(proposer, other, &terms);
+            Ok(DealOutcome::Signed)
+        } else {
+            self.push_event(
+                EventKind::DealRefused,
+                None,
+                None,
+                Some(proposer),
+                Some(other),
+            );
+            Ok(DealOutcome::Refused {
+                reasons: evaluation.reasons,
+            })
+        }
+    }
+
+    /// Terms must be *executable*: ceded systems are actually
+    /// claimed by the ceding party, and whoever pays can pay.
+    fn validate_peace_terms(
+        &self,
+        proposer: u32,
+        other: u32,
+        terms: &PeaceTerms,
+    ) -> SimResult<()> {
+        for &system in &terms.cede_to_proposer {
+            if self.systems.get(&system).and_then(|s| s.claimed_by) != Some(other) {
+                return Err(SimError::SystemNotClaimed(system));
+            }
+        }
+        for &system in &terms.cede_to_other {
+            if self.systems.get(&system).and_then(|s| s.claimed_by) != Some(proposer) {
+                return Err(SimError::SystemNotClaimed(system));
+            }
+        }
+        let (payer, amount) = if terms.credits_from_proposer >= 0.0 {
+            (proposer, terms.credits_from_proposer)
+        } else {
+            (other, -terms.credits_from_proposer)
+        };
+        let available = self.credits_for(payer);
+        if amount > 0.0 && available + 1e-9 < amount {
+            return Err(SimError::InsufficientCredits {
+                needed: amount,
+                available,
+            });
+        }
+        Ok(())
+    }
+
+    /// Execute an accepted settlement.
+    fn apply_peace(&mut self, proposer: u32, other: u32, terms: &PeaceTerms) {
+        let transfers: Vec<(StarId, u32)> = terms
+            .cede_to_proposer
+            .iter()
+            .map(|&s| (s, proposer))
+            .chain(terms.cede_to_other.iter().map(|&s| (s, other)))
+            .collect();
+        for (system, new_owner) in transfers {
+            if let Some(state) = self.systems.get_mut(&system) {
+                state.claimed_by = Some(new_owner);
+                // Receiving a system in a treaty tells you where it
+                // is and what it holds — the treaty itself is the
+                // information transfer.
+                state.surveyed_by.insert(new_owner);
+            }
+            // A dispute over a ceded system is settled by the
+            // cession itself, whichever direction it pointed.
+            self.disputes.retain(|d| d.system != system);
+        }
+        if terms.credits_from_proposer != 0.0 {
+            let amount = terms.credits_from_proposer;
+            if let Some(civ) = self.civs.get_mut(proposer as usize) {
+                civ.credits -= amount;
+            }
+            if let Some(civ) = self.civs.get_mut(other as usize) {
+                civ.credits += amount;
+            }
+        }
+        // Every remaining dispute between the pair is settled by
+        // the recognition itself, and a settlement lifts embargoes:
+        // trade war ends when peace is signed.
+        self.disputes
+            .retain(|d| !((d.holder == proposer && d.challenger == other)
+                || (d.holder == other && d.challenger == proposer)));
+        self.embargoes
+            .retain(|e| !((e.declarer == proposer && e.target == other)
+                || (e.declarer == other && e.target == proposer)));
+        self.push_event(
+            EventKind::PeaceSettled,
+            None,
+            None,
+            Some(proposer),
+            Some(other),
+        );
+    }
+
+    /// Store an offer to the player, honouring the refusal/lapse
+    /// cooldown and the one-pending-offer-per-instrument rule.
+    fn file_proposal(
+        &mut self,
+        proposer: u32,
+        kind: ProposalKind,
+        reasons: Vec<String>,
+    ) -> SimResult<DealOutcome> {
+        let key = Self::pair_key(proposer, PLAYER_CIV);
+        if self
+            .proposals
+            .iter()
+            .any(|p| p.from == proposer && p.to == PLAYER_CIV && p.kind == kind)
+        {
+            return Ok(DealOutcome::Refused {
+                reasons: vec![
+                    "an identical offer is already awaiting the player's answer".to_string(),
+                ],
+            });
+        }
+        let cooldown_key = (key.0, key.1, kind.cooldown_code());
+        if let Some(&ready_day) = self.proposal_cooldowns.get(&cooldown_key) {
+            if self.day < ready_day {
+                return Ok(DealOutcome::Refused {
+                    reasons: vec![format!(
+                        "too soon after a refused or lapsed offer — {} will not re-offer this before day {}",
+                        self.civ(proposer).map(|c| c.name.clone()).unwrap_or_default(),
+                        ready_day
+                    )],
+                });
+            }
+        }
+        let id = self.next_proposal_id;
+        self.next_proposal_id += 1;
+        self.proposals.push(Proposal {
+            id,
+            from: proposer,
+            to: PLAYER_CIV,
+            kind,
+            proposed_day: self.day,
+            reasons,
+        });
+        self.push_event(
+            EventKind::TreatyProposed,
+            None,
+            None,
+            Some(proposer),
+            Some(PLAYER_CIV),
+        );
+        Ok(DealOutcome::Pending { proposal_id: id })
+    }
+
+    /// Answer a proposal addressed to `civ_id` (the player, in
+    /// practice). Acceptance re-validates the deal against today's
+    /// state — the galaxy may have moved since the offer was made —
+    /// and refusal starts the proposer's cooldown.
+    pub fn respond_to_proposal(
+        &mut self,
+        galaxy: &Galaxy,
+        civ_id: u32,
+        proposal_id: u32,
+        accept: bool,
+    ) -> SimResult<DealOutcome> {
+        let proposal = self
+            .proposals
+            .iter()
+            .find(|p| p.id == proposal_id)
+            .cloned()
+            .ok_or(SimError::UnknownProposal(proposal_id))?;
+        if proposal.to != civ_id {
+            return Err(SimError::NotProposalRecipient(proposal_id));
+        }
+        if !accept {
+            self.proposals.retain(|p| p.id != proposal_id);
+            let key = Self::pair_key(proposal.from, civ_id);
+            self.proposal_cooldowns.insert(
+                (key.0, key.1, proposal.kind.cooldown_code()),
+                self.day + PROPOSAL_COOLDOWN_DAYS,
+            );
+            return Ok(DealOutcome::Declined);
+        }
+        match &proposal.kind {
+            ProposalKind::Treaty(kind) => {
+                let kind = *kind;
+                self.require_diplomacy(proposal.from, civ_id)?;
+                if self.treaty_active(proposal.from, civ_id, kind) {
+                    return Err(SimError::TreatyAlreadyActive);
+                }
+                self.proposals.retain(|p| p.id != proposal_id);
+                self.sign_treaty(proposal.from, civ_id, kind);
+                let _ = galaxy;
+                Ok(DealOutcome::Signed)
+            }
+            ProposalKind::Peace(terms) => {
+                let terms = terms.clone();
+                self.require_diplomacy(proposal.from, civ_id)?;
+                self.validate_peace_terms(proposal.from, civ_id, &terms)?;
+                self.proposals.retain(|p| p.id != proposal_id);
+                self.apply_peace(proposal.from, civ_id, &terms);
+                Ok(DealOutcome::Signed)
+            }
+        }
+    }
+
+    /// Break an active treaty (player wrapper over
+    /// `break_treaty_for`).
+    pub fn break_treaty(&mut self, other: u32, kind: TreatyKind) -> SimResult<()> {
+        self.break_treaty_for(PLAYER_CIV, other, kind)
+    }
+
+    /// Break a treaty: the instrument ends today, its trade routes
+    /// close with it, and the breach is remembered against the
+    /// breaker (§6.2). There is no quiet way to break a promise.
+    pub fn break_treaty_for(
+        &mut self,
+        actor: u32,
+        other: u32,
+        kind: TreatyKind,
+    ) -> SimResult<()> {
+        self.require_civ(actor)?;
+        self.require_civ(other)?;
+        let key = Self::pair_key(actor, other);
+        let Some(pos) = self
+            .treaties
+            .iter()
+            .position(|t| t.parties == key && t.kind == kind)
+        else {
+            return Err(SimError::TreatyNotActive);
+        };
+        self.treaties.remove(pos);
+        self.breaches.push(TreatyBreach {
+            breaker: actor,
+            other,
+            kind,
+            day: self.day,
+        });
+        if kind == TreatyKind::TradeAgreement {
+            self.sever_routes_between(actor, other);
+        }
+        self.push_event(
+            EventKind::TreatyBroken,
+            None,
+            None,
+            Some(actor),
+            Some(other),
+        );
+        Ok(())
+    }
+
+    /// Declare an embargo (player wrapper over
+    /// `declare_embargo_for`).
+    pub fn declare_embargo(&mut self, target: u32) -> SimResult<()> {
+        self.declare_embargo_for(PLAYER_CIV, target)
+    }
+
+    /// Declare an embargo: trade with the target closes today.
+    /// Declaring one against a trade partner terminates the trade
+    /// agreement on the spot — and terminating an agreement by
+    /// embargo is a breach, recorded like any other.
+    pub fn declare_embargo_for(&mut self, declarer: u32, target: u32) -> SimResult<()> {
+        self.require_civ(declarer)?;
+        self.require_civ(target)?;
+        if declarer == target {
+            return Err(SimError::UnknownCivilization(target));
+        }
+        if !self.has_contact(declarer, target) {
+            return Err(SimError::NoContact(target));
+        }
+        if self.embargo_of(declarer, target).is_some() {
+            return Err(SimError::EmbargoAlreadyDeclared);
+        }
+        if self.treaty_active(declarer, target, TreatyKind::TradeAgreement) {
+            let key = Self::pair_key(declarer, target);
+            self.treaties
+                .retain(|t| !(t.parties == key && t.kind == TreatyKind::TradeAgreement));
+            self.breaches.push(TreatyBreach {
+                breaker: declarer,
+                other: target,
+                kind: TreatyKind::TradeAgreement,
+                day: self.day,
+            });
+            self.sever_routes_between(declarer, target);
+            self.push_event(
+                EventKind::TreatyBroken,
+                None,
+                None,
+                Some(declarer),
+                Some(target),
+            );
+        }
+        self.embargoes.push(Embargo {
+            declarer,
+            target,
+            since_day: self.day,
+        });
+        self.push_event(
+            EventKind::EmbargoDeclared,
+            None,
+            None,
+            Some(declarer),
+            Some(target),
+        );
+        Ok(())
+    }
+
+    /// Lift an embargo (player wrapper over `lift_embargo_for`).
+    pub fn lift_embargo(&mut self, target: u32) -> SimResult<()> {
+        self.lift_embargo_for(PLAYER_CIV, target)
+    }
+
+    pub fn lift_embargo_for(&mut self, declarer: u32, target: u32) -> SimResult<()> {
+        self.require_civ(declarer)?;
+        self.require_civ(target)?;
+        let Some(pos) = self
+            .embargoes
+            .iter()
+            .position(|e| e.declarer == declarer && e.target == target)
+        else {
+            return Err(SimError::NoEmbargoInForce);
+        };
+        self.embargoes.remove(pos);
+        self.push_event(
+            EventKind::EmbargoLifted,
+            None,
+            None,
+            Some(declarer),
+            Some(target),
+        );
+        Ok(())
+    }
+
+    /// The colony-to-colony path a trade route would travel
+    /// between two endpoint colonies: a chain over *both* parties'
+    /// colonies (the agreement makes their networks one graph for
+    /// this purpose), each leg within tanker range (`TRADE_LEG_LY`),
+    /// fewest legs first, nearest first on ties. Returns the path
+    /// and its total length. This is §4.3's route solver in its S4
+    /// form: the nodes are colonies, the legs are free flight, and
+    /// gate hops join it when gates exist (S5).
+    pub fn trade_path(
+        &self,
+        galaxy: &Galaxy,
+        a: u32,
+        b: u32,
+        from: StarId,
+        to: StarId,
+    ) -> Option<(Vec<StarId>, f64)> {
+        if from == to {
+            return None;
+        }
+        let mut nodes: Vec<StarId> = self.colonies_of(a);
+        for system in self.colonies_of(b) {
+            if !nodes.contains(&system) {
+                nodes.push(system);
+            }
+        }
+        if !nodes.contains(&from) || !nodes.contains(&to) {
+            return None;
+        }
+        // Adjacency, computed once: for each node the neighbours
+        // within tanker range, in `nodes` order — the exact edge
+        // set and relaxation order the naive scan would use, so
+        // the chosen path is unchanged. (The naive form re-scanned
+        // every pair at every settle step; with ~100 colonies a
+        // side that made route searches minutes-slow on the real
+        // table — found by the S4 long run stalling at first
+        // contact.)
+        let mut adjacency: BTreeMap<StarId, Vec<(StarId, f64)>> = BTreeMap::new();
+        for &node in &nodes {
+            let mut edges = Vec::new();
+            for &next in &nodes {
+                if next == node {
+                    continue;
+                }
+                if let Some(leg) = galaxy.distance_ly(node, next) {
+                    if leg <= TRADE_LEG_LY + 1e-9 {
+                        edges.push((next, leg));
+                    }
+                }
+            }
+            adjacency.insert(node, edges);
+        }
+        // Dijkstra over the colony graph. Colony counts are small;
+        // the (distance, system) ordering keeps the chosen path a
+        // pure function of the state.
+        let mut dist: BTreeMap<StarId, f64> = BTreeMap::new();
+        let mut prev: BTreeMap<StarId, StarId> = BTreeMap::new();
+        let mut settled: BTreeSet<StarId> = BTreeSet::new();
+        dist.insert(from, 0.0);
+        loop {
+            let mut best: Option<(f64, StarId)> = None;
+            for &node in &nodes {
+                if settled.contains(&node) {
+                    continue;
+                }
+                if let Some(&d) = dist.get(&node) {
+                    if best.map(|(bd, bid)| d < bd || (d == bd && node < bid)).unwrap_or(true) {
+                        best = Some((d, node));
+                    }
+                }
+            }
+            let Some((cost, node)) = best else {
+                break;
+            };
+            if node == to {
+                let mut path = vec![to];
+                let mut cursor = to;
+                while cursor != from {
+                    cursor = *prev.get(&cursor)?;
+                    path.push(cursor);
+                }
+                path.reverse();
+                return Some((path, cost));
+            }
+            settled.insert(node);
+            for &(next, leg) in &adjacency[&node] {
+                if settled.contains(&next) {
+                    continue;
+                }
+                let next_cost = cost + leg;
+                if next_cost < *dist.get(&next).unwrap_or(&f64::INFINITY) {
+                    dist.insert(next, next_cost);
+                    prev.insert(next, node);
+                }
+            }
+        }
+        None
+    }
+
+    /// The throughput a route between two endpoint colonies would
+    /// carry today (§4.3): a function of both endpoints'
+    /// development and population, with the alliance integration
+    /// bonus when the pair are allies. Zero when either endpoint
+    /// is not currently a colony of the right owner.
+    pub fn route_throughput(&self, a: u32, b: u32, system_a: StarId, system_b: StarId) -> f64 {
+        let endpoint = |owner: u32, system: StarId| -> Option<(f64, f64)> {
+            let state = self.systems.get(&system)?;
+            if state.claimed_by != Some(owner) {
+                return None;
+            }
+            let colony = state.colony.as_ref()?;
+            Some((colony.development as f64, colony.population_millions))
+        };
+        let Some((dev_a, pop_a)) = endpoint(a, system_a) else {
+            return 0.0;
+        };
+        let Some((dev_b, pop_b)) = endpoint(b, system_b) else {
+            return 0.0;
+        };
+        let base = 4.0 * (dev_a + dev_b) + 0.02 * (pop_a + pop_b);
+        if self.treaty_active(a, b, TreatyKind::Alliance) {
+            base * 1.25
+        } else {
+            base
+        }
+    }
+
+    /// A live route's current throughput, from its endpoints.
+    pub fn live_route_throughput(&self, route: &TradeRoute) -> f64 {
+        self.route_throughput(route.civ_a, route.civ_b, route.system_a, route.system_b)
+    }
+
+    /// A route's distance factor (§4.3: income is proportional to
+    /// throughput × distance factor — goods that travel farther
+    /// are worth more at the far end).
+    pub fn route_distance_factor(route: &TradeRoute) -> f64 {
+        1.0 + route.path_ly / 1000.0
+    }
+
+    /// The monthly income one side of a live route earns at its
+    /// current throughput: the exact figure the settlement pays
+    /// and the ledger records. Both sides earn the same (§4.3:
+    /// "both sides earn credits monthly").
+    pub fn route_monthly_income(&self, route: &TradeRoute) -> f64 {
+        self.live_route_throughput(route) * Self::route_distance_factor(route) * TRADE_INCOME_RATE
+    }
+
+    /// The best route a pair could open today: the endpoint pair
+    /// with the highest throughput among pairs a path exists for,
+    /// ties broken by endpoint ids. `None` when no pair connects.
+    /// Used by the AI planner and by the bridge's "open the best
+    /// route" command alike — one rule for everyone.
+    ///
+    /// Candidates are weighed in the preference order above and
+    /// path-checked in that order, so the winner is the same pair
+    /// an exhaustive search would pick whenever the best pair
+    /// connects. Path checks stop after
+    /// [`SUGGEST_PATH_CHECK_CAP`] candidates: a suggestion is a
+    /// heuristic, and the exhaustive form (a Dijkstra per colony
+    /// pair, monthly, per contacted pair) stalled the S4 long run
+    /// at first contact. Explicit-endpoint route commands still
+    /// path-check exactly.
+    pub fn suggest_trade_route(
+        &self,
+        galaxy: &Galaxy,
+        a: u32,
+        b: u32,
+    ) -> Option<(StarId, StarId, Vec<StarId>, f64)> {
+        let mut candidates: Vec<(f64, StarId, StarId)> = Vec::new();
+        for system_a in self.colonies_of(a) {
+            for system_b in self.colonies_of(b) {
+                let throughput = self.route_throughput(a, b, system_a, system_b);
+                if throughput > 0.0 {
+                    candidates.push((throughput, system_a, system_b));
+                }
+            }
+        }
+        candidates.sort_by(|x, y| {
+            y.0.partial_cmp(&x.0)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then((x.1, x.2).cmp(&(y.1, y.2)))
+        });
+        for (_, system_a, system_b) in candidates.into_iter().take(SUGGEST_PATH_CHECK_CAP) {
+            if let Some((path, path_ly)) = self.trade_path(galaxy, a, b, system_a, system_b) {
+                return Some((system_a, system_b, path, path_ly));
+            }
+        }
+        None
+    }
+
+    /// Open a trade route between two endpoint colonies (player
+    /// wrapper over `establish_trade_route_for`; endpoints are the
+    /// player's system first).
+    pub fn establish_trade_route(
+        &mut self,
+        galaxy: &Galaxy,
+        other: u32,
+        my_system: StarId,
+        their_system: StarId,
+    ) -> SimResult<u32> {
+        self.establish_trade_route_for(PLAYER_CIV, galaxy, other, my_system, their_system)
+    }
+
+    /// Open a trade route (design §4.3). Requires an active trade
+    /// agreement, no embargo, both endpoints held as colonies by
+    /// the right parties, and a colony-network path within tanker
+    /// range. Returns the new route's id.
+    pub fn establish_trade_route_for(
+        &mut self,
+        civ_id: u32,
+        galaxy: &Galaxy,
+        other: u32,
+        system_a: StarId,
+        system_b: StarId,
+    ) -> SimResult<u32> {
+        self.require_diplomacy(civ_id, other)?;
+        if !self.treaty_active(civ_id, other, TreatyKind::TradeAgreement) {
+            return Err(SimError::TradeAgreementRequired);
+        }
+        if self.embargo_between(civ_id, other) {
+            return Err(SimError::TradeAgreementRequired);
+        }
+        for (owner, system) in [(civ_id, system_a), (other, system_b)] {
+            match self.systems.get(&system) {
+                Some(state) if state.colony.is_some() && state.claimed_by == Some(owner) => {}
+                Some(state) if state.colony.is_some() => {
+                    return Err(SimError::NotYourColony(system));
+                }
+                _ => return Err(SimError::NoColony(system)),
+            }
+        }
+        if self.trade_routes.iter().any(|r| {
+            (r.civ_a == civ_id && r.system_a == system_a && r.system_b == system_b)
+                || (r.civ_a == other && r.system_a == system_b && r.system_b == system_a)
+        }) {
+            return Err(SimError::TradeRouteAlreadyExists);
+        }
+        let Some((path, path_ly)) = self.trade_path(galaxy, civ_id, other, system_a, system_b)
+        else {
+            return Err(SimError::NoTradePath);
+        };
+        let (civ_a, civ_b, sys_a, sys_b) = if civ_id < other {
+            (civ_id, other, system_a, system_b)
+        } else {
+            (other, civ_id, system_b, system_a)
+        };
+        let (path, path_ly) = if civ_id < other {
+            (path, path_ly)
+        } else {
+            let mut reversed = path;
+            reversed.reverse();
+            (reversed, path_ly)
+        };
+        let id = self.next_route_id;
+        self.next_route_id += 1;
+        self.trade_routes.push(TradeRoute {
+            id,
+            civ_a,
+            civ_b,
+            system_a: sys_a,
+            system_b: sys_b,
+            path,
+            path_ly,
+            established_day: self.day,
+            earned_a: 0.0,
+            earned_b: 0.0,
+            last_income_a: 0.0,
+            last_income_b: 0.0,
+            months_active: 0,
+        });
+        self.push_event(
+            EventKind::TradeRouteEstablished,
+            Some(sys_a),
+            None,
+            Some(civ_a),
+            Some(civ_b),
+        );
+        Ok(id)
+    }
+
+    /// Sever one of your own trade routes (player wrapper over
+    /// `sever_trade_route_for`). Closing a route is a commercial
+    /// act, not a breach — the treaty that enables routes is the
+    /// promise; a route is just business.
+    pub fn sever_trade_route(&mut self, route_id: u32) -> SimResult<()> {
+        self.sever_trade_route_for(PLAYER_CIV, route_id)
+    }
+
+    pub fn sever_trade_route_for(&mut self, civ_id: u32, route_id: u32) -> SimResult<()> {
+        let route = self
+            .trade_routes
+            .iter()
+            .find(|r| r.id == route_id)
+            .ok_or(SimError::UnknownTradeRoute(route_id))?;
+        if route.civ_a != civ_id && route.civ_b != civ_id {
+            return Err(SimError::NotRouteParty(civ_id));
+        }
+        self.close_route(route_id);
+        Ok(())
+    }
+
+    /// The monthly diplomacy settlement: research-pact bonuses,
+    /// trade-route income against the route ledgers, route
+    /// validity, and proposal expiry. Runs inside the daily step
+    /// on settlement days, after the colony settlement, so a save
+    /// advanced by catch-up settles identically (§11.1).
+    fn monthly_diplomacy_settlement(
+        &mut self,
+        galaxy: &Galaxy,
+        research_outputs: &BTreeMap<u32, f64>,
+    ) {
+        // Research pacts: each partner gains a bonus drawn from
+        // the other's actual output this month.
+        let pacts: Vec<(u32, u32)> = self
+            .treaties
+            .iter()
+            .filter(|t| t.kind == TreatyKind::ResearchPact)
+            .map(|t| t.parties)
+            .collect();
+        for (a, b) in pacts {
+            let bonus_a = research_outputs.get(&b).copied().unwrap_or(0.0)
+                * RESEARCH_PACT_BONUS_FRACTION;
+            let bonus_b = research_outputs.get(&a).copied().unwrap_or(0.0)
+                * RESEARCH_PACT_BONUS_FRACTION;
+            if let Some(civ) = self.civs.get_mut(a as usize) {
+                civ.research_points += bonus_a;
+            }
+            if let Some(civ) = self.civs.get_mut(b as usize) {
+                civ.research_points += bonus_b;
+            }
+        }
+
+        // Trade routes: a route pays only while its agreement
+        // holds, no embargo stands, both endpoints are still the
+        // parties' colonies, and every system on its path still
+        // holds a colony of one of the two parties. Otherwise it
+        // closes, on the record.
+        let route_ids: Vec<u32> = self.trade_routes.iter().map(|r| r.id).collect();
+        for route_id in route_ids {
+            let Some(route) = self.trade_routes.iter().find(|r| r.id == route_id).cloned() else {
+                continue;
+            };
+            let valid = self.treaty_active(route.civ_a, route.civ_b, TreatyKind::TradeAgreement)
+                && !self.embargo_between(route.civ_a, route.civ_b)
+                && self.live_route_throughput(&route) > 0.0
+                && route.path.iter().all(|&system| {
+                    self.systems.get(&system).map(|s| {
+                        s.colony.is_some()
+                            && (s.claimed_by == Some(route.civ_a)
+                                || s.claimed_by == Some(route.civ_b))
+                    }) == Some(true)
+                });
+            if !valid {
+                self.close_route(route_id);
+                continue;
+            }
+            let income = self.route_monthly_income(&route);
+            if let Some(live) = self.trade_routes.iter_mut().find(|r| r.id == route_id) {
+                live.earned_a += income;
+                live.earned_b += income;
+                live.last_income_a = income;
+                live.last_income_b = income;
+                live.months_active += 1;
+            }
+            self.total_trade_income += income * 2.0;
+            if let Some(civ) = self.civs.get_mut(route.civ_a as usize) {
+                civ.credits += income;
+            }
+            if let Some(civ) = self.civs.get_mut(route.civ_b as usize) {
+                civ.credits += income;
+            }
+        }
+
+        // Unanswered proposals lapse, and the proposer waits out a
+        // shorter cooldown before offering that instrument again.
+        let today = self.day;
+        let lapsed: Vec<Proposal> = self
+            .proposals
+            .iter()
+            .filter(|p| today > p.proposed_day + PROPOSAL_TTL_DAYS)
+            .cloned()
+            .collect();
+        if !lapsed.is_empty() {
+            self.proposals
+                .retain(|p| today <= p.proposed_day + PROPOSAL_TTL_DAYS);
+            for proposal in lapsed {
+                let key = Self::pair_key(proposal.from, proposal.to);
+                self.proposal_cooldowns.insert(
+                    (key.0, key.1, proposal.kind.cooldown_code()),
+                    today + PROPOSAL_TTL_DAYS,
+                );
+            }
+        }
+        let _ = galaxy;
     }
 }
