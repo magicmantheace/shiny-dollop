@@ -1,11 +1,16 @@
 # Campfire Companions — live desktop wallpaper
 
-A field at dusk, rendered live in your desktop background. Creatures
+A living field, rendered live in your desktop background. Creatures
 built by the [Game Asset Builder](../game-asset-builder/) wander in
-from the dark, gather around a campfire to warm themselves, and wander
-off again — an ember dragon that hops, a snow goblin that waves, a
-triceratops that bounces — while the fire crackles with drifting
-embers under a starry sky.
+from the treeline, gather around a campfire to warm themselves, and
+wander off again — an ember dragon that hops, a snow goblin that
+waves, a triceratops that bounces. The field is dressed with a pine
+forest edge, grass, ferns, glowing mushrooms, fireflies, log benches
+and a worn dirt path — and the sky follows the **real clock**: a
+true sun and moon cycle for Lethbridge, Alberta, computed locally
+in the page, so the scene is bright at noon, burns orange at the
+real sunset, and sits under real moonlight (or a real moonless
+night) after dark.
 
 Built with three.js (vendored, no build step, no network calls) and
 packaged for [Lively Wallpaper](https://www.rocksdanister.com/wallpaper/)
@@ -61,9 +66,43 @@ a few seconds.
   hops, the triceratops bounces, the goblin glides. Adding a creature
   later needs no director change — drop the GLB in `assets/`, add a
   config row, reload.
+- **The sky runs on the real clock.** Sun and moon positions are
+  computed in the page (standard SunCalc/NOAA-style solar math and
+  the standard lunar approximation) for **Lethbridge, Alberta —
+  49.6942° N, 112.8456° W**, a hardcoded constant; the time comes
+  from the system clock, and nothing is fetched from the network.
+  Sky colours, fog, the sun/moon discs, star opacity, and the
+  directional light all follow the sun's elevation:
+  - **Day:** blue gradient, bright ambient light; the fire stays
+    lit but burns smaller and matters less.
+  - **Sunrise/sunset:** the warm orange dusk this wallpaper
+    originally shipped with — now the real golden-hour states.
+  - **Night:** stars out, fireflies drift, the mushroom clusters
+    glow, and the campfire is the dominant warm light. Moonlight
+    is real too: the moon disc is drawn with its actual phase
+    (canvas-generated texture, refreshed hourly), and on a
+    moonless night the field is genuinely dark.
+  - Precision: computed sunrise/sunset for 2026-11-08 land within
+    ~1.5 minutes of timeanddate.com's Lethbridge values; moonrise/
+    moonset within ~10 minutes (the low-precision lunar theory is
+    the limit). Good enough for a wallpaper; details in
+    `docs/TEST_PLAN.md`.
+  - One framing note: the camera faces north, and at 49.7° N the
+    sun and moon cross the *southern* sky — so what you mostly see
+    is their light and the sky's colour cycle; the discs themselves
+    swing through the frame mainly near rise/set in some seasons.
+- **The field is dressed, not bare.** A 190-pine instanced forest
+  edge (plus three feature trees), 950 grass tufts, ferns, berry
+  bushes, nine clusters of softly glowing mushrooms, 64 drifting
+  fireflies, log benches and stump seats around the fire, a
+  woodpile and chopping block, a worn dirt path from the field's
+  edge to the fire, hill silhouettes on the horizon, and the
+  occasional shooting star. All primitives/instancing — no
+  external assets — and the fire clearing stays readable.
 - **Wallpaper manners:** pixel ratio capped at 1.5, ~136 fire
-  particles, no shadow maps, and the render loop stops entirely when
-  the page is hidden. It sips, it doesn't drink.
+  particles (plus the small firefly/star point systems), no shadow
+  maps, and the render loop stops entirely when the page is
+  hidden. It sips, it doesn't drink.
 
 ## Layout
 

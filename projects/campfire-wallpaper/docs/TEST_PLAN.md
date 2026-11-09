@@ -18,8 +18,16 @@ it relies on is the `#status` JSON:
   "loadErrors": [],
   "creatures": [{ "slug": "...", "state": "enter|dwell|leave",
                   "clip": "idle|walk|signature",
-                  "x": 0.0, "z": 0.0 }] }
+                  "x": 0.0, "z": 0.0 }],
+  "sky": { "sunEl": 0.0, "sunAz": 0.0, "moonEl": 0.0,
+           "moonAz": 0.0, "moonFrac": 0.0 } }
 ```
+
+The `?harness=1` seam also accepts `&time=<epoch ms | ISO string>`,
+which freezes the celestial computation at that instant (the page
+otherwise uses the live system clock). Sky-state captures use a
+second driver (`run_sky.mjs` in the same verification folder) that
+loads one frozen instant, steps 30 × 1/30 s, and screenshots.
 
 ## Checks
 
@@ -94,3 +102,99 @@ continuously by construction (plain `requestAnimationFrame` via
 Screenshots: build worktree verification folder
 (`shot-a.png`, `shot-b.png` — the stepped pair described in
 check 3).
+
+## Results — enrichment + celestial cycle (2026-11-08)
+
+Same harness, same shipped folder. Two additions were verified:
+scene dressing (Adam: "make the scene less bare") and the
+real-clock sun/moon cycle for Lethbridge.
+
+**Dressing (all primitives/instancing, clearing kept clear):**
+190 instanced pines in a forest-edge band (r 44–81) + 3 feature
+trees (broad oak, tall pine, dead snag); 950 instanced grass
+tufts; 70 ferns; 10 extra bushes, 7 carrying 63 instanced
+berries; 9 glowing-mushroom clusters (~40 instanced mushrooms,
+emissive caps + one glow sprite each); 64 fireflies (one Points
+system); 2 log benches, 3 stump seats, a 6-log woodpile and a
+chopping block around the fire; a terrain-following dirt-path
+ribbon from (17, 36) to the fire clearing; 6 horizon hill domes;
+an occasional shooting star (one sprite, ~every 9–25 s).
+
+**Celestial verification.** The page's own `#status.sky` values
+matched a standalone copy of the same math to the printed digit
+at every captured instant (e.g. 12:00 local: sun el 21.64°,
+az 160.5°; moon frac 0.003). Event times for 2026-11-08,
+computed by scanning the page's elevation curves (refraction-
+adjusted crossing angles: sun −0.833°, moon +0.125°), against
+timeanddate.com's Lethbridge pages (sun and moon, retrieved
+2026-11-08):
+
+| Event | Computed | Reference | Delta |
+| --- | --- | --- | --- |
+| Sunrise | 08:31:45 (az 115.0°) | 8:32 am (115°) | ~15 s early |
+| Sunset | 17:58:31 (az 244.8°) | 5:57 pm (245°) | ~1.5 min late |
+| Solar noon | 13:15:00, max el 23.7° | 1:15 pm, 23.6° | spot on |
+| Moonrise | 08:20:37 (az 120.5°) | 8:11 am (120°) | ~9.6 min late |
+| Moonset | 17:13:44 (az 236.7°) | 5:09 pm (237°) | ~4.7 min late |
+| Moon meridian | 12:47:30, el 20.4° | 12:45 pm, 19.9° | ~2.5 min late |
+| Moon illumination | 0.3% at 12:45 | 0.4% | match |
+
+Reference times are rounded to the minute by the source. Sun
+events meet the "within a few minutes" target; moon events meet
+the "~15 min is acceptable" target — the moon's shallow horizon
+crossing that day (max el ~20°) amplifies the low-precision
+lunar theory's ~0.3–0.5° position error into minutes. (Note:
+Alberta Time is UTC−6 year-round; all times above are local.)
+
+**State captures** (frozen-time seam, all with zero console
+errors and all templates loaded; screenshots in the verification
+folder):
+
+- `sky-noon.png` — 12:00 local: blue day gradient, hazy
+  blue-grey hills, fire small in bright ambient light, dragon
+  dwelling at the fire.
+- `sky-sunrise.png` — 08:32 local (sun el −0.8°): the orange
+  dusk palette at the real sunrise; field fully readable.
+- `sky-sunset.png` — 17:57 local (sun el −0.6°): same palette at
+  the real sunset; warm light rakes the dwelling triceratops.
+- `sky-night.png` — 02:00 on 2026-11-09 (sun −55.9°, moon
+  −61.2°, illumination 0.2% — genuinely moonless, the day after
+  the Nov 9 01:02 new moon): stars, fireflies, glowing
+  mushrooms, fire pool dominant; field dark but readable.
+- `sky-moonlit.png` — 2026-11-20 22:00 (moon el 49.2°, az
+  174.4°, illumination 85.2%): the field visibly moonlit
+  blue-grey versus the moonless capture. The moon itself is due
+  south — behind the north-facing camera — so this validates
+  moon*light*; the disc's phase rendering was validated
+  separately (next item).
+- `moon-phase-grid.png` — the page's `drawMoonPhase` extracted
+  verbatim into a test page and drawn at phases 0.02–0.982:
+  waxing lit on the right through half (0.25) and gibbous
+  (0.374) to full (0.5), waning mirrored on the left (0.75 half,
+  0.9 crescent). Orientation and shapes correct; dark side
+  carries faint earthshine maria by design.
+
+**Regression check.** The standard verify (420 harness steps at
+the live clock, i.e. night) re-run after both changes: all
+templates load, `loadErrors: []`, zero console errors, an
+entering creature reports clip `"walk"`, and a stepped shot
+shows a creature dwelling at the fire with the dressed scene
+around it. Leave/despawn and signature clips remain *not
+directly observed* in the VM harness (same limitation as the
+initial build).
+
+**Frame cost.** Unchanged in method and caveat: SwiftShader
+fps readings on this VM are dt-cap artifacts (~22 on the page
+counter; real software frames 0.5–3 s under contention), not a
+measurement. The dressing adds only instanced/merged geometry
+and three small point systems — no new dynamic lights (the fire
+still owns the only PointLights) and no shadow maps — so the
+real-GPU cost expectation is unchanged, still unverified by
+measurement on the RTX 3060.
+
+**Harness war story (for the next verifier):** a killed driver
+run left its Chrome profile locked, and later runs' Chrome
+exited instantly on the stale singleton lock while the driver
+polled a dead socket until its deadline. Both drivers now use
+a fresh `--user-data-dir` per run, and runs should be wrapped
+in a `timeout` watchdog.
