@@ -73,7 +73,7 @@ function makePineFoliageGeo() {
     [0.33, 1.15, 4.08, 1.00],
   ];
   const parts = tiers.map(([r, h, cy, shade], k) => {
-    const g = new THREE.ConeGeometry(r, h, 9);
+    const g = new THREE.ConeGeometry(r, h, 14);
     g.rotateY(k * 0.38);
     g.translate(0, cy, 0);
     const n = g.getAttribute('position').count;
@@ -201,7 +201,7 @@ try {
   loadingEl.classList.add('done');
   throw e;
 }
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.3;
@@ -255,7 +255,7 @@ const skyFollowers = [];
 let skyUniforms, starMat;
 let sunDisc, sunHaloMat, moonDisc, moonMat, moonHaloMat;
 const moonCanvas = document.createElement('canvas');
-moonCanvas.width = moonCanvas.height = 256;
+moonCanvas.width = moonCanvas.height = 512;
 const moonCtx = moonCanvas.getContext('2d');
 const moonTex = new THREE.CanvasTexture(moonCanvas);
 moonTex.colorSpace = THREE.SRGBColorSpace;
@@ -279,7 +279,7 @@ let moonTexHour = -1;
         gl_FragColor = vec4(c, 1.0); }`,
   });
   skyUniforms = skyMat.uniforms;
-  scene.add(new THREE.Mesh(new THREE.SphereGeometry(230, 24, 16), skyMat));
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(230, 48, 24), skyMat));
 
   // Stars.
   const starGeo = new THREE.BufferGeometry();
@@ -306,7 +306,7 @@ let moonTexHour = -1;
 
   // Sun: warm disc + halo, positioned by updateSky().
   sunDisc = new THREE.Mesh(
-    new THREE.CircleGeometry(5, 32),
+    new THREE.CircleGeometry(5, 48),
     new THREE.MeshBasicMaterial({ color: 0xffdf9e, fog: false }));
   scene.add(sunDisc);
   sunHaloMat = new THREE.MeshBasicMaterial({
@@ -324,7 +324,7 @@ let moonTexHour = -1;
   moonMat = new THREE.MeshBasicMaterial({
     map: moonTex, transparent: true, fog: false,
   });
-  moonDisc = new THREE.Mesh(new THREE.CircleGeometry(6.5, 32), moonMat);
+  moonDisc = new THREE.Mesh(new THREE.CircleGeometry(6.5, 48), moonMat);
   scene.add(moonDisc);
   moonHaloMat = new THREE.MeshBasicMaterial({
     map: radialSpriteTexture('rgba(190,205,240,0.55)', 'rgba(190,205,240,0)'),
@@ -339,7 +339,7 @@ let moonTexHour = -1;
 // the limb semicircle on the lit side plus the terminator ellipse.
 // Maria are a fixed hint pattern under the lit paint.
 function drawMoonPhase(phase) {
-  const s = 256, c = s / 2, r = c - 4;
+  const s = 512, c = s / 2, r = c - 4;
   const g = moonCtx;
   g.clearRect(0, 0, s, s);
   g.beginPath(); g.arc(c, c, r, 0, Math.PI * 2);
@@ -529,7 +529,7 @@ function updateSky(nowMs) {
 /* -------------------------------------------------------------- field */
 
 {
-  const geo = new THREE.PlaneGeometry(170, 170, 100, 100);
+  const geo = new THREE.PlaneGeometry(170, 170, 170, 170);
   geo.rotateX(-Math.PI / 2);
   const p = geo.attributes.position;
   const colors = new Float32Array(p.count * 3);
@@ -553,9 +553,9 @@ function updateSky(nowMs) {
 // Scattered primitive set dressing: pines, rocks, bushes. Shared
 // geometries/materials, seeded placement, clearing kept free.
 {
-  const trunkGeo = new THREE.CylinderGeometry(0.09, 0.14, 1.1, 6);
-  const rockGeo = new THREE.DodecahedronGeometry(1, 0);
-  const bushGeo = new THREE.IcosahedronGeometry(1, 1);
+  const trunkGeo = new THREE.CylinderGeometry(0.09, 0.14, 1.1, 8);
+  const rockGeo = new THREE.DodecahedronGeometry(1, 1);
+  const bushGeo = new THREE.IcosahedronGeometry(1, 2);
   const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 1 });
   const pineMat = new THREE.MeshStandardMaterial({
     color: 0x2f5233, roughness: 1, flatShading: true, vertexColors: true });
@@ -693,7 +693,7 @@ function updateDressing(t, dt) {
      actual treeline; the outermost ring stands tallest so
      the forest reads as a wall, not a hedge. */
   {
-    const trunkGeo = new THREE.CylinderGeometry(0.09, 0.15, 1.2, 6);
+    const trunkGeo = new THREE.CylinderGeometry(0.09, 0.15, 1.2, 8);
     trunkGeo.translate(0, 0.6, 0);
     const folGeo = makePineFoliageGeo();
     const trunks = instanced(trunkGeo,
@@ -743,10 +743,10 @@ function updateDressing(t, dt) {
     const leafMat = new THREE.MeshStandardMaterial({ color: 0x22391f, roughness: 1, flatShading: true });
     // Broad oak, left mid-field.
     const oak = new THREE.Group();
-    const otrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.46, 2.3, 7), barkMat);
+    const otrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.46, 2.3, 10), barkMat);
     otrunk.position.y = 1.1;
     oak.add(otrunk);
-    const blobGeo = new THREE.IcosahedronGeometry(1, 1);
+    const blobGeo = new THREE.IcosahedronGeometry(1, 2);
     for (const [bx, by, bz, bs] of [[0, 3.4, 0, 2.2], [1.3, 2.9, 0.4, 1.6],
                                     [-1.2, 3.0, -0.5, 1.7], [0.2, 2.7, 1.1, 1.4]]) {
       const b = new THREE.Mesh(blobGeo, leafMat);
@@ -759,7 +759,7 @@ function updateDressing(t, dt) {
     scene.add(oak);
     // Tall pine, right mid-field.
     const pine = new THREE.Group();
-    const ptrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.2, 2.2, 6), barkMat);
+    const ptrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.2, 2.2, 10), barkMat);
     ptrunk.position.y = 1.1;
     pine.add(ptrunk);
     const pfol = new THREE.Mesh(makePineFoliageGeo(),
@@ -772,12 +772,12 @@ function updateDressing(t, dt) {
     scene.add(pine);
     // Dead snag, back-left — bare trunk, two branch stubs.
     const snag = new THREE.Group();
-    const strunk = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.17, 3.4, 6),
+    const strunk = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.17, 3.4, 9),
       new THREE.MeshStandardMaterial({ color: 0x6b5a44, roughness: 1 }));
     strunk.position.y = 1.7;
     snag.add(strunk);
     for (const [ry, rz, len] of [[2.3, 0.7, 0.9], [2.9, -0.5, 0.65]]) {
-      const br = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, len, 5),
+      const br = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, len, 7),
         strunk.material);
       br.position.set(0.3, ry, 0);
       br.rotation.z = rz;
@@ -794,7 +794,7 @@ function updateDressing(t, dt) {
   {
     const blades = [];
     for (let k = 0; k < 5; k++) {
-      const b = new THREE.ConeGeometry(0.05, 0.42, 4);
+      const b = new THREE.ConeGeometry(0.05, 0.42, 6);
       b.translate(0, 0.21, 0);
       const m = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(
         Math.cos(k * 2.4) * 0.32, k * 1.257, Math.sin(k * 2.4) * 0.32));
@@ -829,7 +829,7 @@ function updateDressing(t, dt) {
   {
     const fronds = [];
     for (let k = 0; k < 6; k++) {
-      const f = new THREE.ConeGeometry(0.3, 0.55, 5);
+      const f = new THREE.ConeGeometry(0.3, 0.55, 8);
       f.applyMatrix4(new THREE.Matrix4().makeScale(1, 0.5, 1));
       const m = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(
         Math.cos(k * 1.047) * 0.95, 0, Math.sin(k * 1.047) * 0.95));
@@ -857,7 +857,7 @@ function updateDressing(t, dt) {
   /* More bushes, seven of them dotted with berries (one instanced
      berry mesh shared across all seven). */
   {
-    const bushGeo2 = new THREE.IcosahedronGeometry(1, 1);
+    const bushGeo2 = new THREE.IcosahedronGeometry(1, 2);
     const bushMat2 = new THREE.MeshStandardMaterial({ color: 0x27401f, roughness: 1, flatShading: true });
     const berrySpots = [];
     for (let i = 0; i < 10; i++) {
@@ -880,7 +880,7 @@ function updateDressing(t, dt) {
         }
       }
     }
-    const berries = instanced(new THREE.SphereGeometry(0.038, 6, 5),
+    const berries = instanced(new THREE.SphereGeometry(0.038, 10, 8),
       new THREE.MeshStandardMaterial({ color: 0x8e2430, emissive: 0x38060c, roughness: 0.5 }),
       berrySpots.length);
     berrySpots.forEach(([x, y, z], i) => {
@@ -899,9 +899,9 @@ function updateDressing(t, dt) {
   {
     const anchors = [[-9.2, -3.4], [12.3, -6.2], [5.8, -3.4], [-6.4, 6.8],
                      [14.5, 3.5], [-15, -1.5], [2.5, -10.5], [19, -7], [-3.5, 12.5]];
-    const stemGeo = new THREE.CylinderGeometry(0.035, 0.055, 0.17, 6);
+    const stemGeo = new THREE.CylinderGeometry(0.035, 0.055, 0.17, 9);
     stemGeo.translate(0, 0.085, 0);
-    const capGeo = new THREE.SphereGeometry(0.115, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2);
+    const capGeo = new THREE.SphereGeometry(0.115, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2);
     capGeo.translate(0, 0.15, 0);
     const spots = [];
     for (const [ax, az] of anchors) {
@@ -994,12 +994,12 @@ function updateDressing(t, dt) {
     const logMats = [barkMat, endMat, endMat];
     function bench(a, r) {
       const g = new THREE.Group();
-      const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 1.7, 8), logMats);
+      const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 1.7, 12), logMats);
       seat.rotation.z = Math.PI / 2;
       seat.position.y = 0.46;
       g.add(seat);
       for (const sx of [-0.55, 0.55]) {
-        const sup = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.34, 7), logMats);
+        const sup = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.34, 10), logMats);
         sup.position.set(sx, 0.17, 0);
         g.add(sup);
       }
@@ -1012,12 +1012,12 @@ function updateDressing(t, dt) {
     bench(-1.75, 3.5);
     for (const a of [2.6, -2.6, Math.PI]) {
       const x = Math.sin(a) * 3.2, z = Math.cos(a) * 3.2;
-      const stump = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 0.48, 9), logMats);
+      const stump = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 0.48, 12), logMats);
       stump.position.set(x, groundH(x, z) + 0.24, z);
       scene.add(stump);
     }
     const pile = new THREE.Group();
-    const logGeo2 = new THREE.CylinderGeometry(0.11, 0.11, 1.15, 7);
+    const logGeo2 = new THREE.CylinderGeometry(0.11, 0.11, 1.15, 10);
     for (const [lx, ly] of [[-0.24, 0.11], [0, 0.11], [0.24, 0.11],
                             [-0.12, 0.3], [0.12, 0.3], [0, 0.49]]) {
       const log = new THREE.Mesh(logGeo2, logMats);
@@ -1028,10 +1028,10 @@ function updateDressing(t, dt) {
     pile.position.set(4.7, groundH(4.7, 2.1), 2.1);
     pile.rotation.y = -0.5;
     scene.add(pile);
-    const block = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 0.5, 9), logMats);
+    const block = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 0.5, 12), logMats);
     block.position.set(3.9, groundH(3.9, 3.3) + 0.25, 3.3);
     scene.add(block);
-    const split = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.5, 7), logMats);
+    const split = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.5, 10), logMats);
     split.position.set(3.9, groundH(3.9, 3.3) + 0.72, 3.3);
     scene.add(split);
   }
@@ -1044,7 +1044,7 @@ function updateDressing(t, dt) {
     skyFollowers.push((P) => {
       hillMat.color.copy(P.hor).lerp(P.mid, 0.75).multiplyScalar(0.34);
     });
-    const hillGeo = new THREE.SphereGeometry(1, 24, 12);
+    const hillGeo = new THREE.SphereGeometry(1, 40, 20);
     for (const [hx, hz, w, h] of [[-95, -105, 62, 13], [15, -130, 80, 17],
                                   [100, -90, 55, 11], [-135, -25, 48, 9],
                                   [135, -35, 52, 10], [-40, -145, 70, 14]]) {
@@ -1067,7 +1067,7 @@ function updateDressing(t, dt) {
      pass on each side where the rising/setting sun can still
      touch the horizon line. */
   function buildRidge(R, baseY, peakY, cols, snowline, jag, tintFn) {
-    const span = 1.40, steps = 88;
+    const span = 1.40, steps = 160;
     const bumps = [];
     for (let k = 0; k < 8; k++) {
       bumps.push({
@@ -1140,7 +1140,7 @@ function updateDressing(t, dt) {
   /* Moss patches: dark-green discs mottling the forest floor —
      outside the clearing and off the path (density pass). */
   {
-    const mossGeo = new THREE.CircleGeometry(1, 10);
+    const mossGeo = new THREE.CircleGeometry(1, 20);
     mossGeo.rotateX(-Math.PI / 2);
     const moss = instanced(mossGeo, new THREE.MeshStandardMaterial({
       color: 0x2a4423, roughness: 1,
@@ -1161,7 +1161,7 @@ function updateDressing(t, dt) {
 
   /* More scattered rocks, two in five moss-tinted (density pass). */
   {
-    const rocks = instanced(new THREE.DodecahedronGeometry(1, 0),
+    const rocks = instanced(new THREE.DodecahedronGeometry(1, 1),
       new THREE.MeshStandardMaterial({ roughness: 0.95, flatShading: true }), 30);
     const grey = new THREE.Color(0x5d6068), mossy = new THREE.Color(0x51603c);
     let placed = 0, guard = 0;
@@ -1194,12 +1194,12 @@ function updateDressing(t, dt) {
     function fallenLog(x, z, rotY, len) {
       const g = new THREE.Group();
       const trunk = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.17, 0.21, len, 8), logMats);
+        new THREE.CylinderGeometry(0.17, 0.21, len, 12), logMats);
       trunk.rotation.z = Math.PI / 2;
       trunk.position.y = 0.17;
       g.add(trunk);
       const stub = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.05, 0.07, 0.7, 6), barkMat);
+        new THREE.CylinderGeometry(0.05, 0.07, 0.7, 9), barkMat);
       stub.position.set(len * 0.22, 0.42, 0.08);
       stub.rotation.z = -0.7;
       g.add(stub);
@@ -1284,7 +1284,7 @@ function resetParticle(sys, p, randomAge) {
 
   // Stone ring: sixteen individual rocks around the pit, varied
   // in size, shape, tilt and shade (instanced; density pass).
-  const stoneGeo = new THREE.DodecahedronGeometry(0.17, 0);
+  const stoneGeo = new THREE.DodecahedronGeometry(0.17, 1);
   const stoneMat = new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true });
   const stones = new THREE.InstancedMesh(stoneGeo, stoneMat, 16);
   stones.frustumCulled = false;
@@ -1307,7 +1307,7 @@ function resetParticle(sys, p, randomAge) {
   }
   fire.add(stones);
   // Log pile: a low teepee of cylinders plus two crossed logs.
-  const logGeo = new THREE.CylinderGeometry(0.075, 0.09, 1.15, 7);
+  const logGeo = new THREE.CylinderGeometry(0.075, 0.09, 1.15, 10);
   const logMat = new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 1 });
   for (let i = 0; i < 5; i++) {
     const a = (i / 5) * Math.PI * 2;
@@ -1318,7 +1318,7 @@ function resetParticle(sys, p, randomAge) {
   }
   // Warm glow pooled on the ground.
   glowDisc = new THREE.Mesh(
-    new THREE.CircleGeometry(2.6, 32),
+    new THREE.CircleGeometry(2.6, 48),
     new THREE.MeshBasicMaterial({
       map: radialSpriteTexture('rgba(255,140,50,0.5)', 'rgba(255,140,50,0)'),
       transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
@@ -1414,6 +1414,25 @@ const SPAWN_RADIUS = 30;
 
 const loader = new GLTFLoader();
 const templates = new Map();   // slug -> { cfg, scene, animations, clips }
+
+// Crisp creature textures at grazing angles: without anisotropy
+// the GLB maps smear on ground-level views. Capped at 8 — past
+// that the sampling cost buys nothing on these textures. Set
+// once on the template; SkeletonUtils clones share the maps.
+const MAX_ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+function sharpenTextures(root) {
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of mats) {
+      for (const key of ['map', 'normalMap', 'roughnessMap',
+                         'metalnessMap', 'emissiveMap', 'aoMap']) {
+        const tex = m[key];
+        if (tex) { tex.anisotropy = MAX_ANISO; tex.needsUpdate = true; }
+      }
+    }
+  });
+}
 const loadErrors = [];
 
 function findClip(animations, names) {
@@ -1432,6 +1451,7 @@ function findClip(animations, names) {
 function loadTemplate(cfg) {
   return new Promise((resolve) => {
     loader.load(cfg.file, (gltf) => {
+      sharpenTextures(gltf.scene);
       // Normalize: uniform scale so the model's bounding box matches
       // the configured height, feet on y=0, centred on x/z.
       const box = new THREE.Box3().setFromObject(gltf.scene);
@@ -1465,6 +1485,7 @@ function loadTemplate(cfg) {
 // Treasure chest: static set dressing near the fire, no clips.
 function placeChest() {
   loader.load('assets/treasure-chest.glb', (gltf) => {
+    sharpenTextures(gltf.scene);
     const box = new THREE.Box3().setFromObject(gltf.scene);
     const size = box.getSize(new THREE.Vector3());
     gltf.scene.scale.setScalar(0.72 / (size.y || 1));

@@ -59,7 +59,7 @@ and the hashes above are the post-P4 ones. The chest is unchanged.
 - Models are auto-normalized at load (bounding-box height →
   per-creature target height, feet at y=0), so future GAB exports
   at other scales drop in safely.
-- Wallpaper manners: pixel ratio ≤ 1.5, ~136 fire particles, blob
+- Wallpaper manners: pixel ratio ≤ 2, ~136 fire particles, blob
   shadows (no shadow maps), render loop fully stopped while the
   page is hidden.
 

@@ -382,3 +382,51 @@ watchdog + player. The final live screenshot (06:00, real
 clock, moonless night) shows the new scene on the real
 3840×2160 desktop: open frame edges, tiered treeline
 silhouettes, a triceratops at the fire.
+
+## Results — definition pass (2026-11-09)
+
+Owner-directed (2026-11-09 11:30): "Can we increase the
+definition of everything?" A fidelity pass over geometry,
+textures, and render settings, all in `js/wallpaper.js`
+(plus a regenerated `preview.jpg`):
+
+- Pixel-ratio cap 1.5 → 2 (bites under Windows display
+  scaling; at native 100% scaling nothing changes).
+- Ground plane 100×100 → 170×170 segments — the per-vertex
+  height and colour functions now resolve at ~2.9× the
+  density, so the field's undulation and colour grain are
+  visibly finer.
+- Segment/detail bumps across the dressing set: pine tiers
+  9 → 14 radial segments; trunks, logs, and stumps 5–9 →
+  7–12; rocks `DodecahedronGeometry` detail 0 → 1; bushes
+  and oak blobs `IcosahedronGeometry` detail 1 → 2; grass
+  cones 4 → 6; ferns 5 → 8; berries and mushroom caps
+  roughly doubled; horizon hills 24×12 → 40×20; ridge
+  skyline steps 88 → 160; moss discs 10 → 20 segments;
+  sky dome 24×16 → 48×24; sun/moon discs 32 → 48.
+- Moon phase texture 256² → 512².
+- `sharpenTextures()` at GLB load: anisotropic filtering
+  (renderer maximum, capped at 8) on creature and chest
+  maps, so textures stay crisp at grazing angles.
+  SkeletonUtils clones share the maps.
+- Manners preserved: no shadow maps, particle counts
+  unchanged, hidden-page pause unchanged.
+
+**Measured before/after** (frozen noon 2026-11-08 13:15,
+probe copies of the shipped code reporting
+`renderer.info` through the `#status` JSON, SwiftShader):
+triangles **217,024 → 311,626 (+44%)**, draw calls
+**119 → 119** (instancing absorbs the added detail), page
+fps **22 → 22** — the software-renderer floor is unchanged
+even at the higher triangle count; the real-GPU cost is a
+small fraction of the RTX 3060's headroom, and Lively
+pauses the page under fullscreen apps regardless. Zero
+console errors in every capture. Live-clock verify on the
+shipped folder: all templates load, creatures on stage and
+moving between the two screenshot reads. Before/after HD
+captures (1920×1080, frozen noon) in the verification
+folder — `base-noon-hd.png`, `after-noon-hd.png` — show
+the finer ground grain, smoother rocks and bushes, and
+the smoother ridge skyline. `preview.jpg` regenerated
+from the new build's golden-sunset capture
+(`def-sunset-gold.png`, sun just below the horizon).

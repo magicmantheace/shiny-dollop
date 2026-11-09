@@ -109,7 +109,7 @@ a few seconds.
   distance at noon, near-black at night). All
   primitives/instancing — no external assets — and the fire
   clearing stays readable.
-- **Wallpaper manners:** pixel ratio capped at 1.5, ~136 fire
+- **Wallpaper manners:** pixel ratio capped at 2, ~136 fire
   particles (plus the small firefly/star point systems), no shadow
   maps, and the render loop stops entirely when the page is
   hidden. It sips, it doesn't drink.

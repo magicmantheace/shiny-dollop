@@ -28,7 +28,7 @@ over a Godot-native build).
 ## Non-functional
 
 6. Wallpaper manners: fixed camera with only a slight drift, pixel
-   ratio capped at 1.5, modest particle counts, no shadow maps
+   ratio capped at 2, modest particle counts, no shadow maps
    (blob shadows), render loop paused while the page is hidden.
 7. Robust: a missing/failed GLB degrades to fewer creatures, never
    a blank page; no WebGL shows a readable fallback message.
