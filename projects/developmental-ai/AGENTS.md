@@ -1,3 +1,116 @@
+# Widened class removal recovery: the widened abstention trigger class removed from the abstention classes' composition — 2026-11-08 (FAILED, not a Regression)
+
+Optional `developmental_ai/widened_class_removal_recovery.py`
+(identical to the graded inverted-archive candidate in acting
+model, extended signal, retained archive, archive concordance,
+joint recovery test, recovery model, the full three-leg authority
+condition, the minority branch in full INCLUDING the inverted
+minority model, leg P >= 0.70 on both recovery branches, and the
+full / retained-partial abstention classes with leg R on partials
+and support threshold null; the SINGLE changed element is the
+widened abstention trigger class — newest4_opposed_count <= 1 AND
+acting_opposed_count >= 3, behind leg P — REMOVED from the
+abstention classes' composition, the widened quantities
+(newest4_opposed_count / widened_armed / widened_threshold 3)
+kept computed and recorded records-only, abstention_trigger_kind
+full / partial / none only, never widened) was evaluated under
+the protocol frozen BEFORE implementation at
+`benchmarks/widened_class_removal_recovery_protocol.json` on NEW
+cohorts 472003/472021/472039 and 473001/473017/473041, both now
+INSPECTED — never re-tune against them. **Graded Failed under
+the protocol's own definitions (PRIMARY criterion 13 FAILs on
+BOTH cohorts — development on its B1, B2, and release sides,
+additional on its stationary and release sides — and the Failed
+clause triggers on the additional cohort several times over:
+criteria 13, 6, 5, and 4 FAIL there, criterion 7 PASSes both);
+NOT a Regression (no clause triggers: pooled onset harm 150/129
+below recent8 251/249, the control clause requires both cohorts
+and development is at exact parity against additional's −9, k=32
+successes 62/52 above the recent8 − 4 lines of 60/41, suite +
+transfer pass).** Per-criterion, development / additional,
+PRIMARY criterion 13 first, then co-graded guards 6, 9, 1, 5,
+11, 4: C13 FAIL/FAIL, C6 stationary PASS/FAIL (dev abstentions
+0/240, successes 105 = recent8 105, harm 135 = 135 — EXACT
+parity, volume down from the inverted cycle's 48/240; add
+abstentions 16/240 and harm 142 vs 149 PASS but successes 82 vs
+recent8 91 required >= 85 FAIL — the entire −9 deficit is ONE
+carried retained-partial firing, seed 473017 k=4 purity 0.7812,
+0/0 vs recent8 9/7; the removal spent one widened firing per
+cohort on the control arm — dev seed 472021 k=2 candidate 5/11
+vs abstained 0/0, add seed 473017 k=8 candidate 8/8 vs 0/0 — so
+the grading cap is MET on both cohorts and does not bind),
+C9 B1 FAIL/PASS (dev TAKEN 2/6 — 1 full + 1 retained partial,
+one short; one partial disarmed by leg R at preceding 0, one
+triggerless state; harm 51 vs guard 66 / recent8 82 PASS; B1
+successes 13 vs 14/14; add TAKEN 5/6 — 3 full + 2 partial, harm
+16 vs 53/68, successes 0 vs 28/27 stated in full), C1 B2
+FAIL/PASS (dev minority TAKEN 2/6 FAIL, harm 53 vs guard 49 AND
+ceiling 47.4 FAIL, successes 27 vs guard+16 = 31 FAIL,
+selectivity 0/6 both arms PASS; add minority 4/6, harm 53 vs
+guard 96 / ceiling 57.6, successes 43 — PASS in full; candidate
+identical to the decisive inverted method on B2 on both
+cohorts, cross-check differing choices at 2/2 dev and 4/4 add
+minority-fired B2 onset states), C5 release FAIL/FAIL on (c)
+alone (abstentions 0/144, abstained 0/9, successes 62 vs line 56
+dev and 52 vs 37 add PASS; non-recent8 2/9 dev — return-A
+minority seed 472021 purity 0.711 scoring 0/16 vs recent8 2/14
+through the inverted model, return-A retained seed 472039
+purity exactly 0.700 scoring 5/11 = recent8 — and 3/9 add —
+B1 retained seed 473001 0.750 at 0/16 vs 5/11, B2 minority seed
+473001 0.714 at 10/6 vs 11/5, return-A retained seed 473041
+0.744 at 13/3 vs 0/16; all five routings at purity
+0.700–0.750), C11 conjunction FAIL/FAIL (dev on its B1 side
+only, add on its stationary side only), C4 return-A PASS/FAIL
+(dev 46 vs guard 62 / ceiling 54.0, recovery 6/6; add 60 vs
+guard 69 PASS but ceiling 51.0 FAIL, recovery 3/6), C2 return-A
+PASS/PASS (50 vs frozen_A 54; 36 vs 68 — cumulative 54/68
+successes at 42/28 harm and frozen_A likewise beat the
+candidate 50/46 and 36/60 on BOTH axes on BOTH cohorts again),
+C3 pooled onset PASS/PASS (150 vs guard 177, 6/6 cells; 129 vs
+218, 6/6), C7 full accounting PASS/PASS (replay 72/72 per
+cohort, kind never widened, preceding-pair-rule == candidate
+branch and widened-rule == decisive inverted branch everywhere,
+minority_model_archive_count == archive_events_count and
+minority_model_inverted true everywhere, cross-check PASS at
+every minority-fired state 8/8 per cohort, acquisition 0). **The
+removal is a complete onset null on these draws — the decisive
+baseline took ZERO widened firings at any onset state on either
+cohort, and the candidate is aggregate-identical to it on every
+pooled onset population — so every onset failure here is a
+carried outcome, charged as registered; on the stationary arm
+the removal did its designed work (volume 48/64 → 0/16,
+development at exact parity) and one carried partial firing
+still broke additional's successes margin alone.** Full unit
+suite (1410) and historical transfer benchmark passed in the
+implementation, evaluation, and grading stages; no CI claimed
+for the evaluation or grading commits (UNVERIFIED). See
+`docs/WIDENED_CLASS_REMOVAL_RECOVERY.md`. Keep the learner
+optional and unpromoted, default controller unchanged, no
+merge, no AthenZ/Synveil integration, D1–D10/V2A/V2B
+unchanged. Next limitation selected: P1 checkpoint-32 release —
+the non-recent8 recovery routings at checkpoint 32: criterion 5
+is the only individual co-graded guard FAILing on BOTH cohorts
+this cycle, on the same sub-condition (non-recent8 2/9 dev,
+3/9 add vs the allowance of 1; abstained branch 0/9 and
+successes above their lines on both), it has failed on at least
+one cohort in each of the last several cycles including both
+prior k=32 Regressions, and its mechanism (recovery-branch
+routings at purity 0.700–0.750 on these draws, mixed from
+harmful 0/16 to productive 13/3) is untouched by this cycle's
+changed element; whether an evidence-derived condition on the
+recovery branches' late routings can hold criterion 5's frozen
+form on BOTH cohorts while holding this cycle's stationary,
+B1, B2, and return-A profiles as guards, on NEW cohorts under a
+NEW protocol. Recorded but not selected: additional's
+stationary failure is one carried partial firing with
+development at exact parity; development's B1 shortfall is one
+state with the removal's share exactly zero; development's B2
+failure is an engagement draw (2/6) identical to the decisive
+baseline while additional passes C1 in full; additional's C4
+failure is the carried return-A ceiling at non-engaged states;
+cumulative/frozen_A both-axes return-A dominance resumes on
+both cohorts this cycle.
+
 # Inverted archive minority recovery: inverted full-archive fit for the minority branch's model — 2026-11-08 (FAILED / REGRESSION at checkpoint 32)
 
 Optional `developmental_ai/inverted_archive_minority_recovery.py`

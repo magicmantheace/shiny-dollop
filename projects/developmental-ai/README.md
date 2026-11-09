@@ -1122,6 +1122,64 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 8 — Widened class removal recovery: the widened abstention trigger class removed (FAILED, not a Regression)
+
+Optional `WidenedClassRemovalRecoveryMemory` is identical to the
+graded inverted-archive candidate in acting model, extended signal,
+retained archive, archive concordance, joint recovery test, recovery
+model, the full three-leg authority condition, the minority branch
+in full INCLUDING the inverted minority model, leg P ≥ 0.70 on both
+recovery branches, and the full / retained-partial abstention
+classes with leg R on partials and support threshold null; the
+SINGLE changed element is the widened abstention trigger class
+(newest4 ≤ 1 AND acting ≥ 3, behind leg P) REMOVED from the
+abstention classes' composition — the only selectivity-negative
+class under both published rate pairs — with the widened quantities
+kept records-only and `abstention_trigger_kind` never widened —
+under a protocol frozen before implementation (new cohorts
+472003-family / 473001-family, now INSPECTED). **Graded Failed under
+the protocol's own definitions (PRIMARY criterion 13 FAILs on BOTH
+cohorts — development on its B1, B2, and release sides, additional
+on its stationary and release sides — and the Failed clause triggers
+on the additional cohort several times over, criteria 13, 6, 5, and
+4 failing there); NOT a Regression (pooled onset harm 150/129 well
+below recent8's 251/249, development control at exact parity so the
+both-cohorts control clause does not trigger, k=32 successes 62/52
+above the recent8 − 4 lines of 60/41, suite + transfer pass).**
+Stated as prominently as the failure: the changed element did its
+narrow designed work on the stationary arm — abstention volume fell
+from the inverted cycle's 48/240 and 64/240 to 0/240 (development,
+EXACT recent8 parity: 105/135/0) and 16/240 (additional), the
+grading cap is MET on both cohorts (one exercised removal per
+cohort, both at control states where the decisive baseline's
+widened abstention scored 0/0 and acting scored 5/11 dev and 8/8
+add), and criterion 6 PASSes development in full. What failed is
+the carried profile the conjunction grades: criterion 6 FAILs
+additional on successes alone (82 vs recent8 91, required ≥ 85 —
+the entire −9 deficit is ONE carried retained-partial firing, seed
+473017 k=4, purity 0.7812); criterion 9 FAILs development by one
+state (TAKEN 2/6, harm passing both comparisons; additional PASSes
+5/6); criterion 1 FAILs development (minority TAKEN 2/6, B2 harm
+53 above guard 49 and ceiling 47.4, successes 27 below the
+guard + 16 line of 31; additional PASSes in full) — the candidate
+is aggregate-IDENTICAL to the decisive inverted method on every
+pooled onset population on both cohorts, so every onset outcome is
+carried, not a removal effect; and criterion 5 FAILs BOTH cohorts
+on routing count alone (non-recent8 branch in 2/9 dev and 3/9 add
+k=32 states against an allowance of 1, abstentions 0/144 and
+abstained branch 0/9 on both, successes above their lines on both;
+all five routings at purity 0.700–0.750, mixed in quality from
+0/16 harmful to 13/3 strongly productive). Criterion 4 FAILs
+additional on the return-A ceiling (60 vs 51.0, guard passed);
+criteria 2, 3, and 7 PASS on both cohorts; cumulative/frozen_A
+both-axes return-A dominance resumes on both cohorts. Next
+limitation selected: P1 checkpoint-32 release — the non-recent8
+recovery routings at checkpoint 32, the only individual guard
+failing on both cohorts this cycle. Learner acquisition actions
+zero; external TRAIN actor harm published in full in the report.
+Optional only, no promotion, no merge.
+[Full graded report](docs/WIDENED_CLASS_REMOVAL_RECOVERY.md).
+
 ### November 8 — Inverted archive minority recovery: inverted full-archive fit for the minority branch's model (FAILED / REGRESSION at checkpoint 32)
 
 Optional `InvertedArchiveMinorityRecoveryMemory` is identical to the
