@@ -1,10 +1,189 @@
 # MUSE_HANDOFF — Milky Way Colonization Simulator
 
-State as of **2026-11-08**, end of slice S3 (built and VM-verified;
-see the verified/unverified split at the end of the S3 section).
-Branch `milky-way-colonization-sim/s3-ai-races`, based on the S2
-foundation tip; PR #29 (foundation) merged to `main` on 2026-11-07,
-so the S3 draft PR targets `main` (never auto-merge).
+State as of **2026-11-08**, end of slice S4 (built and VM-verified;
+see the verified/unverified split at the end of the S4 section).
+Branch `milky-way-colonization-sim/s4-trade-diplomacy`, based on
+`main` at `eab90ffc` (S3, PR #43, merged by Adam 2026-11-08 with an
+S4 green-light). This S4 draft PR targets `main` (never auto-merge).
+
+## What S4 delivered
+
+**Authorization.** Adam merged S3 (PR #43) and green-lit S4 —
+trade & diplomacy depth (DESIGN §10 S4, building on §4.3 and
+§6.3) — on 2026-11-08. S5 (war, fleet combat, victory,
+terraforming) is **not** authorized; peace terms here end
+disputes, nothing more.
+
+**The core (`sim/`) — treaties, trade, settlements.**
+- **Instruments (§6.3's set):** Trade Agreement, Gate Access,
+  Non-Aggression Pact, Alliance, Research Pact — plus embargoes
+  and peace settlements. Every command exists in civ-parameterized
+  (`*_for`) and player-wrapper forms, under one gate:
+  `require_diplomacy` (both civs exist, distinct, in contact, and
+  the §6.3 **translation delay** — 90 days after first contact —
+  has run; S3 deferred the delay, S4 implements it).
+- **Deals are evaluated, with stated reasons** (`diplomacy.rs`):
+  the recipient's `DealEvaluation` derives accept/refuse from the
+  opinion breakdown, both personalities, and concrete interests
+  (best-route throughput for trade, the proposer's colony count
+  for gate access, shared dispute-rivals for alliances, the
+  partner's research output for pacts, dispute relief + cession
+  values + credits for peace). Every evaluation returns legible
+  reason strings ending in a verdict; refusals surface verbatim
+  in the bridge result detail and the diplomacy screen. Opinion
+  gained two S4 components: `trade_volume` (+, from settled route
+  earnings with this partner) and `broken_treaties` (−, from the
+  breach record) — both shown in the breakdown.
+- **Negotiation shapes:** player→AI and AI→AI deals resolve on the
+  spot (Signed / Refused{reasons}); anything offered **to** the
+  player is filed in a proposal inbox (`Proposal`, 180-day TTL,
+  365-day re-offer cooldown per instrument) for the player to
+  accept or refuse — the AI never auto-accepts for the player.
+  Breaking a treaty records a `TreatyBreach` (reputation input to
+  opinion and evaluation); embargoing a trade partner terminates
+  the agreement *as* a breach and severs its routes; severing a
+  single route is not a breach. An NAP or Alliance bars claim
+  contests between the parties until broken.
+- **Trade routes (§4.3):** a route links two endpoint colonies
+  over a colony-network path — Dijkstra over both parties'
+  colonies, legs ≤ `TRADE_LEG_LY` (150, an abstract tanker leg;
+  gates are S5). Throughput = `4×(dev_a+dev_b) + 0.02×(pop_a+pop_b)`,
+  ×1.25 between allies; monthly income per side = throughput ×
+  (1 + path_ly/1000) × 0.25, paid in the monthly settlement into
+  both treasuries and the route's own ledger (`earned_a/b`,
+  `last_income_*`, `months_active`), with the campaign-wide
+  `total_trade_income` alongside. Routes die automatically when
+  their agreement ends, an embargo lands, throughput hits zero,
+  or a path system stops being a colony of either party.
+- **Research:** §4.2's Research specialization produced nothing
+  before S4; colonies now accrue a `research_points` stockpile
+  monthly, and a Research Pact pays each partner 30% of the
+  other's output as bonus points. Points have **no spending
+  sink** until the §8 tech tree — recorded as a deliberate
+  minimal ledger, not a finished economy.
+- **Gate access** takes effect in S4 as **port access**: ships
+  may refuel at a treaty partner's colonies (the S3 core already
+  deferred foreign refuelling "to S4"). The same treaty will
+  govern gate *transit* when gate structures exist (S5, §5.3).
+- **Peace settlements** close every dispute between the pair,
+  transfer ceded claims (colonies included — the receiver is
+  granted survey knowledge of what it receives), move credits,
+  and lift pair embargoes. AI planners offer recognition-only
+  settlements for disputes ≥ 180 days old when their own
+  evaluation accepts; cession deals are player-proposable and
+  AI-evaluated (and evaluated AI→AI when offered).
+- **AI planner** (`ai.rs diplomacy_step`, monthly, after claims,
+  before contests): lifts its embargoes when opinion recovers;
+  declares embargoes only when opinion ≤ −35 with aggression
+  ≥ 0.55 and honour < 0.6 and no non-trade treaty binds;
+  proposes instruments in a fixed kind order when its *own*
+  evaluation wants them (one per pair per month, at most one
+  offer to the player per AI per month); keeps up to 2 trade
+  routes per agreement; breaks treaties at opinion ≤ −45 when
+  faithless or itself betrayed (alliances hold to −60).
+- **Events:** nine new kinds (treaty signed/broken, embargo
+  declared/lifted, route established/severed, peace settled,
+  proposal received, deal refused) flow through the log and the
+  catch-up snapshot (which now also carries treaties, trade
+  routes and research points).
+
+**Save format v3 (a bump, flagged).** The payload is strictly
+sequential with an exact trailing-bytes check and no extension
+point, so the S4 state (research points per civ; treaties,
+embargoes, routes, breaches, proposals, cooldowns, id counters,
+total trade income) could not ride along invisibly. Per the v2
+precedent: `SAVE_VERSION = 3`, the format history is documented
+in `save.rs`, and **v2 saves are rejected explicitly**
+("unsupported save version 2" — unit-test pinned). The bridge
+envelope is unchanged (still v1) and catch-up equivalence holds
+with diplomacy active (test-pinned by hash over 730 days).
+
+**The bridge (`bridge/`).** New exec commands: `propose_treaty`,
+`break_treaty`, `declare_embargo`, `lift_embargo`,
+`propose_peace` (player-chair orientation: `cede_to_me`,
+`cede_to_them`, `credits` positive = the player pays),
+`accept_proposal`, `refuse_proposal`, `establish_route`
+(endpoints optional — omitted means the core's suggested best
+route), `sever_route`. Exec results gained a `detail` field
+carrying the negotiated outcome (`signed`, `refused: <reasons>`,
+`proposal #N is awaiting an answer`, `declined`). The view adds
+per-civ treaty lists, embargo flags, `diplomacy_ready` +
+translation day, the player's routes with full ledgers, the
+proposal inbox with reasons verbatim, and galaxy/snapshot
+treaty + route totals. `new` also accepts
+`ai_region_radius_ly` (mirrors S3's `ai_min_spacing_ly` override;
+the S4 headless verify uses a tight region so contact is years
+away — real games leave it alone).
+
+**The viewer (`viewer/`).** The diplomacy screen is now an
+action screen: per contacted civilization it shows treaties,
+embargo state, translation readiness, the extended opinion
+breakdown (trade volume, broken treaties), the player's routes
+with earnings, and research points (also in the HUD) — plus
+buttons to propose/break every instrument, declare/lift
+embargoes, open the suggested route, close individual routes,
+propose settlements (recognition, or per-dispute one-click
+cession terms), and answer inbox offers with the sender's
+stated reasons printed above the Accept/Refuse buttons. Command
+outcomes (including refusal reasons) surface in the message
+line. Player trade routes render on the map as cyan lines along
+their star paths; the catch-up modal reports treaty/route/
+research deltas. `--verify-s4` joins the headless verify family.
+
+**The route-search stall (found by the long run, fixed).** The
+first S4 long run **stalled at first contact** (year 215): pace
+collapsed ~100× and the run sat at year 215 for 10+ minutes.
+Root cause: `suggest_trade_route` ran a full Dijkstra for every
+colony pair (≈3,600 pairs at year-215 colony counts, each
+Dijkstra re-scanning all pairs per settle step) — and deal
+evaluation + planner route upkeep call it monthly per contacted
+pair. Fixes, behaviour-preserving: `trade_path` precomputes
+adjacency once (identical graph, identical relaxation order,
+identical chosen paths); `suggest_trade_route` weighs candidates
+in the established preference order (throughput, then endpoint
+ids) and path-checks in that order — the winner is unchanged
+whenever the best pair connects — stopping after
+`SUGGEST_PATH_CHECK_CAP` (24) checks. Explicit-endpoint route
+commands still path-check exactly. A regression test
+(`trade_paths_chain_colony_legs_and_suggestions_follow`) pins
+multi-leg chaining against an independent test-side Dijkstra.
+Post-fix, the same 300-year run completes with expansion figures
+**identical to S3's** (589 colonized / 2,049 claimed / 2,447
+surveyed; player 64 colonies; first contact year 215) and one
+diplomacy delta: disputes peaked at 3 but only **1 remained open
+at year 300** (S3: 3 open) — two were closed by AI recognition
+settlements. No treaties were signed in that harness: the single
+contact pair's deals never cleared evaluation, and the scripted
+player never proposes (AI offers to it lapse unanswered) — the
+treaty machinery itself is proven by the test suites below.
+
+**Design tensions recorded (not silently redesigned).**
+(1) Save v3 bump — unavoidable, above. (2) Gate Access = port
+access until S5 builds gates. (3) Research points have no sink
+until §8. (4) Opinion's "shared enemies" component remains
+absent (no war until S5); alliance evaluation uses shared
+*dispute rivals* as the S4 proxy. (5) Trade legs use the
+abstract tanker range, no gate hops (S5). (6) The
+Non-Aggression Pact ships in S4: §6.3 lists it among the
+negotiable instruments even though the S4 tasking enumerated
+the other four. (7) The seed-42 balance question from S3 (2 AI
+civs stalling at 2–4 colonies) is **untouched** — no fuel or
+placement retuning; S4's run reproduces S3's expansion exactly.
+
+**Verified (this VM, 2026-11-08; detail in TEST_PLAN.md).**
+Cargo suites: pipeline 22, sim 42 (incl. 13 S4 tests: a
+sign→honour→break lifecycle per treaty type, month-by-month
+trade-ledger reconciliation, stated-reason refusal tests, the
+path-chaining regression), bridge 27 (incl. 4 S4 tests over the
+real binary). Godot `--verify`, `--verify-s2`, `--verify-s3`,
+`--verify-s4` all pass (`--verify-s4`: contact at year 6 in the
+tight setup, proposal refused *with reasons* end-to-end, embargo
+round-trip). All-AI 300-year run completes, above.
+
+**Unverified / owner gates (unchanged in kind).** Interactive
+diplomacy play on Adam's PC (the S2 play-session gate is still
+open); windowed clicking of the diplomacy actions; Windows
+export; overnight real-clock catch-up; FPS on the RTX 3060.
 
 ## What S3 delivered
 
@@ -459,10 +638,12 @@ implementation contract, kept for the record:
 
 ## Next slice
 
-**S3 — AI races**, only on Adam's go-ahead after his S2 play
-session: 8–15 AI civilizations expanding under the same rules with
-weaker information, contact and border friction (§6), feeding the
-same event log / catch-up review surface S2 built.
+**S5 — war & victory**, only on Adam's direction: fleet combat,
+blockades (the combat counterpart of S4's embargoes), gate
+construction and transit (S4's Gate Access treaty then governs
+transit, §5.3), victory conditions, terraforming. S4's peace
+terms, breach records and opinion components are the diplomatic
+substrate S5 builds on.
 
 ## 2026-11-08 — Codex review fixes (findings on PR #29, fixed on main)
 

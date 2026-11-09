@@ -1,9 +1,156 @@
 # TEST_PLAN — Milky Way Colonization Simulator
 
-What was actually run, with results. Last updated 2026-11-08 (S3;
-PR #45 reconciliation re-run the same day).
+What was actually run, with results. Last updated 2026-11-08 (S4).
 Nothing in this file is aspirational: every claim below was executed
-on this VM during the S0/S1/S2/S3 builds.
+on this VM during the S0/S1/S2/S3/S4 builds.
+
+## S4 — Trade & diplomacy depth
+
+All runs below were executed on this VM on 2026-11-08 against the
+final S4 code (branch `milky-way-colonization-sim/s4-trade-diplomacy`).
+
+### Sim tests (Rust, `sim/`)
+
+```
+cd sim && cargo test          # debug profile
+```
+
+Result: **42 passed, 0 failed** (9 unit + 13 S1 integration +
+7 S3 integration + 13 S4 integration in `sim/tests/s4.rs`), exit 0.
+The S1/S3 suites pass unmodified — solo and S3 behaviour preserved.
+
+- **Translation gate (§6.3):** diplomacy commands refuse before
+  contact and during the 90-day translation delay, with the
+  ready-day in the error; they open on day contact+90.
+- **Lifecycle per treaty type (sign → honour → break →
+  consequences):** trade agreement (routes open, ledger accrues,
+  break severs routes + records the breach + the partner's
+  opinion drops by the broken-treaties component, −14);
+  gate access (foreign refuelling refused → allowed, drawing the
+  partner's stock by the exact amount → refused again after the
+  break); non-aggression pact (contests barred while active,
+  allowed after the break); alliance (refused without a shared
+  dispute rival, signed with one; throughput ×1.25 while allied;
+  contests barred); research pact (bonus accrues against a
+  no-pact control game run in lockstep, stops the month the pact
+  breaks).
+- **Trade ledger reconciliation (the §10 requirement):** over 24
+  monthly settlements, each month's treasury delta equals
+  `route_monthly_income` recomputed from post-settlement state
+  (tolerance 1e-6), `last_income` matches to 1e-9, both sides earn
+  equally, and `total_trade_income` survives the agreement's
+  break.
+- **Stated reasons:** the Isolationist Gardeners refuse a trade
+  agreement with reasons naming their xenophobia and a "refused"
+  verdict line; a peace demand for the merchant's homeworld is
+  refused with the home star's name in the reasons.
+- **Peace with cession:** claim + 300 credits accepted — the
+  claim flips, the dispute closes, credits move exactly, and the
+  settlement holds 60 days (no re-dispute).
+- **Embargo:** closes the pair's trade (agreement terminated as a
+  breach, routes severed), blocks new deals while it stands,
+  lifts cleanly.
+- **Proposal inbox:** planner- and test-filed offers coexist;
+  duplicate filing and the 365-day re-offer cooldown are refused;
+  accept signs, refuse declines, both consume the offer.
+- **Route pathing (regression):** on a 70-ly-spaced line galaxy,
+  no path exists until a colony chain bridges the 560-ly gap;
+  the core's Dijkstra matches an independent test-side Dijkstra
+  after every founding (connectivity, cost, leg ≤ 150 ly), and
+  the route suggestion follows the same connectivity.
+- **Catch-up equivalence with diplomacy active:** 730 days
+  uninterrupted ≡ 365 + save/load + 365 by state hash, with
+  treaties signed and trade income > 0.
+- **Save v3:** a full diplomacy record round-trips byte- and
+  hash-identically; a hand-flipped v2 byte string is rejected
+  with "unsupported save version 2".
+
+### Bridge tests (Rust, `bridge/`)
+
+```
+cd bridge && cargo test       # debug profile
+```
+
+Result: **27 passed, 0 failed** (7 unit + 11 S2 + 5 S3 +
+4 S4 integration in `bridge/tests/s4.rs`), exit 0.
+
+- **Commands + view:** propose trade → result `detail: "signed"`,
+  the roster carries the treaty and the S4 opinion components;
+  establish route (auto-suggested endpoints) → the view route
+  carries its star path and throughput; after 60 days
+  `earned_by_me > 0` and `months_active = 2`; embargo → treaty
+  and route vanish from the view, `embargo_by_me` set; lift
+  clears it.
+- **Inbox over the bridge:** research-pact and peace offers filed
+  in-process appear in the view with reasons and sender name;
+  refuse → `"declined"`, accept → `"signed"`.
+- **Refusals carry reasons:** the isolationist's trade refusal
+  arrives as `detail: "refused: …xenophobia…"` on a *successful*
+  command result; proposing to an unmet civ fails with a
+  "no contact" error.
+- **Peace command:** a staged dispute settled via
+  `propose_peace {cede_to_me: [claim], credits: 300}` → signed;
+  the view shows no open disputes for the pair and the system
+  claimed by the player.
+
+### Godot headless verifies (viewer, Godot 4.7.2, real table)
+
+```
+godot --headless --path viewer -- --verify
+godot --headless --path viewer -- --verify-s2 --bridge=<release sim-bridge>
+godot --headless --path viewer -- --verify-s3 --bridge=<release sim-bridge>
+godot --headless --path viewer -- --verify-s4 --bridge=<release sim-bridge>
+```
+
+All pass. `--verify-s4` (new): the S4 view surface exists at
+day 0 (`trade_routes`, `proposals`, player `research_points`);
+a proposal to an unmet civ is refused with "no contact"; in the
+tight setup (4 AI, spacing 25, region 60) first contact lands at
+**year 6**; after translation the civ's `diplomacy_ready` is
+true; a trade proposal returns a legible outcome — in this run
+**refused with stated reasons** ("our opinion of you: −22.7; our
+trade affinity (0.27…"), which exercises the reasons wiring
+end-to-end (the signed path is covered by the bridge tests);
+the embargo declare→lift round-trip flips the roster flags, and
+had the proposal signed, the test asserts the embargo kills the
+treaty.
+
+### Headless long-run campaign (release `sim-cli`, real table)
+
+Seed 42, 12 AI + player, 300 years, S4 diplomacy active:
+**completes, no crashes**, final state hash
+`88d44bae459aa3121febc9c104f8592835971b03fd703d432b5df5780f44c3b3`.
+Expansion figures are **identical to the S3 run of the same
+seed** (589 colonized / 2,049 claimed / 2,447 surveyed
+galaxy-wide; player 64 colonies; contacts 1, first contact at
+year 215) — S4 changed no expansion behaviour. Diplomacy in the
+run: disputes peaked at 3 and **1 remained open at year 300**
+(S3 left 3 open — two were closed by AI recognition
+settlements); no treaties, embargoes or routes formed (the one
+contacted pair's evaluations never accepted, and the scripted
+player never proposes — AI offers to it lapse). Player credits
+never went negative (min 3,999.32).
+
+**The stall that found the route-search bug:** the first S4
+long run (pre-fix code) stalled at year 215 — pace collapsed
+~100× at first contact and the run sat there 10+ minutes
+(partial log retained in the build notes). Root cause and fix
+are recorded in `docs/MUSE_HANDOFF.md` (adjacency precompute +
+ordered, capped suggestion search); the completed run above is
+the post-fix binary.
+
+### Not run / unverified for S4
+
+- Interactive diplomacy play on Adam's PC — the S2 owner-PC
+  play-session gate (DESIGN §10) remains open; the diplomacy
+  action buttons are covered headlessly (script compiles, the
+  bridge contract is test-proven), not by clicking.
+- Windowed rendering of the trade-route lines (headless verify
+  builds the mesh data path, not pixels).
+- Overnight real-clock catch-up with diplomacy active (the
+  elapsed-override + hash-equivalence paths are test-proven).
+- Windows export build and `sim-bridge.exe` execution on Windows.
+- FPS on Adam's RTX 3060 — owner-hardware measurement only.
 
 ## S3 — AI races, first contact, disputes
 
