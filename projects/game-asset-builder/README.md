@@ -108,6 +108,28 @@ schema; records stay `candidate` — promotion is the studio's
 process). Harnesses + procedure: `handoff/README.md`. Suite
 101/101; full numbers in `docs/TEST_PLAN.md`.**
 
+**P4 update (2026-11-08): game-ready locomotion — every rigged
+creature now walks and runs** (branch
+`game-asset-builder/p4-game-animations`, stacked on the P3 branch).
+At the owner's direction ("produce walking animations and any kind
+of animation needed for a game"), the animate stage gained a
+parametric gait model (`stages/animate/poses.py`, P4 section): one
+swing/fold curve pair per leg, phase-offset per rig class —
+anti-phase pairs for the biped-plan templates, a lateral-sequence
+walk (FL → HR → FR → HL) and a bounding-gallop run for the
+quadruped. Loops close exactly by construction; the new leg/arm
+drivers were axis-probed on the shipped rigs like the P0/P1 ones.
+The three catalogued creatures were re-animated from their existing
+rigged GLBs (no mesh, texture, or rig change) and now carry four
+clips each — Ember Dragon: hop/idle/**walk 1.5 s**/**run 1.0 s**;
+Snow Goblin: idle/wave/**walk**/**run**; Triceratops:
+bounce/idle/**walk 2.0 s**/**run** — with catalog records updated
+(actions, per-clip durations, new sha256). Suite **113/113**;
+three.js playback of the new clips verified on the build VM
+(Electron Chromium + SwiftShader, the project's harness page);
+full numbers and the honest limits (procedural gaits, no IK) in
+`docs/TEST_PLAN.md`.**
+
 A fully local, no-API pipeline that builds game assets — creatures included —
 on the owner's own hardware:
 
@@ -161,3 +183,7 @@ cloud-generated reference Pip the owner already has.
 - **P3** — hand-off integrations (animation studio library, Godot projects).
   **Done 2026-11-07** (see the P3 status note above;
   branch `game-asset-builder/p3-handoff`).
+- **P4** — game-ready animation sets: procedural walk/run gaits for
+  every rig template, catalogued creatures re-animated in place.
+  **Done 2026-11-08** (see the P4 status note above;
+  branch `game-asset-builder/p4-game-animations`).

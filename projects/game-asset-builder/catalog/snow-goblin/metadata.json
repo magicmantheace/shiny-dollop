@@ -5,8 +5,8 @@
  "source_concept": "media-generation-biped-snowgoblin-concept-0-7a45eb0e-b49c-4ecd-93c2-2db237069047.webp",
  "asset_file": "snow-goblin.glb",
  "asset_location": "outputs/<slug>/ (local; not in git)",
- "sha256": "e94fb4cb9f998ac2ee2322284c5a878f3ebd512c91b0a40dc42978c3325d4b08",
- "bytes": 22196376,
+ "sha256": "c4ba135bcb26a85dde5012b367dd7c5417c99ba8a3ee60dbc1fe51a985721670",
+ "bytes": 22227900,
  "counts": {
   "verts": 50883,
   "faces": 98583,
@@ -30,6 +30,8 @@
  ],
  "actions": [
   "idle",
+  "run",
+  "walk",
   "wave"
  ],
  "provenance": {
@@ -268,6 +270,29 @@
     "torch_peak_mib": 9960.9,
     "output": "D:\\asset-forge-lab\\out\\gab\\snow-goblin\\textured.glb"
    }
+  },
+  "animation_revision": "2026-11-08, branch game-asset-builder/p4-game-animations: walk/run procedural gaits baked by the animate stage from the existing rigged.glb; mesh, texture and rig unchanged."
+ },
+ "clips": {
+  "idle": {
+   "seconds": 4.79,
+   "frames": 115,
+   "fps": 24
+  },
+  "run": {
+   "seconds": 1.0,
+   "frames": 24,
+   "fps": 24
+  },
+  "walk": {
+   "seconds": 1.5,
+   "frames": 36,
+   "fps": 24
+  },
+  "wave": {
+   "seconds": 2.42,
+   "frames": 58,
+   "fps": 24
   }
  }
 }

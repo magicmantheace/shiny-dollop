@@ -21,6 +21,20 @@ bone tail travels):
   "horizontal" roll, which makes +local X raise either hand up and
   outward symmetrically — the wave. With the "vertical" roll no
   single axis raises a hanging arm at all.
+- P4 gait drivers (probed 2026-11-08 on the shipped rigged GLBs,
+  +0.5 rad, bone-tail world displacement decomposed against the
+  character's facing): legs swing forward on +local X on every
+  template, .L and .R alike (dragon leg.L/R fwd +0.22, goblin
+  leg.L/R fwd +0.145, trike leg.FL fwd +0.216). The goblin's
+  forearm/upper-arm fore-aft swing is local Z, mirrored: +Z swings
+  the .L hand backward (fwd -0.21) but the .R hand forward
+  (+0.21), so the arm-swing drivers carry opposite signs per side
+  to make one channel value mean "hand forward" on both. The
+  dragon's arms are "vertical" roll: +local X swings either hand
+  forward (+0.25), the axis arm_pitch already uses. Biped knee
+  fold: the leg2 channel is + = shin folds back, applied on local
+  X with scale -1 (raw +X swings the foot forward, like the
+  quadruped's leg2).
 
 The root bone's lift axis is NOT assumed either: the stage probes it
 with a synthetic pose (root_y = 0.19, everything else at rest),
@@ -60,6 +74,12 @@ DRIVERS = {
         ("wing2.R", "wing2_pitch", "x", 1.0),
         ("arm.L", "arm_pitch", "x", 1.0),
         ("arm.R", "arm_pitch", "x", 1.0),
+        # P4 gait: legs swing on local X (+ channel = foot forward,
+        # probed); arms counter-swing on the arm_pitch axis.
+        ("leg.L", "leg.L", "x", 1.0),
+        ("leg.R", "leg.R", "x", 1.0),
+        ("arm.L", "arm.L", "x", 1.0),
+        ("arm.R", "arm.R", "x", 1.0),
         ("tail.1", "tail_yaw", "z", 1.0),
         ("tail.2", "tail_yaw", "z", 0.6),
         ("tail.3", "tail_yaw", "z", 0.35),
@@ -92,6 +112,18 @@ DRIVERS = {
         ("arm2.R", "arm_sway", "x", 0.5),
         ("arm.R", "arm_wave", "x", 1.0),
         ("arm2.R", "arm2_wave", "x", 1.0),
+        # P4 gait: legs on local X (+ channel = foot forward,
+        # probed); knees fold via leg2 (+ channel = fold, raw axis
+        # negated); arm fore-aft swing on local Z, mirrored signs
+        # (probed: +Z is backward on .L, forward on .R).
+        ("leg.L", "leg.L", "x", 1.0),
+        ("leg.R", "leg.R", "x", 1.0),
+        ("leg2.L", "leg2.L", "x", -1.0),
+        ("leg2.R", "leg2.R", "x", -1.0),
+        ("arm.L", "arm.L", "z", -1.0),
+        ("arm.R", "arm.R", "z", 1.0),
+        ("arm2.L", "arm2.L", "z", -1.0),
+        ("arm2.R", "arm2.R", "z", 1.0),
     ],
 }
 

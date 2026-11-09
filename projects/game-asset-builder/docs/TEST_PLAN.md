@@ -379,6 +379,82 @@ load is still in flight (with and without virtual-time budgets),
 so the driver polls the result element over the DevTools
 protocol instead.
 
+## Verified — 2026-11-08 (P4 game animations: walk/run gaits)
+
+Gait model + regeneration (build VM, Blender 4.2.3 headless):
+
+- Suite **113/113** under pytest (101 baseline + 12 new in
+  `tests/test_game_animations.py`): every template registers
+  `walk` + `run` at the documented durations; gait recipes return
+  exactly their template's channel set; loop closure holds
+  (pose(0) == pose(period) per channel, and the baked last frame
+  wraps to the first with no jump); biped/winged legs are exactly
+  anti-phase with arms counter-swinging; the quadruped walk
+  matches the lateral-sequence offsets (FL 0, HR 0.25, FR 0.5,
+  HL 0.75) and its run moves front/hind pairs together in
+  anti-phase; the fold curve is zero through mid-stance and
+  non-negative everywhere; each run is shorter-period and
+  larger-amplitude than its walk. A synthetic-GLB test covers the
+  new stdlib clip reader (`stages/animate/glb_clips.py`)
+  hermetically.
+- New drivers axis-probed on the shipped rigged GLBs before use
+  (+0.5 rad, bone-tail world displacement vs facing): legs swing
+  forward on +local X on all templates (dragon +0.22, goblin
+  +0.145, trike FL +0.216); the goblin's fore-aft arm swing is
+  local Z, mirrored (+Z: .L hand back −0.21, .R hand forward
+  +0.21). One false start recorded: a root→head facing heuristic
+  misread the goblin's facing by 90°; the probe values only make
+  sense against the −Y facing the other two rigs share, which the
+  wave axis (+X raise, up + outward) confirms.
+- The three creatures were re-animated from their existing
+  `rigged.glb` files (mesh/texture/rig untouched; the previous
+  finals are kept under `outputs/<slug>/before-p4/`). New clip
+  sets, from the animate reports: Ember Dragon hop 1.25 / idle
+  4.79 / **walk 1.5 (36 f)** / **run 1.0 (24 f)**; Snow Goblin
+  idle 4.79 / wave 2.42 / **walk 1.5** / **run 1.0**;
+  Triceratops bounce 1.25 / idle 4.79 / **walk 2.0 (48 f)** /
+  **run 1.0**. Catalog entries updated (actions, per-clip
+  durations in a new `clips` map, provenance
+  `animation_revision`) — `catalog-verify` MATCH on all three new
+  sha256 (dragon `2837c6b2…`, goblin `c4ba135b…`, trike
+  `39b5f934…`). The GLB-level test re-reads the exported files
+  and confirms clip presence + durations independently of the
+  Blender reports.
+- Ground check (evaluated-mesh minimum Z across each walk cycle,
+  vs rest): dragon never reaches its rest minimum (lowest point
+  rises up to +0.107 during the cycle); goblin and triceratops
+  dip ≤ 0.007 units below rest on a 2-unit character — no
+  material ground penetration. Swing-peak stills (Cycles renders)
+  show a readable mid-stride on goblin and triceratops with no
+  visible limb interpenetration; the dragon's walk reads as a
+  shuffle-step on its seated body plan.
+
+three.js playback (build VM, Electron Chromium + SwiftShader,
+three 0.180, the project's `handoff/threejs/verify.html` harness
+page; the VM's managed Chrome refuses standalone launch, so an
+Electron driver polled the result element the same way
+`run_verify.mjs` does over CDP):
+
+- **THREE_VERIFY_DONE ok=true** for all three creatures: bone
+  counts match the catalog (14/13/15), all four clips per
+  creature present with duration > 0 and real skeleton motion.
+  Project-standard sampling (t=0 vs mid-clip) max bone deltas
+  for the NEW clips: dragon walk Δ0.016 / run Δ0.032; goblin
+  walk Δ0.030 / run Δ0.066; triceratops walk Δ0.330 / run
+  Δ0.120. Note the method's blind spot: at mid-cycle an
+  anti-phase gait passes through neutral, so biped-plan deltas
+  read small; a second pass at quarter-cycle (legs at full
+  swing) gives dragon walk Δ0.078 / run Δ0.083, goblin walk
+  Δ0.146 / run Δ0.174, triceratops walk Δ0.182 / run Δ0.336 —
+  in line with the established clips' deltas (dragon hop
+  0.074–0.085).
+- Not covered by this run: Godot playback of the new clips (the
+  P3 Godot proof predates them; the GLBs differ only in added
+  actions), rendered pixels in an engine, and any judgement of
+  gait quality beyond the stills + deltas above. Foot-slip is
+  not measurable in an in-place cycle — it depends on the
+  consuming game's root-motion speed matching.
+
 ## Not yet verified
 
 - TRELLIS's proper textured export — blocked on the
