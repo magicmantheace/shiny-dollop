@@ -26,6 +26,11 @@ const BridgeClient = preload("res://scripts/bridge_client.gd")
 ## runs the S3 checks (AI-race setup, player-perspective roster,
 ## contest command wiring, catch-up galaxy fields), printing
 ## S3_VERIFY_PASS lines.
+##   godot --headless --path viewer -- --verify-s4 --bridge=PATH
+## runs the S4 checks (diplomacy surface in the view, no-contact
+## refusal, contact + translation, a treaty proposal with its
+## stated outcome, the embargo round-trip), printing
+## S4_VERIFY_PASS lines.
 
 const SPECTRAL_COLORS := {
 	0: Color(0.62, 0.71, 1.0),    # O — blue
@@ -48,6 +53,16 @@ const SPEED_LABELS := ["Paused", "1× (1 day/day)", "1 day/hour", "1 day/min", "
 const SPEC_IDS := ["industrial", "agricultural", "refinery", "research", "fortress", "trade_hub", "shipyard"]
 const SPEC_LABELS := ["Industrial", "Agricultural", "Refinery", "Research", "Fortress", "Trade Hub", "Shipyard"]
 
+# S4 diplomacy instruments (bridge treaty-kind strings).
+const TREATY_KINDS := ["trade_agreement", "gate_access", "non_aggression_pact", "alliance", "research_pact"]
+const TREATY_LABELS := {
+	"trade_agreement": "Trade Agreement",
+	"gate_access": "Gate Access",
+	"non_aggression_pact": "Non-Aggression Pact",
+	"alliance": "Alliance",
+	"research_pact": "Research Pact",
+}
+
 const EVENT_TEXT := {
 	"campaign_started": "Campaign started",
 	"survey_started": "Survey started",
@@ -63,6 +78,15 @@ const EVENT_TEXT := {
 	"specialization_set": "Specialization set",
 	"first_contact": "First contact",
 	"claim_contested": "Claim contested",
+	"treaty_signed": "Treaty signed",
+	"treaty_broken": "Treaty broken",
+	"embargo_declared": "Embargo declared",
+	"embargo_lifted": "Embargo lifted",
+	"trade_route_established": "Trade route opened",
+	"trade_route_severed": "Trade route closed",
+	"peace_settled": "Peace settled",
+	"treaty_proposed": "Proposal received",
+	"deal_refused": "Deal refused",
 }
 
 var table: StarTable
@@ -107,6 +131,7 @@ var speed_buttons: Array = []
 var message_label: Label
 var marker_mi: MeshInstance3D
 var range_mi: MeshInstance3D
+var routes_mi: MeshInstance3D
 var ships_box: VBoxContainer
 var claim_button: Button
 var contest_button: Button
@@ -131,6 +156,7 @@ var eventlog_overlay: Control
 var eventlog_text: RichTextLabel
 var diplomacy_overlay: Control
 var diplomacy_text: RichTextLabel
+var diplomacy_actions: VBoxContainer
 var overwrite_dialog: ConfirmationDialog
 var catchup_overlay: Control
 var catchup_title: Label
@@ -156,6 +182,11 @@ func _ready() -> void:
 	_refresh_saves_list()
 	if user_args.has("measure"):
 		_run_measure(load_ms)
+	elif user_args.has("verify_s4"):
+		if _run_verify_checks(data_path, load_ms) > 0:
+			get_tree().quit(1)
+		else:
+			_run_verify_s4()
 	elif user_args.has("verify_s3"):
 		if _run_verify_checks(data_path, load_ms) > 0:
 			get_tree().quit(1)
@@ -184,6 +215,8 @@ func _parse_user_args() -> Dictionary:
 			out["verify_s2"] = true
 		elif a == "--verify-s3":
 			out["verify_s3"] = true
+		elif a == "--verify-s4":
+			out["verify_s4"] = true
 		elif a == "--measure":
 			out["measure"] = true
 		elif a.begins_with("--data="):
@@ -196,7 +229,7 @@ func _parse_user_args() -> Dictionary:
 func _setup_bridge() -> void:
 	bridge_client = BridgeClient.new()
 	var explicit := str(user_args.get("bridge", ""))
-	if (user_args.has("verify_s2") or user_args.has("verify_s3")) and explicit != "":
+	if (user_args.has("verify_s2") or user_args.has("verify_s3") or user_args.has("verify_s4")) and explicit != "":
 		# Verify mode names the exact binary under test; do not let
 		# the candidate search substitute a different one.
 		bridge_path = explicit
@@ -283,6 +316,16 @@ func _build_scene() -> void:
 	# selected ship's reachable-range layer reuse the same shader.
 	marker_mi = _make_points_instance()
 	range_mi = _make_points_instance()
+
+	# S4: trade routes as line segments along their star paths.
+	routes_mi = MeshInstance3D.new()
+	var route_mat := StandardMaterial3D.new()
+	route_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	route_mat.albedo_color = Color(0.35, 0.9, 0.95)
+	route_mat.vertex_color_use_as_albedo = true
+	routes_mi.material_override = route_mat
+	routes_mi.custom_aabb = AABB(Vector3(-60000, -60000, -60000), Vector3(120000, 120000, 120000))
+	add_child(routes_mi)
 
 	var layer := CanvasLayer.new()
 	add_child(layer)
@@ -595,7 +638,7 @@ func _build_diplomacy(layer: CanvasLayer) -> void:
 	centre.add_child(panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
-	box.custom_minimum_size = Vector2(640, 420)
+	box.custom_minimum_size = Vector2(700, 560)
 	panel.add_child(box)
 	var title := Label.new()
 	title.text = "Diplomacy"
@@ -603,9 +646,17 @@ func _build_diplomacy(layer: CanvasLayer) -> void:
 	box.add_child(title)
 	diplomacy_text = RichTextLabel.new()
 	diplomacy_text.fit_content = false
-	diplomacy_text.custom_minimum_size = Vector2(620, 330)
+	diplomacy_text.custom_minimum_size = Vector2(680, 300)
 	diplomacy_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_child(diplomacy_text)
+	var actions_scroll := ScrollContainer.new()
+	actions_scroll.custom_minimum_size = Vector2(680, 190)
+	actions_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(actions_scroll)
+	diplomacy_actions = VBoxContainer.new()
+	diplomacy_actions.add_theme_constant_override("separation", 4)
+	diplomacy_actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	actions_scroll.add_child(diplomacy_actions)
 	var close_button := Button.new()
 	close_button.text = "Close"
 	close_button.pressed.connect(_on_diplomacy_close_pressed)
@@ -919,6 +970,7 @@ func _enter_session(resp: Dictionary) -> void:
 	_refresh_ships_panel()
 	_refresh_diplomacy_text()
 	_rebuild_markers()
+	_rebuild_routes_layer()
 	_rebuild_range_layer()
 	var home := int(view_data.get("home_system", 0))
 	if home >= 0 and home < table.star_count:
@@ -940,17 +992,25 @@ func _apply_exec_response(resp: Dictionary, success_message: String = "", quiet:
 		event_cursor = int(resp["event_cursor"])
 	var ok := bool(resp.get("ok", false))
 	var first_error := str(resp.get("error", ""))
+	var first_detail := ""
 	var results = resp.get("results", [])
 	if results is Array:
 		for r in results:
-			if r is Dictionary and not bool(r.get("ok", true)):
-				ok = false
-				if first_error == "":
-					first_error = str(r.get("error", "command failed"))
+			if r is Dictionary:
+				if not bool(r.get("ok", true)):
+					ok = false
+					if first_error == "":
+						first_error = str(r.get("error", "command failed"))
+				# S4: diplomacy commands report their negotiated
+				# outcome (signed / refused with reasons / pending)
+				# as a detail on the result object.
+				elif first_detail == "" and str(r.get("detail", "")) != "":
+					first_detail = str(r["detail"])
 	_refresh_hud()
 	_refresh_ships_panel()
 	_refresh_diplomacy_text()
 	_rebuild_markers()
+	_rebuild_routes_layer()
 	_rebuild_range_layer()
 	if session_active and selected_system >= 0:
 		# Re-inspect so the panel reflects post-command state; this
@@ -963,6 +1023,8 @@ func _apply_exec_response(resp: Dictionary, success_message: String = "", quiet:
 		speed_idx = 0
 		_update_speed_buttons()
 		_set_message("Paused — interrupting event (colony abandoned or ship stranded). See Event Log.")
+	elif first_detail != "":
+		_set_message(first_detail.substr(0, 1).to_upper() + first_detail.substr(1))
 	elif success_message != "":
 		_set_message(success_message)
 	return ok
@@ -988,12 +1050,24 @@ func _refresh_hud() -> void:
 		return
 	hud_label.text = "Year %d · Day %d (day %d)" % [int(view_data.get("year", 0)), int(view_data.get("day_of_year", 0)), int(view_data.get("day", 0))]
 	var counts: Dictionary = view_data.get("counts", {}) if view_data.get("counts", {}) is Dictionary else {}
-	hud_stats_label.text = "Credits %s · Surveyed %d · Claimed %d · Colonized %d · Pop %.1f M · Fuel %s" % [
+	hud_stats_label.text = "Credits %s · Surveyed %d · Claimed %d · Colonized %d · Pop %.1f M · Fuel %s · Research %s" % [
 		_fmt_thousands(float(view_data.get("credits", 0.0)), 0),
 		int(counts.get("surveyed", 0)), int(counts.get("claimed", 0)), int(counts.get("colonized", 0)),
 		float(view_data.get("total_population_millions", 0.0)),
 		_fmt_thousands(float(view_data.get("total_fuel_stock", 0.0)), 0),
+		_fmt_thousands(_player_research_points(), 1),
 	]
+
+
+## The player's stockpile of research points (S4), from the
+## player's own civilization entry in the view.
+func _player_research_points() -> float:
+	var civs = view_data.get("civilizations", [])
+	if civs is Array:
+		for c in civs:
+			if c is Dictionary and bool(c.get("is_player", false)):
+				return float(c.get("research_points", 0.0))
+	return 0.0
 
 
 func _update_speed_buttons() -> void:
@@ -1037,8 +1111,10 @@ func _on_diplomacy_close_pressed() -> void:
 
 ## The diplomacy screen (design §6.3): every civilization the
 ## player has met, with the legible opinion breakdown in both
-## directions and any open claim disputes. Unmet civilizations are
-## not listed — the bridge never sends them.
+## directions, open claim disputes, the S4 treaty/embargo state,
+## trade routes and proposals — plus the action buttons below
+## (propose, break, embargo, settle, answer offers). Unmet
+## civilizations are not listed — the bridge never sends them.
 func _refresh_diplomacy_text() -> void:
 	if diplomacy_text == null:
 		return
@@ -1051,26 +1127,47 @@ func _refresh_diplomacy_text() -> void:
 		if not c is Dictionary:
 			continue
 		if bool(c.get("is_player", false)):
-			lines.append("%s (you) — %d colonies · home: %s" % [
-				str(c.get("name", "?")), int(c.get("colonies", 0)), str(c.get("home_name", "?"))])
+			lines.append("%s (you) — %d colonies · home: %s · research %s pts" % [
+				str(c.get("name", "?")), int(c.get("colonies", 0)), str(c.get("home_name", "?")),
+				_fmt_thousands(float(c.get("research_points", 0.0)), 1)])
 			continue
 		lines.append("")
 		lines.append("%s — %s" % [str(c.get("name", "?")), str(c.get("archetype", ""))])
 		lines.append("  First contact: day %d · Home: %s · Colonies you know of: %d" % [
 			int(c.get("contacted_day", 0)), str(c.get("home_name", "?")), int(c.get("known_colonies", 0))])
+		if not bool(c.get("diplomacy_ready", true)):
+			lines.append("  Translation completes day %d — full diplomacy is not open yet." % int(c.get("translation_ready_day", 0)))
 		var theirs = c.get("opinion_of_player", {})
 		if theirs is Dictionary and not theirs.is_empty():
-			lines.append("  Their opinion of you: %s (disposition %s · disputes %s · border friction %s)" % [
+			lines.append("  Their opinion of you: %s (disposition %s · disputes %s · border friction %s · trade %s · broken treaties %s)" % [
 				_fmt_signed(float(theirs.get("total", 0.0)), 1),
 				_fmt_signed(float(theirs.get("disposition", 0.0)), 1),
 				_fmt_signed(float(theirs.get("disputes", 0.0)), 1),
-				_fmt_signed(float(theirs.get("border_friction", 0.0)), 1)])
+				_fmt_signed(float(theirs.get("border_friction", 0.0)), 1),
+				_fmt_signed(float(theirs.get("trade_volume", 0.0)), 1),
+				_fmt_signed(float(theirs.get("broken_treaties", 0.0)), 1)])
 		var ours = c.get("player_opinion", {})
 		if ours is Dictionary and not ours.is_empty():
-			lines.append("  Your opinion of them: %s (disputes %s · border friction %s)" % [
+			lines.append("  Your opinion of them: %s (disputes %s · border friction %s · trade %s · broken treaties %s)" % [
 				_fmt_signed(float(ours.get("total", 0.0)), 1),
 				_fmt_signed(float(ours.get("disputes", 0.0)), 1),
-				_fmt_signed(float(ours.get("border_friction", 0.0)), 1)])
+				_fmt_signed(float(ours.get("border_friction", 0.0)), 1),
+				_fmt_signed(float(ours.get("trade_volume", 0.0)), 1),
+				_fmt_signed(float(ours.get("broken_treaties", 0.0)), 1)])
+		var treaties = c.get("treaties", [])
+		if treaties is Array:
+			if treaties.is_empty():
+				lines.append("  Treaties: none")
+			else:
+				var parts := PackedStringArray()
+				for t in treaties:
+					if t is Dictionary:
+						parts.append("%s (day %d)" % [TREATY_LABELS.get(str(t.get("kind", "")), str(t.get("kind", ""))), int(t.get("signed_day", 0))])
+				lines.append("  Treaties: %s" % " · ".join(parts))
+		if bool(c.get("embargo_by_me", false)):
+			lines.append("  ⚠ Embargo: you have closed trade with them")
+		if bool(c.get("embargo_by_them", false)):
+			lines.append("  ⚠ Embargo: they have closed trade with you")
 		var disputes = c.get("disputes", [])
 		if disputes is Array:
 			for d in disputes:
@@ -1082,7 +1179,196 @@ func _refresh_diplomacy_text() -> void:
 		lines.append("")
 		lines.append("No other civilization has been contacted yet.")
 		lines.append("Survey a system another civilization holds to make first contact.")
+	var routes = view_data.get("trade_routes", [])
+	if routes is Array and not routes.is_empty():
+		lines.append("")
+		lines.append("Your trade routes:")
+		for r in routes:
+			if r is Dictionary:
+				lines.append("  %s ↔ %s (%s) — throughput %s · earns %s/mo · earned %s so far" % [
+					str(r.get("my_system_name", "?")), str(r.get("their_system_name", "?")),
+					str(r.get("other_name", "?")),
+					_fmt_thousands(float(r.get("throughput", 0.0)), 1),
+					_fmt_thousands(float(r.get("monthly_income", 0.0)), 1),
+					_fmt_thousands(float(r.get("earned_by_me", 0.0)), 1)])
+	var proposals = view_data.get("proposals", [])
+	if proposals is Array and not proposals.is_empty():
+		lines.append("")
+		lines.append("%d offer(s) await your answer below — each shows the sender's stated reasons." % proposals.size())
 	diplomacy_text.text = "\n".join(lines)
+	_refresh_diplomacy_actions()
+
+
+## Rebuilds the diplomacy action area: proposal answers first,
+## then per-civilization propose / break / embargo / peace /
+## route buttons. Every button issues one bridge command; the
+## core answers with a legible outcome (see _apply_exec_response).
+func _refresh_diplomacy_actions() -> void:
+	if diplomacy_actions == null:
+		return
+	for child in diplomacy_actions.get_children():
+		diplomacy_actions.remove_child(child)
+		child.queue_free()
+	if not session_active:
+		return
+	var proposals = view_data.get("proposals", [])
+	if proposals is Array:
+		for p in proposals:
+			if not p is Dictionary:
+				continue
+			var pid := int(p.get("id", -1))
+			var what := ""
+			if str(p.get("kind", "")) == "treaty":
+				what = "%s proposes a %s" % [str(p.get("from_name", "?")), TREATY_LABELS.get(str(p.get("treaty_kind", "")), str(p.get("treaty_kind", "")))]
+			else:
+				# Terms are stated from the proposer's chair:
+				# cede_to_proposer = systems you would give them,
+				# cede_to_other = systems they would give you.
+				var terms = p.get("terms", {})
+				var bits := PackedStringArray()
+				if terms is Dictionary:
+					for entry in terms.get("cede_to_other", []):
+						if entry is Dictionary:
+							bits.append("they cede %s" % str(entry.get("system_name", "?")))
+					for entry in terms.get("cede_to_proposer", []):
+						if entry is Dictionary:
+							bits.append("you cede %s" % str(entry.get("system_name", "?")))
+					var credits := float(terms.get("credits_from_proposer", 0.0))
+					if credits > 0.0:
+						bits.append("they pay you %s cr" % _fmt_thousands(credits, 0))
+					elif credits < 0.0:
+						bits.append("you pay them %s cr" % _fmt_thousands(-credits, 0))
+				what = "%s proposes a settlement%s" % [str(p.get("from_name", "?")), (": " + ", ".join(bits)) if not bits.is_empty() else " (mutual recognition)"]
+			var head := Label.new()
+			head.text = "Offer — %s (day %d)" % [what, int(p.get("proposed_day", 0))]
+			diplomacy_actions.add_child(head)
+			var reasons = p.get("reasons", [])
+			if reasons is Array:
+				for reason in reasons:
+					var rl := Label.new()
+					rl.text = "    " + str(reason)
+					diplomacy_actions.add_child(rl)
+			var row := HBoxContainer.new()
+			row.add_theme_constant_override("separation", 6)
+			var accept := Button.new()
+			accept.text = "Accept"
+			accept.pressed.connect(_on_proposal_answer.bind(pid, true))
+			row.add_child(accept)
+			var refuse := Button.new()
+			refuse.text = "Refuse"
+			refuse.pressed.connect(_on_proposal_answer.bind(pid, false))
+			row.add_child(refuse)
+			diplomacy_actions.add_child(row)
+	var civs = view_data.get("civilizations", [])
+	if not civs is Array:
+		return
+	for c in civs:
+		if not c is Dictionary or bool(c.get("is_player", false)):
+			continue
+		var civ_id := int(c.get("id", -1))
+		var head := Label.new()
+		head.text = str(c.get("name", "?"))
+		diplomacy_actions.add_child(head)
+		if not bool(c.get("diplomacy_ready", true)):
+			var wait := Label.new()
+			wait.text = "    Awaiting translation (day %d)." % int(c.get("translation_ready_day", 0))
+			diplomacy_actions.add_child(wait)
+			continue
+		var active := {}
+		var treaties = c.get("treaties", [])
+		if treaties is Array:
+			for t in treaties:
+				if t is Dictionary:
+					active[str(t.get("kind", ""))] = true
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 6)
+		for kind in TREATY_KINDS:
+			var b := Button.new()
+			if active.has(kind):
+				b.text = "Break %s" % TREATY_LABELS[kind]
+				b.pressed.connect(_on_treaty_action.bind(civ_id, kind, true))
+			else:
+				b.text = "Propose %s" % TREATY_LABELS[kind]
+				b.pressed.connect(_on_treaty_action.bind(civ_id, kind, false))
+			row.add_child(b)
+		diplomacy_actions.add_child(row)
+		var row2 := HBoxContainer.new()
+		row2.add_theme_constant_override("separation", 6)
+		if bool(c.get("embargo_by_me", false)):
+			var lift := Button.new()
+			lift.text = "Lift Embargo"
+			lift.pressed.connect(_on_embargo_action.bind(civ_id, false))
+			row2.add_child(lift)
+		elif not bool(c.get("embargo_by_them", false)):
+			var declare := Button.new()
+			declare.text = "Declare Embargo"
+			declare.pressed.connect(_on_embargo_action.bind(civ_id, true))
+			row2.add_child(declare)
+		if active.has("trade_agreement"):
+			var route := Button.new()
+			route.text = "Open Trade Route (best pair)"
+			route.pressed.connect(_on_route_action.bind(civ_id))
+			row2.add_child(route)
+		var disputes = c.get("disputes", [])
+		if disputes is Array and not disputes.is_empty():
+			var settle := Button.new()
+			settle.text = "Propose Settlement (recognition)"
+			settle.pressed.connect(_on_peace_action.bind(civ_id, [], [], 0.0))
+			row2.add_child(settle)
+			for d in disputes:
+				if not d is Dictionary:
+					continue
+				var sys := int(d.get("system", -1))
+				var sname := str(d.get("system_name", "?"))
+				var b := Button.new()
+				if int(d.get("holder", -1)) == 0:
+					# The player holds it: offer the cession and
+					# demand compensation.
+					b.text = "Settle: cede %s, demand 300 cr" % sname
+					b.pressed.connect(_on_peace_action.bind(civ_id, [], [sys], -300.0))
+				else:
+					b.text = "Settle: buy %s for 300 cr" % sname
+					b.pressed.connect(_on_peace_action.bind(civ_id, [sys], [], 300.0))
+				row2.add_child(b)
+		diplomacy_actions.add_child(row2)
+		# Open routes with this civilization can be closed singly
+		# (not a breach — only breaking the agreement is).
+		var routes = view_data.get("trade_routes", [])
+		if routes is Array:
+			for r in routes:
+				if r is Dictionary and int(r.get("other_civ", -1)) == civ_id:
+					var sever := Button.new()
+					sever.text = "Close route %s ↔ %s" % [str(r.get("my_system_name", "?")), str(r.get("their_system_name", "?"))]
+					sever.pressed.connect(_on_sever_route.bind(int(r.get("id", -1))))
+					diplomacy_actions.add_child(sever)
+
+
+func _on_proposal_answer(proposal_id: int, accept: bool) -> void:
+	_exec_commands([{"cmd": "accept_proposal" if accept else "refuse_proposal", "proposal": proposal_id}],
+		"Offer answered.")
+
+
+func _on_treaty_action(civ_id: int, kind: String, breaking: bool) -> void:
+	_exec_commands([{"cmd": "break_treaty" if breaking else "propose_treaty", "civ": civ_id, "kind": kind}],
+		"Treaty updated.")
+
+
+func _on_embargo_action(civ_id: int, declare: bool) -> void:
+	_exec_commands([{"cmd": "declare_embargo" if declare else "lift_embargo", "civ": civ_id}],
+		"Embargo updated.")
+
+
+func _on_route_action(civ_id: int) -> void:
+	_exec_commands([{"cmd": "establish_route", "civ": civ_id}], "Route opened.")
+
+
+func _on_sever_route(route_id: int) -> void:
+	_exec_commands([{"cmd": "sever_route", "route": route_id}], "Route closed.")
+
+
+func _on_peace_action(civ_id: int, cede_to_me: Array, cede_to_them: Array, credits: float) -> void:
+	_exec_commands([{"cmd": "propose_peace", "civ": civ_id, "cede_to_me": cede_to_me, "cede_to_them": cede_to_them, "credits": credits}],
+		"Settlement proposed.")
 
 
 func _on_menu_pressed() -> void:
@@ -1129,6 +1415,43 @@ func _rebuild_markers() -> void:
 			verts.append(table.positions[idx])
 			colors.append(c)
 	_set_points(marker_mi, verts, colors)
+
+
+## S4: draw the player's trade routes as cyan line segments along
+## their star paths (star id == table index, as for markers).
+func _rebuild_routes_layer() -> void:
+	if routes_mi == null:
+		return
+	var verts := PackedVector3Array()
+	var colors := PackedColorArray()
+	if session_active:
+		var routes = view_data.get("trade_routes", [])
+		if routes is Array:
+			for r in routes:
+				if not r is Dictionary:
+					continue
+				var path = r.get("path", [])
+				if not path is Array:
+					continue
+				for i in range(path.size() - 1):
+					var a := int(path[i])
+					var b := int(path[i + 1])
+					if a < 0 or b < 0 or a >= table.star_count or b >= table.star_count:
+						continue
+					verts.append(table.positions[a])
+					verts.append(table.positions[b])
+					colors.append(Color(0.35, 0.9, 0.95))
+					colors.append(Color(0.35, 0.9, 0.95))
+	if verts.is_empty():
+		routes_mi.mesh = null
+		return
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_COLOR] = colors
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
+	routes_mi.mesh = mesh
 
 
 func _rebuild_range_layer() -> void:
@@ -1505,6 +1828,13 @@ func _open_catchup(catchup: Dictionary) -> void:
 		lines.append(_catchup_delta_line("Surveyed (all civilizations)", before, after, "galaxy_surveyed", 0))
 		lines.append(_catchup_delta_line("Civilizations in contact (pairs)", before, after, "contacts", 0))
 		lines.append(_catchup_delta_line("Open claim disputes", before, after, "disputes", 0))
+	# S4: treaties, trade and research moved too.
+	if after.has("treaties"):
+		lines.append("")
+		lines.append("Diplomacy:")
+		lines.append(_catchup_delta_line("Active treaties (galaxy)", before, after, "treaties", 0))
+		lines.append(_catchup_delta_line("Trade routes (galaxy)", before, after, "trade_routes", 0))
+		lines.append(_catchup_delta_line("Research points (yours)", before, after, "research_points", 1))
 	var events = catchup.get("events", [])
 	if events is Array and events.is_empty():
 		lines.append("\nNo ship or colony events — the galaxy ticked quietly (economy settled monthly).")
@@ -1999,3 +2329,194 @@ func _run_verify_s3() -> void:
 	get_tree().quit(0)
 
 
+
+
+## --verify-s4: scripted S4 session against the real bridge —
+## the diplomacy surface is in the view from day 0, a proposal to
+## an unmet civilization fails cleanly, first contact happens by
+## mutual expansion (tight homeworld spacing), translation opens
+## diplomacy, a treaty proposal returns its stated outcome, and
+## the embargo round-trip flips the view's flags.
+func _run_verify_s4() -> void:
+	# S0 lines have already been printed by _run_verify_checks.
+	if not user_args.has("bridge") or str(user_args.get("bridge", "")) == "":
+		printerr("S4_VERIFY_FAIL bridge not specified")
+		get_tree().quit(1)
+		return
+	if bridge_client == null or bridge_path == "":
+		printerr("S4_VERIFY_FAIL bridge not found")
+		get_tree().quit(1)
+		return
+	var verify_dir := ProjectSettings.globalize_path("user://verify-s4/")
+	DirAccess.make_dir_recursive_absolute(verify_dir)
+	var save := verify_dir.path_join("verify-s4.mwsb")
+	if FileAccess.file_exists(save):
+		DirAccess.remove_absolute(save)
+	_s2_events.clear()
+	_s2_cursor = 0
+
+	# a) New campaign: 4 AI races at tight spacing, so contact is a
+	# matter of years of mutual expansion, not centuries.
+	var resp: Dictionary = bridge_client.call_bridge({"op": "new", "save": save, "seed": 42, "ai_races": 4, "ai_min_spacing_ly": 25.0, "ai_region_radius_ly": 60.0})
+	var v = resp.get("view", {})
+	if not bool(resp.get("ok", false)) or not v is Dictionary:
+		printerr("S4_VERIFY_FAIL new resp=%s" % str(resp).substr(0, 400))
+		get_tree().quit(1)
+		return
+	# The S4 surface exists from day 0: routes, proposals, and the
+	# player's research stockpile.
+	var player_entry: Dictionary = {}
+	var civs0 = v.get("civilizations", [])
+	if civs0 is Array:
+		for c in civs0:
+			if c is Dictionary and bool(c.get("is_player", false)):
+				player_entry = c
+	if not v.has("trade_routes") or not v.has("proposals") or not player_entry.has("research_points"):
+		printerr("S4_VERIFY_FAIL surface view keys trade_routes/proposals/research_points missing")
+		get_tree().quit(1)
+		return
+	print("S4_VERIFY_PASS surface trade_routes+proposals+research_points present")
+
+	# b) Diplomacy with an unmet civilization fails cleanly.
+	resp = _s2_exec(save, [{"cmd": "propose_treaty", "civ": 1, "kind": "trade_agreement"}])
+	var results = resp.get("results", [])
+	var refused := false
+	var refuse_err := ""
+	if results is Array and not results.is_empty() and results[0] is Dictionary:
+		refused = not bool(results[0].get("ok", true))
+		refuse_err = str(results[0].get("error", ""))
+	if not refused or not refuse_err.contains("no contact"):
+		printerr("S4_VERIFY_FAIL no_contact expected a no-contact refusal, resp=%s" % str(resp).substr(0, 400))
+		get_tree().quit(1)
+		return
+	print("S4_VERIFY_PASS no_contact proposal refused cleanly")
+
+	# c) Expand until first contact: each year, if the surveyor is
+	# sitting somewhere, send it to the nearest star it has not
+	# surveyed yet — dispatch and the year's advance ride in ONE
+	# exec. AI civilizations expand toward the player at the same
+	# time; with homes 25–60 ly away (the tight setup region),
+	# someone's surveyor reaches a held system within decades.
+	var contact_civ := -1
+	var years := 0
+	while contact_civ < 0 and years < 60:
+		var commands: Array = []
+		var surveyor := _s2_find_ship(resp, "surveyor")
+		if not surveyor.is_empty():
+			var state = surveyor.get("state", {})
+			if state is Dictionary and str(state.get("type", "")) == "at_system":
+				var origin := int(state.get("system", -1))
+				var surveyed := {}
+				var vv = resp.get("view", {})
+				if vv is Dictionary and vv.get("systems", null) is Array:
+					for s in vv["systems"]:
+						if s is Dictionary and str(s.get("survey", "")) == "surveyed":
+							surveyed[int(s.get("index", -1))] = true
+				var best := -1
+				var best_d := 70.0
+				if origin >= 0 and origin < table.star_count:
+					for i in table.star_count:
+						if surveyed.has(i) or i == origin:
+							continue
+						var d := table.positions[i].distance_to(table.positions[origin])
+						if d < best_d:
+							best_d = d
+							best = i
+				if best >= 0:
+					commands.append({"cmd": "dispatch", "ship": int(surveyor.get("id", -1)), "to": best, "purpose": "survey"})
+		commands.append({"cmd": "advance", "days": 365})
+		resp = _s2_exec(save, commands)
+		years += 1
+		var vv2 = resp.get("view", {})
+		if vv2 is Dictionary and vv2.get("civilizations", null) is Array:
+			for c in vv2["civilizations"]:
+				if c is Dictionary and not bool(c.get("is_player", false)):
+					contact_civ = int(c.get("id", -1))
+	if contact_civ < 0:
+		printerr("S4_VERIFY_FAIL contact no contact after %d years" % years)
+		get_tree().quit(1)
+		return
+	print("S4_VERIFY_PASS contact civ=%d after_years=%d" % [contact_civ, years])
+
+	# d) Translation: after the delay the pair's diplomacy is open.
+	resp = _s2_exec(save, [{"cmd": "advance", "days": 150}])
+	var entry: Dictionary = _s4_civ_entry(resp, contact_civ)
+	if entry.is_empty() or not bool(entry.get("diplomacy_ready", false)):
+		printerr("S4_VERIFY_FAIL translation diplomacy_ready not set, entry=%s" % str(entry).substr(0, 300))
+		get_tree().quit(1)
+		return
+	print("S4_VERIFY_PASS translation diplomacy_ready=true")
+
+	# e) A treaty proposal returns a legible outcome: signed (and
+	# visible in the roster) or refused with stated reasons.
+	resp = _s2_exec(save, [{"cmd": "propose_treaty", "civ": contact_civ, "kind": "trade_agreement"}])
+	results = resp.get("results", [])
+	var detail := ""
+	var cmd_ok := false
+	if results is Array and not results.is_empty() and results[0] is Dictionary:
+		cmd_ok = bool(results[0].get("ok", false))
+		detail = str(results[0].get("detail", ""))
+	if not cmd_ok or detail == "":
+		printerr("S4_VERIFY_FAIL proposal outcome missing, resp=%s" % str(resp).substr(0, 400))
+		get_tree().quit(1)
+		return
+	var signed := detail == "signed"
+	if signed:
+		entry = _s4_civ_entry(resp, contact_civ)
+		var kinds: Array = []
+		var ts = entry.get("treaties", [])
+		if ts is Array:
+			for t in ts:
+				if t is Dictionary:
+					kinds.append(str(t.get("kind", "")))
+		if not kinds.has("trade_agreement"):
+			printerr("S4_VERIFY_FAIL proposal signed but the treaty is not in the roster")
+			get_tree().quit(1)
+			return
+	elif not detail.begins_with("refused:"):
+		printerr("S4_VERIFY_FAIL proposal unexpected outcome detail=%s" % detail)
+		get_tree().quit(1)
+		return
+	print("S4_VERIFY_PASS proposal outcome=%s" % detail.substr(0, 60))
+
+	# f) Embargo round-trip: declare (which also ends any signed
+	# trade agreement), then lift.
+	resp = _s2_exec(save, [{"cmd": "declare_embargo", "civ": contact_civ}])
+	if not _s2_result_ok(resp):
+		printerr("S4_VERIFY_FAIL embargo declare resp=%s" % str(resp).substr(0, 400))
+		get_tree().quit(1)
+		return
+	entry = _s4_civ_entry(resp, contact_civ)
+	if entry.is_empty() or not bool(entry.get("embargo_by_me", false)):
+		printerr("S4_VERIFY_FAIL embargo flag not set in the roster")
+		get_tree().quit(1)
+		return
+	if signed:
+		var kinds2: Array = []
+		var ts2 = entry.get("treaties", [])
+		if ts2 is Array:
+			for t in ts2:
+				if t is Dictionary:
+					kinds2.append(str(t.get("kind", "")))
+		if kinds2.has("trade_agreement"):
+			printerr("S4_VERIFY_FAIL embargo the trade agreement survived the embargo")
+			get_tree().quit(1)
+			return
+	resp = _s2_exec(save, [{"cmd": "lift_embargo", "civ": contact_civ}])
+	entry = _s4_civ_entry(resp, contact_civ)
+	if not _s2_result_ok(resp) or entry.is_empty() or bool(entry.get("embargo_by_me", true)):
+		printerr("S4_VERIFY_FAIL embargo lift did not clear the flag")
+		get_tree().quit(1)
+		return
+	print("S4_VERIFY_PASS embargo round_trip=true")
+	print("S4_VERIFY_PASS all")
+	get_tree().quit(0)
+
+
+func _s4_civ_entry(resp: Dictionary, civ_id: int) -> Dictionary:
+	var v = resp.get("view", {})
+	if v is Dictionary and v.get("civilizations", null) is Array:
+		for c in v["civilizations"]:
+			if c is Dictionary and int(c.get("id", -1)) == civ_id:
+				return c
+	return {}
