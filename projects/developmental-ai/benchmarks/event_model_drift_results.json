@@ -1,0 +1,194 @@
+{
+  "blind": false,
+  "calibration": "train/800..879 (pairs)",
+  "evaluation": "test/94000..94039 (pairs)",
+  "per_seed_per_condition": 40,
+  "protocol": "benchmarks/event_model_drift_protocol.json",
+  "rows": [
+    {
+      "calibration_thresholds": {
+        "change_rate": 0.8125,
+        "cusum": 9.893827,
+        "window": 0.457407
+      },
+      "conditions": {
+        "shifted": {
+          "change_rate": {
+            "any_alarm": 15,
+            "clean_detected": 15,
+            "early_alarm": 0,
+            "median_post_delay": 29,
+            "post_change_detected": 15
+          },
+          "cusum": {
+            "any_alarm": 27,
+            "clean_detected": 26,
+            "early_alarm": 1,
+            "median_post_delay": 37,
+            "post_change_detected": 27
+          },
+          "mean_log_loss": 1.252861,
+          "window": {
+            "any_alarm": 15,
+            "clean_detected": 13,
+            "early_alarm": 2,
+            "median_post_delay": 30.0,
+            "post_change_detected": 14
+          }
+        },
+        "stationary": {
+          "change_rate": {
+            "any_alarm": 1,
+            "clean_detected": 0,
+            "early_alarm": 0,
+            "median_post_delay": null,
+            "post_change_detected": 0
+          },
+          "cusum": {
+            "any_alarm": 5,
+            "clean_detected": 0,
+            "early_alarm": 1,
+            "median_post_delay": null,
+            "post_change_detected": 0
+          },
+          "mean_log_loss": 1.171181,
+          "window": {
+            "any_alarm": 3,
+            "clean_detected": 0,
+            "early_alarm": 2,
+            "median_post_delay": null,
+            "post_change_detected": 0
+          }
+        }
+      },
+      "hmm_p": 0.804288,
+      "hmm_q": 0.802446,
+      "reference_loss": 1.162981,
+      "seed": 14003
+    },
+    {
+      "calibration_thresholds": {
+        "change_rate": 0.8125,
+        "cusum": 9.172073,
+        "window": 0.435146
+      },
+      "conditions": {
+        "shifted": {
+          "change_rate": {
+            "any_alarm": 9,
+            "clean_detected": 8,
+            "early_alarm": 1,
+            "median_post_delay": 37,
+            "post_change_detected": 9
+          },
+          "cusum": {
+            "any_alarm": 23,
+            "clean_detected": 23,
+            "early_alarm": 0,
+            "median_post_delay": 28,
+            "post_change_detected": 23
+          },
+          "mean_log_loss": 1.264368,
+          "window": {
+            "any_alarm": 15,
+            "clean_detected": 13,
+            "early_alarm": 2,
+            "median_post_delay": 23,
+            "post_change_detected": 13
+          }
+        },
+        "stationary": {
+          "change_rate": {
+            "any_alarm": 2,
+            "clean_detected": 0,
+            "early_alarm": 1,
+            "median_post_delay": null,
+            "post_change_detected": 0
+          },
+          "cusum": {
+            "any_alarm": 5,
+            "clean_detected": 0,
+            "early_alarm": 0,
+            "median_post_delay": null,
+            "post_change_detected": 0
+          },
+          "mean_log_loss": 1.187171,
+          "window": {
+            "any_alarm": 3,
+            "clean_detected": 0,
+            "early_alarm": 2,
+            "median_post_delay": null,
+            "post_change_detected": 0
+          }
+        }
+      },
+      "hmm_p": 0.800898,
+      "hmm_q": 0.801802,
+      "reference_loss": 1.17555,
+      "seed": 14009
+    },
+    {
+      "calibration_thresholds": {
+        "change_rate": 0.8125,
+        "cusum": 8.644502,
+        "window": 0.411128
+      },
+      "conditions": {
+        "shifted": {
+          "change_rate": {
+            "any_alarm": 11,
+            "clean_detected": 10,
+            "early_alarm": 1,
+            "median_post_delay": 30.5,
+            "post_change_detected": 10
+          },
+          "cusum": {
+            "any_alarm": 18,
+            "clean_detected": 17,
+            "early_alarm": 1,
+            "median_post_delay": 21.0,
+            "post_change_detected": 18
+          },
+          "mean_log_loss": 1.246686,
+          "window": {
+            "any_alarm": 21,
+            "clean_detected": 19,
+            "early_alarm": 2,
+            "median_post_delay": 25.0,
+            "post_change_detected": 20
+          }
+        },
+        "stationary": {
+          "change_rate": {
+            "any_alarm": 1,
+            "clean_detected": 0,
+            "early_alarm": 1,
+            "median_post_delay": null,
+            "post_change_detected": 0
+          },
+          "cusum": {
+            "any_alarm": 3,
+            "clean_detected": 0,
+            "early_alarm": 1,
+            "median_post_delay": null,
+            "post_change_detected": 0
+          },
+          "mean_log_loss": 1.171666,
+          "window": {
+            "any_alarm": 3,
+            "clean_detected": 0,
+            "early_alarm": 2,
+            "median_post_delay": null,
+            "post_change_detected": 0
+          }
+        }
+      },
+      "hmm_p": 0.801582,
+      "hmm_q": 0.786953,
+      "reference_loss": 1.173524,
+      "seed": 14033
+    }
+  ],
+  "schema": "developmental-ai.event-model-drift-benchmark/v1",
+  "train": "source_bursts/train/0..159"
+}

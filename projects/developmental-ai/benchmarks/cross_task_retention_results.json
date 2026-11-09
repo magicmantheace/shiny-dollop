@@ -1,0 +1,77 @@
+{
+  "blind": false,
+  "rows": [
+    {
+      "delayed_long": {
+        "initial": 40,
+        "latest": 10,
+        "learned": 40
+      },
+      "gate_digest": "2ad8a8757b4e5b5768dafd99f9c0f9eb53c8089ab6da732ec5b2844ce823565b",
+      "occluded": {
+        "initial": 37,
+        "latest": 0,
+        "learned": 37
+      },
+      "seed": 2749,
+      "selected": "initial",
+      "validation": {
+        "initial": 120,
+        "latest": 38
+      }
+    },
+    {
+      "delayed_long": {
+        "initial": 40,
+        "latest": 11,
+        "learned": 40
+      },
+      "gate_digest": "f450bcc7da96711b0ceb5a6e4cf7575115600bffa098809bebe58252fd57bd19",
+      "occluded": {
+        "initial": 37,
+        "latest": 0,
+        "learned": 37
+      },
+      "seed": 6607,
+      "selected": "initial",
+      "validation": {
+        "initial": 120,
+        "latest": 23
+      }
+    },
+    {
+      "delayed_long": {
+        "initial": 40,
+        "latest": 10,
+        "learned": 40
+      },
+      "gate_digest": "931dfa7aa5cee989b5a72553495e8c5ae4e3d60fba68836935d047fc46a4ac94",
+      "occluded": {
+        "initial": 37,
+        "latest": 0,
+        "learned": 37
+      },
+      "seed": 9901,
+      "selected": "initial",
+      "validation": {
+        "initial": 120,
+        "latest": 28
+      }
+    }
+  ],
+  "schema": "developmental-ai.cross-task-retention-benchmark/v1",
+  "seeds": [
+    2749,
+    6607,
+    9901
+  ],
+  "test_episodes_per_family_seed": 40,
+  "test_indices": {
+    "delayed": "test/85000+",
+    "occluded": "test/86000+"
+  },
+  "train_episodes": 400,
+  "train_indices": "train/0..N-1",
+  "validation_episodes": 120,
+  "validation_indices": "train/5000+"
+}

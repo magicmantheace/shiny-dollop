@@ -1,0 +1,70 @@
+name: Stochastic prequential memory validation
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/prequential_ensemble_memory.py"
+      - "benchmarks/stochastic_prequential_protocol.json"
+      - "benchmarks/stochastic_prequential_benchmark.py"
+      - "tests/test_stochastic_prequential.py"
+      - ".github/workflows/stochastic-prequential.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prequential-stochastic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Prequential regression, simulated stochasticity and prior models
+        run: python -m unittest tests.test_stochastic_prequential tests.test_multi_switch tests.test_adaptive_horizon tests.test_fast_shock -v
+      - name: Precommitted development seeds
+        run: python -m benchmarks.stochastic_prequential_benchmark --cohort development > prequential-development.json
+      - name: Precommitted additional seeds
+        run: python -m benchmarks.stochastic_prequential_benchmark --cohort additional > prequential-additional.json
+      - name: Report all policy tasks, harms, abstentions and actual source costs
+        run: |
+          python - <<'PY'
+          import json
+          for path in ("prequential-development.json","prequential-additional.json"):
+              d=json.load(open(path,encoding="utf8"))
+              print("RESULT",path,"blind",d["blind"],"learner_train_actions",
+                    d["learner_training_actions"])
+              for stage in ("A","B1","return_A","B2"):
+                  actor=[row["true_and_reported_training_costs"][stage]
+                         for row in d["rows"]]
+                  print("ACTOR",stage,{k:sum(x[k] for x in actor) for k in
+                      ("observations","actual_harmful","actual_productive",
+                       "actual_neutral","label_flips","reported_harmful")})
+              for stage,points in (("B1",(0,2,4,8,12,24,32,64)),
+                                   ("return_A",(0,2,4,8,12,24,48)),
+                                   ("B2",(0,2,4,8,12,24,32,64))):
+                  for n in points:
+                      rows=[r["stages"][stage][str(n)] for r in d["rows"]]
+                      print("CHECKPOINT",stage,n,"weights",
+                            [r["prequential"]["weights"] for r in rows],
+                            "leading",
+                            [r["prequential"]["highest_weight"] for r in rows])
+                      for method in ("prequential_ensemble","contrastive_multi",
+                                     "adaptive_horizon","fast_shock","recent8",
+                                     "recent32","frozen_A","untrained_random",
+                                     "always_abstain","privileged_expected_oracle"):
+                          data=[x["scores"][method] for x in rows]
+                          print("SCORE",method,{k:sum(y[k] for y in data)
+                              for k in ("successes","harmful_actions","abstained")})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stochastic-prequential-frozen-evidence
+          path: |
+            prequential-development.json
+            prequential-additional.json
+          retention-days: 14

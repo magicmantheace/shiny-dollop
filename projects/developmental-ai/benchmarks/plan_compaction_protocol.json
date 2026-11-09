@@ -1,0 +1,53 @@
+{
+  "schema": "developmental-ai.plan-compaction-protocol/v1",
+  "status": "precommitted-before-test-evaluation",
+  "question": "Can leave-one-step-out outcome feedback compress a successful procedural trace into a cheaper reusable plan, then adapt to unknown prerequisite changes?",
+  "generator": "RepairWorld with unchanged seven-role hidden A/B graph, no public phase, stable seed-bound role tags and per-episode shuffled action aliases",
+  "cohorts": {
+    "development": [
+      34007,
+      34019,
+      34031
+    ],
+    "additional": [
+      56003,
+      56009,
+      56017
+    ]
+  },
+  "evaluation": {
+    "split": "test",
+    "start": 87000,
+    "episodes": 80,
+    "phases": [
+      20,
+      40,
+      20
+    ],
+    "budget": 7
+  },
+  "model": "optional reward-only plan ablation controller built on frozen RepairPlanMemory; ablate one non-goal role per subsequent episode, revise only from successful outcomes; replay all public decisions and outcomes",
+  "methods": [
+    "baseline repair-aware cached plans without ablation",
+    "ablation-learned compact cached plan",
+    "context-free reactive no-memory control",
+    "engineered fixed ordering containing all possible prerequisites",
+    "privileged hidden-graph shortest plan"
+  ],
+  "metrics": [
+    "tasks completed per phase and seed",
+    "mean attempted actions",
+    "blocked attempts",
+    "plan compression and plan update counts",
+    "snapshot replay equality"
+  ],
+  "caveats": [
+    "The previous 7-step task was already evaluated and latest-plan reuse tied repair-aware completion",
+    "This is a follow-up exploratory experiment, not independent blind validation",
+    "Keep earlier plan_repair_protocol.json and its published results unchanged",
+    "No simulator graph/phase accessible to controller",
+    "Hand-engineered stable role identities and action architecture still limit transfer",
+    "Do not promote by default or claim D4 closed",
+    "V2A before overlapping V2B; no OS/AthenZ/Synveil authority"
+  ]
+}

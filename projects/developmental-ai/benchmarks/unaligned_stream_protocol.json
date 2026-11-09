@@ -1,0 +1,72 @@
+{
+  "schema": "developmental-ai.unaligned-stream-protocol/v1",
+  "status": "frozen-before-first-evaluation",
+  "objective": "Select per-episode reliable cues from independently inserted raw token streams, without aligned slots or a known symbol substitution.",
+  "cohorts": {
+    "development": [
+      43103,
+      50021,
+      61031
+    ],
+    "additional_inspected": [
+      72019,
+      83003,
+      94009
+    ]
+  },
+  "train": {
+    "split": "train",
+    "start": 89400,
+    "episodes_per_seed": 240
+  },
+  "test": {
+    "split": "test",
+    "start": 99600,
+    "episodes_per_seed": 40
+  },
+  "source_family": "existing synthetic dynamic-reliability forecast/navigation task",
+  "updater": {
+    "family": "grid",
+    "split": "train",
+    "episodes": 24
+  },
+  "public_streams": {
+    "alphabet_sizes": [
+      4,
+      4
+    ],
+    "underlying_events": 8,
+    "extra_tokens_each": [
+      2,
+      4
+    ],
+    "independent_insertions": true,
+    "sequence_order_preserved": true,
+    "token_cipher_seed_fixed": true
+  },
+  "learner": "terminal-reward learned token-pair compatibility plus monotonic sequence alignment; no oracle references/cipher",
+  "baselines": [
+    "random candidate",
+    "fixed-source identity from same choices and terminal reward",
+    "bag-frequency naive learned token co-occurrence",
+    "unsupervised windowed token-permutation plus monotonic alignment, equal observations",
+    "privileged cipher-aware monotonic alignment",
+    "privileged correct cue"
+  ],
+  "primary_metric": "simulated navigation successes per 40 episodes and aggregate",
+  "additional_metrics": [
+    "correct-source-selection count",
+    "model integrity and exact replay",
+    "alignment edit cost"
+  ],
+  "restrictions": [
+    "Freeze algorithms/budgets and both cohorts before first evaluation",
+    "No hidden cipher or true positions to learner or unsupervised baseline",
+    "No target paired supervision; only binary navigation success rewards in learner fit",
+    "No evaluation reward training",
+    "Retain negative results, including simple baseline gains",
+    "No automatic action authorization or default deployment",
+    "These seeds have been inspected in preceding studies and are not independent blind cohorts"
+  ],
+  "note": "Exploratory research D3 gate stays open even if navigation improves."
+}

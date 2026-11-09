@@ -1,0 +1,96 @@
+{
+  "schema": "developmental-ai.contextual-affordance-protocol/v1",
+  "frozen_before_implementation": true,
+  "date": "2026-10-21",
+  "scope": "sequential A -> B -> A descriptor-identity remapping in unchanged cargo simulator",
+  "not_a_claim": "The cue is an engineered observable two-element phase indicator; this evaluates context-indexed memory retrieval, NOT independent detection of latent regime, semantic perception, changed physics or consciousness.",
+  "phases": {
+    "A": "normal stable numeric signatures for all cargo action kinds",
+    "B": "swap the numeric signatures of safe wash and harmful spoil; hidden cargo dynamics are identical"
+  },
+  "public_observation": "Existing numerical sensor/goal/action frame, stable two-byte action numeric descriptors, plus unnamed two-integer context cue; no family or action names/hidden mapping enter learner",
+  "cue": {
+    "A": [
+      0,
+      2
+    ],
+    "B": [
+      2,
+      0
+    ],
+    "ambiguous_ablation": [
+      1,
+      1
+    ]
+  },
+  "training": {
+    "sourceA_indices": [
+      0,
+      79
+    ],
+    "changedB_indices": [
+      300,
+      379
+    ],
+    "split": "train",
+    "episodes_each": 80,
+    "policy": "unchanged unfiltered novel-first",
+    "terminal_reward_only": true
+  },
+  "evaluation": {
+    "split": "test",
+    "phaseA_indices": [
+      8400,
+      8459
+    ],
+    "phaseB_indices": [
+      8400,
+      8459
+    ],
+    "returnA_indices": [
+      8500,
+      8559
+    ],
+    "episodes_per_phase_per_seed": 60
+  },
+  "seed_cohorts": {
+    "development": [
+      51001,
+      51013,
+      51031
+    ],
+    "reserved": [
+      61001,
+      61013,
+      61031
+    ]
+  },
+  "policies": [
+    "context_retrieval",
+    "A_only_frozen",
+    "B_only_latest",
+    "untrained_novel",
+    "ambiguous_cue",
+    "privileged_risk_veto",
+    "full_privileged_order"
+  ],
+  "metrics": [
+    "task_success",
+    "spoilage",
+    "attempts",
+    "blocked",
+    "stalled",
+    "A_B_A_retention",
+    "replay_integrity"
+  ],
+  "limitations": [
+    "Cues perfectly distinguish phase by construction",
+    "Swap exactly two preidentified simulator action descriptors",
+    "Per-phase prior learning from 80 episodes, not zero-shot adaptation",
+    "Cannot infer unseen phase without a diagnostic signal",
+    "All seeds and worlds hand-designed; reserved group becomes inspected after first run",
+    "B-only/A-only compare 80 vs 160 total episodes; not total-experience matched",
+    "No real action/OS authority; PR stays draft"
+  ],
+  "historical": "Existing original 539-test validated repo, all previous benchmarks, OpaqueWorld/DescribedWorld implementations unchanged; add a separate experimental module."
+}

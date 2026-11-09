@@ -1,0 +1,226 @@
+{
+  "limitations": [
+    "The target offset is visible at reset only.",
+    "Memory retention and exact odometry are engineered, not learned.",
+    "Layouts share the existing procedural distribution; seeds are not blind.",
+    "The full-map oracle has privileged simulation information."
+  ],
+  "results": [
+    {
+      "full_map_oracle": {
+        "episodes": 200,
+        "mean_steps": 6.555,
+        "mode": "memory",
+        "policy": "oracle",
+        "schema": "occluded-navigation-v1",
+        "seed": 7,
+        "split": "test",
+        "success_rate": 1.0,
+        "trained": 3000
+      },
+      "memory_greedy": {
+        "episodes": 200,
+        "mean_steps": 12.6,
+        "mode": "memory",
+        "policy": "greedy",
+        "schema": "occluded-navigation-v1",
+        "seed": 7,
+        "split": "test",
+        "success_rate": 0.925,
+        "trained": 3000
+      },
+      "memory_trained": {
+        "episodes": 200,
+        "mean_steps": 30.945,
+        "mode": "memory",
+        "policy": "learned",
+        "schema": "occluded-navigation-v1",
+        "seed": 7,
+        "split": "test",
+        "success_rate": 0.715,
+        "trained": 3000
+      },
+      "memory_untrained": {
+        "episodes": 200,
+        "mean_steps": 78.315,
+        "mode": "memory",
+        "policy": "learned",
+        "schema": "occluded-navigation-v1",
+        "seed": 7,
+        "split": "test",
+        "success_rate": 0.175,
+        "trained": 0
+      },
+      "reactive_random": {
+        "episodes": 200,
+        "mean_steps": 77.565,
+        "mode": "reactive",
+        "policy": "random",
+        "schema": "occluded-navigation-v1",
+        "seed": 7,
+        "split": "test",
+        "success_rate": 0.21,
+        "trained": 3000
+      },
+      "reactive_trained": {
+        "episodes": 200,
+        "mean_steps": 85.61,
+        "mode": "reactive",
+        "policy": "learned",
+        "schema": "occluded-navigation-v1",
+        "seed": 7,
+        "split": "test",
+        "success_rate": 0.0,
+        "trained": 3000
+      },
+      "seed": 7
+    },
+    {
+      "full_map_oracle": {
+        "episodes": 200,
+        "mean_steps": 6.32,
+        "mode": "memory",
+        "policy": "oracle",
+        "schema": "occluded-navigation-v1",
+        "seed": 23,
+        "split": "test",
+        "success_rate": 1.0,
+        "trained": 3000
+      },
+      "memory_greedy": {
+        "episodes": 200,
+        "mean_steps": 13.675,
+        "mode": "memory",
+        "policy": "greedy",
+        "schema": "occluded-navigation-v1",
+        "seed": 23,
+        "split": "test",
+        "success_rate": 0.925,
+        "trained": 3000
+      },
+      "memory_trained": {
+        "episodes": 200,
+        "mean_steps": 28.345,
+        "mode": "memory",
+        "policy": "learned",
+        "schema": "occluded-navigation-v1",
+        "seed": 23,
+        "split": "test",
+        "success_rate": 0.765,
+        "trained": 3000
+      },
+      "memory_untrained": {
+        "episodes": 200,
+        "mean_steps": 86.825,
+        "mode": "memory",
+        "policy": "learned",
+        "schema": "occluded-navigation-v1",
+        "seed": 23,
+        "split": "test",
+        "success_rate": 0.155,
+        "trained": 0
+      },
+      "reactive_random": {
+        "episodes": 200,
+        "mean_steps": 84.23,
+        "mode": "reactive",
+        "policy": "random",
+        "schema": "occluded-navigation-v1",
+        "seed": 23,
+        "split": "test",
+        "success_rate": 0.205,
+        "trained": 3000
+      },
+      "reactive_trained": {
+        "episodes": 200,
+        "mean_steps": 93.94,
+        "mode": "reactive",
+        "policy": "learned",
+        "schema": "occluded-navigation-v1",
+        "seed": 23,
+        "split": "test",
+        "success_rate": 0.0,
+        "trained": 3000
+      },
+      "seed": 23
+    },
+    {
+      "full_map_oracle": {
+        "episodes": 200,
+        "mean_steps": 6.665,
+        "mode": "memory",
+        "policy": "oracle",
+        "schema": "occluded-navigation-v1",
+        "seed": 41,
+        "split": "test",
+        "success_rate": 1.0,
+        "trained": 3000
+      },
+      "memory_greedy": {
+        "episodes": 200,
+        "mean_steps": 11.22,
+        "mode": "memory",
+        "policy": "greedy",
+        "schema": "occluded-navigation-v1",
+        "seed": 41,
+        "split": "test",
+        "success_rate": 0.95,
+        "trained": 3000
+      },
+      "memory_trained": {
+        "episodes": 200,
+        "mean_steps": 35.855,
+        "mode": "memory",
+        "policy": "learned",
+        "schema": "occluded-navigation-v1",
+        "seed": 41,
+        "split": "test",
+        "success_rate": 0.665,
+        "trained": 3000
+      },
+      "memory_untrained": {
+        "episodes": 200,
+        "mean_steps": 85.14,
+        "mode": "memory",
+        "policy": "learned",
+        "schema": "occluded-navigation-v1",
+        "seed": 41,
+        "split": "test",
+        "success_rate": 0.19,
+        "trained": 0
+      },
+      "reactive_random": {
+        "episodes": 200,
+        "mean_steps": 83.945,
+        "mode": "reactive",
+        "policy": "random",
+        "schema": "occluded-navigation-v1",
+        "seed": 41,
+        "split": "test",
+        "success_rate": 0.175,
+        "trained": 3000
+      },
+      "reactive_trained": {
+        "episodes": 200,
+        "mean_steps": 93.23,
+        "mode": "reactive",
+        "policy": "learned",
+        "schema": "occluded-navigation-v1",
+        "seed": 41,
+        "split": "test",
+        "success_rate": 0.0,
+        "trained": 3000
+      },
+      "seed": 41
+    }
+  ],
+  "schema": "occluded-navigation-v1",
+  "seeds": [
+    7,
+    23,
+    41
+  ],
+  "status": "development_seed_only",
+  "test_episodes": 200,
+  "train_episodes": 3000
+}

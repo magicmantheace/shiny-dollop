@@ -1,0 +1,59 @@
+name: Two-window contradiction audit (focused)
+
+on:
+  push:
+    branches:
+      - "priority/**"
+    paths:
+      - "developmental_ai/two_window_confirmation.py"
+      - "benchmarks/two_window_confirmation_protocol.json"
+      - "benchmarks/two_window_confirmation_benchmark.py"
+      - "tests/test_two_window_confirmation.py"
+      - ".github/workflows/two-window-confirmation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-only-contradiction:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Exact public evidence and replay tests
+        run: python -m unittest tests.test_two_window_confirmation -v
+      - name: Inspected development seed comparison
+        run: python -m benchmarks.two_window_confirmation_benchmark --cohort development > windows-development.json
+      - name: Inspected additional seed comparison
+        run: python -m benchmarks.two_window_confirmation_benchmark --cohort inspected-additional > windows-additional.json
+      - name: Report all methods, calibration harm and failed tasks
+        run: |
+          python - <<'PY'
+          import json
+          for path in ("windows-development.json","windows-additional.json"):
+              data=json.load(open(path,encoding="utf-8"))
+              print(path)
+              for condition in ("normal","reversed","normal_to_reversed","reversed_to_normal"):
+                  group={}
+                  for method in ("early4","confirmed8","recent8","cumulative8","always_abstain","oracle"):
+                      rows=[x["worlds"][condition][method] for x in data["rows"]]
+                      group[method]={
+                          "successes":sum(r["evaluation"]["successes"] for r in rows),
+                          "test_damage":sum(r["evaluation"]["hurt"] for r in rows),
+                          "probes":sum(r["calibration"]["probes"] for r in rows),
+                          "calibration_damage":sum(r["calibration"]["harm"] for r in rows),
+                          "choices":[r["calibration"]["chosen"] for r in rows],
+                          "contradictions":sum(bool(r["calibration"]["contradiction"]) for r in rows)}
+                  print(condition,json.dumps(group,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: two-window-public-evidence-full-tables
+          path: |
+            windows-development.json
+            windows-additional.json
+          retention-days: 14

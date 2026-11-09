@@ -1,0 +1,53 @@
+{
+  "schema": "developmental-ai.reward-only-alignment-protocol/v1",
+  "frozen_before_evaluation": true,
+  "candidate": "context-conditioned source selection from terminal navigation rewards only",
+  "training_only": "train/78000..78359 per seed; no reference cue passed to learner",
+  "evaluation_only": "test/98000..98039 per seed; immutable after initial run",
+  "seeds": {
+    "development": [
+      2749,
+      6607,
+      9901
+    ],
+    "additional_inspected": [
+      17431,
+      24869,
+      37021
+    ]
+  },
+  "training_episodes_per_seed": 360,
+  "test_episodes_per_seed": 40,
+  "fixed_updater_training": {
+    "family": "grid",
+    "episodes": 24,
+    "split": "train"
+  },
+  "scoring": {
+    "primary": "target navigation successes out of 40",
+    "secondary": [
+      "reward-feedback counts by source",
+      "selection accuracy at evaluation (scoring only)",
+      "per-seed regret versus oracle"
+    ]
+  },
+  "baselines": [
+    "reward-only direct context/source lookup",
+    "context-blind reward-only source lookup",
+    "random source",
+    "first source",
+    "last source",
+    "privileged reference oracle"
+  ],
+  "constraints": [
+    "No paired reference reaches fit, choose, feedback, or restore APIs",
+    "Only final collected vs not-collected reward for target training",
+    "No hidden environment state, true positions, or task labels reach learner",
+    "The cue generator receives a public initial beacon to construct synthetic candidate streams",
+    "Freeze manifest and training budget before looking at test results",
+    "Keep all failed seeds and novelty weaknesses",
+    "Previously inspected seeds are not blind",
+    "No promotions, external actions, or AthenZ/Synveil permissions"
+  ],
+  "status": "protocol-only; no outcomes measured"
+}

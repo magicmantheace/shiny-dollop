@@ -1,0 +1,522 @@
+{
+  "conditions": [
+    "known_half",
+    "unequal_two",
+    "one_site",
+    "no_sites"
+  ],
+  "fit_partition": "train/0+",
+  "iterations": 4,
+  "kind": "previously-inspected-seeds-not-blind",
+  "map_histories": 16,
+  "navigation_episodes": 30,
+  "navigation_partition": "test/57000+",
+  "notes": "Known ring sizes and two recognizable possible sensor symbols remain fixed priors. Baselines receive identical train/test evidence. Oracle knows true physics/map, not live position. All outcomes include negative results; no default model changes.",
+  "rows": [
+    {
+      "conditions": {
+        "known_half": {
+          "learned_sites": {
+            "11": [
+              2,
+              7
+            ],
+            "9": [
+              2,
+              6
+            ]
+          },
+          "mean_observation_log_likelihood": {
+            "fixed_half_structure": -1.53552,
+            "flexible_sites": -1.53621,
+            "physics_oracle": -1.52561,
+            "unconstrained_em": -1.58241
+          },
+          "navigation_success": {
+            "fixed_half_structure": 0.56667,
+            "flexible_sites": 0.53333,
+            "physics_oracle": 0.53333,
+            "unconstrained_em": 0.16667
+          },
+          "training_curve": [
+            -783.17367,
+            -757.58288,
+            -746.88302,
+            -744.29176
+          ],
+          "true_sites_for_scoring_only": {
+            "11": [
+              2,
+              7
+            ],
+            "9": [
+              2,
+              6
+            ]
+          }
+        },
+        "no_sites": {
+          "learned_sites": {
+            "11": [
+              null,
+              null
+            ],
+            "9": [
+              null,
+              null
+            ]
+          },
+          "mean_observation_log_likelihood": {
+            "fixed_half_structure": -1.12649,
+            "flexible_sites": -1.11185,
+            "physics_oracle": -1.10644,
+            "unconstrained_em": -1.19131
+          },
+          "navigation_success": {
+            "fixed_half_structure": 0.33333,
+            "flexible_sites": 0.23333,
+            "physics_oracle": 0.3,
+            "unconstrained_em": 0.16667
+          },
+          "training_curve": [
+            -508.12138,
+            -497.51988,
+            -496.41751,
+            -496.16025
+          ],
+          "true_sites_for_scoring_only": {
+            "11": [
+              null,
+              null
+            ],
+            "9": [
+              null,
+              null
+            ]
+          }
+        },
+        "one_site": {
+          "learned_sites": {
+            "11": [
+              7,
+              null
+            ],
+            "9": [
+              3,
+              null
+            ]
+          },
+          "mean_observation_log_likelihood": {
+            "fixed_half_structure": -1.25975,
+            "flexible_sites": -1.24922,
+            "physics_oracle": -1.2457,
+            "unconstrained_em": -1.36742
+          },
+          "navigation_success": {
+            "fixed_half_structure": 0.7,
+            "flexible_sites": 0.7,
+            "physics_oracle": 0.63333,
+            "unconstrained_em": 0.36667
+          },
+          "training_curve": [
+            -587.9034,
+            -577.2697,
+            -574.7615,
+            -573.72419
+          ],
+          "true_sites_for_scoring_only": {
+            "11": [
+              7,
+              null
+            ],
+            "9": [
+              3,
+              null
+            ]
+          }
+        },
+        "unequal_two": {
+          "learned_sites": {
+            "11": [
+              2,
+              8
+            ],
+            "9": [
+              1,
+              3
+            ]
+          },
+          "mean_observation_log_likelihood": {
+            "fixed_half_structure": -1.6484,
+            "flexible_sites": -1.61168,
+            "physics_oracle": -1.60296,
+            "unconstrained_em": -1.66771
+          },
+          "navigation_success": {
+            "fixed_half_structure": 0.23333,
+            "flexible_sites": 0.36667,
+            "physics_oracle": 0.7,
+            "unconstrained_em": 0.16667
+          },
+          "training_curve": [
+            -809.77828,
+            -783.04073,
+            -775.84697,
+            -771.83254
+          ],
+          "true_sites_for_scoring_only": {
+            "11": [
+              1,
+              8
+            ],
+            "9": [
+              1,
+              3
+            ]
+          }
+        }
+      },
+      "seed": 17
+    },
+    {
+      "conditions": {
+        "known_half": {
+          "learned_sites": {
+            "11": [
+              2,
+              6
+            ],
+            "9": [
+              2,
+              6
+            ]
+          },
+          "mean_observation_log_likelihood": {
+            "fixed_half_structure": -1.63816,
+            "flexible_sites": -1.65501,
+            "physics_oracle": -1.62719,
+            "unconstrained_em": -1.69025
+          },
+          "navigation_success": {
+            "fixed_half_structure": 0.66667,
+            "flexible_sites": 0.53333,
+            "physics_oracle": 0.63333,
+            "unconstrained_em": 0.16667
+          },
+          "training_curve": [
+            -813.71553,
+            -781.61123,
+            -772.49432,
+            -769.68666
+          ],
+          "true_sites_for_scoring_only": {
+            "11": [
+              2,
+              7
+            ],
+            "9": [
+              2,
+              6
+            ]
+          }
+        },
+        "no_sites": {
+          "learned_sites": {
+            "11": [
+              null,
+              null
+            ],
+            "9": [
+              null,
+              null
+            ]
+          },
+          "mean_observation_log_likelihood": {
+            "fixed_half_structure": -1.19196,
+            "flexible_sites": -1.18297,
+            "physics_oracle": -1.18596,
+            "unconstrained_em": -1.25909
+          },
+          "navigation_success": {
+            "fixed_half_structure": 0.26667,
+            "flexible_sites": 0.2,
+            "physics_oracle": 0.23333,
+            "unconstrained_em": 0.16667
+          },
+          "training_curve": [
+            -546.56691,
+            -542.52431,
+            -542.5127,
+            -542.51506
+          ],
+          "true_sites_for_scoring_only": {
+            "11": [
+              null,
+              null
+            ],
+            "9": [
+              null,
+              null
+            ]
+          }
+        },
+        "one_site": {
+          "learned_sites": {
+            "11": [
+              7,
+              null
+            ],
+            "9": [
+              3,
+              null
+            ]
+          },
+          "mean_observation_log_likelihood": {
+            "fixed_half_structure": -1.34794,
+            "flexible_sites": -1.34624,
+            "physics_oracle": -1.34279,
+            "unconstrained_em": -1.49091
+          },
+          "navigation_success": {
+            "fixed_half_structure": 0.6,
+            "flexible_sites": 0.56667,
+            "physics_oracle": 0.53333,
+            "unconstrained_em": 0.23333
+          },
+          "training_curve": [
+            -644.08952,
+            -639.67238,
+            -639.09058,
+            -638.80928
+          ],
+          "true_sites_for_scoring_only": {
+            "11": [
+              7,
+              null
+            ],
+            "9": [
+              3,
+              null
+            ]
+          }
+        },
+        "unequal_two": {
+          "learned_sites": {
+            "11": [
+              1,
+              8
+            ],
+            "9": [
+              1,
+              3
+            ]
+          },
+          "mean_observation_log_likelihood": {
+            "fixed_half_structure": -1.67039,
+            "flexible_sites": -1.57426,
+            "physics_oracle": -1.56607,
+            "unconstrained_em": -1.65603
+          },
+          "navigation_success": {
+            "fixed_half_structure": 0.4,
+            "flexible_sites": 0.53333,
+            "physics_oracle": 0.5,
+            "unconstrained_em": 0.1
+          },
+          "training_curve": [
+            -816.30754,
+            -785.0226,
+            -778.71866,
+            -776.2657
+          ],
+          "true_sites_for_scoring_only": {
+            "11": [
+              1,
+              8
+            ],
+            "9": [
+              1,
+              3
+            ]
+          }
+        }
+      },
+      "seed": 23
+    },
+    {
+      "conditions": {
+        "known_half": {
+          "learned_sites": {
+            "11": [
+              2,
+              7
+            ],
+            "9": [
+              2,
+              6
+            ]
+          },
+          "mean_observation_log_likelihood": {
+            "fixed_half_structure": -1.6649,
+            "flexible_sites": -1.6641,
+            "physics_oracle": -1.64945,
+            "unconstrained_em": -1.72364
+          },
+          "navigation_success": {
+            "fixed_half_structure": 0.43333,
+            "flexible_sites": 0.46667,
+            "physics_oracle": 0.46667,
+            "unconstrained_em": 0.06667
+          },
+          "training_curve": [
+            -876.22197,
+            -834.92614,
+            -826.66224,
+            -823.2564
+          ],
+          "true_sites_for_scoring_only": {
+            "11": [
+              2,
+              7
+            ],
+            "9": [
+              2,
+              6
+            ]
+          }
+        },
+        "no_sites": {
+          "learned_sites": {
+            "11": [
+              null,
+              null
+            ],
+            "9": [
+              null,
+              null
+            ]
+          },
+          "mean_observation_log_likelihood": {
+            "fixed_half_structure": -1.17638,
+            "flexible_sites": -1.17287,
+            "physics_oracle": -1.16049,
+            "unconstrained_em": -1.24925
+          },
+          "navigation_success": {
+            "fixed_half_structure": 0.33333,
+            "flexible_sites": 0.33333,
+            "physics_oracle": 0.33333,
+            "unconstrained_em": 0.06667
+          },
+          "training_curve": [
+            -526.09996,
+            -519.0281,
+            -518.36682,
+            -518.19282
+          ],
+          "true_sites_for_scoring_only": {
+            "11": [
+              null,
+              null
+            ],
+            "9": [
+              null,
+              null
+            ]
+          }
+        },
+        "one_site": {
+          "learned_sites": {
+            "11": [
+              7,
+              null
+            ],
+            "9": [
+              3,
+              null
+            ]
+          },
+          "mean_observation_log_likelihood": {
+            "fixed_half_structure": -1.29279,
+            "flexible_sites": -1.29189,
+            "physics_oracle": -1.26809,
+            "unconstrained_em": -1.3906
+          },
+          "navigation_success": {
+            "fixed_half_structure": 0.7,
+            "flexible_sites": 0.66667,
+            "physics_oracle": 0.63333,
+            "unconstrained_em": 0.2
+          },
+          "training_curve": [
+            -607.42352,
+            -597.54624,
+            -596.12946,
+            -595.62267
+          ],
+          "true_sites_for_scoring_only": {
+            "11": [
+              7,
+              null
+            ],
+            "9": [
+              3,
+              null
+            ]
+          }
+        },
+        "unequal_two": {
+          "learned_sites": {
+            "11": [
+              0,
+              8
+            ],
+            "9": [
+              1,
+              3
+            ]
+          },
+          "mean_observation_log_likelihood": {
+            "fixed_half_structure": -1.69746,
+            "flexible_sites": -1.65466,
+            "physics_oracle": -1.6281,
+            "unconstrained_em": -1.68915
+          },
+          "navigation_success": {
+            "fixed_half_structure": 0.3,
+            "flexible_sites": 0.33333,
+            "physics_oracle": 0.56667,
+            "unconstrained_em": 0.03333
+          },
+          "training_curve": [
+            -851.71295,
+            -816.67359,
+            -810.74749,
+            -808.4105
+          ],
+          "true_sites_for_scoring_only": {
+            "11": [
+              1,
+              8
+            ],
+            "9": [
+              1,
+              3
+            ]
+          }
+        }
+      },
+      "seed": 41
+    }
+  ],
+  "schema": "flexible-landmarks/v1",
+  "seeds": [
+    17,
+    23,
+    41
+  ],
+  "site_penalty": 3.0,
+  "test_episodes": 20,
+  "test_partition": "test/51000+",
+  "train_episodes": 40
+}

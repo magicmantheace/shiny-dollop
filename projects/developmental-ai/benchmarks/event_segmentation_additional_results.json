@@ -1,0 +1,124 @@
+{
+  "episodes_per_seed_and_family": 64,
+  "independent_blind": false,
+  "protocol": "benchmarks/event_segmentation_protocol.json",
+  "rows": [
+    {
+      "families": {
+        "shifted_bursts": {
+          "exact_boundary_recall": 0.38125,
+          "framewise_latent_accuracy": 0.80709,
+          "mean_predicted_segments": 5.9531,
+          "mean_true_segments": 6.0,
+          "successes": {
+            "first": 17,
+            "fixed_hmm": 42,
+            "global_majority": 37,
+            "last": 23,
+            "learned_hmm": 42,
+            "oracle_segments": 64,
+            "raw_longest_run": 24
+          }
+        },
+        "source_bursts": {
+          "exact_boundary_recall": 0.54688,
+          "framewise_latent_accuracy": 0.86102,
+          "mean_predicted_segments": 4.5625,
+          "mean_true_segments": 5.0,
+          "successes": {
+            "first": 17,
+            "fixed_hmm": 51,
+            "global_majority": 43,
+            "last": 26,
+            "learned_hmm": 51,
+            "oracle_segments": 64,
+            "raw_longest_run": 37
+          }
+        }
+      },
+      "fitted_p": 0.8064,
+      "fitted_q": 0.800474,
+      "learned_model_sha256": "d775184994d532265180febeb2b1d1b922b00dc94a17bc837e61cfd1b3145b00",
+      "seed": 27007
+    },
+    {
+      "families": {
+        "shifted_bursts": {
+          "exact_boundary_recall": 0.51562,
+          "framewise_latent_accuracy": 0.76125,
+          "mean_predicted_segments": 11.9062,
+          "mean_true_segments": 6.0,
+          "successes": {
+            "first": 25,
+            "fixed_hmm": 45,
+            "global_majority": 40,
+            "last": 23,
+            "learned_hmm": 37,
+            "oracle_segments": 64,
+            "raw_longest_run": 31
+          }
+        },
+        "source_bursts": {
+          "exact_boundary_recall": 0.6875,
+          "framewise_latent_accuracy": 0.84649,
+          "mean_predicted_segments": 7.1094,
+          "mean_true_segments": 5.0,
+          "successes": {
+            "first": 22,
+            "fixed_hmm": 39,
+            "global_majority": 40,
+            "last": 18,
+            "learned_hmm": 50,
+            "oracle_segments": 64,
+            "raw_longest_run": 37
+          }
+        }
+      },
+      "fitted_p": 0.801317,
+      "fitted_q": 0.811924,
+      "learned_model_sha256": "39cf64fb527e80bb5dcabf70784e9ff98675ce36de1fafe9c8d84c61aef1c7e5",
+      "seed": 27011
+    },
+    {
+      "families": {
+        "shifted_bursts": {
+          "exact_boundary_recall": 0.35938,
+          "framewise_latent_accuracy": 0.82937,
+          "mean_predicted_segments": 5.7812,
+          "mean_true_segments": 6.0,
+          "successes": {
+            "first": 21,
+            "fixed_hmm": 45,
+            "global_majority": 38,
+            "last": 20,
+            "learned_hmm": 43,
+            "oracle_segments": 64,
+            "raw_longest_run": 28
+          }
+        },
+        "source_bursts": {
+          "exact_boundary_recall": 0.54297,
+          "framewise_latent_accuracy": 0.87261,
+          "mean_predicted_segments": 4.625,
+          "mean_true_segments": 5.0,
+          "successes": {
+            "first": 17,
+            "fixed_hmm": 44,
+            "global_majority": 41,
+            "last": 19,
+            "learned_hmm": 44,
+            "oracle_segments": 64,
+            "raw_longest_run": 35
+          }
+        }
+      },
+      "fitted_p": 0.805224,
+      "fitted_q": 0.792144,
+      "learned_model_sha256": "26a10cf86bbc9483bc5eeb407bcb05c3315b0759258af9a82fdd28ab655b1f32",
+      "seed": 27017
+    }
+  ],
+  "schema": "developmental-ai.event-segmentation-benchmark/v1",
+  "test": "test/92000..92063",
+  "train": "source_bursts/train/0..159"
+}

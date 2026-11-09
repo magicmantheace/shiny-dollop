@@ -1,0 +1,101 @@
+{
+  "schema": "developmental-ai.nonstationary-event-value-protocol/v1",
+  "status": "frozen_before_fit_or_evaluation",
+  "aim": "Causal evidence of whether event memory can adapt to changed reward mappings and recover previously useful preferences after an A-B-A return",
+  "seed_groups": {
+    "development": [
+      14003,
+      14009,
+      14033
+    ],
+    "additional_previously_inspected": [
+      27007,
+      27011,
+      27017
+    ]
+  },
+  "segmentation_training": {
+    "family": "source_bursts",
+    "split": "train",
+    "indices": [
+      0,
+      159
+    ],
+    "iterations": 5
+  },
+  "initial_reward_training": {
+    "family": "source_bursts",
+    "split": "train",
+    "indices": [
+      2000,
+      2199
+    ],
+    "phase": "A"
+  },
+  "online_adaptation": {
+    "family": "shifted_bursts",
+    "split": "train",
+    "stage_B_indices": [
+      6000,
+      6119
+    ],
+    "stage_A_return_indices": [
+      6200,
+      6319
+    ],
+    "phase_label_available_to_generator_only": true,
+    "stage_B_reward_targets": "two label preferences selected via seed-specific derangement of initial A context targets",
+    "stage_A_return": "exact initial A hidden preferences; no phase signal to learner"
+  },
+  "evaluation": {
+    "family": "shifted_bursts",
+    "split": "test",
+    "after_A_indices": [
+      95000,
+      95039
+    ],
+    "after_B_indices": [
+      95100,
+      95139
+    ],
+    "after_A_return_indices": [
+      95200,
+      95239
+    ],
+    "frozen_no_feedback": true,
+    "per_seed_each_phase": 40
+  },
+  "methods": [
+    "frozen_original_A_preference",
+    "reward_only_all_history",
+    "sliding_window_last_32_feedback",
+    "archive_plus_recent_with_reward_surprise_switch",
+    "raw_event_sliding_window_control",
+    "privileged_true_target_available_reference"
+  ],
+  "constants": {
+    "window": 32,
+    "pseudocount": 1,
+    "change_trigger": "3 failures in last 4 outcome updates",
+    "archive_recall_trigger": "3 failures in last 4 outcome updates with archived expected success greater than recent by >=0.15",
+    "seeded_training_exploration": "20 percent random available span",
+    "mode_switch_cooldown": 8
+  },
+  "metrics": [
+    "per_seed_per_stage evaluation successes",
+    "prequential train-stage cumulative successes",
+    "archive activation counts",
+    "false switches on original A stage",
+    "time to recover after return",
+    "checkpoint restoration replay and forged-state rejection"
+  ],
+  "limits": [
+    "Context and decoded event labels engineered; no hidden phase or target provided to memory",
+    "All methods receive same number of episodes and their own binary feedback only",
+    "No test feedback updates weights; previously inspected seeds are not blind",
+    "Any hyperparameter or protocol adjustment after observed test scores must be explicitly reported exploratory",
+    "Report learned-vs-simple baseline failures and task shift regressions",
+    "No unreviewed promotion, OS commands, AthenZ identity data or Synveil permissions",
+    "Retain V2A and V2B order and D1 D3 D4 gate status"
+  ]
+}

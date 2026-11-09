@@ -1,0 +1,86 @@
+{
+  "schema": "developmental-ai.adaptive-memory-horizon-protocol/v1",
+  "date": "2026-10-22",
+  "order": "Frozen by its own commit before learner, benchmark/test implementations or access to scores. Do not tune thresholds after inspecting results without precommitting a new protocol and cohort.",
+  "question": "Does an engineered error-count horizon policy retain fast early B adaptation while recovering the later B stability of recent32 and B->A archived skill, despite unannounced same-schema reversals?",
+  "simulator": "Exactly same authored two-key SameSchemaWorld from the prior study: original A (240 independent training episodes), reversed B (64), original A again (48), with unchanged inlet/outlet features/action frame across stages and no hidden phase data given to learner.",
+  "source": "Oldest 192 public outcome observations define immutable archive, learned by RelationOutcomeMemory using engineered value span max-min; no true change points, scenario IDs or labels stored by learner.",
+  "algorithm": {
+    "surprise": "An event is surprising when anchor's smoothed likelihood of the observed public progress/damage/neutral class is below 0.125.",
+    "newest_four": "Count surprises among last four outcomes; count all last eight and last32.",
+    "gate": "If latest four surprises >=2 or latest four surprises==1 and last eight surprises>=3, do not use anchor; otherwise use archive anchor.",
+    "adaptive_horizon": "When gate is open, choose newest 32 outcomes if last 32 contain >=15 surprises relative to anchor, otherwise newest 8 outcomes. No hardcoded elapsed phase times or access to hidden regime. Model fits on all chosen events, including triggering evidence; these are NOT independent model-selection data.",
+    "abstain": "Never abstain in this experimental candidate; an always-abstain policy remains explicit and counted as failed tasks.",
+    "replay": "Append-only public three-field evidence, exact same feature-key set, bound MAX_SAMPLES, SHA256 checkpoint and replay; no default promotion or autonomous training actions."
+  },
+  "cohorts": {
+    "development": [
+      192003,
+      192021,
+      192039
+    ],
+    "additional": [
+      193001,
+      193017,
+      193041
+    ]
+  },
+  "training_indices": {
+    "A": "1000..1239",
+    "B": "2000..2063",
+    "return_A": "3000..3047"
+  },
+  "evaluation": {
+    "split": "test",
+    "test_start_B": 110000,
+    "test_start_return_A": 120000,
+    "test_episodes_per_seed_checkpoint": 30,
+    "independent_between_seed": true,
+    "reused_within_stage_across_checkpoints": true,
+    "checkpoint_B": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      12,
+      16,
+      24,
+      32,
+      48,
+      64
+    ],
+    "checkpoint_return_A": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      12,
+      16,
+      24,
+      48
+    ]
+  },
+  "comparators": [
+    "adaptive_horizon",
+    "fast_shock",
+    "legacy_disjoint_12plus4",
+    "recent8",
+    "recent32",
+    "frozen_A",
+    "cumulative_range",
+    "untrained_random",
+    "always_abstain",
+    "privileged_oracle"
+  ],
+  "success_criteria": "At B8, seek at least 165/180 successes (fast_shock baseline) and at B32,B48,B64 seek >=170/180, better than fast_shock on average; return-A4 seek >=170/180 and archive retention. Disclose if recent32, recent8, or legacy is better at any checkpoint and report all harms, abstentions, acquisition costs. No promotion regardless of score.",
+  "provenance": "One seed-isolated external random actor first-action observation per disposable TRAIN episode; count harmful actor interventions exactly once, separate from harmful read-only TEST simulated actions. All policies see matched training history, holdout episodes never train.",
+  "limitations": [
+    "Fixed short/long windows and surprise cutoffs are developer choices, not autonomously discovered appropriate timescales.",
+    "Same simplistic manually authored deterministic symmetric A-B-A range-rule reversal; not unknown independent domains or stochastic real-world processes.",
+    "Recent models train on the same observations used to choose them, risking selection overfit.",
+    "No safe first contact possible without B outcome observations; measure harm explicitly.",
+    "No real-world authority, promotion, GitHub PR merge, source authentication, AthenZ/Synveil integration, or D1-D10/V2A/V2B roadmap changes."
+  ]
+}

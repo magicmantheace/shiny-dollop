@@ -482,3 +482,65 @@ fn diplomacy_view_and_event_filter() {
             .is_some()
     );
 }
+
+#[test]
+fn new_with_ai_races_respects_the_overwrite_guard() {
+    // The PR #45 overwrite guard composes with S3 setup: it sits in
+    // op_new ahead of campaign creation, so it protects multi-civ
+    // campaigns exactly like solo ones (regression pin for the
+    // PR #43 / PR #45 reconciliation).
+    let dir = test_dir("overwrite_guard");
+    let data = write_stars(&dir);
+    let save = dir.join("game.mwsb");
+    let response = run_req(&dir, &data, new_game_req(&save, 3), "new-first");
+    assert_eq!(response.get("ok").and_then(|v| v.as_bool().ok()), Some(true));
+
+    // Same save path, no overwrite flag: refused, campaign intact.
+    let refused = run_req(&dir, &data, new_game_req(&save, 3), "new-refused");
+    assert_eq!(
+        refused.get("ok").and_then(|v| v.as_bool().ok()),
+        Some(false),
+        "second new without overwrite must be refused: {refused}"
+    );
+    let err = refused
+        .get("error")
+        .and_then(|v| v.as_str().ok())
+        .unwrap_or("");
+    assert!(err.contains("already exists"), "error names the cause: {err}");
+    let intact = run_req(
+        &dir,
+        &data,
+        req_obj(vec![("op", Value::from("view")), ("save", save_str(&save))]),
+        "view-intact",
+    );
+    assert_eq!(
+        view_of(&intact)
+            .get("galaxy")
+            .and_then(|g| g.get("civilizations"))
+            .and_then(|v| v.as_u64().ok()),
+        Some(4),
+        "refused overwrite leaves the 4-civ campaign intact"
+    );
+
+    // Explicit overwrite: a fresh multi-civ game replaces it.
+    let pairs = vec![
+        ("op", Value::from("new")),
+        ("save", save_str(&save)),
+        ("seed", Value::from(42u64)),
+        ("now_unix", Value::from(NOW)),
+        ("ai_races", Value::from(2u64)),
+        ("ai_min_spacing_ly", Value::Number(15.0)),
+        ("overwrite", Value::Bool(true)),
+    ];
+    let replaced = run_req(&dir, &data, req_obj(pairs), "new-overwrite");
+    assert_eq!(
+        replaced.get("ok").and_then(|v| v.as_bool().ok()),
+        Some(true),
+        "explicit overwrite succeeds: {replaced}"
+    );
+    assert_eq!(
+        arr(replaced.get("setup").expect("setup block present"), "ai").len(),
+        2,
+        "the replacement is the new 2-AI game, not the old 3-AI one"
+    );
+}

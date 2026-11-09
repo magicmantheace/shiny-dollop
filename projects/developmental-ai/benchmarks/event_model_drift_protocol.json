@@ -1,0 +1,61 @@
+{
+  "schema": "developmental-ai.event-model-drift-protocol/v1",
+  "status": "frozen before evaluation",
+  "purpose": "Test whether a source-family four-state HMM can signal out-of-distribution event timing/noise during a continuous unlabelled stream, versus simple raw switching",
+  "cohorts": {
+    "development": [
+      14003,
+      14009,
+      14033
+    ],
+    "previously_inspected": [
+      27007,
+      27011,
+      27017
+    ]
+  },
+  "training": {
+    "fit": "source_bursts/train/0..159",
+    "calibration": "source_bursts/train/800..879, disjoint from fit",
+    "calibration_trials_per_seed": 80
+  },
+  "evaluation": {
+    "split": "test",
+    "start": 94000,
+    "episodes_per_seed": 40
+  },
+  "scenarios": {
+    "stationary": "source_bursts + source_bursts",
+    "shifted": "source_bursts + shifted_bursts"
+  },
+  "generator": "Concatenate two independent event_segmentation episode observed arrays; no boundary fields passed to detector, boundary used only for scoring",
+  "methods": [
+    "HMM predictive-surprise CUSUM calibrated on stationary training maxima",
+    "sliding-window HMM predictive-surprise mean calibrated on identical stationary training",
+    "raw adjacent-symbol change-rate monitor calibrated on identical stationary training"
+  ],
+  "fixed_settings": {
+    "warmup": 12,
+    "cusum_reference": 0.03,
+    "window": 16,
+    "lookback_start": 12,
+    "maximum_false_alarms_on_calibration": 0.1,
+    "score_rule": "one-sided accumulated centered log surprise, baseline reference from source train only",
+    "threshold": "smallest observed calibration maximum with fewer than or equal to 10 percent strictly-greater maxima; ties not alarms"
+  },
+  "metrics": [
+    "false-alarm episode count in 240 stationary test trials",
+    "detected changes out of 240 shifted test trials",
+    "before-change false alarms",
+    "median detection delay for detections",
+    "mean negative predictive log likelihood by scenario"
+  ],
+  "boundaries": [
+    "Only tokens enter monitor; no simulator hidden labels, phase, boundary, or test rewards used by detector",
+    "No retuning after reading evaluation results",
+    "Six seeds inspected previously; not independent blind",
+    "No claims of safety from empirical false alarms",
+    "No model retraining or promotion",
+    "Preserve original benchmark and V2A/V2B order"
+  ]
+}

@@ -14,3 +14,11 @@ Root `AGENTS.md` overrides these instructions on conflict.
 8. Record commands actually run, observed results and unresolved platform limitations; do not claim Windows/AI/provider tests passed without executing them.
 9. Only update this project's status to MVP/verified after a genuine runnable demonstration. Maintain `docs/IMPLEMENTATION_STATUS.md` after substantive work.
 10. Leave project-specific code on a reviewable, unmerged PR. Do not modify shared root workflows or utilities without separate permission.
+
+## Implementation notes (MVP, 2026-10-23)
+
+- Canonical IPC contract lives in `app/shared/types.ts` (`DtfApi`, namespaced: `templates.*`, `documents.*`, `export.*` with object inputs). The preload exposes exactly this shape; the renderer declares `window.dtf` from the same interface. Do not redefine the contract in task briefs — point at `shared/types.ts`.
+- Backend store functions (`electron/main/store.ts`) use positional args; the IPC layer wraps them into the object-input API.
+- Tests run as two vitest projects (`backend` node + `renderer` jsdom) via `app/vitest.config.ts`; `npm test` runs both (120 tests at MVP).
+- Export pipeline order: required-field validation → render → contrast → structure. `exportedAt` is returned in the license record but never hashed; contentHash = sha256 of the HTML bytes.
+- Imported (external) templates persist in SQLite but have no renderer — `export:generate` returns `TEMPLATE_RENDER_UNSUPPORTED` for them. This is by design, not a bug.

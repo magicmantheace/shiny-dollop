@@ -1,0 +1,126 @@
+{
+  "schema": "developmental-ai.multi-switch-contrastive-protocol/v1",
+  "frozen_on": "2026-10-22",
+  "registration": "Commit before source learner, actor/noise simulator, tests and any benchmark scores. If results fail, document failure without retuning; future modifications need a NEW protocol and NEW seed cohorts.",
+  "question": "Can learned archive-versus-recent predictive contrast prevent false reversion on neutral samples while sustaining short-latency reacquisition through same-schema A->B->A->B, with imperfect reported public feedback?",
+  "environments": "Same deterministic engineered two-field range simulator (inlet/outlet), action frame names and candidate distribution unchanged. Hidden A is source and returned A; hidden B reverses progress/damage; all phases produce real simulator outcomes and unlabelled public feedback. NOT new independently authored rules or stochastic physical dynamics.",
+  "observation_corruption": "After independent random first-action TRAIN outcome, deterministically hash (seed, episode index, 'report-noise') to flip progress<->damage in 10% of episodes where actual outcome is progress or damage; neutral never flipped. Corrupted public feedback is all learner sees. Count both TRUE actor harm and reported damage separately; do not use true effect in learner. TEST is true deterministic hidden outcome, never corrupted.",
+  "stages": [
+    {
+      "name": "A",
+      "rule": "original",
+      "train_indices": "1000..1239",
+      "n": 240
+    },
+    {
+      "name": "B1",
+      "rule": "reversed",
+      "train_indices": "2000..2063",
+      "n": 64
+    },
+    {
+      "name": "return_A",
+      "rule": "original",
+      "train_indices": "3000..3047",
+      "n": 48
+    },
+    {
+      "name": "B2",
+      "rule": "reversed",
+      "train_indices": "4000..4063",
+      "n": 64
+    }
+  ],
+  "model": {
+    "anchor": "First 192 events train source relation; 240-source warmup is intentionally provided before hidden changes.",
+    "entry_to_recent": "While archive selected, require at least 2 of latest 4 public outcome classes to have smoothed archive prediction p < 0.125. Only check starting at index 240, without stage markers.",
+    "archive_reentry": "While recent selected, consider latest four public events and a recent-32 alternative fitted on PRECEDING events, excluding the latest four. Require at least two individual events with archive probability >=0.55 AND archive probability >=4 * the alternative probability. Require >=8 events since entering recent to enable comparison. This is discriminatory evidence, not 'absence of surprise' and neutral agreement cannot trigger reentry.",
+    "recent_horizon": "Use recent8 until >=24 observed outcomes have accumulated since the algorithm-inferred switch to recent; then use recent32. No simulator phase label passed. Candidate training overlaps incoming evidence; not fully independent.",
+    "restart": "Append-only validated public observations only, recompute inferred mode/change indices by deterministic event replay; SHA256 exact checkpoint validation. Persist no simulator hidden rules, stage IDs or real-world permissions.",
+    "abstentions": "None. All attempted interventions scored for harmful TEST actions."
+  },
+  "comparators": [
+    "contrastive_multi",
+    "adaptive_horizon",
+    "fast_shock",
+    "legacy_disjoint",
+    "recent8",
+    "recent32",
+    "frozen_A",
+    "untrained_random",
+    "always_abstain",
+    "privileged_oracle"
+  ],
+  "cohorts": {
+    "development": [
+      202003,
+      202021,
+      202039
+    ],
+    "additional": [
+      203001,
+      203017,
+      203041
+    ]
+  },
+  "checkpoint_counts": {
+    "B1": [
+      0,
+      2,
+      4,
+      8,
+      12,
+      16,
+      24,
+      32,
+      48,
+      64
+    ],
+    "return_A": [
+      0,
+      2,
+      4,
+      8,
+      12,
+      24,
+      48
+    ],
+    "B2": [
+      0,
+      2,
+      4,
+      8,
+      12,
+      16,
+      24,
+      32,
+      64
+    ]
+  },
+  "test_indices": {
+    "B1": "130000..130019",
+    "return_A": "140000..140019",
+    "B2": "150000..150019"
+  },
+  "episodes_per_seed_stage_checkpoint": 20,
+  "reuses_same_test_episode_indices_across_checkpoints": true,
+  "metrics": [
+    "successes per 120 per stage/checkpoint",
+    "harmful TEST actions",
+    "abstentions-as-failures",
+    "source-actor actual damaging interventions counted once",
+    "reported damage and report-flip counts",
+    "inferred archive-vs-recent and recent8-vs-recent32 selections",
+    "source forgetting and repeated-B recovery",
+    "checkpoint replay before/after TEST"
+  ],
+  "acceptance": "At B1/ B2 8 observations aim >50% successes, at B1/B2 32 and 64 target >=100/120 each, return-A8 >=100/120. Disclose all baselines, false reversion, harm and test metrics even when failure; no promotion even if all gates pass.",
+  "cautions": [
+    "Handcrafted dynamic inversion, manually selected windows/thresholds and deterministic label flips; NOT independent noisy real-world physics, broad transfer, or generalized self-improvement.",
+    "B warmup and returning A are structurally easy, and fixed recent32 is a strong benchmark.",
+    "Observation forgery remains possible; SHA256 does not authenticate sources.",
+    "Source actor causes harmful simulated actions; learner does not intervene to collect data.",
+    "No test feedback used for learning and no changing thresholds after seed inspection.",
+    "No default agent promotion, GitHub merge, AthenZ/Synveil integration or change to D1-D10/V2A/V2B roadmap."
+  ]
+}

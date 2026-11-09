@@ -1,0 +1,236 @@
+{
+  "iterations": 6,
+  "kind": "inspected-development-not-blind",
+  "navigation_episodes": 12,
+  "notes": "No simulator truth in training, validation or model selection. Oracle only for comparison. Held-out test results inspected after design; not blind.",
+  "partitions": {
+    "fit": "train 0+",
+    "test": "test 9000+",
+    "validation": "train 2500+"
+  },
+  "rows": [
+    {
+      "regimes": {
+        "changed": {
+          "baseline_navigation": 0.0833,
+          "baseline_test_log_likelihood": -1.654006,
+          "chosen_start": 1,
+          "multistart_navigation": 0.0833,
+          "multistart_test_log_likelihood": -1.651592,
+          "oracle_navigation": 0.4167,
+          "oracle_test_log_likelihood": -1.631226,
+          "validation_scores": [
+            -1.72129413,
+            -1.71722734,
+            -1.72668369
+          ]
+        },
+        "original": {
+          "baseline_navigation": 0.8333,
+          "baseline_test_log_likelihood": -1.568746,
+          "chosen_start": 1,
+          "multistart_navigation": 0.5833,
+          "multistart_test_log_likelihood": -1.520371,
+          "oracle_navigation": 0.75,
+          "oracle_test_log_likelihood": -1.485675,
+          "validation_scores": [
+            -1.57616465,
+            -1.52952037,
+            -1.65133625
+          ]
+        }
+      },
+      "seed": 1009,
+      "selection": {
+        "baseline": {
+          "changed": {
+            "correct": true,
+            "predicted": "changed",
+            "scores": {
+              "changed": -1.65611,
+              "original": -1.743756
+            }
+          },
+          "original": {
+            "correct": true,
+            "predicted": "original",
+            "scores": {
+              "changed": -1.651531,
+              "original": -1.512596
+            }
+          }
+        },
+        "multistart": {
+          "changed": {
+            "correct": true,
+            "predicted": "changed",
+            "scores": {
+              "changed": -1.65219,
+              "original": -1.812714
+            }
+          },
+          "original": {
+            "correct": true,
+            "predicted": "original",
+            "scores": {
+              "changed": -1.65182,
+              "original": -1.473888
+            }
+          }
+        }
+      }
+    },
+    {
+      "regimes": {
+        "changed": {
+          "baseline_navigation": 0.0,
+          "baseline_test_log_likelihood": -1.666905,
+          "chosen_start": 1,
+          "multistart_navigation": 0.0833,
+          "multistart_test_log_likelihood": -1.660165,
+          "oracle_navigation": 0.5833,
+          "oracle_test_log_likelihood": -1.616112,
+          "validation_scores": [
+            -1.62708106,
+            -1.62144174,
+            -1.63857441
+          ]
+        },
+        "original": {
+          "baseline_navigation": 0.75,
+          "baseline_test_log_likelihood": -1.526353,
+          "chosen_start": 1,
+          "multistart_navigation": 0.6667,
+          "multistart_test_log_likelihood": -1.487414,
+          "oracle_navigation": 0.6667,
+          "oracle_test_log_likelihood": -1.447359,
+          "validation_scores": [
+            -1.46285232,
+            -1.42650112,
+            -1.5431216
+          ]
+        }
+      },
+      "seed": 1013,
+      "selection": {
+        "baseline": {
+          "changed": {
+            "correct": true,
+            "predicted": "changed",
+            "scores": {
+              "changed": -1.70114,
+              "original": -1.715472
+            }
+          },
+          "original": {
+            "correct": true,
+            "predicted": "original",
+            "scores": {
+              "changed": -1.713929,
+              "original": -1.525371
+            }
+          }
+        },
+        "multistart": {
+          "changed": {
+            "correct": true,
+            "predicted": "changed",
+            "scores": {
+              "changed": -1.693155,
+              "original": -1.759277
+            }
+          },
+          "original": {
+            "correct": true,
+            "predicted": "original",
+            "scores": {
+              "changed": -1.700066,
+              "original": -1.481746
+            }
+          }
+        }
+      }
+    },
+    {
+      "regimes": {
+        "changed": {
+          "baseline_navigation": 0.25,
+          "baseline_test_log_likelihood": -1.706721,
+          "chosen_start": 1,
+          "multistart_navigation": 0.25,
+          "multistart_test_log_likelihood": -1.703985,
+          "oracle_navigation": 0.5833,
+          "oracle_test_log_likelihood": -1.658314,
+          "validation_scores": [
+            -1.73660252,
+            -1.73465534,
+            -1.7843283
+          ]
+        },
+        "original": {
+          "baseline_navigation": 0.9167,
+          "baseline_test_log_likelihood": -1.473535,
+          "chosen_start": 1,
+          "multistart_navigation": 0.9167,
+          "multistart_test_log_likelihood": -1.422994,
+          "oracle_navigation": 0.8333,
+          "oracle_test_log_likelihood": -1.390227,
+          "validation_scores": [
+            -1.49128803,
+            -1.4523254,
+            -1.57316846
+          ]
+        }
+      },
+      "seed": 1031,
+      "selection": {
+        "baseline": {
+          "changed": {
+            "correct": true,
+            "predicted": "changed",
+            "scores": {
+              "changed": -1.682193,
+              "original": -1.766959
+            }
+          },
+          "original": {
+            "correct": true,
+            "predicted": "original",
+            "scores": {
+              "changed": -1.756316,
+              "original": -1.504044
+            }
+          }
+        },
+        "multistart": {
+          "changed": {
+            "correct": true,
+            "predicted": "changed",
+            "scores": {
+              "changed": -1.679019,
+              "original": -1.823813
+            }
+          },
+          "original": {
+            "correct": true,
+            "predicted": "original",
+            "scores": {
+              "changed": -1.753629,
+              "original": -1.447045
+            }
+          }
+        }
+      }
+    }
+  ],
+  "schema": "robust-world-model/v1",
+  "seeds": [
+    1009,
+    1013,
+    1031
+  ],
+  "starts": 3,
+  "test_count": 40,
+  "training_count": 90,
+  "validation_count": 30
+}

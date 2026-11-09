@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/ai-animation-studio/character.schema.json",
+  "title": "Modular character recipe v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "character_id",
+    "rig_id",
+    "body_base",
+    "head",
+    "hair",
+    "outfit",
+    "colors",
+    "voice_profile",
+    "personality_tags",
+    "status"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "character_id": {
+      "$ref": "#/$defs/id"
+    },
+    "rig_id": {
+      "$ref": "#/$defs/id"
+    },
+    "body_base": {
+      "$ref": "#/$defs/id"
+    },
+    "head": {
+      "$ref": "#/$defs/id"
+    },
+    "hair": {
+      "$ref": "#/$defs/id"
+    },
+    "outfit": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    },
+    "colors": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^#[0-9a-fA-F]{6}$"
+      }
+    },
+    "voice_profile": {
+      "type": "string"
+    },
+    "personality_tags": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    },
+    "status": {
+      "enum": [
+        "candidate",
+        "approved",
+        "retired"
+      ]
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+    }
+  }
+}

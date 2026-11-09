@@ -1,0 +1,246 @@
+{
+  "calibration_episodes_per_model": 40,
+  "calibration_namespace": "train indices 5000..",
+  "evaluation_namespace": "test indices 6000..",
+  "fit_iterations": 6,
+  "kind": "inspected-development-not-blind",
+  "note": "regime truth is used only for offline calibration and scoring, never online selection; threshold is not calibrated confidence",
+  "phase_episodes": 12,
+  "rows": [
+    {
+      "calibration": {
+        "artifact_digest": "34ed25824270b2144b4b3d417fb7848b00f2212452aa853117a804b5495a19b3",
+        "catalogue": "d6bf3384e44e3152b8ed431d4a5097ca5ff721f624b741aea6411357b707a1aa",
+        "episodes_per_regime": 40,
+        "input_hash": "5ef831e9c61a0d909df23c3f99d05829b18ccb240214eb4963a48ed46838ff9a",
+        "margin": 0.038746212,
+        "schema": "calibrated-step/v1",
+        "seed": 1009,
+        "signed_advantages": {
+          "changed": 0.077492423,
+          "original": 0.161444419
+        }
+      },
+      "seed": 1009,
+      "strategies": {
+        "frozen_baseline": [
+          {
+            "final_selected": "original",
+            "first_correct_observation": 7,
+            "fraction_abstained": 0.0417,
+            "fraction_correct": 0.9583,
+            "fraction_wrong": 0.0,
+            "regime_for_scoring_only": "original",
+            "switches": 1
+          },
+          {
+            "final_selected": "changed",
+            "first_correct_observation": 31,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.7917,
+            "fraction_wrong": 0.2083,
+            "regime_for_scoring_only": "changed",
+            "switches": 1
+          },
+          {
+            "final_selected": "original",
+            "first_correct_observation": 11,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.9306,
+            "fraction_wrong": 0.0694,
+            "regime_for_scoring_only": "original",
+            "switches": 1
+          }
+        ],
+        "offline_calibrated": [
+          {
+            "final_selected": "original",
+            "first_correct_observation": 7,
+            "fraction_abstained": 0.0417,
+            "fraction_correct": 0.9583,
+            "fraction_wrong": 0.0,
+            "regime_for_scoring_only": "original",
+            "switches": 1
+          },
+          {
+            "final_selected": "changed",
+            "first_correct_observation": 19,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.875,
+            "fraction_wrong": 0.125,
+            "regime_for_scoring_only": "changed",
+            "switches": 1
+          },
+          {
+            "final_selected": "original",
+            "first_correct_observation": 7,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.9583,
+            "fraction_wrong": 0.0417,
+            "regime_for_scoring_only": "original",
+            "switches": 1
+          }
+        ]
+      }
+    },
+    {
+      "calibration": {
+        "artifact_digest": "45bc921c9ec246c8e43cf34efb68464823d4f6b845214cfed8fa0d88f439ccc0",
+        "catalogue": "1d3932246d092bee3449ce6e552c171762997168bea78e20745bb76a4fe24ad1",
+        "episodes_per_regime": 40,
+        "input_hash": "b0f26fb5ef43c472ff15e46cbb900b44d9fa708ea29a291ca1e4df455335b797",
+        "margin": 0.043524116,
+        "schema": "calibrated-step/v1",
+        "seed": 1013,
+        "signed_advantages": {
+          "changed": 0.087048232,
+          "original": 0.203376044
+        }
+      },
+      "seed": 1013,
+      "strategies": {
+        "frozen_baseline": [
+          {
+            "final_selected": "original",
+            "first_correct_observation": 55,
+            "fraction_abstained": 0.375,
+            "fraction_correct": 0.625,
+            "fraction_wrong": 0.0,
+            "regime_for_scoring_only": "original",
+            "switches": 1
+          },
+          {
+            "final_selected": "changed",
+            "first_correct_observation": 68,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.5347,
+            "fraction_wrong": 0.4653,
+            "regime_for_scoring_only": "changed",
+            "switches": 1
+          },
+          {
+            "final_selected": "original",
+            "first_correct_observation": 19,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.875,
+            "fraction_wrong": 0.125,
+            "regime_for_scoring_only": "original",
+            "switches": 1
+          }
+        ],
+        "offline_calibrated": [
+          {
+            "final_selected": "original",
+            "first_correct_observation": 12,
+            "fraction_abstained": 0.0764,
+            "fraction_correct": 0.9236,
+            "fraction_wrong": 0.0,
+            "regime_for_scoring_only": "original",
+            "switches": 1
+          },
+          {
+            "final_selected": "changed",
+            "first_correct_observation": 67,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.5417,
+            "fraction_wrong": 0.4583,
+            "regime_for_scoring_only": "changed",
+            "switches": 1
+          },
+          {
+            "final_selected": "original",
+            "first_correct_observation": 10,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.9375,
+            "fraction_wrong": 0.0625,
+            "regime_for_scoring_only": "original",
+            "switches": 1
+          }
+        ]
+      }
+    },
+    {
+      "calibration": {
+        "artifact_digest": "30e80b2966db32eb169a12323803ebc1bde5758fe877a3954831f05a70ec5d12",
+        "catalogue": "4c83b09b920f32c8dd5ac85f3fb9a5cfce8879573bac0fe223e64a5d7f8a47d5",
+        "episodes_per_regime": 40,
+        "input_hash": "6181ee0f27cfaab214f585dcba67b50327be745967d62b50e65eaadcbb4460d8",
+        "margin": 0.02268605,
+        "schema": "calibrated-step/v1",
+        "seed": 1031,
+        "signed_advantages": {
+          "changed": 0.045372101,
+          "original": 0.196411446
+        }
+      },
+      "seed": 1031,
+      "strategies": {
+        "frozen_baseline": [
+          {
+            "final_selected": "original",
+            "first_correct_observation": 7,
+            "fraction_abstained": 0.0417,
+            "fraction_correct": 0.9583,
+            "fraction_wrong": 0.0,
+            "regime_for_scoring_only": "original",
+            "switches": 1
+          },
+          {
+            "final_selected": "changed",
+            "first_correct_observation": 72,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.5069,
+            "fraction_wrong": 0.4931,
+            "regime_for_scoring_only": "changed",
+            "switches": 1
+          },
+          {
+            "final_selected": "original",
+            "first_correct_observation": 19,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.875,
+            "fraction_wrong": 0.125,
+            "regime_for_scoring_only": "original",
+            "switches": 1
+          }
+        ],
+        "offline_calibrated": [
+          {
+            "final_selected": "original",
+            "first_correct_observation": 7,
+            "fraction_abstained": 0.0417,
+            "fraction_correct": 0.9583,
+            "fraction_wrong": 0.0,
+            "regime_for_scoring_only": "original",
+            "switches": 1
+          },
+          {
+            "final_selected": "changed",
+            "first_correct_observation": 67,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.5417,
+            "fraction_wrong": 0.4583,
+            "regime_for_scoring_only": "changed",
+            "switches": 1
+          },
+          {
+            "final_selected": "original",
+            "first_correct_observation": 19,
+            "fraction_abstained": 0.0,
+            "fraction_correct": 0.875,
+            "fraction_wrong": 0.125,
+            "regime_for_scoring_only": "original",
+            "switches": 1
+          }
+        ]
+      }
+    }
+  ],
+  "schema": "calibrated-step/v1",
+  "seed_list": [
+    1009,
+    1013,
+    1031
+  ],
+  "train_episodes_per_model": 130
+}

@@ -1,0 +1,142 @@
+{
+  "schema": "selective-memory-v1",
+  "protocol": {
+    "train_split": "train",
+    "train_band": "short",
+    "test_split": "test",
+    "testing_bands": [
+      "short",
+      "long"
+    ],
+    "training_episodes": 6000,
+    "testing_episodes": 400,
+    "seeds": [
+      11,
+      31,
+      73
+    ],
+    "evaluation": "development (all seeds inspected)"
+  },
+  "rows": [
+    {
+      "seed": 11,
+      "mode": "learned",
+      "before_long": 0.275,
+      "after_short": 1.0,
+      "after_long": 1.0,
+      "retention_long": 1.0
+    },
+    {
+      "seed": 11,
+      "mode": "first",
+      "before_long": 0.2875,
+      "after_short": 0.3175,
+      "after_long": 0.3225,
+      "retention_long": 0.0675
+    },
+    {
+      "seed": 11,
+      "mode": "last",
+      "before_long": 0.2875,
+      "after_short": 0.3575,
+      "after_long": 0.2725,
+      "retention_long": 0.05
+    },
+    {
+      "seed": 11,
+      "mode": "random",
+      "before_long": 0.23,
+      "after_short": 0.3625,
+      "after_long": 0.3175,
+      "retention_long": 0.0475
+    },
+    {
+      "seed": 11,
+      "mode": "oracle",
+      "before_long": 1.0,
+      "after_short": 1.0,
+      "after_long": 1.0,
+      "retention_long": 1.0
+    },
+    {
+      "seed": 31,
+      "mode": "learned",
+      "before_long": 0.2575,
+      "after_short": 1.0,
+      "after_long": 1.0,
+      "retention_long": 1.0
+    },
+    {
+      "seed": 31,
+      "mode": "first",
+      "before_long": 0.28,
+      "after_short": 0.37,
+      "after_long": 0.305,
+      "retention_long": 0.055
+    },
+    {
+      "seed": 31,
+      "mode": "last",
+      "before_long": 0.28,
+      "after_short": 0.3925,
+      "after_long": 0.3225,
+      "retention_long": 0.045
+    },
+    {
+      "seed": 31,
+      "mode": "random",
+      "before_long": 0.2975,
+      "after_short": 0.405,
+      "after_long": 0.2675,
+      "retention_long": 0.05
+    },
+    {
+      "seed": 31,
+      "mode": "oracle",
+      "before_long": 1.0,
+      "after_short": 1.0,
+      "after_long": 1.0,
+      "retention_long": 1.0
+    },
+    {
+      "seed": 73,
+      "mode": "learned",
+      "before_long": 0.25,
+      "after_short": 1.0,
+      "after_long": 1.0,
+      "retention_long": 1.0
+    },
+    {
+      "seed": 73,
+      "mode": "first",
+      "before_long": 0.24,
+      "after_short": 0.3675,
+      "after_long": 0.315,
+      "retention_long": 0.0575
+    },
+    {
+      "seed": 73,
+      "mode": "last",
+      "before_long": 0.24,
+      "after_short": 0.4025,
+      "after_long": 0.275,
+      "retention_long": 0.05
+    },
+    {
+      "seed": 73,
+      "mode": "random",
+      "before_long": 0.2475,
+      "after_short": 0.3775,
+      "after_long": 0.33,
+      "retention_long": 0.0625
+    },
+    {
+      "seed": 73,
+      "mode": "oracle",
+      "before_long": 1.0,
+      "after_short": 1.0,
+      "after_long": 1.0,
+      "retention_long": 1.0
+    }
+  ]
+}

@@ -1,0 +1,183 @@
+{
+  "iterations": 6,
+  "kind": "inspected-development-not-blind",
+  "navigation_episodes": 60,
+  "navigation_split": "test/34000+",
+  "rows": [
+    {
+      "regimes": {
+        "changed": {
+          "correct_map_offset_for_scoring_only": 2,
+          "fit_curve": [
+            -1836.384778,
+            -1771.281077,
+            -1757.619052,
+            -1752.216889,
+            -1749.515136,
+            -1747.968178
+          ],
+          "heldout_mean_log_likelihood_per_sensor": {
+            "physics_oracle": -1.60929,
+            "structured_map": -1.61883,
+            "unconstrained_em": -1.64591
+          },
+          "learned_map_offset_by_ring": {
+            "11": 2,
+            "9": 2
+          },
+          "navigation_success": {
+            "physics_oracle": 0.58333,
+            "structured_map": 0.63333,
+            "unconstrained_em": 0.1
+          }
+        },
+        "original": {
+          "correct_map_offset_for_scoring_only": 0,
+          "fit_curve": [
+            -1525.171682,
+            -1509.529808,
+            -1506.082406,
+            -1504.773734,
+            -1504.232249,
+            -1503.992026
+          ],
+          "heldout_mean_log_likelihood_per_sensor": {
+            "physics_oracle": -1.42747,
+            "structured_map": -1.43271,
+            "unconstrained_em": -1.5037
+          },
+          "learned_map_offset_by_ring": {
+            "11": 0,
+            "9": 0
+          },
+          "navigation_success": {
+            "physics_oracle": 0.73333,
+            "structured_map": 0.75,
+            "unconstrained_em": 0.75
+          }
+        }
+      },
+      "seed": 1009
+    },
+    {
+      "regimes": {
+        "changed": {
+          "correct_map_offset_for_scoring_only": 2,
+          "fit_curve": [
+            -1870.943881,
+            -1792.844313,
+            -1777.751365,
+            -1771.437218,
+            -1768.015521,
+            -1765.841653
+          ],
+          "heldout_mean_log_likelihood_per_sensor": {
+            "physics_oracle": -1.60719,
+            "structured_map": -1.60598,
+            "unconstrained_em": -1.6437
+          },
+          "learned_map_offset_by_ring": {
+            "11": 2,
+            "9": 2
+          },
+          "navigation_success": {
+            "physics_oracle": 0.48333,
+            "structured_map": 0.45,
+            "unconstrained_em": 0.1
+          }
+        },
+        "original": {
+          "correct_map_offset_for_scoring_only": 0,
+          "fit_curve": [
+            -1578.105222,
+            -1570.2931,
+            -1568.366237,
+            -1567.621564,
+            -1567.264379,
+            -1567.063994
+          ],
+          "heldout_mean_log_likelihood_per_sensor": {
+            "physics_oracle": -1.50368,
+            "structured_map": -1.51636,
+            "unconstrained_em": -1.58496
+          },
+          "learned_map_offset_by_ring": {
+            "11": 0,
+            "9": 0
+          },
+          "navigation_success": {
+            "physics_oracle": 0.73333,
+            "structured_map": 0.78333,
+            "unconstrained_em": 0.86667
+          }
+        }
+      },
+      "seed": 1013
+    },
+    {
+      "regimes": {
+        "changed": {
+          "correct_map_offset_for_scoring_only": 2,
+          "fit_curve": [
+            -1834.587155,
+            -1761.965047,
+            -1748.186913,
+            -1742.929655,
+            -1740.368093,
+            -1738.919003
+          ],
+          "heldout_mean_log_likelihood_per_sensor": {
+            "physics_oracle": -1.67168,
+            "structured_map": -1.67071,
+            "unconstrained_em": -1.7126
+          },
+          "learned_map_offset_by_ring": {
+            "11": 2,
+            "9": 2
+          },
+          "navigation_success": {
+            "physics_oracle": 0.48333,
+            "structured_map": 0.56667,
+            "unconstrained_em": 0.2
+          }
+        },
+        "original": {
+          "correct_map_offset_for_scoring_only": 0,
+          "fit_curve": [
+            -1586.731558,
+            -1579.199747,
+            -1577.437753,
+            -1576.725973,
+            -1576.378066,
+            -1576.186517
+          ],
+          "heldout_mean_log_likelihood_per_sensor": {
+            "physics_oracle": -1.49638,
+            "structured_map": -1.50579,
+            "unconstrained_em": -1.55271
+          },
+          "learned_map_offset_by_ring": {
+            "11": 0,
+            "9": 0
+          },
+          "navigation_success": {
+            "physics_oracle": 0.86667,
+            "structured_map": 0.91667,
+            "unconstrained_em": 0.96667
+          }
+        }
+      },
+      "seed": 1031
+    }
+  ],
+  "schema": "structured-landmarks/v1",
+  "seeds": [
+    1009,
+    1013,
+    1031
+  ],
+  "test_episodes": 40,
+  "test_split": "test/28000+",
+  "train_episodes": 90,
+  "train_split": "train/0+"
+}

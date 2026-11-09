@@ -1,0 +1,74 @@
+{
+  "schema_version": "1.0.0",
+  "scene_id": "tavern_meeting_demo",
+  "environment_id": "preview_stage",
+  "actors": [
+    {
+      "id": "innkeeper",
+      "recipe_id": "innkeeper_01",
+      "color": "#d9945c"
+    },
+    {
+      "id": "traveler",
+      "recipe_id": "traveler_01",
+      "color": "#6499b5"
+    }
+  ],
+  "events": [
+    {
+      "at_ms": 0,
+      "op": "spawn",
+      "actor_id": "innkeeper",
+      "position": [
+        1.8,
+        0,
+        0
+      ]
+    },
+    {
+      "at_ms": 0,
+      "op": "spawn",
+      "actor_id": "traveler",
+      "position": [
+        -3.5,
+        0,
+        0
+      ]
+    },
+    {
+      "at_ms": 800,
+      "op": "move",
+      "actor_id": "traveler",
+      "target": [
+        -0.9,
+        0,
+        0
+      ],
+      "duration_ms": 2200
+    },
+    {
+      "at_ms": 3200,
+      "op": "emote",
+      "actor_id": "traveler",
+      "emotion": "nervous",
+      "intensity": 0.65
+    },
+    {
+      "at_ms": 3800,
+      "op": "speak",
+      "actor_id": "traveler",
+      "line": "Excuse me, do you have a room for the night?"
+    },
+    {
+      "at_ms": 6600,
+      "op": "speak",
+      "actor_id": "innkeeper",
+      "line": "We have one upstairs. Come in."
+    },
+    {
+      "at_ms": 9500,
+      "op": "camera",
+      "shot": "wide"
+    }
+  ]
+}

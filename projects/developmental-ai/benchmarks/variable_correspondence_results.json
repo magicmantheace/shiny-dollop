@@ -1,0 +1,106 @@
+{
+  "blind": false,
+  "protocol": "benchmarks/variable_correspondence_protocol.json",
+  "rows": [
+    {
+      "correct_source": {
+        "correct_cue": 40,
+        "estimated_variable": 21,
+        "fixed_identity": 8,
+        "old_marginal_8": 16,
+        "old_max_path": 16,
+        "old_reward": 14,
+        "oracle_cipher_variable": 21
+      },
+      "inferred_match_probability": 0.794475,
+      "inferred_survival": 0.768907,
+      "mean_generator_common_event_count_scoring_only": 6.15,
+      "mean_predicted_common_events_on_true_candidate_scoring_only": 6.02507,
+      "navigation_successes": {
+        "correct_cue": 38,
+        "estimated_variable": 21,
+        "fixed_identity": 8,
+        "old_marginal_8": 15,
+        "old_max_path": 16,
+        "old_reward": 14,
+        "oracle_cipher_variable": 21
+      },
+      "permutation_correct": true,
+      "seed": 43103,
+      "supplemental_posthoc_absolute_count_error": {
+        "constant_6": 0.6,
+        "learned_model": 0.6909,
+        "public_length_minus_4": 0.4875
+      },
+      "training_digest": "7ec0913bb174557f4e97a66ea1302204f7167bccb5a608a951aa15e28cbb46d4"
+    },
+    {
+      "correct_source": {
+        "correct_cue": 40,
+        "estimated_variable": 23,
+        "fixed_identity": 3,
+        "old_marginal_8": 21,
+        "old_max_path": 24,
+        "old_reward": 22,
+        "oracle_cipher_variable": 23
+      },
+      "inferred_match_probability": 0.803535,
+      "inferred_survival": 0.783612,
+      "mean_generator_common_event_count_scoring_only": 6.55,
+      "mean_predicted_common_events_on_true_candidate_scoring_only": 6.3653,
+      "navigation_successes": {
+        "correct_cue": 37,
+        "estimated_variable": 21,
+        "fixed_identity": 3,
+        "old_marginal_8": 19,
+        "old_max_path": 22,
+        "old_reward": 20,
+        "oracle_cipher_variable": 21
+      },
+      "permutation_correct": true,
+      "seed": 50021,
+      "supplemental_posthoc_absolute_count_error": {
+        "constant_6": 1.0,
+        "learned_model": 0.9835,
+        "public_length_minus_4": 0.6625
+      },
+      "training_digest": "5bdbb0a952fba2b13572fece9e7dd042ce162fcb6324a907ac37f22cf5ac7461"
+    },
+    {
+      "correct_source": {
+        "correct_cue": 40,
+        "estimated_variable": 23,
+        "fixed_identity": 10,
+        "old_marginal_8": 20,
+        "old_max_path": 16,
+        "old_reward": 17,
+        "oracle_cipher_variable": 23
+      },
+      "inferred_match_probability": 0.813748,
+      "inferred_survival": 0.78492,
+      "mean_generator_common_event_count_scoring_only": 5.975,
+      "mean_predicted_common_events_on_true_candidate_scoring_only": 6.06403,
+      "navigation_successes": {
+        "correct_cue": 37,
+        "estimated_variable": 21,
+        "fixed_identity": 9,
+        "old_marginal_8": 19,
+        "old_max_path": 14,
+        "old_reward": 15,
+        "oracle_cipher_variable": 21
+      },
+      "permutation_correct": true,
+      "seed": 61031,
+      "supplemental_posthoc_absolute_count_error": {
+        "constant_6": 0.925,
+        "learned_model": 0.8204,
+        "public_length_minus_4": 0.675
+      },
+      "training_digest": "4332e26069e9f75aa09eea096fa77c1c9c15f0062a4a267ae64c0ab8fc96fbd3"
+    }
+  ],
+  "schema": "developmental-ai.variable-correspondence-benchmark/v1",
+  "test": "test/99800..99839",
+  "train": "train/90000..90119",
+  "train_supervision": "public pseudo-selected streams only"
+}

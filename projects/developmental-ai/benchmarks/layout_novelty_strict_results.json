@@ -1,0 +1,263 @@
+{
+  "budgets": {
+    "evaluation_per_condition": 24,
+    "fit": 48,
+    "hazard": 12,
+    "iterations": 2,
+    "layout_alpha": 0.04,
+    "reference": 64,
+    "rounds": 1,
+    "validation": 16
+  },
+  "kind": "previously-inspected-seeds-not-blind",
+  "notes": "Alternative landmark offsets use the hardcoded two-half-separated-mark prior and learned bank roles, motion and odometry. Max-prefix threshold chosen on train-only 50/50 normal/known-switch streams. Runtime sees no true positions, regime or fault labels. Union across three detectors is not false-alarm calibrated. The map search is an observational diagnostic, not model learning or an authorization. Strict alpha=.04 was selected for an exploratory post-result follow-up, not a preregistered blind holdout.",
+  "partitions": {
+    "evaluation": "test/93000+",
+    "fit": "train/0+",
+    "hazard": "train/40000+",
+    "map_reference": "train/50000+",
+    "model_validation": "train/10000+"
+  },
+  "rows": [
+    {
+      "conditions": {
+        "known-shift": {
+          "channel_alarms": 0,
+          "combined_alarms": 0,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "combined": null,
+            "layout": null,
+            "prior_layer": null
+          },
+          "layout_alarms": 0,
+          "layout_only_alarms": 0,
+          "legacy_surprise_alarms": 0,
+          "prior_layer_alarms": 0
+        },
+        "landmark-fault": {
+          "channel_alarms": 24,
+          "combined_alarms": 24,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "combined": 4.042,
+            "layout": 8.778,
+            "prior_layer": 4.042
+          },
+          "layout_alarms": 18,
+          "layout_only_alarms": 0,
+          "legacy_surprise_alarms": 24,
+          "prior_layer_alarms": 24
+        },
+        "normal": {
+          "channel_alarms": 0,
+          "combined_alarms": 0,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "combined": null,
+            "layout": null,
+            "prior_layer": null
+          },
+          "layout_alarms": 0,
+          "layout_only_alarms": 0,
+          "legacy_surprise_alarms": 0,
+          "prior_layer_alarms": 0
+        },
+        "odometry-fault": {
+          "channel_alarms": 24,
+          "combined_alarms": 24,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "combined": 5.792,
+            "layout": 9.0,
+            "prior_layer": 5.792
+          },
+          "layout_alarms": 2,
+          "layout_only_alarms": 0,
+          "legacy_surprise_alarms": 3,
+          "prior_layer_alarms": 24
+        },
+        "rotated-map": {
+          "channel_alarms": 0,
+          "combined_alarms": 11,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "combined": 8.364,
+            "layout": 11.25,
+            "prior_layer": 4.333
+          },
+          "layout_alarms": 8,
+          "layout_only_alarms": 5,
+          "legacy_surprise_alarms": 6,
+          "prior_layer_alarms": 6
+        }
+      },
+      "hazard": 0.04,
+      "layout_threshold": 3.714788,
+      "model_count": 2,
+      "seed": 17
+    },
+    {
+      "conditions": {
+        "known-shift": {
+          "channel_alarms": 1,
+          "combined_alarms": 3,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "combined": 14.0,
+            "layout": null,
+            "prior_layer": 14.0
+          },
+          "layout_alarms": 0,
+          "layout_only_alarms": 0,
+          "legacy_surprise_alarms": 2,
+          "prior_layer_alarms": 3
+        },
+        "landmark-fault": {
+          "channel_alarms": 24,
+          "combined_alarms": 24,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "combined": 4.0,
+            "layout": 8.0,
+            "prior_layer": 4.0
+          },
+          "layout_alarms": 18,
+          "layout_only_alarms": 0,
+          "legacy_surprise_alarms": 24,
+          "prior_layer_alarms": 24
+        },
+        "normal": {
+          "channel_alarms": 0,
+          "combined_alarms": 1,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "combined": 4.0,
+            "layout": null,
+            "prior_layer": 4.0
+          },
+          "layout_alarms": 0,
+          "layout_only_alarms": 0,
+          "legacy_surprise_alarms": 1,
+          "prior_layer_alarms": 1
+        },
+        "odometry-fault": {
+          "channel_alarms": 24,
+          "combined_alarms": 24,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "combined": 5.5,
+            "layout": null,
+            "prior_layer": 5.5
+          },
+          "layout_alarms": 0,
+          "layout_only_alarms": 0,
+          "legacy_surprise_alarms": 11,
+          "prior_layer_alarms": 24
+        },
+        "rotated-map": {
+          "channel_alarms": 0,
+          "combined_alarms": 13,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "combined": 4.769,
+            "layout": 8.545,
+            "prior_layer": 4.182
+          },
+          "layout_alarms": 11,
+          "layout_only_alarms": 2,
+          "legacy_surprise_alarms": 11,
+          "prior_layer_alarms": 11
+        }
+      },
+      "hazard": 0.0,
+      "layout_threshold": 2.539432,
+      "model_count": 1,
+      "seed": 23
+    },
+    {
+      "conditions": {
+        "known-shift": {
+          "channel_alarms": 0,
+          "combined_alarms": 1,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "combined": 5.0,
+            "layout": null,
+            "prior_layer": 5.0
+          },
+          "layout_alarms": 0,
+          "layout_only_alarms": 0,
+          "legacy_surprise_alarms": 1,
+          "prior_layer_alarms": 1
+        },
+        "landmark-fault": {
+          "channel_alarms": 24,
+          "combined_alarms": 24,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "combined": 4.0,
+            "layout": 11.211,
+            "prior_layer": 4.0
+          },
+          "layout_alarms": 19,
+          "layout_only_alarms": 0,
+          "legacy_surprise_alarms": 24,
+          "prior_layer_alarms": 24
+        },
+        "normal": {
+          "channel_alarms": 0,
+          "combined_alarms": 1,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "combined": 5.0,
+            "layout": null,
+            "prior_layer": 5.0
+          },
+          "layout_alarms": 0,
+          "layout_only_alarms": 0,
+          "legacy_surprise_alarms": 1,
+          "prior_layer_alarms": 1
+        },
+        "odometry-fault": {
+          "channel_alarms": 24,
+          "combined_alarms": 24,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "combined": 5.958,
+            "layout": 35.0,
+            "prior_layer": 5.958
+          },
+          "layout_alarms": 1,
+          "layout_only_alarms": 0,
+          "legacy_surprise_alarms": 1,
+          "prior_layer_alarms": 24
+        },
+        "rotated-map": {
+          "channel_alarms": 0,
+          "combined_alarms": 9,
+          "episodes": 24,
+          "first_alarm_mean_step": {
+            "combined": 5.222,
+            "layout": 8.167,
+            "prior_layer": 5.0
+          },
+          "layout_alarms": 6,
+          "layout_only_alarms": 1,
+          "legacy_surprise_alarms": 8,
+          "prior_layer_alarms": 8
+        }
+      },
+      "hazard": 0.1,
+      "layout_threshold": 5.498813,
+      "model_count": 2,
+      "seed": 41
+    }
+  ],
+  "schema": "layout-novelty/v1",
+  "seeds": [
+    17,
+    23,
+    41
+  ]
+}

@@ -1,0 +1,134 @@
+{
+  "iterations": 10,
+  "kind": "inspected-development-not-blind",
+  "navigation_episodes": 100,
+  "note": "model fitting receives only initial beacon and action/odometry/landmark history, not simulator truth",
+  "probe_episodes": 50,
+  "rows": [
+    {
+      "conditions": {
+        "high_shifted": {
+          "oracle_navigation": 0.54,
+          "oracle_probe_log_likelihood": -1.643274,
+          "scores": {
+            "high_shifted": -1.666118,
+            "standard_fixed": -1.824925
+          },
+          "selected": "high_shifted",
+          "selected_model_probe_log_likelihood": -1.666118,
+          "selected_navigation": 0.34,
+          "wrong_model_navigation": 0.11
+        },
+        "standard_fixed": {
+          "oracle_navigation": 0.85,
+          "oracle_probe_log_likelihood": -1.392284,
+          "scores": {
+            "high_shifted": -1.608023,
+            "standard_fixed": -1.394973
+          },
+          "selected": "standard_fixed",
+          "selected_model_probe_log_likelihood": -1.394973,
+          "selected_navigation": 0.87,
+          "wrong_model_navigation": 0.15
+        }
+      },
+      "optimization_curve_first_last": {
+        "('high', 'shifted')": [
+          -7519.42364,
+          -6817.12754
+        ],
+        "('standard', 'fixed')": [
+          -8248.09264,
+          -6112.77422
+        ]
+      },
+      "seed": 101
+    },
+    {
+      "conditions": {
+        "high_shifted": {
+          "oracle_navigation": 0.58,
+          "oracle_probe_log_likelihood": -1.60349,
+          "scores": {
+            "high_shifted": -1.618054,
+            "standard_fixed": -1.739293
+          },
+          "selected": "high_shifted",
+          "selected_model_probe_log_likelihood": -1.618054,
+          "selected_navigation": 0.3,
+          "wrong_model_navigation": 0.14
+        },
+        "standard_fixed": {
+          "oracle_navigation": 0.82,
+          "oracle_probe_log_likelihood": -1.442468,
+          "scores": {
+            "high_shifted": -1.663688,
+            "standard_fixed": -1.444348
+          },
+          "selected": "standard_fixed",
+          "selected_model_probe_log_likelihood": -1.444348,
+          "selected_navigation": 0.89,
+          "wrong_model_navigation": 0.1
+        }
+      },
+      "optimization_curve_first_last": {
+        "('high', 'shifted')": [
+          -7738.87487,
+          -6947.04605
+        ],
+        "('standard', 'fixed')": [
+          -8283.6225,
+          -6124.79017
+        ]
+      },
+      "seed": 303
+    },
+    {
+      "conditions": {
+        "high_shifted": {
+          "oracle_navigation": 0.62,
+          "oracle_probe_log_likelihood": -1.606896,
+          "scores": {
+            "high_shifted": -1.617096,
+            "standard_fixed": -1.812018
+          },
+          "selected": "high_shifted",
+          "selected_model_probe_log_likelihood": -1.617096,
+          "selected_navigation": 0.36,
+          "wrong_model_navigation": 0.19
+        },
+        "standard_fixed": {
+          "oracle_navigation": 0.77,
+          "oracle_probe_log_likelihood": -1.471702,
+          "scores": {
+            "high_shifted": -1.741495,
+            "standard_fixed": -1.478051
+          },
+          "selected": "standard_fixed",
+          "selected_model_probe_log_likelihood": -1.478051,
+          "selected_navigation": 0.81,
+          "wrong_model_navigation": 0.17
+        }
+      },
+      "optimization_curve_first_last": {
+        "('high', 'shifted')": [
+          -7778.87064,
+          -6944.07033
+        ],
+        "('standard', 'fixed')": [
+          -8323.11449,
+          -6032.33948
+        ]
+      },
+      "seed": 707
+    }
+  ],
+  "schema": "online-dynamics/v1",
+  "seeds": [
+    101,
+    303,
+    707
+  ],
+  "train_episodes_per_regime": 350,
+  "train_steps": 12
+}

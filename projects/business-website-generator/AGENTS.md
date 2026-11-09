@@ -14,3 +14,11 @@ Root `AGENTS.md` overrides these instructions on conflict.
 8. Record commands actually run, observed results and unresolved platform limitations; do not claim Windows/AI/provider tests passed without executing them.
 9. Only update this project's status to MVP/verified after a genuine runnable demonstration. Maintain `docs/IMPLEMENTATION_STATUS.md` after substantive work.
 10. Leave project-specific code on a reviewable, unmerged PR. Do not modify shared root workflows or utilities without separate permission.
+
+## Implementation notes (MVP, 2026-10-23)
+
+- Stack: Electron 45 + React 19 + TypeScript strict + Vite, `node:sqlite`, zod-validated IPC, vitest. App code in `app/`; canonical IPC/domain contract in `app/shared/types.ts` — do not fork it.
+- Themes are pure deterministic functions (`app/electron/main/themes/`); every theme must escape all user content via `app/shared/escape.ts` and emit zero external assets/scripts.
+- Validators live in `app/electron/main/validate.ts` with named `CODE:detail` codes; export is blocked on any error-severity issue.
+- Renderer tests are hermetic (`window.bwg` mock in `app/tests/renderer/mock-bwg.ts`); backend tests use synthetic fixtures (`app/tests/backend/fixtures.ts`).
+- Windows-only validation (click-through, packaging) is pending the owner's hardware — never claim it here.

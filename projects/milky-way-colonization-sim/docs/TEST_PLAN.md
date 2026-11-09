@@ -1,6 +1,7 @@
 # TEST_PLAN — Milky Way Colonization Simulator
 
-What was actually run, with results. Last updated 2026-11-08 (S3).
+What was actually run, with results. Last updated 2026-11-08 (S3;
+PR #45 reconciliation re-run the same day).
 Nothing in this file is aspirational: every claim below was executed
 on this VM during the S0/S1/S2/S3 builds.
 
@@ -48,8 +49,12 @@ unmodified — solo behavior is preserved by construction.
 cd bridge && cargo test       # debug profile
 ```
 
-Result: **20 passed, 0 failed** (7 unit + 9 S2 integration +
-4 S3 integration in `bridge/tests/s3.rs`), exit 0.
+Result: **23 passed, 0 failed** (7 unit + 11 S2 integration +
+5 S3 integration in `bridge/tests/s3.rs`), exit 0. (As first built
+the suite was 20; the PR #45 reconciliation merged into this branch
+added PR #45's two S2 tests — overwrite refusal and fractional
+catch-up — plus one combined test below, and the whole suite was
+re-run green on the merged tree, as were the Godot verifies.)
 
 - **Setup without leaks:** `new` with `ai_races: 3` — the setup
   block names 3 AI civs and contains no home-system field; the view
@@ -68,6 +73,12 @@ Result: **20 passed, 0 failed** (7 unit + 9 S2 integration +
   `first_contact` / `claim_contested` events reach the player with
   civ names; the same window's foreign `ship_built` /
   `ship_refuelled` / `specialization_set` events do not.
+- **Overwrite guard × AI setup (reconciliation pin):** `new` with
+  `ai_races` against an occupied save path is refused and the
+  4-civ campaign is intact afterwards; `new` with
+  `"overwrite": true` replaces it with the fresh game. The PR #45
+  guard sits ahead of campaign creation in `op_new`, so it covers
+  solo and multi-civ campaigns alike.
 
 ### Godot headless verifies (viewer, Godot 4.7.2, real table)
 
@@ -153,6 +164,17 @@ Result: **16 passed, 0 failed** (7 unit + 9 integration in
   - **Whole-days floor:** +36 h of clock elapsed advances exactly
     1 day; +23 h advances 0 and does not rewrite the save (the
     unplayed partial day is not eaten).
+  - **Fractional remainder preserved (2026-11-08):** a load at
+    +36 h reaches day 1, and a second load at +48 h reaches day 2 —
+    the first load's rewrite banks the unconsumed 12 h instead of
+    discarding it; a single uninterrupted load at +48 h lands on
+    the identical state hash, and a load at +50 h advances nothing
+    further (no double-counting).
+  - **Overwrite protection (2026-11-08):** a second `new` against
+    an occupied save path is refused (`save already exists`), the
+    existing campaign's state hash is unchanged afterwards, and
+    `new` with `"overwrite": true` is the explicit replacement
+    path, producing a fresh day-0 campaign.
   - **Refusal surfacing:** an illegal command (claim an unsurveyed
     system) returns the core's error, leaves credits/systems
     untouched, the save still loads, and a subsequent legal command

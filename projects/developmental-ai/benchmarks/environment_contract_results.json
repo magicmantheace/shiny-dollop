@@ -1,0 +1,207 @@
+{
+  "independent_blind": false,
+  "profile": "development",
+  "protocol_sha256": "c1dd32c3a6b014d24dae489c207fb799bfc840e203b40eb77d747fc5ef6a72f9",
+  "rows": [
+    {
+      "episodes": 16,
+      "family": "grid",
+      "mean_reward": -21.0237,
+      "mean_steps": 75.75,
+      "policy": "random",
+      "seed": 2749,
+      "successes": 3,
+      "terminal_success_rate": 0.1875,
+      "valid_action_fraction": 1.0
+    },
+    {
+      "episodes": 16,
+      "family": "grid",
+      "mean_reward": 5.2675,
+      "mean_steps": 21.4375,
+      "policy": "family_specific",
+      "seed": 2749,
+      "successes": 13,
+      "terminal_success_rate": 0.8125,
+      "valid_action_fraction": 1.0
+    },
+    {
+      "episodes": 16,
+      "family": "grid",
+      "mean_reward": -22.6812,
+      "mean_steps": 77.1875,
+      "policy": "random",
+      "seed": 6607,
+      "successes": 2,
+      "terminal_success_rate": 0.125,
+      "valid_action_fraction": 1.0
+    },
+    {
+      "episodes": 16,
+      "family": "grid",
+      "mean_reward": 6.0525,
+      "mean_steps": 17.4375,
+      "policy": "family_specific",
+      "seed": 6607,
+      "successes": 14,
+      "terminal_success_rate": 0.875,
+      "valid_action_fraction": 1.0
+    },
+    {
+      "episodes": 16,
+      "family": "grid",
+      "mean_reward": -22.745,
+      "mean_steps": 78.3125,
+      "policy": "random",
+      "seed": 9901,
+      "successes": 1,
+      "terminal_success_rate": 0.0625,
+      "valid_action_fraction": 1.0
+    },
+    {
+      "episodes": 16,
+      "family": "grid",
+      "mean_reward": 7.755,
+      "mean_steps": 6.125,
+      "policy": "family_specific",
+      "seed": 9901,
+      "successes": 16,
+      "terminal_success_rate": 1.0,
+      "valid_action_fraction": 1.0
+    },
+    {
+      "episodes": 16,
+      "family": "occluded",
+      "mean_reward": -24.0887,
+      "mean_steps": 81.4375,
+      "policy": "random",
+      "seed": 2749,
+      "successes": 3,
+      "terminal_success_rate": 0.1875,
+      "valid_action_fraction": 1.0
+    },
+    {
+      "episodes": 16,
+      "family": "occluded",
+      "mean_reward": 6.11,
+      "mean_steps": 16.0,
+      "policy": "family_specific",
+      "seed": 2749,
+      "successes": 14,
+      "terminal_success_rate": 0.875,
+      "valid_action_fraction": 1.0
+    },
+    {
+      "episodes": 16,
+      "family": "occluded",
+      "mean_reward": -29.16,
+      "mean_steps": 103.0625,
+      "policy": "random",
+      "seed": 6607,
+      "successes": 1,
+      "terminal_success_rate": 0.0625,
+      "valid_action_fraction": 1.0
+    },
+    {
+      "episodes": 16,
+      "family": "occluded",
+      "mean_reward": 6.7975,
+      "mean_steps": 14.4375,
+      "policy": "family_specific",
+      "seed": 6607,
+      "successes": 15,
+      "terminal_success_rate": 0.9375,
+      "valid_action_fraction": 1.0
+    },
+    {
+      "episodes": 16,
+      "family": "occluded",
+      "mean_reward": -25.9312,
+      "mean_steps": 93.125,
+      "policy": "random",
+      "seed": 9901,
+      "successes": 2,
+      "terminal_success_rate": 0.125,
+      "valid_action_fraction": 1.0
+    },
+    {
+      "episodes": 16,
+      "family": "occluded",
+      "mean_reward": 7.7325,
+      "mean_steps": 6.6875,
+      "policy": "family_specific",
+      "seed": 9901,
+      "successes": 16,
+      "terminal_success_rate": 1.0,
+      "valid_action_fraction": 1.0
+    },
+    {
+      "episodes": 16,
+      "family": "delayed",
+      "mean_reward": -0.5225,
+      "mean_steps": 15.75,
+      "policy": "random",
+      "seed": 2749,
+      "successes": 5,
+      "terminal_success_rate": 0.3125,
+      "valid_action_fraction": 1.0
+    },
+    {
+      "episodes": 16,
+      "family": "delayed",
+      "mean_reward": 0.8525,
+      "mean_steps": 15.75,
+      "policy": "family_specific",
+      "seed": 2749,
+      "successes": 16,
+      "terminal_success_rate": 1.0,
+      "valid_action_fraction": 1.0
+    },
+    {
+      "episodes": 16,
+      "family": "delayed",
+      "mean_reward": -0.7869,
+      "mean_steps": 17.1875,
+      "policy": "random",
+      "seed": 6607,
+      "successes": 3,
+      "terminal_success_rate": 0.1875,
+      "valid_action_fraction": 1.0
+    },
+    {
+      "episodes": 16,
+      "family": "delayed",
+      "mean_reward": 0.8381,
+      "mean_steps": 17.1875,
+      "policy": "family_specific",
+      "seed": 6607,
+      "successes": 16,
+      "terminal_success_rate": 1.0,
+      "valid_action_fraction": 1.0
+    },
+    {
+      "episodes": 16,
+      "family": "delayed",
+      "mean_reward": -0.9006,
+      "mean_steps": 16.0625,
+      "policy": "random",
+      "seed": 9901,
+      "successes": 2,
+      "terminal_success_rate": 0.125,
+      "valid_action_fraction": 1.0
+    },
+    {
+      "episodes": 16,
+      "family": "delayed",
+      "mean_reward": 0.8494,
+      "mean_steps": 16.0625,
+      "policy": "family_specific",
+      "seed": 9901,
+      "successes": 16,
+      "terminal_success_rate": 1.0,
+      "valid_action_fraction": 1.0
+    }
+  ],
+  "schema": "developmental-ai.cross-family-results/v1",
+  "warning": "All evaluated seeds become inspected. Task-specific policies are NOT cross-family transfer."
+}

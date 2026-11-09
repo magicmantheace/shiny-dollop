@@ -1,0 +1,333 @@
+# Handoff — Game Asset Builder
+
+## State at scaffold (2026-11-06)
+
+Commissioned by the owner on 2026-11-06 with three binding constraints:
+**fully local, no APIs**; **mesh and texture are different models that
+unload between uses** (separate processes); **test multiple models**, with
+**Pip as the benchmark** against the owner's Meshy-generated reference Pip.
+
+Done:
+- Project scaffold: README, AGENTS.md, DESIGN.md (founding decisions, stage
+  architecture, candidate matrix, benchmark protocol), REQUIREMENTS.md,
+  TEST_PLAN.md, .gitignore.
+- Stage registry (`stages.py`) + stdlib CLI (`asset_builder.py`:
+  doctor / stages / benchmark-plan) + 8 unit tests, all passing on the VM.
+- Benchmark input committed: `benchmarks/pip/input-idle.png` (the exact
+  cutout that produced the reference).
+- Hardware verified firsthand: VM has no GPU (7 GB RAM); owner's PC has an
+  RTX 3060 with 12,288 MiB VRAM / 9,210 MiB free at rest, 3.1 TB free on D:.
+
+## Bake-off round 1 — COMPLETE (2026-11-06)
+
+Ran on the owner's PC (lab persists at `D:\asset-forge-lab` for re-runs);
+meshes fetched back and re-verified on the VM; scored with the Blender
+scorer now committed at `benchmarks/pip/` (`score_render.py`,
+`iou_sheet.py`, `scores.json`, `scores.md`).
+
+- **Hunyuan3D-2 shape + paint — RIGGABLE (front IoU 0.84), the winner.**
+  Split pair behaved exactly as designed (separate processes, VRAM
+  released between). Paint peaked at 12,086 MiB (~200 MiB headroom) and
+  its texturing phase is ~21 min CPU-bound — looks hung, isn't. Side
+  profile is its weak view (IoU 0.27).
+- **TRELLIS — MELTED as delivered:** inference fine, but the textured
+  export's CUDA rasterizer won't build here; fallback vertex-color GLB
+  is a blob (its 0.55 front IoU is a coverage artifact; the sheet
+  overrules it, per protocol).
+- **TripoSR — MELTED:** 39 s, but the same ruffle-blob failure as the
+  CPU spike; no UVs.
+- **Stable Fast 3D — BLOCKED:** gated HF repo; needs the owner to accept
+  Stability's licence and supply a token. Not chased.
+
+## P0 pipeline — BUILT AND PROVEN (2026-11-06)
+
+The pipeline is implemented around the Hunyuan pair and ran end-to-end
+on a second creature, the **Ember Dragon** (concept → cutout → shape →
+paint → rig → animate → catalogued GLB):
+
+- Code: `pipeline.py` (orchestrator), `gpu_bridge.py` (bridge dispatch,
+  env-configured, GET-retry + job reattach), stage modules under
+  `stages/` (prep cutout; mesh/texture PC scripts with the bake-off's
+  exact parameters; rig template + Blender rigger; animate pose
+  recipes ported from Drabbit Pet's pose driver; catalog metadata +
+  cold re-import verifier with preview renders). CLI grew `run`,
+  `cutout`, and `catalog-verify` commands. 23 unit tests at P0;
+  28 after the skinning pass.
+- Ember Dragon run (PC, RTX 3060): shape 334 s (peak 7,233 MiB;
+  423,908 verts out), paint 909 s (peak 12,043 MiB — ~250 MiB headroom
+  again; 657,672 verts textured), VRAM back at baseline after each
+  stage. Rig: welded 395,731 → decimated 45,012 verts, 14 bones
+  (arms in, ears out), idle (4.8 s) + hop (1.24 s) clips baked; final
+  GLB 20.7 MB, sha256 pinned in `catalog/ember-dragon/metadata.json`
+  and re-verified via `catalog-verify`.
+- Skinning reality (at P0): Blender bone-heat yielded **zero** weights
+  on these Hunyuan meshes (both Pip and the dragon), so the rig's
+  deterministic distance-to-bone fallback did the skinning both times
+  — coverage 1.0, hop renders clean. **Superseded the same day by the
+  skinning-hardening pass below: heat weights now ship.**
+- Incident, recovered honestly: the first pipeline process died on a
+  transient bridge disconnect while polling the paint job. The job
+  kept running server-side and finished; its outputs were adopted via
+  the new reattach path, and the catalog provenance records the
+  recovery. (The bridge job wrapper also reported that job "failed"
+  while the stage's own result JSON records exit 0 — the stage
+  artifacts and result JSON are the authority.)
+
+## Skinning hardening — DONE (2026-11-06, branch game-asset-builder/skinning)
+
+Diagnosed the P0 bone-heat failure with measurements, on both Hunyuan
+meshes (dragon rig input / Pip stand-in):
+
+- **Cause 1 — non-manifold geometry.** Raw Hunyuan paint output is a
+  triangle soup (dragon: 438,098 boundary edges, 44,126 shells; Pip:
+  558,648 / 50,258). The P0 weld repaired almost all of it, but the
+  decimated rig inputs still carried 28 (dragon) / 135 (Pip)
+  non-manifold edges, 20 / 106 non-manifold verts, and debris shells
+  (7 / 153). Blender's heat solver needs a closed 2-manifold: it
+  printed "Bone Heat Weighting: failed to find solution for one or
+  more bones" and produced 0 weighted verts on both meshes.
+- **Cause 2 — bones outside the mesh volume.** A controls-validated
+  ray-parity test on the actual P0 rig found only **5 of 28** bone
+  endpoints inside the dragon mesh: all wing endpoints float in air
+  (Hunyuan folded the wings low; the template places spread-wing
+  bones), the tail chain runs down the centreline while the model's
+  tail curls sideways, the head endpoints sit outside the skull.
+  Outside bones get no heat weights — and this, not the weighting
+  math, is also why the P0 fallback's wingtip dominance measured 0.0.
+- Ruled out: scale/units (height normalised to 2.0, signed volume
+  consistent), flipped normals (0 inconsistent-orientation edges).
+
+Fix shipped in `stages/rig/rig_blender.py` (+ pure policy module
+`stages/rig/skin_policy.py`, +5 unit tests, suite 28/28):
+
+1. `cleanup_geometry` after decimation: duplicate + degenerate faces
+   out, debris shells (< 0.5% of the largest) out, over-connected
+   edges resolved to their two largest faces, holes filled. Dragon:
+   28 → 1 residual non-manifold edge (reported, heat tolerates it);
+   Pip: 135 → 0.
+2. `snap_bone_endpoints`: endpoints failing the inside test are moved
+   to the nearest surface point pulled 1% of height inward (fallback:
+   pulled toward the bone's other end). Dragon: 23 snapped, 0 failed.
+   Pip: 22 snapped, `head.tail` unplaceable (heat still covered it).
+3. Heat result is normalised, measured, and judged by
+   `skin_policy.assess_heat` (coverage ≥ 0.98, every bone non-empty,
+   wingtip dominance ≥ 0.5). Verts the heat field never reaches get
+   distance weights for those verts only ("rescue", counted in the
+   report). Full distance fallback remains for rejected heat results.
+
+Ember Dragon re-rigged + re-animated + re-catalogued (GPU stages NOT
+re-run; same textured.glb): **bone-heat weights**, coverage 1.0,
+rescue on 6 verts, new GLB sha256 in the catalog metadata. Metrics
+(old fallback → new heat): wingtip dominance **0.0 → 1.0**, tail zone
+0.98 → 0.92, head zone 0.79 → 0.62 (heat shares the neck boundary
+with the spine — anatomically reasonable), blended-vert share
+99.6% → 87.5% and mean influences 3.84 → 3.00 (the fallback's higher
+"blend" numbers are smear: it assigns every bone everywhere; zone
+dominance is the correctness metric). Stress render
+(`stages/catalog/stress_render.py`: one wing at 1.25 rad — twice the
+hop's peak — head turned hard, tail curled hard) shows the raised
+wing intact with no tearing or joint collapse. Known cosmetic limit,
+pre-existing under the fallback too: a texture-seam streak down the
+belly centreline that appears as deformation grows (faint at hop
+apex, pronounced in the beyond-clip stress pose; absent at rest).
+
+Pip through the shipped rigger (stand-in check): pure bone-heat,
+coverage 1.0, wingtip 1.0, no rescue needed. Note the head-zone check
+reads 0.0 for Pip by definition — with ears fitted, the ear bones
+rightly dominate the top-central zone the check credits to "head".
+
+## P1 templates + prop path — BUILT AND PROVEN (2026-11-06, branch game-asset-builder/p1-templates)
+
+PR #37 (skinning) was merged by the owner; this branch starts from
+main at `cc28756`. What landed:
+
+- **Templates** (`stages/rig/template.py`): `quadruped()` — 15 bones
+  (root; spine + hips splitting the body so front and rear pitch
+  independently; neck, head; two-segment legs at four corners;
+  tail.1–2) and `biped(ears=False)` — 11 bones, 13 with ears
+  (vertical root/spine/head, two-segment arms and legs). Both are
+  bbox-fraction layouts in the same parameterized system as
+  `winged-creature`, and both run the unchanged skinning stack
+  (cleanup → snap → bone heat → `skin_policy` acceptance). One
+  measured design point: biped arm bones use a horizontal roll —
+  probed in Blender, that makes local +X the symmetric raise axis;
+  with the vertical roll no single axis raises a hanging arm.
+- **Recipes** (`stages/animate/poses.py` + per-template driver
+  tables in `animate_blender.py`): quadruped `idle` + `bounce`
+  (two-hop bounce chosen over a walk cycle — a walk's footfall
+  timing would be invented; the bounce's lift is measurable in a
+  still: apex ground clearance vs rest); biped `idle` + `wave`
+  (1.9 rad arm raise with a smoothstep hold envelope and a forearm
+  wiggle). The winged recipes/drivers are byte-for-byte the P0
+  behaviour (winged back-compat re-verified on the Ember Dragon).
+- **Tip checks generalized**: the acceptance policy's extremities
+  check is now labelled per template — wingtips (winged), feet
+  (quadruped: lowest 10% of verts, leg-dominated), hands (biped:
+  outer-low verts, same-side-arm dominated). Zone evidence is
+  per-template too; the biped head zone now counts ear bones across
+  the full head width (the inherited centre-strip definition
+  under-reported by ~0.4 on the goblin — metric fix, not a rig
+  change; the re-rigged GLB was byte-identical).
+- **Prop path** (`stages/prop/prop_blender.py`, pipeline `--prop`
+  mode): prep → mesh → texture → weld/decimate/cleanup → static
+  GLB → catalog. No rig/animate stage runs; the catalog entry has
+  empty bones/actions and provenance `rigged: false`,
+  `weight_method: null`. `render_verify.py --static` proves the
+  absence of an armature on cold re-import and refuses to pass a
+  rigged file. The stage registry is unchanged — a prop run is a
+  pipeline mode, not a fake stage.
+- **Facing correction**: `rig_blender.py --rotate-z {0,90,180,270}`,
+  plumbed through the pipeline/CLI and recorded in the rig report
+  and catalog provenance. Implemented via `matrix_world` after the
+  first implementation silently no-opped (glTF imports sit in
+  quaternion rotation mode; `rotation_euler` writes are ignored —
+  the bake-off scorer's lesson, second time it has bitten).
+
+Proof assets (all numbers in `docs/TEST_PLAN.md`; catalog entries
+sha-verified):
+
+- **Triceratops** (quadruped): Hunyuan emitted the body SIDEWAYS
+  (axis along X). First rig: heat shipped, coverage 1.0, head zone
+  0.05 — the metric exposed the mismatch instead of hiding it.
+  Re-rigged at rotate-z 90: coverage 1.0, feet 1.0, head zone
+  0.9998, 45,001 verts, idle + bounce, stress pose clean.
+- **Snow Goblin** (biped + ears): messiest rig input yet (137
+  non-manifold edges, 58 shells); heat shipped, coverage 1.0,
+  hands 1.0, 49,080 verts, idle + wave. Known cosmetic limit: the
+  fused-fur ruff is partly arm-weighted — the shipped wave reads
+  fine; a 2.2 rad stress raise drags a visible fur sail. No
+  tearing. Mitigation (weight-distance veto) is future work.
+  **Superseded the same day by the P1.1 fix below** — the owner
+  flagged the shipped wave itself (body texture stretching with
+  the arm), and the goblin was re-rigged with the veto.
+- **Treasure Chest** (prop): 27,041 verts from a 1.08M-vert
+  textured mesh, static verify clean (0 bones/groups/actions),
+  renders match the concept.
+
+Incidents: the bridge's exec-job tracking ends at ~15 min on long
+jobs (observed on the goblin and chest paint stages; the P0 paint
+disconnect fits the same pattern). The PC-side processes were
+unharmed both times and finished; their outputs were adopted from
+the lab (stage_runner result JSON is the authority) and the
+manifests/catalogues carry the true adopted records — a resume
+pass initially overwrote the mesh-stage records with
+`{"resumed": true}` placeholders, which were restored from the
+PC-side result files before cataloguing. Suite: 44/44.
+
+## P1.1 weight-distance veto — BUILT AND PROVEN (2026-11-06, same branch)
+
+Owner verdict on the shipped goblin wave: "the body texture
+stretched with the arm." Correct — bone heat had diffused through
+the fused fur mass until 0.51 of the torso zone's total weight sat
+on the arm bones (the ruff band measured 0.61). The fix is a general
+skinning-stack step, not a goblin special case:
+
+- `skin_policy.apply_veto` (pure, unit-tested): after heat, a
+  non-trunk bone keeps a vertex's weight only within its reach
+  radius — max(factor × bone length, floor × mesh height), shipped
+  defaults factor 0.85, floor 0.19. Vetoed weight renormalizes onto
+  the survivors. The root→head trunk chain (`template.trunk_chain`)
+  is exempt: its segments run through the mass they own, so distance
+  measures body radius there, not bleed. A vertex left weightless is
+  rescued onto its nearest eligible bone — a vetoing bone is
+  eligible again only for flesh projecting past its segment
+  endpoints (fingertips, ear tips, toes), so the armpit web rescues
+  onto the trunk instead of back onto the arm.
+- `skin_policy.assess_zone_share` gates the result: torso-zone arm
+  share must be ≤ 0.25 (unvetoed goblin: 0.51 — the check would
+  have caught the defect at P1 time).
+- The radius was tuned by measurement, not taste: on this mesh the
+  arm's own flesh sits 0.34 (median) from its segment while torso
+  bleed sits at 0.51, and the distributions overlap — tighter
+  (0.7/0.16: torso share 0.065) hollowed the arm into a stretched
+  fin in the wave render; looser (1.0/0.16) kept the arm whole but
+  left the ruff at 0.56. The shipped point (0.85/0.19) is the
+  measured compromise; renders were the judge (iterations kept
+  under `outputs/snow-goblin/before-veto/`).
+
+Re-proof (goblin only, from the saved textured.glb; mesh/texture
+stages NOT re-run; Ember Dragon, Triceratops and Treasure Chest
+untouched, catalogue-verified byte-identical):
+
+- torso arm share 0.506 → **0.139**; ruff-band share 0.614 → 0.448
+- coverage 1.0; hands (tip) dominance 1.0 → 0.997; head zone
+  0.667 → **0.787**; feet zone 0.904 (unchanged); every bone
+  populated (arm.L 24,162 → 6,967 weighted verts)
+- new GLB sha256 `86c91cd6…` (catalogue re-verified); suite 57/57
+- Visual verdict on the new renders: at the wave's 1.9 rad peak the
+  chest and ruff stay with the body and the raised paw reads as a
+  paw — the flagged defect is gone. Residual, stated plainly: a
+  taut fur sheet still stretches in the armpit web at full raise
+  (arm and torso are one fused fur mass; some web must stretch),
+  and the 2.2 rad stress pose — beyond the shipped clip — still
+  sails the flank, as it did before the veto. Euclidean distance
+  cannot fully separate flesh from bleed on a near-spherical fur
+  character; a geodesic-weight cleanup would be the next step if
+  the owner wants the stress pose clean too.
+
+Next:
+1. Owner decisions outstanding: merge of this P1/PR #38 (draft,
+   against main — now includes the P1.1 veto commits); whether to
+   unblock Stable Fast 3D (owner-side HF action, only if wanted).
+2. P2 when directed: a simple local UI over the catalog and
+   pipeline. Possible further hardening if wanted: a bridge-client
+   adoption path for >15 min stages instead of the manual recovery
+   used here.
+
+## P2 cleanup slice — BUILT AND PROVEN (2026-11-06, branch game-asset-builder/p2-cleanup, stacked on PR #38)
+
+Owner commissioned all three layers (time/GPU explicitly not a
+constraint). Full numbers in TEST_PLAN's P2 section; design notes
+in `skin_policy.py` / `rig_blender.py` docstrings.
+
+- **Layer 1 — pose spec + preflight.** Spec in DESIGN.md
+  (per body plan; quadrupeds get their own spec — standing
+  square, legs separated, belly clear — since A/T poses don't
+  fix them). `stages/prep/preflight.py` runs in the pipeline for
+  rigged runs and records a pass/warn in the manifest. To-spec
+  giraffe concept passes; the original goblin concept warns
+  (arm-daylight 0.009).
+- **Layer 2 — geodesic veto.** Veto reach = max(Euclidean,
+  graph-geodesic) (`stages/rig/geodesic.py`, Dijkstra over the
+  edge graph; ~2 s build at 50k verts). Geodesic alone REJECTED
+  by measurement (goblin gate failure at 0.268). Beyond-tail
+  exemption for distal flesh; both-ends exemption measured and
+  rejected (ruff). Side finding: the P1.1 belly guard zone had
+  never run on a quadruped and misfired on leg centrelines —
+  redrawn between the leg columns, threshold unchanged.
+- **Layer 3 — segmentation.** Bake-off
+  (`benchmarks/segmentation/scores.md`): P3-SAM adopted
+  (licence-clean in Canada; goblin CLEAN, triceratops ROUGH);
+  PartField better but NVIDIA-non-commercial — rejected for
+  adoption, research cross-check only; SAMesh not run per the
+  bake-off's gating. New `segment` stage between texture and
+  rig: VM proxy with the bake-off's exact recipe (recipe is
+  load-bearing — a rig-frame variant collapsed the triceratops
+  to one part), P3-SAM in its own PC venv/process (peak
+  9.8 GB, VRAM verified back to baseline), labels via nearest
+  face centroid under the recorded canonical transform,
+  geometry separation at part boundaries (split verts are the
+  seam caps), then label-aware skinning: plurality label→bone
+  map; only foreign-part dominants can be forbidden, and only
+  on non-boundary or beyond-reach pairs.
+- **Re-proofs** (saved textured meshes; priors preserved under
+  `outputs/<slug>/before-cleanup/`): goblin 9 parts, torso
+  share 0.139 → **0.079**, head 0.787 → 0.881, feet 0.831,
+  hands 0.778 (label-veto cost, disclosed), stress sail
+  materially reduced (front) / reduced (three-quarter) —
+  residual is the arm part's own web fin at 2.2 rad. Trike
+  5 parts (2 of 4 legs separate — P3-SAM's known weakness),
+  feet/head 1.0, belly 0.200. Dragon/Chest byte-identical.
+  Suite 79/79.
+
+Next:
+1. Owner decisions: merge PR #38, then this slice's PR (stacked
+   draft); the UI slice (old P2) and engine hand-offs (P3) are
+   still pending direction.
+2. Known follow-ups if wanted: P3-SAM leg re-prompting for
+   quadrupeds (interactive point-prompt mode exists upstream);
+   hands-dominance cost of fine arm labels (0.78) could be
+   revisited if a future asset's hands matter more.
+
+Boundaries: no cloud fallback exists or may be added; weights and outputs
+never enter git; GPU claims only from PC runs; merges are the owner's call.

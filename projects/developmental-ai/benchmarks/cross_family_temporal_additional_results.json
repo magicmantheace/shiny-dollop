@@ -1,0 +1,100 @@
+{
+  "blind": false,
+  "evaluation": "delayed test/99900..99939",
+  "protocol": "benchmarks/cross_family_temporal_protocol.json",
+  "response_fit": "delayed train/0..299,validation train/5000..5059",
+  "rows": [
+    {
+      "cue_hits": {
+        "bag": 6,
+        "correct_cue": 40,
+        "fixed_eight": 19,
+        "last_token": 27,
+        "max_path": 14,
+        "oracle_cipher_variable": 15,
+        "variable_transfer": 15
+      },
+      "delayed_task_successes": {
+        "bag": 6,
+        "correct_cue": 40,
+        "fixed_eight": 19,
+        "last_token": 27,
+        "max_path": 14,
+        "oracle_cipher_variable": 15,
+        "variable_transfer": 15
+      },
+      "emission_p": 0.789084,
+      "event_count_mae_diagnostic": {
+        "always_six": 1.075,
+        "estimated_common": 0.95534,
+        "length_minus_four": 0.6
+      },
+      "fit_mapping_exact_scoring_only": true,
+      "model_sha256": "d2546c2f744b196aa371442ed189933fe287a06f41d7f4e11827be146cd0ae00",
+      "seed": 72019,
+      "survival_p": 0.773051
+    },
+    {
+      "cue_hits": {
+        "bag": 10,
+        "correct_cue": 40,
+        "fixed_eight": 19,
+        "last_token": 27,
+        "max_path": 21,
+        "oracle_cipher_variable": 19,
+        "variable_transfer": 19
+      },
+      "delayed_task_successes": {
+        "bag": 10,
+        "correct_cue": 40,
+        "fixed_eight": 19,
+        "last_token": 27,
+        "max_path": 21,
+        "oracle_cipher_variable": 19,
+        "variable_transfer": 19
+      },
+      "emission_p": 0.787763,
+      "event_count_mae_diagnostic": {
+        "always_six": 0.925,
+        "estimated_common": 1.00733,
+        "length_minus_four": 0.6125
+      },
+      "fit_mapping_exact_scoring_only": true,
+      "model_sha256": "b8c18a5dba623c35bf01365fcf167f2cfaabfe60e8feeac3deaa5045ff1a227d",
+      "seed": 83003,
+      "survival_p": 0.773261
+    },
+    {
+      "cue_hits": {
+        "bag": 9,
+        "correct_cue": 40,
+        "fixed_eight": 18,
+        "last_token": 28,
+        "max_path": 18,
+        "oracle_cipher_variable": 18,
+        "variable_transfer": 18
+      },
+      "delayed_task_successes": {
+        "bag": 9,
+        "correct_cue": 40,
+        "fixed_eight": 18,
+        "last_token": 28,
+        "max_path": 18,
+        "oracle_cipher_variable": 18,
+        "variable_transfer": 18
+      },
+      "emission_p": 0.797801,
+      "event_count_mae_diagnostic": {
+        "always_six": 0.95,
+        "estimated_common": 0.83781,
+        "length_minus_four": 0.5625
+      },
+      "fit_mapping_exact_scoring_only": true,
+      "model_sha256": "623bb729225e3a2b5299a38a1a7293de4a6e2abcfb380a4dd9051e69b27245d9",
+      "seed": 94009,
+      "survival_p": 0.774795
+    }
+  ],
+  "schema": "developmental-ai.cross-family-temporal-benchmark/v1",
+  "source_fit": "navigation train/89400..89639 and train/90500..90529"
+}

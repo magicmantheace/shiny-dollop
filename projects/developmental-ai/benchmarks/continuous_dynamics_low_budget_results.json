@@ -1,0 +1,189 @@
+{
+  "iterations": 6,
+  "kind": "inspected-development-not-blind",
+  "navigation_episodes_per_phase": 10,
+  "note": "the monitor sees only ordinary unlabelled histories; benchmark truth is used only for measurement",
+  "order": [
+    "original",
+    "changed",
+    "original"
+  ],
+  "phase_episodes": 20,
+  "rows": [
+    {
+      "phases": [
+        {
+          "correct_snapshot_navigation": 0.7,
+          "correct_steps": 16,
+          "final_selected": "original",
+          "final_status": "stable",
+          "first_correct_step": 5,
+          "fixed_original_navigation": 0.7,
+          "fraction_correct": 0.8,
+          "known_physics_oracle_navigation": 0.7,
+          "mean_end_model_log_likelihoods": {
+            "changed": -1.557091,
+            "original": -1.400719
+          },
+          "regime_for_scoring_only": "original",
+          "selected_model_navigation": 0.7,
+          "switch_events": 1
+        },
+        {
+          "correct_snapshot_navigation": 0.5,
+          "correct_steps": 0,
+          "final_selected": "original",
+          "final_status": "uncertain",
+          "first_correct_step": null,
+          "fixed_original_navigation": 0.3,
+          "fraction_correct": 0.0,
+          "known_physics_oracle_navigation": 0.5,
+          "mean_end_model_log_likelihoods": {
+            "changed": -1.510691,
+            "original": -1.542165
+          },
+          "regime_for_scoring_only": "changed",
+          "selected_model_navigation": 0.3,
+          "switch_events": 0
+        },
+        {
+          "correct_snapshot_navigation": 0.8,
+          "correct_steps": 20,
+          "final_selected": "original",
+          "final_status": "stable",
+          "first_correct_step": 1,
+          "fixed_original_navigation": 0.8,
+          "fraction_correct": 1.0,
+          "known_physics_oracle_navigation": 0.5,
+          "mean_end_model_log_likelihoods": {
+            "changed": -1.739965,
+            "original": -1.59387
+          },
+          "regime_for_scoring_only": "original",
+          "selected_model_navigation": 0.8,
+          "switch_events": 0
+        }
+      ],
+      "seed": 1009
+    },
+    {
+      "phases": [
+        {
+          "correct_snapshot_navigation": 1.0,
+          "correct_steps": 15,
+          "final_selected": "original",
+          "final_status": "stable",
+          "first_correct_step": 6,
+          "fixed_original_navigation": 1.0,
+          "fraction_correct": 0.75,
+          "known_physics_oracle_navigation": 1.0,
+          "mean_end_model_log_likelihoods": {
+            "changed": -1.872783,
+            "original": -1.63506
+          },
+          "regime_for_scoring_only": "original",
+          "selected_model_navigation": 1.0,
+          "switch_events": 1
+        },
+        {
+          "correct_snapshot_navigation": 0.1,
+          "correct_steps": 8,
+          "final_selected": "changed",
+          "final_status": "uncertain",
+          "first_correct_step": 13,
+          "fixed_original_navigation": 0.1,
+          "fraction_correct": 0.4,
+          "known_physics_oracle_navigation": 0.5,
+          "mean_end_model_log_likelihoods": {
+            "changed": -1.538497,
+            "original": -1.625311
+          },
+          "regime_for_scoring_only": "changed",
+          "selected_model_navigation": 0.1,
+          "switch_events": 1
+        },
+        {
+          "correct_snapshot_navigation": 0.9,
+          "correct_steps": 18,
+          "final_selected": "original",
+          "final_status": "stable",
+          "first_correct_step": 3,
+          "fixed_original_navigation": 0.9,
+          "fraction_correct": 0.9,
+          "known_physics_oracle_navigation": 0.8,
+          "mean_end_model_log_likelihoods": {
+            "changed": -1.738335,
+            "original": -1.484098
+          },
+          "regime_for_scoring_only": "original",
+          "selected_model_navigation": 0.9,
+          "switch_events": 1
+        }
+      ],
+      "seed": 1013
+    },
+    {
+      "phases": [
+        {
+          "correct_snapshot_navigation": 0.7,
+          "correct_steps": 16,
+          "final_selected": "original",
+          "final_status": "stable",
+          "first_correct_step": 5,
+          "fixed_original_navigation": 0.7,
+          "fraction_correct": 0.8,
+          "known_physics_oracle_navigation": 0.7,
+          "mean_end_model_log_likelihoods": {
+            "changed": -1.677385,
+            "original": -1.47136
+          },
+          "regime_for_scoring_only": "original",
+          "selected_model_navigation": 0.7,
+          "switch_events": 1
+        },
+        {
+          "correct_snapshot_navigation": 0.3,
+          "correct_steps": 0,
+          "final_selected": "original",
+          "final_status": "uncertain",
+          "first_correct_step": null,
+          "fixed_original_navigation": 0.1,
+          "fraction_correct": 0.0,
+          "known_physics_oracle_navigation": 0.7,
+          "mean_end_model_log_likelihoods": {
+            "changed": -1.619275,
+            "original": -1.683194
+          },
+          "regime_for_scoring_only": "changed",
+          "selected_model_navigation": 0.1,
+          "switch_events": 0
+        },
+        {
+          "correct_snapshot_navigation": 1.0,
+          "correct_steps": 20,
+          "final_selected": "original",
+          "final_status": "stable",
+          "first_correct_step": 1,
+          "fixed_original_navigation": 1.0,
+          "fraction_correct": 1.0,
+          "known_physics_oracle_navigation": 1.0,
+          "mean_end_model_log_likelihoods": {
+            "changed": -1.501337,
+            "original": -1.294492
+          },
+          "regime_for_scoring_only": "original",
+          "selected_model_navigation": 1.0,
+          "switch_events": 0
+        }
+      ],
+      "seed": 1031
+    }
+  ],
+  "schema": "continuous-dynamics/v1",
+  "seeds": [
+    1009,
+    1013,
+    1031
+  ],
+  "train_episodes_per_model": 160
+}

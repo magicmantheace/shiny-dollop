@@ -131,6 +131,7 @@ var eventlog_overlay: Control
 var eventlog_text: RichTextLabel
 var diplomacy_overlay: Control
 var diplomacy_text: RichTextLabel
+var overwrite_dialog: ConfirmationDialog
 var catchup_overlay: Control
 var catchup_title: Label
 var catchup_body: RichTextLabel
@@ -520,6 +521,12 @@ func _build_menu(layer: CanvasLayer) -> void:
 	new_button.pressed.connect(_on_new_campaign_pressed)
 	box.add_child(new_button)
 
+	overwrite_dialog = ConfirmationDialog.new()
+	overwrite_dialog.title = "Overwrite existing campaign?"
+	overwrite_dialog.ok_button_text = "Overwrite"
+	overwrite_dialog.confirmed.connect(_on_overwrite_confirmed)
+	add_child(overwrite_dialog)
+
 	var saves_caption := Label.new()
 	saves_caption.text = "Saved campaigns"
 	box.add_child(saves_caption)
@@ -842,13 +849,31 @@ func _on_new_campaign_pressed() -> void:
 	if not name.ends_with(".mwsb"):
 		name += ".mwsb"
 	save_path = _saves_dir_global().path_join(name)
-	var resp: Dictionary = bridge_client.call_bridge({"op": "new", "save": save_path, "seed": int(seed_spin.value), "ai_races": int(ai_spin.value)})
+	_start_new_campaign(false)
+
+
+func _start_new_campaign(overwrite: bool) -> void:
+	var req := {"op": "new", "save": save_path, "seed": int(seed_spin.value), "ai_races": int(ai_spin.value)}
+	if overwrite:
+		req["overwrite"] = true
+	var resp: Dictionary = bridge_client.call_bridge(req)
 	last_bridge_ms = Time.get_ticks_msec()
 	if not bool(resp.get("ok", false)):
-		_set_message("New campaign failed: %s" % str(resp.get("error", "unknown error")))
+		var err := str(resp.get("error", "unknown error"))
+		if not overwrite and err.contains("already exists"):
+			# The bridge refused to clobber an existing campaign — ask
+			# first, and only retry with the explicit overwrite flag.
+			overwrite_dialog.dialog_text = "A campaign named \"%s\" already exists.\nStarting a new campaign will permanently replace it." % save_path.get_file()
+			overwrite_dialog.popup_centered()
+			return
+		_set_message("New campaign failed: %s" % err)
 		return
 	_enter_session(resp)
 	_set_message("Campaign started at Sol — day 0.")
+
+
+func _on_overwrite_confirmed() -> void:
+	_start_new_campaign(true)
 
 
 func _on_load_pressed() -> void:

@@ -1,0 +1,58 @@
+{
+  "schema": "developmental-ai.context-plan-transfer-protocol/v1",
+  "status": "frozen-before-first-evaluation",
+  "purpose": "Test retention and retrieval of complete action sequences for alternating unfamiliar hidden-precondition tasks using opaque action roles and strict budgets",
+  "family": "novel procedural simulator, independent of historical workshop/repair generators",
+  "generator": {
+    "roles": 7,
+    "role_tokens": "seed-specific opaque stable identifiers; public per-episode action aliases independently shuffled",
+    "contexts": 2,
+    "context_label": "seed-opaque but stable; not the dependency structure",
+    "graph_A": "two leaves -> merge -> common goal, 4 required actions",
+    "graph_B": "three serial steps -> common goal, 4 required actions; disjoint non-goal prerequisite roles",
+    "episode_budget": 7,
+    "episodes_alternate_context": true,
+    "simulation_only": true
+  },
+  "cohorts": {
+    "development": [
+      14003,
+      14009,
+      14033
+    ],
+    "additional_inspected": [
+      27007,
+      27011,
+      27017
+    ]
+  },
+  "evaluation": {
+    "split": "test",
+    "first_index": 85000,
+    "episodes_per_seed": 80,
+    "cold_first_20": true,
+    "report_per_context": true
+  },
+  "models": [
+    "context-indexed successful action-plan memory with online exploration fallback",
+    "single most recent success plan regardless of context",
+    "no cross-episode retention (same exploration policy)",
+    "fixed lexical action role ordering",
+    "privileged dependency oracle"
+  ],
+  "metrics": [
+    "successes by model/seed, first20 and later60",
+    "mean accepted and blocked action attempts",
+    "coverage of both context skill slots",
+    "independent replay and rehashed mutation rejection"
+  ],
+  "boundaries": [
+    "No DAG, action graph, hidden prereq or simulator reward truth to learner API; terminal success and accepted/blocked feedback only",
+    "No privileged role semantics; stable role IDs and contexts remain engineered priors",
+    "No transfer to independently named third environment claimed",
+    "Previously inspected seeds NOT blind",
+    "No retroactive protocol edits or hyperparameter tuning on test episodes",
+    "No real actions, automatic model promotion or AthenZ/Synveil permission",
+    "V2A and V2B scope preserved"
+  ]
+}

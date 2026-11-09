@@ -1,0 +1,81 @@
+{
+  "blind": false,
+  "episodes_per_seed": 40,
+  "rows": [
+    {
+      "competing_signals": 40,
+      "gate_digest": "74dd93158ebad5145c69eb5233c5eb1c816737f49f03eb940ddd0ca2ac32e1ac",
+      "navigation": {
+        "first": 5,
+        "last": 3,
+        "learned": 35,
+        "no_context": 18,
+        "oracle": 35,
+        "random": 8
+      },
+      "seed": 17431,
+      "source_scores": {
+        "0:A": 0.78903,
+        "0:B": 0.17507,
+        "0:N": 0.27289,
+        "1:A": 0.33188,
+        "1:B": 0.7216,
+        "1:N": 0.24582
+      }
+    },
+    {
+      "competing_signals": 40,
+      "gate_digest": "3ab11e26aea5850dc6b9a6047086859ce5ea325c9c79f7c3efb238cf71f6ad3a",
+      "navigation": {
+        "first": 10,
+        "last": 13,
+        "learned": 37,
+        "no_context": 20,
+        "oracle": 37,
+        "random": 15
+      },
+      "seed": 24869,
+      "source_scores": {
+        "0:A": 0.76955,
+        "0:B": 0.26552,
+        "0:N": 0.20165,
+        "1:A": 0.22358,
+        "1:B": 0.797,
+        "1:N": 0.09282
+      }
+    },
+    {
+      "competing_signals": 40,
+      "gate_digest": "05e09d574a69c7ca07a92dc19d71004863c33abbf3f815a5310e05c2f600bd3a",
+      "navigation": {
+        "first": 10,
+        "last": 8,
+        "learned": 37,
+        "no_context": 18,
+        "oracle": 37,
+        "random": 7
+      },
+      "seed": 37021,
+      "source_scores": {
+        "0:A": 0.76862,
+        "0:B": 0.08953,
+        "0:N": 0.21998,
+        "1:A": 0.15347,
+        "1:B": 0.77684,
+        "1:N": 0.28916
+      }
+    }
+  ],
+  "schema": "developmental-ai.online-gate-benchmark/v1",
+  "seeds": [
+    17431,
+    24869,
+    37021
+  ],
+  "test_splits": {
+    "occluded": "test/94000+",
+    "signals": "test/93000+"
+  },
+  "train": 1800,
+  "train_split": "train/0..N-1 (competing signals); grid train for motion updater"
+}

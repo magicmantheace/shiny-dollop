@@ -1,0 +1,97 @@
+{
+  "blind": false,
+  "paired_reference_to_learner": false,
+  "precommitted_protocol": "benchmarks/reward_only_alignment_protocol.json",
+  "reward_is_terminal_success_only": true,
+  "rows": [
+    {
+      "chosen_cue_matches_public_reference_scoring_only": {
+        "context_blind": 19,
+        "direct_lookup": 40,
+        "first": 10,
+        "last": 10,
+        "oracle": 40,
+        "random": 7,
+        "reward_only": 40
+      },
+      "record_digest": "411f95d371efcd88c0f2367ffa1ea4a079b0af72cb6f9bd05ee58593182eaa82",
+      "scores": {
+        "context_blind": 17,
+        "direct_lookup": 35,
+        "first": 9,
+        "last": 9,
+        "oracle": 35,
+        "random": 7,
+        "reward_only": 35
+      },
+      "seed": 2749,
+      "source_selection": {
+        "lunar": "foreign-47",
+        "solar": "foreign-91"
+      },
+      "train_success_context_blind": 153,
+      "train_success_reward_only": 309
+    },
+    {
+      "chosen_cue_matches_public_reference_scoring_only": {
+        "context_blind": 20,
+        "direct_lookup": 40,
+        "first": 9,
+        "last": 6,
+        "oracle": 40,
+        "random": 9,
+        "reward_only": 40
+      },
+      "record_digest": "801af4401d0c90c3e5d734086b5f9b8a2193ef206fe718ac854fb6e7a089287a",
+      "scores": {
+        "context_blind": 18,
+        "direct_lookup": 36,
+        "first": 8,
+        "last": 5,
+        "oracle": 36,
+        "random": 7,
+        "reward_only": 36
+      },
+      "seed": 6607,
+      "source_selection": {
+        "lunar": "foreign-66",
+        "solar": "foreign-13"
+      },
+      "train_success_context_blind": 167,
+      "train_success_reward_only": 305
+    },
+    {
+      "chosen_cue_matches_public_reference_scoring_only": {
+        "context_blind": 18,
+        "direct_lookup": 40,
+        "first": 8,
+        "last": 7,
+        "oracle": 40,
+        "random": 9,
+        "reward_only": 40
+      },
+      "record_digest": "795807c8356b183a4904a84b40c763bd23034af005525b263571c3dc6c14deee",
+      "scores": {
+        "context_blind": 17,
+        "direct_lookup": 36,
+        "first": 8,
+        "last": 5,
+        "oracle": 36,
+        "random": 7,
+        "reward_only": 36
+      },
+      "seed": 9901,
+      "source_selection": {
+        "lunar": "foreign-66",
+        "solar": "foreign-13"
+      },
+      "train_success_context_blind": 155,
+      "train_success_reward_only": 309
+    }
+  ],
+  "schema": "developmental-ai.reward-only-alignment-benchmark/v1",
+  "test_namespace": "test/98000..98039",
+  "test_target_episodes": 40,
+  "train_namespace": "train/78000..78359",
+  "train_target_episodes": 360
+}

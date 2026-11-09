@@ -1,0 +1,64 @@
+{
+  "schema": "developmental-ai.procedural-skill-transfer-protocol/v1",
+  "status": "frozen prior to implementation and evaluation",
+  "research_question": "Can a policy trained on procedural workshop dependencies reuse a learned action-priority skill in an independently generated maintenance/repair dependency task without target rewards?",
+  "source": "workshop",
+  "target": "repair",
+  "shared_engineered_interface": "public DAG tasks, candidate action names, their prerequisites, completed action list, active goal, remaining step budget; no simulator secrets or graph membership answer label",
+  "train": {
+    "split": "train",
+    "seed_cohort": [
+      14003,
+      14009,
+      14033
+    ],
+    "index_start": 0,
+    "episodes_per_seed": 600,
+    "max_steps": 6,
+    "action_exploration": "epsilon 0.3 decaying to 0.05; deterministic per episode"
+  },
+  "evaluation": {
+    "split": "test",
+    "index_start": 70000,
+    "episodes_per_seed_per_family": 100,
+    "seeds": [
+      14003,
+      14009,
+      14033
+    ],
+    "later_additional_inspected": [
+      27007,
+      27011,
+      27017
+    ],
+    "source_family": "workshop",
+    "target_family": "repair"
+  },
+  "families": {
+    "workshop": "two independent material actions, one join, one deliver; three distractors; shuffled opaque work labels",
+    "repair": "one inspect, two independent fix steps, one certify, one restore; two distractors; shuffled opaque repair labels"
+  },
+  "methods": [
+    "source-trained tabular contextual action scorer zero-shot target",
+    "untrained random available action",
+    "public-DAG greedy goal-ancestry heuristic",
+    "public shortest valid plan oracle with full public DAG",
+    "learned policy with ancestor feature ablated"
+  ],
+  "metrics": [
+    "completed goal within six steps / 100",
+    "mean wasted actions",
+    "source-vs-target regression",
+    "frozen policy SHA256 and restart equivalence"
+  ],
+  "boundaries": [
+    "No target-family learning or test-reward updates",
+    "Public graph ancestor feature is engineered and MUST be disclosed",
+    "No hidden required action labels beyond what is inferable from public goal/prerequisites",
+    "Score policy trained from public outcomes only",
+    "All seeds previously inspected in other experiments, not independent blind; split namespace is distinct",
+    "Keep all regressions and strong greedy/oracle controls",
+    "No hardware, system tools, credentials, model promotion or private human data",
+    "D3/D4 remain open absent unrelated task/representation transfer"
+  ]
+}

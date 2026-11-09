@@ -1,0 +1,81 @@
+{
+  "schema": "developmental-ai.variable-correspondence-protocol/v1",
+  "status": "frozen before evaluating variable-deletion episodes",
+  "objective": "Infer uncertainty in common event correspondences and token emission reliability using only public training streams, not the generator's retained indices",
+  "cohorts": {
+    "development": [
+      43103,
+      50021,
+      61031
+    ],
+    "additional_inspected": [
+      72019,
+      83003,
+      94009
+    ]
+  },
+  "fit": {
+    "split": "train",
+    "index_start": 90000,
+    "episodes_per_seed": 120,
+    "selector": "frozen baseline eight-match marginal, trained permutation from prior unsupervised public streams",
+    "em_iterations": 3,
+    "initial_match_reliability": 0.75,
+    "initial_event_survival": 0.7,
+    "prior_pseudocounts": 2
+  },
+  "test": {
+    "split": "test",
+    "index_start": 99800,
+    "episodes_per_seed": 40
+  },
+  "synthetic_deletions": {
+    "underlying_events": 8,
+    "drop_per_sensor_stream": "integer uniform 0..2",
+    "drop_per_candidate_stream": "integer uniform 0..2",
+    "independent_extra_tokens_per_stream": "integer uniform 2..4",
+    "lengths": "8..12; no insertion indices passed to learner"
+  },
+  "estimated_model": {
+    "shared_event_count_support": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "probability_of_symbol_agreement_range": [
+      0.52,
+      0.94
+    ],
+    "event_survival_range": [
+      0.4,
+      0.95
+    ],
+    "method": "sum-product alignment expectation-semiring EM on pseudo-positive candidates from frozen old selector; three iterations; no true alignment, labels or heldout feedback"
+  },
+  "baselines": [
+    "same-data eight-pair unsupervised marginal",
+    "same-data unsupervised maximum-path alignment",
+    "same-data old reward-alignment scorer",
+    "fixed source learned from train navigation reward",
+    "oracle cipher with learned variable-count model",
+    "privileged correct cue"
+  ],
+  "metrics": [
+    "navigation completed/40 per seed",
+    "correct candidate hits/40",
+    "per-episode latent matched-event posterior and generator-only true common event count scoring",
+    "learned emission and survival parameters",
+    "integrity/restart and exhaustive small reference"
+  ],
+  "constraints": [
+    "Do not edit old benchmarks, train splits or prior results",
+    "Freeze all fit/eval seeds, parameters and comparisons before test execution",
+    "Previously inspected cohorts are not blind",
+    "No hidden generator drop indices, token cipher, correct candidate or positions to learner or EM fit",
+    "No candidate promotion or system actions",
+    "Report regressions and simple-model wins"
+  ]
+}
