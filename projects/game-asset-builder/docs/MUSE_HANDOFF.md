@@ -466,3 +466,81 @@ Next:
 
 Boundaries: no cloud fallback exists or may be added; weights and outputs
 never enter git; GPU claims only from PC runs; merges are the owner's call.
+
+## P5 campfire creatures — PARTIAL (2026-11-09, branch game-asset-builder/p5-campfire-creatures, stacked on P4)
+
+Owner commissioned eight "weird smashup" creatures for the
+campfire wallpaper (2026-11-08): batch 1 = Moth-Hart, Toasty,
+Lantern Snail; batch 2 = Ember Owl-Cat, Geode Tortoise,
+Axolotl-Capybara, Mandrake Toddler, Crow Postman. Reference art for
+all eight exists in `~/workspace/creature-refs/` (batch 2's five
+were generated 2026-11-09 in the same recipe).
+
+- **Infrastructure (commit `d81bb38`)**: `winged-quadruped` and
+  `snail` rig templates, the SIGNATURES registry (fan / headturn /
+  bounce / scream / bow / shiver / wiggle; the snail's showcase is
+  its built-in `retract`), the snail emissive-shell material note
+  in the catalog step, and the session-0 bridge transport
+  (PowerShell jobs as .ps1 files via cmd jobs). P5 test module:
+  21 tests.
+- **Moth-Hart — BUILT AND VERIFIED.** Winged-quadruped + `--ears`,
+  signature `fan`. Mesh exit 0 (334.11 s; 318,606 verts raw),
+  texture exit 0 (runner 1,330.41 s; textured 487,742 verts; peak
+  VRAM 11,870 MiB), segment exit 0 (136.74 s; 12 P3-SAM parts),
+  rig 21 bones with bone-heat + geodesic veto + label-aware veto
+  (25,087 entries vetoed; distance rescue on 2,759 verts). Clips:
+  idle 4.79 s, fan 2.79 s, walk 2.0 s, run 1.0 s. Catalogued
+  45,637 verts / 89,496 faces, GLB 20,692,592 bytes, sha256
+  `0616e52aaeed63ba…`, catalog-verify **MATCH**. three.js playback
+  verified on the build VM (Chrome headless shell + SwiftShader,
+  the project harness page): ok=true, 21 bones; quarter-cycle
+  deltas fan 0.666 / run 0.308 / walk 0.170 / idle 0.030. Rest +
+  fan renders read clean — four distinct legs despite the
+  preflight "warn" (leg band fuses in the concept's erosion test;
+  segmentation + separation handled it). Verdict: **RIGGABLE**.
+- **The other seven are NOT BUILT — blocked on the PC bridge.**
+  On 2026-11-09 the build VM rebooted and its Tailscale route to
+  the bridge agent stopped passing traffic (proxy accepts then
+  drops connections to the agent; `tailscale status` still says
+  Connected; no approval request was visible from the build
+  side). Every remaining creature needs GPU mesh/texture/segment
+  stages on the PC, so work stops at Moth-Hart until the route is
+  re-established/re-approved from the owner's side. Nothing about
+  the block is in the pipeline or the PC agent (both proven the
+  same evening).
+- **Bookkeeping repairs, recorded in the Moth-Hart manifest +
+  catalog provenance (`stage_record_note`)**: a `--resume`
+  relaunch overwrote the manifest's detailed mesh record, and the
+  texture stage's post-run result fetch once returned a previous
+  aborted attempt's exit-1 record after the stage had actually
+  completed (exit 0). The textured GLB was fetched manually
+  (sha256-verified) and the pipeline resumed from it; the true
+  mesh/texture records were restored from the stages' own PC
+  result files. The segment record was likewise reconstructed
+  (runner exit 0 / 136.74 s, read live pre-reboot) after the
+  post-reboot relaunch's manifest rewrite dropped it; its outputs
+  on disk are the originals.
+- **Operational lessons (hard-won, 2026-11-08/09)**: (1) a
+  pipeline client that dies after dispatching a GPU stage leaves
+  the stage RUNNING server-side — check the agent's job/process
+  list before re-dispatching, or two paint stages will share one
+  GPU and exhaust the PC's RAM (observed: 0.5 GB free of 32 GB;
+  both trees had to be taskkilled). (2) Bridge file reads can
+  return a stale record for minutes after a stage writes its
+  result — when a stage reports failure, re-fetch its result +
+  log before re-running anything; the reads self-heal. (3) VM
+  reboots wipe /tmp and kill in-flight clients — keep run
+  scripts/logs in the workspace, and prefer `--resume` +
+  manifest checks over blind relaunches.
+- Suite **134/134** (the UI catalog test now expects five assets
+  incl. moth-hart, bone count 21).
+
+Next when the bridge route returns: run Toasty (biped, signature
+`bounce`) and Lantern Snail (snail template, no `--signature` —
+showcase `retract`; the catalog step adds the emissive shell
+note), then batch 2 in commission order (Ember Owl-Cat =
+winged-creature/`headturn`, Geode Tortoise = quadruped/`shiver`,
+Axolotl-Capybara = quadruped/`wiggle`, Mandrake Toddler =
+biped/`scream`, Crow Postman = biped/`bow`), verify each
+(catalog-verify + three.js deltas), push, and open the single
+draft PR against `game-asset-builder/p4-game-animations`.

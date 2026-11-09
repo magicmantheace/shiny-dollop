@@ -1,0 +1,371 @@
+{
+ "entry_version": 1,
+ "name": "Moth-Hart",
+ "slug": "moth-hart",
+ "source_concept": "media-generation-moth-hart-reference-0-de0d4da4-8dba-467d-a34c-9fcb6ee5a154.webp",
+ "asset_file": "moth-hart.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "0616e52aaeed63badd7f47c1340cb094e77ee54ac2ed9bc5276f423a880e06fa",
+ "bytes": 20692592,
+ "counts": {
+  "verts": 45637,
+  "faces": 89496,
+  "raw_mesh_verts": 487742,
+  "raw_mesh_faces": 637164
+ },
+ "bones": [
+  "root",
+  "spine",
+  "hips",
+  "neck",
+  "head",
+  "ear.L",
+  "ear.R",
+  "wing.L",
+  "wing2.L",
+  "wing.R",
+  "wing2.R",
+  "leg.FL",
+  "leg2.FL",
+  "leg.HL",
+  "leg2.HL",
+  "leg.FR",
+  "leg2.FR",
+  "leg.HR",
+  "leg2.HR",
+  "tail.1",
+  "tail.2"
+ ],
+ "actions": [
+  "fan",
+  "idle",
+  "run",
+  "walk"
+ ],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": true,
+  "rig_template": "winged-quadruped",
+  "signature_clip": "fan",
+  "weight_method": "bone-heat (automatic weights); geodesic distance veto (factor 0.85, floor 0.19); label-aware veto (P3-SAM parts, 25087 entries vetoed by label); distance rescue on 2759 verts",
+  "segmentation": {
+   "model": "P3-SAM (Tencent Hunyuan3D-Part)",
+   "parts": 12,
+   "proxy_faces": 50000,
+   "islands_relabelled": 34,
+   "separated_verts_added": 893,
+   "labelled_verts": 45637
+  },
+  "label_map": {
+   "0": {
+    "dominant": "ear.L",
+    "allowed": [
+     "ear.L",
+     "head",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "ear.R",
+     "leg.FL",
+     "leg.FR",
+     "leg2.HR",
+     "wing.L",
+     "wing.R",
+     "wing2.L"
+    ]
+   },
+   "1": {
+    "dominant": "ear.R",
+    "allowed": [
+     "ear.R",
+     "head",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "ear.L",
+     "leg.FL",
+     "leg.FR",
+     "leg2.HR",
+     "wing.L",
+     "wing.R",
+     "wing2.L"
+    ]
+   },
+   "2": {
+    "dominant": "neck",
+    "allowed": [
+     "head",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "ear.L",
+     "ear.R",
+     "leg.FL",
+     "leg.FR",
+     "leg2.HR",
+     "wing.L",
+     "wing.R",
+     "wing2.L"
+    ]
+   },
+   "3": {
+    "dominant": "wing2.L",
+    "allowed": [
+     "head",
+     "neck",
+     "root",
+     "spine",
+     "wing.L",
+     "wing2.L"
+    ],
+    "forbidden": [
+     "ear.L",
+     "ear.R",
+     "leg.FL",
+     "leg.FR",
+     "leg2.HR",
+     "wing.R"
+    ]
+   },
+   "4": {
+    "dominant": "neck",
+    "allowed": [
+     "head",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "ear.L",
+     "ear.R",
+     "leg.FL",
+     "leg.FR",
+     "leg2.HR",
+     "wing.L",
+     "wing.R",
+     "wing2.L"
+    ]
+   },
+   "5": {
+    "dominant": "wing.L",
+    "allowed": [
+     "head",
+     "neck",
+     "root",
+     "spine",
+     "wing.L",
+     "wing2.L"
+    ],
+    "forbidden": [
+     "ear.L",
+     "ear.R",
+     "leg.FL",
+     "leg.FR",
+     "leg2.HR",
+     "wing.R"
+    ]
+   },
+   "6": {
+    "dominant": "leg.FL",
+    "allowed": [
+     "head",
+     "leg.FL",
+     "leg2.FL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "ear.L",
+     "ear.R",
+     "leg.FR",
+     "leg2.HR",
+     "wing.L",
+     "wing.R",
+     "wing2.L"
+    ]
+   },
+   "7": {
+    "dominant": "leg.FR",
+    "allowed": [
+     "head",
+     "leg.FR",
+     "leg2.FR",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "ear.L",
+     "ear.R",
+     "leg.FL",
+     "leg2.HR",
+     "wing.L",
+     "wing.R",
+     "wing2.L"
+    ]
+   },
+   "8": {
+    "dominant": "leg.FR",
+    "allowed": [
+     "head",
+     "leg.FR",
+     "leg2.FR",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "ear.L",
+     "ear.R",
+     "leg.FL",
+     "leg2.HR",
+     "wing.L",
+     "wing.R",
+     "wing2.L"
+    ]
+   },
+   "9": {
+    "dominant": "wing.R",
+    "allowed": [
+     "head",
+     "neck",
+     "root",
+     "spine",
+     "wing.R",
+     "wing2.R"
+    ],
+    "forbidden": [
+     "ear.L",
+     "ear.R",
+     "leg.FL",
+     "leg.FR",
+     "leg2.HR",
+     "wing.L",
+     "wing2.L"
+    ]
+   },
+   "10": {
+    "dominant": "wing.R",
+    "allowed": [
+     "head",
+     "neck",
+     "root",
+     "spine",
+     "wing.R",
+     "wing2.R"
+    ],
+    "forbidden": [
+     "ear.L",
+     "ear.R",
+     "leg.FL",
+     "leg.FR",
+     "leg2.HR",
+     "wing.L",
+     "wing2.L"
+    ]
+   },
+   "11": {
+    "dominant": "leg2.HR",
+    "allowed": [
+     "head",
+     "leg.HR",
+     "leg2.HR",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "ear.L",
+     "ear.R",
+     "leg.FL",
+     "leg.FR",
+     "wing.L",
+     "wing.R",
+     "wing2.L"
+    ]
+   }
+  },
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "runner": {
+    "name": "moth-hart_shape",
+    "exit_code": 0,
+    "seconds": 334.11,
+    "baseline_vram_mib": 2544,
+    "peak_vram_mib": 8654,
+    "peak_delta_mib": 6110,
+    "vram_after_exit_mib": 2290,
+    "n_samples": 692,
+    "job_state": "done"
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 318606,
+    "faces": 637172,
+    "load_s": 129.92,
+    "inference_s": 159.74,
+    "total_s": 289.73,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\moth-hart\\shape.glb"
+   }
+  },
+  "texture_stage": {
+   "runner": {
+    "name": "moth-hart_texture",
+    "exit_code": 0,
+    "seconds": 1330.41,
+    "baseline_vram_mib": 1207,
+    "peak_vram_mib": 11870,
+    "peak_delta_mib": 10663,
+    "vram_after_exit_mib": 1457,
+    "n_samples": 2744
+   },
+   "stats": {
+    "stage": "texture",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+    "verts": 487742,
+    "faces": 637172,
+    "load_s": 106.92,
+    "texture_s": 1192.22,
+    "total_s": 1299.96,
+    "torch_peak_mib": 9939.9,
+    "output": "D:\\asset-forge-lab\\out\\gab\\moth-hart\\textured.glb"
+   }
+  },
+  "stage_record_note": "Records restored 2026-11-09 from the stages' own PC result files after two bookkeeping accidents: (1) a --resume relaunch overwrote the manifest's detailed mesh record with {'resumed': true}; (2) the texture stage completed on the PC (STAGE_JSON in its log, textured.glb written, runner result exit 0 / 1330.41 s) but the pipeline's post-stage result fetch returned a stale exit-1 record from a previous aborted attempt, so the run aborted and the textured GLB was fetched manually (sha256-verified, 22930108 bytes) and the pipeline resumed from it. All numbers above are the stages' own outputs, read directly."
+ },
+ "clips": {
+  "fan": {
+   "frames": 67,
+   "fps": 24,
+   "seconds": 2.79
+  },
+  "idle": {
+   "frames": 115,
+   "fps": 24,
+   "seconds": 4.79
+  },
+  "run": {
+   "frames": 24,
+   "fps": 24,
+   "seconds": 1.0
+  },
+  "walk": {
+   "frames": 48,
+   "fps": 24,
+   "seconds": 2.0
+  }
+ }
+}

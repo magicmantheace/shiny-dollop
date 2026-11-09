@@ -88,11 +88,13 @@ class CatalogDataTests(unittest.TestCase):
         entry = {"bones": [], "provenance": {}}
         self.assertFalse(catalog_data._is_rigged(entry))
 
-    def test_real_catalog_has_the_four_proven_assets(self):
+    def test_real_catalog_has_the_proven_assets(self):
         summaries = {s["slug"]: s for s in catalog_data.list_catalog()}
         self.assertEqual(set(summaries), {"ember-dragon", "snow-goblin",
-                                          "treasure-chest", "triceratops"})
+                                          "treasure-chest", "triceratops",
+                                          "moth-hart"})
         self.assertEqual(summaries["ember-dragon"]["bone_count"], 14)
+        self.assertEqual(summaries["moth-hart"]["bone_count"], 21)
         self.assertFalse(summaries["treasure-chest"]["rigged"])
 
     def test_preview_path_rejects_traversal_and_non_png(self):

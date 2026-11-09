@@ -455,6 +455,60 @@ Electron driver polled the result element the same way
   not measurable in an in-place cycle — it depends on the
   consuming game's root-motion speed matching.
 
+## P5 campfire creatures (2026-11-09, branch game-asset-builder/p5-campfire-creatures)
+
+Infrastructure tests: `tests/test_p5_campfire.py` (21 tests —
+snail + winged-quadruped templates, signature registry and
+recipe selection, session-0 bridge transport). Full suite
+**134 passed** (pytest), including the UI catalog test updated
+to the five-asset catalog.
+
+Moth-Hart (winged-quadruped, `--ears`, signature `fan`) — full
+pipeline, all stages on the owner's PC / build VM as designed:
+
+- mesh (PC): exit 0, 334.11 s; shape 318,606 verts / 637,172
+  faces; peak VRAM 8,654 MiB.
+- texture (PC): exit 0, runner 1,330.41 s (texturing 1,192.2 s);
+  textured 487,742 verts; peak VRAM 11,870 MiB of the 12 GB
+  card. (One earlier dispatch of this stage was killed by the
+  owner's stop order and one duplicate dispatch pair was
+  tree-killed by hand — see the P5 section of
+  `docs/MUSE_HANDOFF.md` for the operational record; the
+  numbers here are the single clean run's.)
+- segment (PC): exit 0, 136.74 s; P3-SAM 12 parts.
+- rig (VM Blender): 21 bones (root/spine/hips/neck/head, ear
+  pair, wing + wing2 pairs, 8 leg bones, tail pair); weights
+  bone-heat + geodesic veto + label-aware veto (25,087 entries
+  vetoed) + distance rescue on 2,759 verts; 893 separated
+  verts added; rigged 45,637 verts / 89,496 faces.
+- animate: idle 4.79 s, fan 2.79 s, walk 2.0 s, run 1.0 s —
+  the full P4 locomotion set + the P5 signature.
+- catalog: GLB 20,692,592 bytes, sha256
+  `0616e52aaeed63badd7f47c1340cb094e77ee54ac2ed9bc5276f423a880e06fa`;
+  `catalog-verify` **MATCH**.
+- three.js playback (build VM, Chrome headless shell +
+  SwiftShader, project harness page, three 0.180): ok=true,
+  21 bones, 1 mesh. Mid-cycle max bone deltas: fan 0.627,
+  idle 0.047, run 0.138, walk 0.121. Quarter-cycle (the
+  meaningful sample for anti-phase gaits): fan 0.666,
+  run 0.308, walk 0.170, idle 0.030 — in line with the P4
+  creatures (triceratops quarter walk 0.182 / run 0.336).
+- Renders (rest + fan showcase): the creature reads
+  immediately as the concept — four patterned wings, feather
+  antennae, antlers, four distinct legs; the fan pose sweeps
+  both foreground wings vertical. Verdict: **RIGGABLE**.
+  The concept preflight verdict was "warn" (leg band fuses
+  under erosion); segmentation + separation produced four
+  separately weighted legs anyway.
+
+Not verified for P5: the other seven creatures (Toasty,
+Lantern Snail, Ember Owl-Cat, Geode Tortoise,
+Axolotl-Capybara, Mandrake Toddler, Crow Postman) — reference
+art exists, builds are blocked on the PC bridge route (lost
+after a build-VM reboot 2026-11-09; see MUSE_HANDOFF).
+Godot playback of the Moth-Hart, and the snail template on a
+real mesh, are likewise still open.
+
 ## Not yet verified
 
 - TRELLIS's proper textured export — blocked on the
