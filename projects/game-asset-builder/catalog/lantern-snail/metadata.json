@@ -1,0 +1,134 @@
+{
+ "entry_version": 1,
+ "name": "Lantern Snail",
+ "slug": "lantern-snail",
+ "source_concept": "media-generation-lantern-snail-reference-0-27ea8c67-4343-41d8-82af-f64fc90e2c65.webp",
+ "asset_file": "lantern-snail.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "240dbfafbdfded9a255b9ea441904979051aba284ba73f5d760a59dc5727af14",
+ "bytes": 21410520,
+ "counts": {
+  "verts": 45457,
+  "faces": 89798,
+  "raw_mesh_verts": 769509,
+  "raw_mesh_faces": 988234
+ },
+ "bones": [
+  "root",
+  "body.1",
+  "body.2",
+  "body.3",
+  "neck",
+  "head",
+  "eye.L",
+  "eye.R",
+  "shell"
+ ],
+ "actions": [
+  "glide",
+  "idle",
+  "retract"
+ ],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": true,
+  "rig_template": "snail",
+  "signature_clip": "retract",
+  "weight_method": "bone-heat (automatic weights); geodesic distance veto (factor 0.85, floor 0.19); label-aware veto (P3-SAM parts, 0 entries vetoed by label); distance rescue on 3351 verts",
+  "segmentation": {
+   "model": "P3-SAM (Tencent Hunyuan3D-Part)",
+   "parts": 4,
+   "proxy_faces": 50000,
+   "islands_relabelled": 18,
+   "separated_verts_added": 556,
+   "labelled_verts": 45457
+  },
+  "label_map": {
+   "0": {
+    "dominant": "shell",
+    "allowed": [
+     "body.1",
+     "body.2",
+     "body.3",
+     "eye.L",
+     "eye.R",
+     "head",
+     "neck",
+     "root",
+     "shell"
+    ],
+    "forbidden": []
+   },
+   "1": {
+    "dominant": "root",
+    "allowed": [
+     "body.1",
+     "body.2",
+     "body.3",
+     "head",
+     "neck",
+     "root",
+     "shell"
+    ],
+    "forbidden": []
+   },
+   "2": {
+    "dominant": "root",
+    "allowed": [
+     "body.1",
+     "body.2",
+     "body.3",
+     "head",
+     "neck",
+     "root",
+     "shell"
+    ],
+    "forbidden": []
+   },
+   "3": {
+    "dominant": "root",
+    "allowed": [
+     "body.1",
+     "body.2",
+     "body.3",
+     "head",
+     "neck",
+     "root",
+     "shell"
+    ],
+    "forbidden": []
+   }
+  },
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ },
+ "clips": {
+  "glide": {
+   "frames": 72,
+   "fps": 24,
+   "seconds": 3.0
+  },
+  "idle": {
+   "frames": 115,
+   "fps": 24,
+   "seconds": 4.79
+  },
+  "retract": {
+   "frames": 77,
+   "fps": 24,
+   "seconds": 3.21
+  }
+ },
+ "material_notes": [
+  "shell: paper-lantern shell \u2014 emissive/glow-friendly. Treat the shell material as a warm amber light source (the campfire wallpaper does); derive emissive from the shell's amber texels or set a uniform warm emissive in the engine. The GLB carries albedo only."
+ ]
+}
