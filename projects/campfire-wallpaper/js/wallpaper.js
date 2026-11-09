@@ -309,6 +309,9 @@ function refreshEnvironment() {
 // fireScale shrinks the fire's presence in daylight; nightFactor
 // gates fireflies and the mushroom glow.
 let fireScale = 1, nightFactor = 1;
+// AAA experiment stage 2: shared wind clock for the grass sway
+// shader (one uniform object, referenced by the grass material).
+const windUniform = { value: 0 };
 let skyState = { sunEl: -20, sunAz: 0, moonEl: -20, moonAz: 0, moonFrac: 0 };
 // Scene elements created later (e.g. the horizon hills) register a
 // callback here to be tinted by the sky palette each frame.
@@ -612,6 +615,66 @@ function updateSky(nowMs) {
 
 /* -------------------------------------------------------------- field */
 
+// AAA experiment stage 2: procedural ground detail. A periodic
+// value-noise heightfield (lattice frequencies divide the tile,
+// so it wraps seamlessly) becomes both a near-neutral diffuse —
+// it multiplies the vertex colours, so it hovers around a middle
+// luminance — and a normal map derived from the same heights.
+// Tiled across the field; the vertex-colour macro pattern breaks
+// up any visible repetition.
+function makeGroundTextures() {
+  const S = 256;
+  const height = new Float32Array(S * S);
+  const octaves = [[4, 0.5], [8, 0.28], [16, 0.16], [32, 0.09]];
+  const lattices = octaves.map(([f]) => {
+    const g = new Float32Array(f * f);
+    for (let i = 0; i < g.length; i++) g[i] = Math.random();
+    return g;
+  });
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    let v = 0;
+    for (let o = 0; o < octaves.length; o++) {
+      const f = octaves[o][0], g = lattices[o];
+      const fx = x / S * f, fy = y / S * f;
+      const x0 = Math.floor(fx) % f, y0 = Math.floor(fy) % f;
+      const x1 = (x0 + 1) % f, y1 = (y0 + 1) % f;
+      let tx = fx - Math.floor(fx), ty = fy - Math.floor(fy);
+      tx = tx * tx * (3 - 2 * tx); ty = ty * ty * (3 - 2 * ty);
+      const a = g[y0 * f + x0], b = g[y0 * f + x1],
+            c = g[y1 * f + x0], d = g[y1 * f + x1];
+      v += ((a + (b - a) * tx) * (1 - ty) + (c + (d - c) * tx) * ty) * octaves[o][1];
+    }
+    height[y * S + x] = v;
+  }
+  const difC = document.createElement('canvas'); difC.width = difC.height = S;
+  const dctx = difC.getContext('2d'); const dimg = dctx.createImageData(S, S);
+  const norC = document.createElement('canvas'); norC.width = norC.height = S;
+  const nctx = norC.getContext('2d'); const nimg = nctx.createImageData(S, S);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const i = y * S + x, h = height[i];
+    const lum = 168 + (h - 0.5) * 130;
+    dimg.data[i * 4] = lum * 0.97; dimg.data[i * 4 + 1] = lum;
+    dimg.data[i * 4 + 2] = lum * 0.9; dimg.data[i * 4 + 3] = 255;
+    const hx = height[y * S + (x + 1) % S] - height[y * S + (x - 1 + S) % S];
+    const hy = height[((y + 1) % S) * S + x] - height[((y - 1 + S) % S) * S + x];
+    let nx = -hx * 2.2, ny = hy * 2.2, nz = 1;
+    const il = 1 / Math.hypot(nx, ny, nz);
+    nimg.data[i * 4] = (nx * il * 0.5 + 0.5) * 255;
+    nimg.data[i * 4 + 1] = (ny * il * 0.5 + 0.5) * 255;
+    nimg.data[i * 4 + 2] = (nz * il * 0.5 + 0.5) * 255;
+    nimg.data[i * 4 + 3] = 255;
+  }
+  dctx.putImageData(dimg, 0, 0); nctx.putImageData(nimg, 0, 0);
+  const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  const dif = new THREE.CanvasTexture(difC);
+  dif.wrapS = dif.wrapT = THREE.RepeatWrapping; dif.repeat.set(26, 26);
+  dif.colorSpace = THREE.SRGBColorSpace; dif.anisotropy = aniso;
+  const nor = new THREE.CanvasTexture(norC);
+  nor.wrapS = nor.wrapT = THREE.RepeatWrapping; nor.repeat.set(26, 26);
+  nor.anisotropy = aniso;
+  return { dif, nor };
+}
+
 {
   const geo = new THREE.PlaneGeometry(170, 170, 170, 170);
   geo.rotateX(-Math.PI / 2);
@@ -630,8 +693,13 @@ function updateSky(nowMs) {
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geo.computeVertexNormals();
+  const groundTex = makeGroundTextures();
   scene.add(new THREE.Mesh(geo,
-    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 })));
+    new THREE.MeshStandardMaterial({
+      vertexColors: true, roughness: 1, metalness: 0,
+      map: groundTex.dif, normalMap: groundTex.nor,
+      normalScale: new THREE.Vector2(0.5, 0.5),
+    })));
 }
 
 // Scattered primitive set dressing: pines, rocks, bushes. Shared
@@ -872,12 +940,14 @@ function updateDressing(t, dt) {
     scene.add(snag);
   }
 
-  /* Grass tufts: instanced five-blade cones — 950 spread through
+  /* Grass tufts: instanced seven-blade cones — 950 spread through
      the field, plus 300 more ringing the clearing (density pass).
-     Sparse in the clearing, none on the path. */
+     Sparse in the clearing, none on the path. AAA experiment
+     stage 2: the blades sway in a vertex shader (see the
+     material's onBeforeCompile below). */
   {
     const blades = [];
-    for (let k = 0; k < 5; k++) {
+    for (let k = 0; k < 7; k++) {
       const b = new THREE.ConeGeometry(0.05, 0.42, 6);
       b.translate(0, 0.21, 0);
       const m = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(
@@ -887,8 +957,28 @@ function updateDressing(t, dt) {
       blades.push(b);
     }
     const tuftGeo = mergeGeometries(blades);
-    const grass = instanced(tuftGeo,
-      new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), 1250);
+    // Wind sway: bend each blade by its height squared, phased by
+    // the instance's world position so gusts travel across the
+    // field. Injected into the standard material's vertex shader;
+    // grass does not cast shadows, so the shadow pass never sees
+    // the undisplaced-vs-displaced difference.
+    const grassMat = new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true });
+    grassMat.onBeforeCompile = (shader) => {
+      shader.uniforms.uWindTime = windUniform;
+      shader.vertexShader = 'uniform float uWindTime;\n' + shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        {
+          vec2 ip = vec2(instanceMatrix[3][0], instanceMatrix[3][2]);
+          float ph = ip.x * 0.37 + ip.y * 0.29;
+          float wgt = pow(clamp(position.y / 0.45, 0.0, 1.0), 2.0);
+          float sway = sin(uWindTime * 1.6 + ph) * 0.6
+                     + sin(uWindTime * 3.3 + ph * 1.7) * 0.4;
+          transformed.x += sway * 0.06 * wgt;
+          transformed.z += sway * 0.035 * wgt;
+        }`);
+    };
+    const grass = instanced(tuftGeo, grassMat, 1250);
     grass.name = 'grassTufts';   // receives shadows; does not cast
     const gA = new THREE.Color(0x39512a), gB = new THREE.Color(0x5a7a3c);
     let placed = 0, guard = 0;
@@ -1335,6 +1425,10 @@ function updateDressing(t, dt) {
 const FIRE_POS = new THREE.Vector3(0, 0, 0);
 let fireLight, glowDisc, bounceLight;
 const flameSystems = [];
+// AAA experiment stage 2: the shader flame's per-plane uniforms
+// and the smoke sprite pool, both driven from updateFire.
+const flameUniformsList = [];
+const smokePuffs = [];
 
 function makeParticles(count, size, color, blending) {
   const geo = new THREE.BufferGeometry();
@@ -1422,6 +1516,77 @@ function resetParticle(sys, p, randomAge) {
   bounceLight.position.set(0, 0.6, 1.9);
   fire.add(bounceLight);
 
+  // AAA experiment stage 2: a continuous flame body under the
+  // particles — three crossed planes with a procedural flame
+  // shader (scrolling fbm noise erodes a teardrop mask; the
+  // colour ramps deep orange -> yellow -> near-white at the
+  // base). The particle flames above read as tongues and licks
+  // off this body instead of the whole fire.
+  const flameVert = `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`;
+  const flameFrag = `
+    varying vec2 vUv;
+    uniform float uTime, uScale, uSeed;
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float noise(vec2 p) {
+      vec2 i = floor(p), f = fract(p);
+      f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x),
+                 mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+    }
+    float fbm(vec2 p) {
+      float v = 0.0, a = 0.5;
+      for (int i = 0; i < 4; i++) { v += a * noise(p); p *= 2.03; a *= 0.5; }
+      return v;
+    }
+    void main() {
+      vec2 uv = vUv;
+      float rise = fbm(vec2(uv.x * 3.0 + uSeed, uv.y * 2.4 - uTime * 1.7 + uSeed));
+      float rise2 = fbm(vec2(uv.x * 7.0 - uSeed, uv.y * 5.0 - uTime * 2.6));
+      float cx = abs(uv.x - 0.5) + (rise - 0.5) * 0.34 * (0.25 + uv.y);
+      float width = mix(0.40, 0.015, pow(uv.y, 0.75));
+      float body = smoothstep(width, width - 0.30, cx);
+      float base = smoothstep(0.0, 0.14, uv.y);
+      float inten = body * base * (1.0 - uv.y * 0.72) * (0.75 + rise2 * 0.5);
+      vec3 col = mix(vec3(0.95, 0.22, 0.01), vec3(1.0, 0.55, 0.08), inten);
+      col = mix(col, vec3(1.0, 0.88, 0.45), smoothstep(0.55, 0.95, inten - uv.y * 0.35));
+      gl_FragColor = vec4(col * inten * 1.8 * uScale, inten * uScale);
+    }`;
+  for (let i = 0; i < 3; i++) {
+    const fu = { uTime: { value: 0 }, uScale: { value: 1 }, uSeed: { value: i * 7.31 } };
+    const fm = new THREE.ShaderMaterial({
+      uniforms: fu, vertexShader: flameVert, fragmentShader: flameFrag,
+      transparent: true, depthWrite: false,
+      blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    });
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 1.05), fm);
+    plane.rotation.y = i * Math.PI / 3;
+    plane.position.y = 0.6;
+    plane.renderOrder = 6;
+    fire.add(plane);
+    flameUniformsList.push(fu);
+  }
+
+  // Smoke: a slow pool of soft sprites that swell, drift with
+  // the wind (+x), and fade; nearly invisible at night, as smoke
+  // mostly is. Driven from updateFire.
+  const smokeTex = radialSpriteTexture('rgba(205,210,220,0.9)', 'rgba(205,210,220,0)');
+  for (let i = 0; i < 12; i++) {
+    const sm = new THREE.SpriteMaterial({
+      map: smokeTex, transparent: true, opacity: 0,
+      depthWrite: false, color: 0x42464e,
+    });
+    const sp = new THREE.Sprite(sm);
+    sp.renderOrder = 5;
+    sp.userData.seed = Math.random();
+    fire.add(sp);
+    smokePuffs.push(sp);
+  }
+
   // Flames: short-lived particles that narrow and redden as they rise.
   const flames = makeParticles(90, 0.62);
   const flameSys = {
@@ -1479,6 +1644,25 @@ function updateFire(t, dt) {
     }
     pos.needsUpdate = true;
     col.needsUpdate = true;
+  }
+
+  // AAA experiment stage 2: flame body + smoke (see the fire
+  // block for the setup).
+  for (const fu of flameUniformsList) {
+    fu.uTime.value = t;
+    fu.uScale.value = (0.3 + 0.7 * fireScale) * (0.8 + 0.35 * flicker);
+  }
+  for (const sp of smokePuffs) {
+    const seed = sp.userData.seed, cycle = 8 + seed * 4;
+    const n = ((t * (0.75 + seed * 0.3) + seed * cycle) % cycle) / cycle;
+    sp.position.set(
+      (seed - 0.5) * 0.9 * n + n * n * 4.2 + Math.sin(seed * 40) * 0.2,
+      1.1 + n * 4.3,
+      (seed - 0.5) * 0.5 + Math.sin(t * 0.4 + seed * 20) * 0.18 * n);
+    const sc = 0.7 + n * 2.6;
+    sp.scale.set(sc, sc, 1);
+    sp.material.opacity = Math.sin(Math.PI * Math.min(1, n * 1.06)) *
+      0.10 * (1 - nightFactor * 0.65);
   }
 }
 
@@ -1818,6 +2002,7 @@ function tick() {
   const t = clock.elapsedTime;
 
   updateSky(FROZEN_TIME ?? Date.now());
+  windUniform.value = t;
   updateFire(t, dt);
   updateDirector(dt);
   updateDressing(t, dt);
@@ -1882,6 +2067,7 @@ if (PAGE_PARAMS.has('harness')) {
     for (let i = 0; i < steps; i++) {
       perfNow += dt * 1000;
       const t = perfNow * 0.001;
+      windUniform.value = t;
       updateFire(t, dt);
       updateDirector(dt);
     }

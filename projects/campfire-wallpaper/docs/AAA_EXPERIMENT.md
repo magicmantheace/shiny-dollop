@@ -75,3 +75,36 @@ approves a PC-side test (a second Lively library entry would
 leave the bookmarked build untouched). SwiftShader fps stayed
 at the known 22 artifact floor, which says nothing about the
 RTX 3060 either way.
+
+## Stage 2 — ground, grass, fire (owner's pick, 2026-11-09)
+
+- **Ground texture.** A periodic value-noise heightfield
+  (lattice frequencies divide the tile, so it wraps seamlessly)
+  generated at runtime into a 256² near-neutral diffuse plus a
+  Sobel normal map from the same heights, tiled 26× over the
+  field under the existing vertex colours. Daylight captures
+  show real grain and patch variation where the field used to
+  be flat colour.
+- **Grass.** Tufts went from five blades to seven, and a vertex
+  shader injected into the grass material bends each blade by
+  height², phased by instance position so gusts travel. Grass
+  does not cast shadows, so the displaced render has no shadow
+  mismatch. Motion itself cannot be proven from stills; the
+  captures show the varied lean the shader produces.
+- **Fire.** A continuous flame body under the particles: three
+  crossed planes with a procedural flame shader (scrolling fbm
+  erodes a teardrop mask; deep orange → yellow → near-white at
+  the base), so the particle flames read as tongues off a real
+  body. Plus a 12-sprite smoke pool that swells, drifts +x, and
+  fades. First smoke tuning was WRONG — light-grey puffs stacked
+  over the fire read as a searchlight beam against the dusk
+  sky; darkened (0x42464e), thinned (peak opacity 0.10), and
+  spread from birth. Final captures: smoke is subtle, present
+  if you look for it — the safe side of the line.
+- Captures (SwiftShader, zero console errors): `aaa2-morning`
+  (ground grain + fuller grass), `aaa2-sunset2` / `aaa2-night2`
+  (flame body, embers, glow). Added steady-state cost is small
+  (one 256² texture pair, one extra shader material ×3 planes,
+  12 sprites); the SwiftShader fps floor did not move, which
+  cannot resolve deltas this small — the real-GPU number still
+  waits on an owner-approved PC test.
