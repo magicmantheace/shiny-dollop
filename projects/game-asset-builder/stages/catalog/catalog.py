@@ -29,8 +29,8 @@ def slugify(name: str) -> str:
 
 def build_entry(name: str, source_concept: str, glb_path: str,
                 counts: dict, bones: list[str], actions: list[str],
-                provenance: dict) -> dict:
-    return {
+                provenance: dict, clips: dict | None = None) -> dict:
+    entry = {
         "entry_version": ENTRY_VERSION,
         "name": name,
         "slug": slugify(name),
@@ -44,6 +44,11 @@ def build_entry(name: str, source_concept: str, glb_path: str,
         "actions": actions,
         "provenance": provenance,
     }
+    if clips is not None:
+        # Per-clip {seconds, frames, fps} from the animate report —
+        # the shape the P4-regenerated entries carry.
+        entry["clips"] = clips
+    return entry
 
 
 def write_entry(catalog_dir: str, entry: dict) -> str:

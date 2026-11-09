@@ -38,6 +38,9 @@ GAITS = {
     "quadruped": (2.0, 1.0,
                   ("leg.FL", "leg.FR", "leg.HL", "leg.HR"),
                   ("leg2.FL", "leg2.FR", "leg2.HL", "leg2.HR")),
+    "winged-quadruped": (2.0, 1.0,
+                          ("leg.FL", "leg.FR", "leg.HL", "leg.HR"),
+                          ("leg2.FL", "leg2.FR", "leg2.HL", "leg2.HR")),
 }
 
 
@@ -66,7 +69,7 @@ class GaitRegistryTests(unittest.TestCase):
 class GaitLoopTests(unittest.TestCase):
     def test_loop_closure_pose_zero_equals_pose_period(self):
         for template, spec in poses.TEMPLATE_RECIPES.items():
-            for clip in ("walk", "run"):
+            for clip in poses.LOCOMOTION[template]:
                 fn, seconds = spec["recipes"][clip]
                 start, end = fn(0.0), fn(seconds)
                 for channel in spec["channels"]:
@@ -140,6 +143,8 @@ class GaitPhaseTests(unittest.TestCase):
 
     def test_run_is_faster_and_bigger_than_walk(self):
         for template, spec in poses.TEMPLATE_RECIPES.items():
+            if template not in GAITS:
+                continue  # snail: glide only, no walk/run pair
             walk_fn, walk_s = spec["recipes"]["walk"]
             run_fn, run_s = spec["recipes"]["run"]
             self.assertLess(run_s, walk_s, template)

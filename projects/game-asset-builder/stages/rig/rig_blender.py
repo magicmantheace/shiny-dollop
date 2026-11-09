@@ -446,12 +446,30 @@ def _zone_defs(template, dims):
     are evidence; only the tip check (tip_dominance) gates."""
     (x0, x1), (y0, y1), (z0, z1) = dims
     w, d, h = x1 - x0, y1 - y0, z1 - z0
-    if template == "quadruped":
-        return {
+    if template in ("quadruped", "winged-quadruped"):
+        zones = {
             "head": (lambda x, y, z: y < y0 + 0.20 * d
                      and z > z0 + 0.40 * h, ("neck", "head")),
             "tail": (lambda x, y, z: y > y0 + 0.78 * d,
                      ("tail.1", "tail.2")),
+        }
+        if template == "winged-quadruped":
+            zones["head"] = (
+                lambda x, y, z: y < y0 + 0.20 * d
+                and z > z0 + 0.40 * h,
+                ("neck", "head", "ear.L", "ear.R"))
+            zones["wings"] = (
+                lambda x, y, z: abs(x) > 0.30 * w
+                and z > z0 + 0.50 * h,
+                ("wing.L", "wing2.L", "wing.R", "wing2.R"))
+        return zones
+    if template == "snail":
+        return {
+            "head": (lambda x, y, z: y < y0 + 0.20 * d
+                     and z > z0 + 0.50 * h,
+                     ("neck", "head", "eye.L", "eye.R")),
+            "shell": (lambda x, y, z: y > y0 + 0.55 * d
+                      and z > z0 + 0.35 * h, ("shell",)),
         }
     if template == "biped":
         return {
@@ -520,12 +538,21 @@ def tip_dominance(obj, dims, template="winged-creature"):
     Returns (fraction, verts_checked, label)."""
     (x0, x1), (y0, y1), (z0, z1) = dims
     w, d, h = x1 - x0, y1 - y0, z1 - z0
-    if template == "quadruped":
+    if template in ("quadruped", "winged-quadruped"):
         legs = ("leg.FL", "leg2.FL", "leg.FR", "leg2.FR",
                 "leg.HL", "leg2.HL", "leg.HR", "leg2.HR")
         frac, total = _dominance_where(
             obj, lambda x, y, z: z < z0 + 0.10 * h, lambda x: legs)
         return frac, total, "feet"
+    if template == "snail":
+        # The extremity this plan loses to the body mass is the head:
+        # front-top verts should belong to the neck/head/stalk bones,
+        # not the foot chain or the shell.
+        frac, total = _dominance_where(
+            obj,
+            lambda x, y, z: y < y0 + 0.20 * d and z > z0 + 0.50 * h,
+            lambda x: ("neck", "head", "eye.L", "eye.R"))
+        return frac, total, "head"
     if template == "biped":
         frac, total = _dominance_where(
             obj,
@@ -1062,7 +1089,15 @@ def _share_zone_defs(template, dims):
     and inboard of the hands zone."""
     (x0, x1), (y0, y1), (z0, z1) = dims
     w, d, h = x1 - x0, y1 - y0, z1 - z0
-    if template == "quadruped":
+    if template == "snail":
+        # The foot skirt must not ride the shell bone: if the shell
+        # owns the ground skirt, the glide's body wave drags the
+        # lantern with it.
+        return {
+            "foot": (lambda x, y, z: z < z0 + 0.22 * h,
+                     ("shell",), "shell"),
+        }
+    if template in ("quadruped", "winged-quadruped"):
         legs = ("leg.FL", "leg2.FL", "leg.FR", "leg2.FR",
                 "leg.HL", "leg2.HL", "leg.HR", "leg2.HR")
         # The zone is the belly wall BETWEEN the leg columns, not the
@@ -1074,9 +1109,14 @@ def _share_zone_defs(template, dims):
         # first time the P1.1-era gate was exercised on a quadruped
         # (P2). The strip below clears the leg columns and reads
         # 0.204 on the same weights; the 0.25 threshold is unchanged.
+        group = legs
+        label = "leg"
+        if template == "winged-quadruped":
+            group = legs + ("wing.L", "wing2.L", "wing.R", "wing2.R")
+            label = "leg/wing"
         return {
             "belly": (lambda x, y, z: z0 + 0.28 * h <= z <= z0 + 0.45 * h
-                      and abs(x) < 0.15 * w, legs, "leg"),
+                      and abs(x) < 0.15 * w, group, label),
         }
     if template == "biped":
         return {

@@ -16,6 +16,18 @@ VRAM). This module uploads the project's stage scripts + inputs, runs
 each stage as its own job, and downloads the outputs — the mesh process
 has fully exited (and its VRAM release is verified) before the texture
 stage is dispatched, so the unload discipline is structural.
+
+PowerShell transport (P5, 2026-11-08): the production bridge is now the
+SYSTEM core in session 0, where a bare ``powershell`` shell fails to
+spawn (WinError 1920 — the name resolves to a per-user WindowsApps
+alias SYSTEM cannot execute; the core-side fix is not yet live on the
+running agent). PowerShell work therefore travels as a .ps1 file:
+the script is uploaded, plain-copied into the lab with a cmd job
+(double quotes cannot survive the agent's cmd /c wrapping, so every
+command built here is quote-free — all lab paths are space-free), and
+run with the full-path System32 PowerShell via ``-File``. Set
+GAB_PS_MODE=direct to restore the historical shell="powershell" jobs
+(e.g. if the bridge ever runs in-session again).
 """
 
 import base64
@@ -31,6 +43,32 @@ import urllib.request
 CHUNK = 8 * 1024 * 1024
 DEFAULT_URL = "http://100.104.193.31:8765"
 DEFAULT_LAB = r"D:\asset-forge-lab"
+PS_EXE = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+
+
+def ps_mode() -> str:
+    """PowerShell transport: "wrap" (default, .ps1 via cmd) or
+    "direct" (historical shell="powershell" jobs)."""
+    return os.environ.get("GAB_PS_MODE", "wrap")
+
+
+def wrap_powershell_script(script: str) -> str:
+    """The .ps1 body for a wrapped PowerShell job: stop on cmdlet
+    errors (so a failed copy cannot exit 0 silently) and propagate the
+    last native command's exit code (stage_runner / nvidia-smi)."""
+    return ("$ErrorActionPreference = 'Stop'\n"
+            + script.rstrip() + "\n"
+            "if ($null -ne $LASTEXITCODE) { exit $LASTEXITCODE }\n")
+
+
+def ps_file_command(lab_ps1: str) -> str:
+    """Quote-free cmd line running a lab .ps1 with full-path
+    PowerShell. Paths must be space-free (the agent's cmd /c wrapping
+    mangles embedded double quotes); lab paths are by construction."""
+    if " " in lab_ps1 or '"' in lab_ps1:
+        raise BridgeError(f"lab script path is not cmd-safe: {lab_ps1}")
+    return (f"{PS_EXE} -NoProfile -NonInteractive "
+            f"-ExecutionPolicy Bypass -File {lab_ps1}")
 
 
 class BridgeError(Exception):
@@ -177,10 +215,39 @@ class BridgeRunner:
     # -- exec jobs --------------------------------------------------------
     def exec_job(self, command, timeout_s=600, poll_s=5.0,
                  shell="powershell"):
+        if shell == "powershell" and ps_mode() == "wrap":
+            return self._powershell_via_cmd(command,
+                                            timeout_s=timeout_s,
+                                            poll_s=poll_s)
         job = self.request("POST", "/v1/exec", {
             "command": command, "shell": shell, "timeout_s": timeout_s})
         return self.wait_job(job["job_id"], timeout_s=timeout_s,
                              poll_s=poll_s)
+
+    def _powershell_via_cmd(self, script, timeout_s=600, poll_s=5.0):
+        """Run a PowerShell script under the session-0 core: stage it
+        as a .ps1 in the lab and invoke full-path PowerShell from a
+        cmd job (see the module docstring). The staging copy itself
+        is a plain, quote-free cmd copy."""
+        self._ps_counter = getattr(self, "_ps_counter", 0) + 1
+        name = f"gab_ps_{os.getpid()}_{self._ps_counter}.ps1"
+        local = os.path.join(os.environ.get("TMPDIR", "/tmp"), name)
+        with open(local, "w", encoding="utf-8") as fh:
+            fh.write(wrap_powershell_script(script))
+        self.upload(local, name)
+        lab_ps1 = self.lab_dir + "\\scripts\\" + name
+        src = self.file_root + "\\" + name
+        if " " in src or " " in lab_ps1:
+            raise BridgeError("bridge/lab path contains a space; "
+                              "cmd transport cannot quote it")
+        copy = self.exec_job(f"copy /Y {src} {lab_ps1}",
+                             timeout_s=120, shell="cmd")
+        if copy["state"] != "done" or copy.get("exit_code") != 0:
+            raise BridgeError(f"staging {name} into the lab failed: "
+                              f"{copy.get('stderr', '')[:300]}")
+        return self.exec_job(ps_file_command(lab_ps1),
+                             timeout_s=timeout_s, poll_s=poll_s,
+                             shell="cmd")
 
     def wait_job(self, job_id, timeout_s=600, poll_s=5.0):
         """Poll an existing job to completion. Also the reattach path:
@@ -217,7 +284,12 @@ class BridgeRunner:
             f"-Path (Split-Path {q(dst)}) | Out-Null; "
             f"Copy-Item {q(src)} {q(dst)} -Force; "
             f"(Get-Item {q(dst)}).Length")
-        if job["state"] != "done" or job.get("exit_code") != 0:
+        out_lines = [ln.strip() for ln in
+                     job.get("stdout", "").splitlines() if ln.strip()]
+        size_ok = bool(out_lines) and out_lines[-1].isdigit() \
+            and int(out_lines[-1]) > 0
+        if job["state"] != "done" or job.get("exit_code") != 0 \
+                or not size_ok:
             raise BridgeError(f"PC copy {src} -> {dst} failed: "
                               f"{job.get('stderr', '')[:400]}")
         return job

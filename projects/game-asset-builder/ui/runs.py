@@ -20,7 +20,8 @@ import time
 import uuid
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEMPLATES = ("winged-creature", "quadruped", "biped")
+TEMPLATES = ("winged-creature", "quadruped", "biped",
+             "winged-quadruped", "snail")
 ROTATIONS = (0, 90, 180, 270)
 _MAX_OUTPUT_LINES = 500
 

@@ -57,7 +57,9 @@ catalog_mod = _load_module("gab_catalog", "stages/catalog/catalog.py")
 poses_mod = _load_module("gab_poses", "stages/animate/poses.py")
 
 _TEMPLATE_BODY_PLAN = {"biped": "biped", "quadruped": "quadruped",
-                       "winged-creature": "winged"}
+                       "winged-creature": "winged",
+                       "winged-quadruped": "quadruped",
+                       "snail": "quadruped"}
 
 
 def find_blender() -> str:
@@ -177,15 +179,18 @@ def run_pipeline(concept_path: str, name: str, ears: bool = False,
                  resume: bool = False, template: str = "winged-creature",
                  unrigged: bool = False, rotate_z: int = 0,
                  prop_target_verts: int = 30000,
-                 segment: bool = True) -> dict:
+                 segment: bool = True,
+                 signature: str | None = None) -> dict:
     """Run the pipeline on one concept image.
 
     ``template`` selects the rig template (winged-creature, quadruped,
-    biped). ``unrigged=True`` runs the prop path instead: prep -> mesh
-    -> texture -> prop (clean static GLB) -> catalog, with no rig or
-    animate stage and a catalog entry that says so. ``rotate_z`` is
-    the recorded per-run facing correction for the rig stage (see
-    rig_blender.py); it is ignored for props.
+    biped, winged-quadruped, snail). ``signature`` (P5) selects a
+    per-creature signature clip from poses.SIGNATURES in place of the
+    template's showcase clip. ``unrigged=True`` runs the prop path
+    instead: prep -> mesh -> texture -> prop (clean static GLB) ->
+    catalog, with no rig or animate stage and a catalog entry that
+    says so. ``rotate_z`` is the recorded per-run facing correction
+    for the rig stage (see rig_blender.py); it is ignored for props.
     """
     from gpu_bridge import BridgeRunner
 
@@ -194,6 +199,7 @@ def run_pipeline(concept_path: str, name: str, ears: bool = False,
     os.makedirs(workdir, exist_ok=True)
     manifest = {"name": name, "slug": slug, "concept": concept_path,
                 "template": None if unrigged else template,
+                "signature": signature,
                 "unrigged": unrigged, "rotate_z": rotate_z,
                 "stages": {}}
     started = time.time()
@@ -337,10 +343,14 @@ def run_pipeline(concept_path: str, name: str, ears: bool = False,
 
     # 5. animate -----------------------------------------------------------
     animate_report_path = os.path.join(workdir, "animate-report.json")
-    anim = _run_blender("stages/animate/animate_blender.py", [
+    anim_args = [
         "--input", rigged_glb, "--output", final_glb,
         "--report", animate_report_path,
-        "--template", template], "ANIMATE_OK")
+        "--template", template]
+    if signature:
+        anim_args += ["--signature", signature]
+    anim = _run_blender("stages/animate/animate_blender.py",
+                        anim_args, "ANIMATE_OK")
     record("animate", anim)
 
     # 6. catalog -----------------------------------------------------------
@@ -354,11 +364,15 @@ def run_pipeline(concept_path: str, name: str, ears: bool = False,
                 "raw_mesh_faces": rig["raw_faces"]},
         bones=rig["bones"],
         actions=sorted(anim["actions"].keys()),
+        clips={name: anim["actions"][name]
+               for name in sorted(anim["actions"])},
         provenance={
             "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
             "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
             "rigged": True,
             "rig_template": rig["template"],
+            "signature_clip": signature
+                              or poses_mod.showcase_clip(template),
             "weight_method": rig["weight_method"],
             "segmentation": rig.get("segmentation"),
             "label_map": (rig.get("weight_veto") or {}).get("label_map"),
@@ -366,17 +380,28 @@ def run_pipeline(concept_path: str, name: str, ears: bool = False,
             "mesh_stage": manifest["stages"].get("mesh", {}),
             "texture_stage": manifest["stages"].get("texture", {}),
         })
+    if template == "snail":
+        # The wallpaper lights this shell as a light source; the
+        # paint stage produces albedo only, so the glow is an
+        # engine-side material decision recorded here.
+        entry["material_notes"] = [
+            "shell: paper-lantern shell — emissive/glow-friendly. "
+            "Treat the shell material as a warm amber light source "
+            "(the campfire wallpaper does); derive emissive from "
+            "the shell's amber texels or set a uniform warm emissive "
+            "in the engine. The GLB carries albedo only."]
     entry_path = catalog_mod.write_entry(CATALOG_DIR, entry)
     record("catalog", {"entry": entry_path, "sha256": entry["sha256"]})
 
     # 7. verify: cold re-import + preview renders (catalog stage output)
-    showcase = poses_mod.showcase_clip(template)
+    showcase = signature or poses_mod.showcase_clip(template)
     verify = _run_blender("stages/catalog/render_verify.py", [
         "--input", final_glb,
         "--rest-png", os.path.join(renders_dir, "rest.png"),
         "--action-png", os.path.join(renders_dir, f"{showcase}.png"),
         "--report", os.path.join(workdir, "verify-report.json"),
-        "--template", template], "VERIFY_OK")
+        "--template", template,
+        "--action", showcase], "VERIFY_OK")
     record("verify", verify)
 
     manifest["seconds_total"] = round(time.time() - started, 2)

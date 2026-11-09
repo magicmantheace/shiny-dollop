@@ -66,6 +66,7 @@ FPS = 24
 DRIVERS = {
     "winged-creature": [
         ("head", "head_pitch", "x", 1.0),
+        ("head", "head_yaw", "z", 1.0),
         ("ear.L", "ear_pitch", "x", 1.0),
         ("ear.R", "ear_pitch", "x", 1.0),
         ("wing.L", "wing_pitch", "x", 1.0),
@@ -127,6 +128,36 @@ DRIVERS = {
     ],
 }
 
+# P5 templates. winged-quadruped reuses the quadruped drivers and
+# adds the winged template's wing drivers (same "horizontal" roll
+# construction, so the same sign sweeps both wings up) plus ear
+# drivers. The snail's retract channel fans out over neck/head/eyes:
+# neck leans back toward the shell while the head tucks and the
+# stalks fold — rotation only, no translation (see poses.py).
+DRIVERS["winged-quadruped"] = DRIVERS["quadruped"] + [
+    ("ear.L", "ear_pitch", "x", 1.0),
+    ("ear.R", "ear_pitch", "x", 1.0),
+    ("wing.L", "wing_pitch", "x", 1.0),
+    ("wing.R", "wing_pitch", "x", 1.0),
+    ("wing2.L", "wing2_pitch", "x", 1.0),
+    ("wing2.R", "wing2_pitch", "x", 1.0),
+]
+DRIVERS["snail"] = [
+    ("root", "sway", "z", 1.0),
+    ("body.1", "undulate.1", "x", 1.0),
+    ("body.2", "undulate.2", "x", 1.0),
+    ("body.3", "undulate.3", "x", 1.0),
+    ("neck", "neck_pitch", "x", 1.0),
+    ("head", "head_pitch", "x", 1.0),
+    ("eye.L", "stalk", "x", 1.0),
+    ("eye.R", "stalk", "x", 1.0),
+    ("neck", "retract", "x", -0.55),
+    ("head", "retract", "x", 0.35),
+    ("eye.L", "retract", "x", 0.40),
+    ("eye.R", "retract", "x", 0.40),
+    ("body.3", "retract", "x", 0.15),
+]
+
 
 def parse_args():
     argv = sys.argv[sys.argv.index("--") + 1:]
@@ -135,6 +166,10 @@ def parse_args():
     p.add_argument("--output", required=True)
     p.add_argument("--report", required=True)
     p.add_argument("--template", default="winged-creature")
+    p.add_argument("--signature", default=None,
+                   help="P5 signature clip replacing the template's "
+                        "showcase (poses.SIGNATURES); default bakes "
+                        "the template's historical clip set")
     return p.parse_args(argv)
 
 
@@ -227,7 +262,7 @@ def main():
 
     arm.animation_data_create()
     baked = {}
-    for name in spec["recipes"]:
+    for name in pose_mod.recipes_for(args.template, args.signature):
         samples = pose_mod.sample_for(args.template, name, fps=FPS)
         action = bpy.data.actions.new(name)
         arm.animation_data.action = action
@@ -254,6 +289,7 @@ def main():
         "input": args.input,
         "output": args.output,
         "template": args.template,
+        "signature": args.signature,
         "lift_axis": lift_axis,
         "probe_lift_at_apex": probe_lift,
         "actions": baked,

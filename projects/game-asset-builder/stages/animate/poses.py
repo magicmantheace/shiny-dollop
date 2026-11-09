@@ -35,7 +35,8 @@ import math
 
 TAU = math.pi * 2
 
-CHANNELS = ("root_y", "sway", "head_pitch", "ear_pitch", "wing_pitch",
+CHANNELS = ("root_y", "sway", "head_pitch", "head_yaw", "ear_pitch",
+            "wing_pitch",
             "wing2_pitch", "arm_pitch", "tail_yaw",
             # P4 gait channels: per-leg swing (+ = foot forward) and
             # per-arm swing (+ = hand forward), winged template.
@@ -237,8 +238,10 @@ def template_spec(template: str) -> dict:
 
 def sample_for(template: str, recipe: str,
                fps: int = 24) -> list[tuple[int, dict]]:
-    """(frame, pose) pairs for any template's recipe, frames from 1."""
-    fn, seconds = template_spec(template)["recipes"][recipe]
+    """(frame, pose) pairs for any template's recipe, frames from 1.
+    Resolves base recipes and P5 signature recipes alike (see
+    ``recipe_fn`` at the bottom of this module)."""
+    fn, seconds = recipe_fn(template, recipe)
     frames = round(seconds * fps)
     return [(f, fn(f / fps)) for f in range(1, frames + 1)]
 
@@ -431,3 +434,328 @@ BIPED_RECIPES["walk"] = (biped_walk, 1.5)
 BIPED_RECIPES["run"] = (biped_run, 1.0)
 QUAD_RECIPES["walk"] = (quad_walk, 2.0)
 QUAD_RECIPES["run"] = (quad_run, 1.0)
+
+
+# ---------------------------------------------------------------------
+# P5 campfire pack: two new rig classes and per-creature signature
+# clips. A template's base recipe set stays {idle, showcase, walk,
+# run}; a run may instead select ONE signature from SIGNATURES below,
+# and the animate stage then bakes {idle, locomotion..., signature}
+# (see recipes_for). Signatures are creature-specific performances
+# written against the template's existing channels — no new rig
+# mechanics, just new choreography.
+# ---------------------------------------------------------------------
+
+# --- winged-quadruped: quadruped motion + wing/ear terms -------------
+
+WQ_CHANNELS = QUAD_CHANNELS + ("wing_pitch", "wing2_pitch", "ear_pitch")
+WQREST = dict.fromkeys(WQ_CHANNELS, 0.0)
+
+
+def _wq(quad_pose: dict, **extra) -> dict:
+    pose = dict(WQREST)
+    pose.update(quad_pose)
+    pose.update(extra)
+    return pose
+
+
+def wq_idle(t: float) -> dict:
+    breath = math.sin(TAU * (t / 2.4))
+    return _wq(quad_idle(t),
+               wing_pitch=0.03 * breath,
+               wing2_pitch=0.02 * math.sin(TAU * (t / 2.4) + 0.4),
+               ear_pitch=0.05 * math.sin(TAU * (t / 2.4) + 0.6))
+
+
+def wq_bounce(t: float) -> dict:
+    arch = hop_arch(t, 0.62)
+    return _wq(quad_bounce(t),
+               wing_pitch=0.45 * arch,
+               wing2_pitch=0.25 * hop_arch(t - 0.05, 0.62),
+               ear_pitch=-0.08 + 0.18 * hop_arch(t - 0.08, 0.62))
+
+
+def wq_walk(t: float) -> dict:
+    ph = 2 * TAU * (t / 2.0)
+    return _wq(quad_walk(t),
+               wing_pitch=0.04 * math.sin(ph),
+               wing2_pitch=0.03 * math.sin(ph - 0.4),
+               ear_pitch=0.04 * math.sin(ph - 0.5))
+
+
+def wq_run(t: float) -> dict:
+    ph = TAU * (t / 1.0)
+    return _wq(quad_run(t),
+               wing_pitch=0.14 + 0.10 * math.sin(ph),
+               wing2_pitch=0.09 + 0.06 * math.sin(ph - 0.4),
+               ear_pitch=-0.05 + 0.04 * math.sin(ph - 0.5))
+
+
+WQ_RECIPES = {
+    "idle": (wq_idle, 4.8),
+    "bounce": (wq_bounce, 1.24),
+    "walk": (wq_walk, 2.0),
+    "run": (wq_run, 1.0),
+}
+
+
+def wq_fan(t: float) -> dict:
+    """Moth-Hart signature: wings raise into a full fan, flutter
+    three beats while fully spread, then fold away. Head lifts and
+    the antennae tremble with the flutter."""
+    period = 2.8
+    tt = t % period
+    if tt < 0.6:
+        env = _smoothstep(tt / 0.6)
+    elif tt < 2.2:
+        env = 1.0
+    else:
+        env = _smoothstep((period - tt) / 0.6)
+    flut = math.sin(TAU * 3.0 * (tt - 0.6)) if 0.6 <= tt <= 2.2 else 0.0
+    flut2 = math.sin(TAU * 3.0 * (tt - 0.6) - 0.5) \
+        if 0.6 <= tt <= 2.2 else 0.0
+    return _wq(quad_idle(t),
+               wing_pitch=0.85 * env + 0.16 * env * flut,
+               wing2_pitch=0.55 * env + 0.12 * env * flut2,
+               ear_pitch=0.06 * env * flut,
+               neck_pitch=-0.10 * env,
+               head_pitch=-0.04 * env,
+               tail_yaw=0.16 * math.sin(TAU * 2.0 * (tt / period)))
+
+
+# --- snail: body-chain undulation, no legs anywhere ------------------
+
+SNAIL_CHANNELS = ("root_y", "sway", "undulate.1", "undulate.2",
+                  "undulate.3", "neck_pitch", "head_pitch", "stalk",
+                  "retract")
+SNREST = dict.fromkeys(SNAIL_CHANNELS, 0.0)
+
+
+def snail_idle(t: float) -> dict:
+    breath = math.sin(TAU * (t / 2.4))
+    return {
+        **SNREST,
+        "sway": 0.02 * breath,
+        "undulate.2": 0.02 * breath,
+        "neck_pitch": 0.04 * math.sin(TAU * (t / 2.4) + 0.4),
+        "head_pitch": 0.04 * math.sin(TAU * (t / 2.4) + 0.8),
+        "stalk": 0.06 * math.sin(TAU * (t / 4.8)),
+    }
+
+
+def snail_glide(t: float) -> dict:
+    """Locomotion: a pitch wave travels rear-to-front along the foot
+    chain (the pedal wave a real snail rides), head and stalks
+    counter-swaying. 3.0 s loop, exact by construction."""
+    period = 3.0
+    ph = t / period
+    pose = {
+        **SNREST,
+        "root_y": 0.012 * math.sin(2 * TAU * ph),
+        "sway": 0.015 * math.sin(TAU * ph),
+        "neck_pitch": -0.05 * math.sin(TAU * ph + 0.6),
+        "head_pitch": 0.05 * math.sin(TAU * ph + 1.1),
+        "stalk": 0.05 * math.sin(TAU * ph - 0.7),
+    }
+    for i in (1, 2, 3):
+        pose[f"undulate.{i}"] = 0.10 * math.sin(TAU * ph
+                                                - (i - 1) * 0.9)
+    return pose
+
+
+def snail_retract(t: float) -> dict:
+    """Signature: the head folds back and down toward the shell
+    opening and the eye stalks fold with it, holds, then re-emerges.
+    The ``retract`` channel carries the fold (the animate stage fans
+    it out over neck/head/stalks); pitch alone cannot translate the
+    head into the shell, so this reads as a deep withdraw-lean — the
+    honest limit of a rotation-only rig."""
+    env = _wave_envelope(t, period=3.2)
+    return {
+        **SNREST,
+        "retract": env,
+        "root_y": -0.015 * env,
+        "stalk": -0.10 * env,
+        "sway": 0.01 * math.sin(TAU * (t / 3.2)),
+    }
+
+
+SNAIL_RECIPES = {
+    "idle": (snail_idle, 4.8),
+    "glide": (snail_glide, 3.0),
+    "retract": (snail_retract, 3.2),
+}
+
+TEMPLATE_RECIPES["winged-quadruped"] = {
+    "channels": WQ_CHANNELS, "rest": WQREST,
+    "recipes": WQ_RECIPES, "showcase": "bounce"}
+TEMPLATE_RECIPES["snail"] = {
+    "channels": SNAIL_CHANNELS, "rest": SNREST,
+    "recipes": SNAIL_RECIPES, "showcase": "retract"}
+
+
+# --- per-creature signatures for the existing templates --------------
+
+def winged_headturn(t: float) -> dict:
+    """Ember Owl-Cat signature: one slow full head-turn, left to
+    right and back, with a small two-beat wing shuffle."""
+    period = 3.2
+    ph = t / period
+    return {
+        **REST,
+        "head_yaw": 0.55 * math.sin(TAU * ph),
+        "head_pitch": 0.03 * math.sin(2 * TAU * ph),
+        "wing_pitch": 0.07 * math.sin(2 * TAU * ph),
+        "wing2_pitch": 0.05 * math.sin(2 * TAU * ph - 0.6),
+        "ear_pitch": 0.06 * math.sin(2 * TAU * ph + 0.8),
+        "tail_yaw": 0.08 * math.sin(TAU * ph),
+    }
+
+
+def biped_bounce(t: float) -> dict:
+    """Toasty signature: the quadruped bounce's envelope on the biped
+    root — two happy hops, twig arms flailing up on the same raise
+    axis the wave uses, knees tucking."""
+    arch = hop_arch(t, 0.62)
+    return {
+        **BREST,
+        "root_y": 0.12 * arch ** 1.2,
+        "head_pitch": -0.05 * arch,
+        "ear_pitch": -0.08 + 0.20 * hop_arch(t - 0.08, 0.62),
+        "arm_sway": 0.55 * arch,
+        "leg.L": 0.12 * arch,
+        "leg.R": 0.12 * arch,
+        "leg2.L": 0.25 * arch,
+        "leg2.R": 0.25 * arch,
+    }
+
+
+def biped_scream(t: float) -> dict:
+    """Mandrake Toddler signature: both arms shoot up and the head
+    throws back (the silent scream), holds, then the raised right
+    arm waves while the pose releases."""
+    period = 3.0
+    tt = t % period
+    if tt < 0.9:
+        up = _smoothstep(tt / 0.9)
+    elif tt < 2.6:
+        up = 1.0
+    else:
+        up = _smoothstep((period - tt) / 0.4)
+    wiggle = math.sin(TAU * 2.0 * (tt - 1.2)) if 1.2 <= tt <= 2.6 \
+        else 0.0
+    return {
+        **BREST,
+        "root_y": 0.01 * up,
+        "head_pitch": -0.32 * up,
+        "head_tilt": 0.06 * up * wiggle,
+        "ear_pitch": 0.10 * up,
+        "arm_sway": 1.50 * up,
+        "arm_wave": 0.60 * up,
+        "arm2_wave": 0.30 * up * wiggle,
+    }
+
+
+def biped_bow(t: float) -> dict:
+    """Crow Postman signature: a formal bow — head dips deep, both
+    arms sweep back, a small deferential dip of the whole body."""
+    env = _wave_envelope(t, period=2.6)
+    return {
+        **BREST,
+        "root_y": -0.03 * env,
+        "head_pitch": 0.80 * env,
+        "ear_pitch": 0.15 * env,
+        "arm.L": -0.45 * env,
+        "arm.R": -0.45 * env,
+        "arm2.L": -0.25 * env,
+        "arm2.R": -0.25 * env,
+    }
+
+
+def quad_shiver(t: float) -> dict:
+    """Geode Tortoise signature: a short full-body shiver — the
+    shell-sparkle shake — quick small oscillations through the spine
+    and root under a smooth in/out envelope."""
+    period = 1.6
+    tt = t % period
+    env = _smoothstep(tt / 0.2) * _smoothstep((period - tt) / 0.2)
+    buzz = math.sin(TAU * 6.0 * tt)
+    return {
+        **QREST,
+        "sway": 0.045 * env * buzz,
+        "spine_pitch": 0.03 * env * math.sin(TAU * 6.0 * tt + 1.0),
+        "root_y": 0.006 * env * buzz,
+        "neck_pitch": -0.03 * env * buzz,
+        "head_pitch": 0.03 * env * math.sin(TAU * 6.0 * tt + 0.5),
+        "tail_yaw": 0.20 * math.sin(TAU * 3.0 * tt),
+    }
+
+
+def quad_wiggle(t: float) -> dict:
+    """Axolotl-Capybara signature: a full-body happy wiggle — the
+    sway travels root -> spine -> tail with phase lag, head
+    counter-swaying, one slow cycle."""
+    period = 2.4
+    ph = t / period
+    return {
+        **QREST,
+        "sway": 0.10 * math.sin(TAU * ph),
+        "spine_pitch": 0.05 * math.sin(TAU * ph - 0.4),
+        "tail_yaw": 0.38 * math.sin(TAU * ph - 0.9),
+        "neck_pitch": -0.05 * math.sin(TAU * ph + 0.3),
+        "head_pitch": 0.04 * math.sin(TAU * ph + 0.7),
+        "root_y": 0.010 * math.sin(2 * TAU * ph),
+    }
+
+
+# Signature registry: template -> {clip name: (pose fn, seconds)}.
+# These are alternatives to the template's showcase clip, selected
+# per run; the base recipe dicts are untouched, so re-running an old
+# creature without a signature reproduces its historical clip set.
+SIGNATURES = {
+    "winged-creature": {"headturn": (winged_headturn, 3.2)},
+    "winged-quadruped": {"fan": (wq_fan, 2.8)},
+    "biped": {"bounce": (biped_bounce, 1.24),
+              "scream": (biped_scream, 3.0),
+              "bow": (biped_bow, 2.6)},
+    "quadruped": {"shiver": (quad_shiver, 1.6),
+                  "wiggle": (quad_wiggle, 2.4)},
+    "snail": {},
+}
+
+# The clips that move the creature through space, per template —
+# baked alongside idle + the chosen signature. The snail has no
+# walk/run by design: glide substitutes for both.
+LOCOMOTION = {
+    "winged-creature": ("walk", "run"),
+    "biped": ("walk", "run"),
+    "quadruped": ("walk", "run"),
+    "winged-quadruped": ("walk", "run"),
+    "snail": ("glide",),
+}
+
+
+def recipe_fn(template: str, name: str):
+    """(pose fn, seconds) for any bakeable clip of a template: its
+    base recipes first, then its P5 signatures."""
+    spec = template_spec(template)
+    if name in spec["recipes"]:
+        return spec["recipes"][name]
+    sig = SIGNATURES.get(template, {})
+    if name in sig:
+        return sig[name]
+    raise KeyError(f"unknown clip {name!r} for template {template!r}")
+
+
+def recipes_for(template: str, signature: str | None = None) -> dict:
+    """The clip set a run bakes. No signature (or the template's own
+    showcase): the historical base set, unchanged. A P5 signature:
+    idle + the template's locomotion clips + that signature."""
+    spec = template_spec(template)
+    if signature is None or signature == spec["showcase"]:
+        return dict(spec["recipes"])
+    out = {"idle": spec["recipes"]["idle"]}
+    for clip in LOCOMOTION[template]:
+        out[clip] = spec["recipes"][clip]
+    out[signature] = recipe_fn(template, signature)
+    return out

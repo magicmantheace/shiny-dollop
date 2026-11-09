@@ -160,6 +160,64 @@ def biped(ears: bool = False, arms: bool = True) -> list[BoneSpec]:
     return bones
 
 
+def winged_quadruped(ears: bool = False, arms: bool = False
+                     ) -> list[BoneSpec]:
+    """Quadruped body plan + a wing pair on the spine (P5: the
+    Moth-Hart is a four-legged deer with four moth wings — the upright
+    winged-creature plan cannot rig it). Wings use the winged
+    template's "horizontal" roll, so the animate stage's wing drivers
+    carry over. ``ears`` adds antenna/ear bones on the head."""
+    base = quadruped()
+    extra = []
+    if ears:
+        extra += [
+            BoneSpec("ear.L", (0.07, -0.30, 0.80), (0.13, -0.33, 0.99),
+                     "head", "vertical"),
+            BoneSpec("ear.R", (-0.07, -0.30, 0.80), (-0.13, -0.33, 0.99),
+                     "head", "vertical"),
+        ]
+    extra += [
+        BoneSpec("wing.L", (0.10, 0.02, 0.78), (0.34, 0.10, 0.94),
+                 "spine", "horizontal"),
+        BoneSpec("wing2.L", (0.34, 0.10, 0.94), (0.52, 0.16, 0.76),
+                 "wing.L", "horizontal"),
+        BoneSpec("wing.R", (-0.10, 0.02, 0.78), (-0.34, 0.10, 0.94),
+                 "spine", "horizontal"),
+        BoneSpec("wing2.R", (-0.34, 0.10, 0.94), (-0.52, 0.16, 0.76),
+                 "wing.R", "horizontal"),
+    ]
+    return base[:5] + extra + base[5:]
+
+
+def snail(ears: bool = False, arms: bool = False) -> list[BoneSpec]:
+    """Legless snail plan (P5): a three-bone chain along the foot,
+    a rising neck + head at the front, two eye-stalk bones, and one
+    shell bone parented to the root so the lantern shell rides the
+    body sway without deforming under the undulation. No legs exist
+    on this plan by design — locomotion is a body wave (the animate
+    stage's glide), never a leg gait."""
+    return [
+        BoneSpec("root", (0, 0.02, 0.02), (0, 0.02, 0.20), None,
+                 "vertical"),
+        BoneSpec("body.1", (0, 0.30, 0.05), (0, 0.10, 0.06), "root",
+                 "vertical"),
+        BoneSpec("body.2", (0, 0.10, 0.06), (0, -0.12, 0.07), "body.1",
+                 "vertical"),
+        BoneSpec("body.3", (0, -0.12, 0.07), (0, -0.28, 0.14), "body.2",
+                 "vertical"),
+        BoneSpec("neck", (0, -0.28, 0.14), (0, -0.34, 0.44), "body.3",
+                 "vertical"),
+        BoneSpec("head", (0, -0.34, 0.44), (0, -0.38, 0.64), "neck",
+                 "vertical"),
+        BoneSpec("eye.L", (0.07, -0.36, 0.58), (0.10, -0.38, 0.86),
+                 "head", "vertical"),
+        BoneSpec("eye.R", (-0.07, -0.36, 0.58), (-0.10, -0.38, 0.86),
+                 "head", "vertical"),
+        BoneSpec("shell", (0, 0.14, 0.26), (0, 0.20, 0.58), "root",
+                 "vertical"),
+    ]
+
+
 def trunk_chain(bones: list[BoneSpec],
                 head_name: str = "head") -> set[str]:
     """The axial (trunk) bones: the parent chain from ``head_name``
@@ -183,7 +241,9 @@ def trunk_chain(bones: list[BoneSpec],
 
 TEMPLATES = {"winged-creature": winged_creature,
              "quadruped": quadruped,
-             "biped": biped}
+             "biped": biped,
+             "winged-quadruped": winged_quadruped,
+             "snail": snail}
 
 
 def build_template(name: str = "winged-creature", **options) -> list[BoneSpec]:
