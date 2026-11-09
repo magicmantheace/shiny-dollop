@@ -185,3 +185,28 @@ those would mean new backdrop art, not more tuning.
   reads pale through the haze (near trees carry the detail),
   and up close the geometry is still stylized low-poly —
   that is the scene's skeleton, not its skin.
+
+## Stage 5 — new models (owner: "Then do new models", 2026-11-09)
+
+- **Pines rebuilt.** `makePineFoliageGeo` no longer stacks
+  cones: five whorls of displaced foliage clusters (centre
+  blob + three satellites per level, plump enough to overlap
+  into a continuous crown) plus a leader, in the same
+  envelope as the old tiers so every placement, scale, and
+  instance matrix in the scene works unchanged — the 245
+  treeline instances, the scattered pines, and the feature
+  pine all inherit the new model. Treeline trunks got the
+  bark painting, and the per-instance tints deepened (their
+  lightness range was washing the far trees to grey).
+- **Rocks and bushes rebuilt** as merged clusters of
+  displaced blobs with flattened undersides (three-lobe
+  bushes; a main rock with two satellites); the oak's canopy
+  blobs are displaced now too.
+- Verified in `aaa6-morning2` / `aaa6-sunset2` (zero console
+  errors): near and mid-field pines read as full-crowned
+  stylized pines; dusk silhouettes are continuous instead of
+  stacked plates. At 50 m+ the treeline is a hazy wall —
+  there the fog, not the model, is what you see, and that is
+  the honest end of this line of work: skin (stage 4) and
+  skeleton (stage 5) are both redone, and what remains is
+  the scene's deliberately stylized low-poly character.

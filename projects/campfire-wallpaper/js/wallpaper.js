@@ -74,43 +74,73 @@ function groundH(x, z) {
 // Local units match the pine trunks: foliage spans y 0.8–4.65
 // over a ~1.2-tall trunk.
 function makePineFoliageGeo() {
-  const tiers = [
-    // [radius, height, centreY]
-    [1.04, 1.50, 1.55],
-    [0.87, 1.40, 2.25],
-    [0.70, 1.30, 2.90],
-    [0.52, 1.20, 3.50],
-    [0.33, 1.15, 4.08],
+  // AAA experiment stage 5: a new tree model. The stacked
+  // cones (kept, jittered, through stage 4) are replaced by
+  // whorls of displaced foliage clusters around the trunk
+  // line — an irregular, lumpy silhouette with air in it,
+  // instead of a paper cone. Same envelope as the old tiers
+  // (about 2.1 wide, 0.75..4.7 tall) so every placement,
+  // scale, and instance matrix in the scene keeps working.
+  const parts = [];
+  const levels = [
+    // [centreY, spread, clusterRadius]
+    [1.20, 1.00, 0.55], [1.95, 0.90, 0.52], [2.65, 0.74, 0.47],
+    [3.30, 0.56, 0.42], [3.85, 0.38, 0.37],
   ];
-  const parts = tiers.map(([r, h, cy], k) => {
-    const g = new THREE.ConeGeometry(r, h, 14);
-    g.rotateY(k * 0.38);
-    g.translate(0, cy, 0);
-    // AAA experiment stage 4: break the perfect cones. Each
-    // vertex is pushed radially by a smooth angular wave (an
-    // integer frequency, so the seam stays closed) and the
-    // shade is now a continuous height gradient with a whisper
-    // of per-vertex variation — the hard per-tier bands were a
-    // cartoon tell.
+  const addBlob = (cx, cy, cz, r, sy, shadeBase, seedK) => {
+    const g = new THREE.IcosahedronGeometry(r, 1);
+    displaceGeo(g, 0.16, 2.6);
+    g.scale(1, sy, 1);
+    g.translate(cx, cy, cz);
     const p = g.getAttribute('position');
-    const n = p.count;
-    const col = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) {
-      const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-      const ang = Math.atan2(z, x);
-      const jr = 1 + 0.085 * Math.sin(ang * 3 + cy * 2 + k * 1.7) *
-                     Math.sin(y * 4.2 + k * 3.1);
-      p.setX(i, x * jr);
-      p.setZ(i, z * jr);
-      p.setY(i, y + 0.03 * Math.sin(ang * 5 + k * 2.3));
-      const shade = THREE.MathUtils.clamp(
-        0.45 + 0.55 * (y - 0.8) / 3.9 +
-        0.05 * Math.sin(ang * 7 + y * 6 + k), 0.3, 1.05);
-      col[i * 3] = shade; col[i * 3 + 1] = shade; col[i * 3 + 2] = shade;
+    const col = new Float32Array(p.count * 3);
+    for (let i = 0; i < p.count; i++) {
+      const s = THREE.MathUtils.clamp(shadeBase +
+        0.07 * Math.sin(p.getX(i) * 9 + p.getY(i) * 7 + seedK * 3), 0.3, 1.05);
+      col[i * 3] = s; col[i * 3 + 1] = s; col[i * 3 + 2] = s;
     }
     g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    return g;
+    parts.push(g);
+  };
+  levels.forEach(([cy, spread, cr], li) => {
+    const shadeBase = 0.45 + 0.55 * (cy - 0.8) / 3.9;
+    addBlob(0, cy + 0.06, 0, cr * 1.12, 0.82, shadeBase, li * 4);
+    for (let j = 0; j < 3; j++) {
+      const a = li * 1.3 + j * 2.1;
+      addBlob(Math.cos(a) * spread * 0.52, cy - 0.05,
+              Math.sin(a) * spread * 0.52, cr * 0.92, 0.78, shadeBase, li * 4 + j + 1);
+    }
   });
+  addBlob(0, 4.38, 0, 0.30, 1.25, 1.0, 99);   // the leader
+  return mergeGeometries(parts);
+}
+
+// AAA experiment stage 5: rock and bush models to match the
+// new trees — merged clusters of displaced blobs with
+// flattened undersides, instead of single primitives.
+function makeRockGeo() {
+  const parts = [];
+  for (const [ox, oy, oz, r] of [[0, 0, 0, 1], [0.58, -0.18, 0.28, 0.62], [-0.5, -0.22, -0.3, 0.48]]) {
+    const g = displaceGeo(new THREE.DodecahedronGeometry(r, 1), 0.13, 1.6);
+    g.translate(ox, oy, oz);
+    parts.push(g);
+  }
+  const merged = mergeGeometries(parts);
+  const p = merged.getAttribute('position');
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i);
+    if (y < -0.55) p.setY(i, -0.55 - (y + 0.55) * 0.3);
+  }
+  return merged;
+}
+function makeBushGeo() {
+  const parts = [];
+  for (const [ox, oy, oz, r] of [[0, 0.05, 0, 1], [0.62, -0.03, 0.18, 0.66], [-0.55, 0, -0.22, 0.58]]) {
+    const g = displaceGeo(new THREE.IcosahedronGeometry(r, 2), 0.13, 1.6);
+    g.scale(1, 0.78, 1);
+    g.translate(ox, oy, oz);
+    parts.push(g);
+  }
   return mergeGeometries(parts);
 }
 
@@ -867,8 +897,8 @@ const ridgeTex = makePaintedTexture(
 // geometries/materials, seeded placement, clearing kept free.
 {
   const trunkGeo = new THREE.CylinderGeometry(0.09, 0.14, 1.1, 8);
-  const rockGeo = displaceGeo(new THREE.DodecahedronGeometry(1, 1), 0.10, 1.4);
-  const bushGeo = displaceGeo(new THREE.IcosahedronGeometry(1, 2), 0.13, 1.1);
+  const rockGeo = makeRockGeo();
+  const bushGeo = makeBushGeo();
   const trunkMat = new THREE.MeshStandardMaterial({ color: 0xf5efe8, roughness: 1, map: barkTex });
   const pineMat = new THREE.MeshStandardMaterial({
     color: 0xe6ebdd, roughness: 1, vertexColors: true, map: foliageTex });
@@ -1010,7 +1040,7 @@ function updateDressing(t, dt) {
     trunkGeo.translate(0, 0.6, 0);
     const folGeo = makePineFoliageGeo();
     const trunks = instanced(trunkGeo,
-      new THREE.MeshStandardMaterial({ color: 0x33261a, roughness: 1 }), 245);
+      new THREE.MeshStandardMaterial({ color: 0xf5efe8, roughness: 1, map: barkTex }), 245);
     const fols = instanced(folGeo,
       new THREE.MeshStandardMaterial({
         color: 0xe6ebdd, roughness: 1, vertexColors: true, map: foliageTex }), 245);
@@ -1022,7 +1052,7 @@ function updateDressing(t, dt) {
       const s = 0.95 + layoutRand() * 1.15;
       setInst(trunks, i, x, z, s, 0.12);
       fols.setMatrixAt(i, dummy.matrix);
-      tint.setHSL(0.32, 0.25, 0.42 + layoutRand() * 0.2);
+      tint.setHSL(0.32, 0.3, 0.33 + layoutRand() * 0.16);
       fols.setColorAt(i, tint);
     }
     for (; i < 190; i++) {                 // a nearer blending band
@@ -1032,7 +1062,7 @@ function updateDressing(t, dt) {
       const s = 0.85 + layoutRand() * 0.8;
       setInst(trunks, i, x, z, s, 0.12);
       fols.setMatrixAt(i, dummy.matrix);
-      tint.setHSL(0.32, 0.25, 0.42 + layoutRand() * 0.2);
+      tint.setHSL(0.32, 0.3, 0.33 + layoutRand() * 0.16);
       fols.setColorAt(i, tint);
     }
     for (; i < 245; i++) {                 // a taller back wall (density pass)
@@ -1042,7 +1072,7 @@ function updateDressing(t, dt) {
       const s = 1.5 + layoutRand() * 1.2;
       setInst(trunks, i, x, z, s, 0.12);
       fols.setMatrixAt(i, dummy.matrix);
-      tint.setHSL(0.32, 0.25, 0.36 + layoutRand() * 0.18);
+      tint.setHSL(0.32, 0.3, 0.28 + layoutRand() * 0.14);
       fols.setColorAt(i, tint);
     }
     trunks.instanceMatrix.needsUpdate = true;
@@ -1059,7 +1089,7 @@ function updateDressing(t, dt) {
     const otrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.46, 2.3, 10), barkMat);
     otrunk.position.y = 1.1;
     oak.add(otrunk);
-    const blobGeo = new THREE.IcosahedronGeometry(1, 2);
+    const blobGeo = displaceGeo(new THREE.IcosahedronGeometry(1, 2), 0.13, 1.6);
     for (const [bx, by, bz, bs] of [[0, 3.4, 0, 2.2], [1.3, 2.9, 0.4, 1.6],
                                     [-1.2, 3.0, -0.5, 1.7], [0.2, 2.7, 1.1, 1.4]]) {
       const b = new THREE.Mesh(blobGeo, leafMat);
