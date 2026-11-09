@@ -22,6 +22,10 @@ const BridgeClient = preload("res://scripts/bridge_client.gd")
 ##   godot --headless --path viewer -- --verify-s2 --bridge=PATH
 ## additionally runs a scripted end-to-end session against the real
 ## bridge, printing S2_VERIFY_PASS lines.
+##   godot --headless --path viewer -- --verify-s3 --bridge=PATH
+## runs the S3 checks (AI-race setup, player-perspective roster,
+## contest command wiring, catch-up galaxy fields), printing
+## S3_VERIFY_PASS lines.
 
 const SPECTRAL_COLORS := {
 	0: Color(0.62, 0.71, 1.0),    # O — blue
@@ -57,6 +61,8 @@ const EVENT_TEXT := {
 	"colony_founded": "Colony founded",
 	"colony_abandoned": "Colony abandoned",
 	"specialization_set": "Specialization set",
+	"first_contact": "First contact",
+	"claim_contested": "Claim contested",
 }
 
 var table: StarTable
@@ -103,6 +109,7 @@ var marker_mi: MeshInstance3D
 var range_mi: MeshInstance3D
 var ships_box: VBoxContainer
 var claim_button: Button
+var contest_button: Button
 var build_surveyor_button: Button
 var build_colony_button: Button
 var spec_row: HBoxContainer
@@ -116,11 +123,14 @@ var refuel_button: Button
 var menu_overlay: Control
 var menu_status_label: Label
 var seed_spin: SpinBox
+var ai_spin: SpinBox
 var save_name_edit: LineEdit
 var saves_item_list: ItemList
 var elapsed_spin: SpinBox
 var eventlog_overlay: Control
 var eventlog_text: RichTextLabel
+var diplomacy_overlay: Control
+var diplomacy_text: RichTextLabel
 var overwrite_dialog: ConfirmationDialog
 var catchup_overlay: Control
 var catchup_title: Label
@@ -146,6 +156,11 @@ func _ready() -> void:
 	_refresh_saves_list()
 	if user_args.has("measure"):
 		_run_measure(load_ms)
+	elif user_args.has("verify_s3"):
+		if _run_verify_checks(data_path, load_ms) > 0:
+			get_tree().quit(1)
+		else:
+			_run_verify_s3()
 	elif user_args.has("verify_s2"):
 		if _run_verify_checks(data_path, load_ms) > 0:
 			get_tree().quit(1)
@@ -167,6 +182,8 @@ func _parse_user_args() -> Dictionary:
 			out["verify"] = true
 		elif a == "--verify-s2":
 			out["verify_s2"] = true
+		elif a == "--verify-s3":
+			out["verify_s3"] = true
 		elif a == "--measure":
 			out["measure"] = true
 		elif a.begins_with("--data="):
@@ -179,7 +196,7 @@ func _parse_user_args() -> Dictionary:
 func _setup_bridge() -> void:
 	bridge_client = BridgeClient.new()
 	var explicit := str(user_args.get("bridge", ""))
-	if user_args.has("verify_s2") and explicit != "":
+	if (user_args.has("verify_s2") or user_args.has("verify_s3")) and explicit != "":
 		# Verify mode names the exact binary under test; do not let
 		# the candidate search substitute a different one.
 		bridge_path = explicit
@@ -305,6 +322,7 @@ func _build_scene() -> void:
 
 	_build_menu(layer)
 	_build_event_log(layer)
+	_build_diplomacy(layer)
 	_build_catchup(layer)
 
 
@@ -349,6 +367,10 @@ func _build_hud(layer: CanvasLayer) -> void:
 	log_button.text = "Event Log"
 	log_button.pressed.connect(_on_event_log_pressed)
 	row.add_child(log_button)
+	var diplomacy_button := Button.new()
+	diplomacy_button.text = "Diplomacy"
+	diplomacy_button.pressed.connect(_on_diplomacy_pressed)
+	row.add_child(diplomacy_button)
 	var menu_button := Button.new()
 	menu_button.text = "Menu"
 	menu_button.pressed.connect(_on_menu_pressed)
@@ -372,6 +394,8 @@ func _build_system_panel(layer: CanvasLayer) -> void:
 
 	claim_button = _action_button("Claim System — 25 cr", _on_claim_pressed)
 	box.add_child(claim_button)
+	contest_button = _action_button("Contest Claim", _on_contest_pressed)
+	box.add_child(contest_button)
 	build_surveyor_button = _action_button("Build Surveyor", _on_build_surveyor_pressed)
 	box.add_child(build_surveyor_button)
 	build_colony_button = _action_button("Build Colony Ship", _on_build_colony_pressed)
@@ -469,6 +493,19 @@ func _build_menu(layer: CanvasLayer) -> void:
 	seed_row.add_child(seed_spin)
 	box.add_child(seed_row)
 
+	var ai_row := HBoxContainer.new()
+	var ai_caption := Label.new()
+	ai_caption.text = "AI races (0–39)"
+	ai_row.add_child(ai_caption)
+	ai_spin = SpinBox.new()
+	ai_spin.min_value = 0
+	ai_spin.max_value = 39
+	ai_spin.step = 1
+	ai_spin.value = 12
+	ai_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ai_row.add_child(ai_spin)
+	box.add_child(ai_row)
+
 	var name_row := HBoxContainer.new()
 	var name_caption := Label.new()
 	name_caption.text = "Save name"
@@ -547,6 +584,33 @@ func _build_event_log(layer: CanvasLayer) -> void:
 	close_button.pressed.connect(_on_event_log_close_pressed)
 	box.add_child(close_button)
 	eventlog_overlay.visible = false
+
+
+func _build_diplomacy(layer: CanvasLayer) -> void:
+	diplomacy_overlay = _overlay_base(layer)
+	var centre := CenterContainer.new()
+	centre.set_anchors_preset(Control.PRESET_FULL_RECT)
+	diplomacy_overlay.add_child(centre)
+	var panel := PanelContainer.new()
+	centre.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	box.custom_minimum_size = Vector2(640, 420)
+	panel.add_child(box)
+	var title := Label.new()
+	title.text = "Diplomacy"
+	title.add_theme_font_size_override("font_size", 20)
+	box.add_child(title)
+	diplomacy_text = RichTextLabel.new()
+	diplomacy_text.fit_content = false
+	diplomacy_text.custom_minimum_size = Vector2(620, 330)
+	diplomacy_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(diplomacy_text)
+	var close_button := Button.new()
+	close_button.text = "Close"
+	close_button.pressed.connect(_on_diplomacy_close_pressed)
+	box.add_child(close_button)
+	diplomacy_overlay.visible = false
 
 
 func _build_catchup(layer: CanvasLayer) -> void:
@@ -691,6 +755,16 @@ func _ship_current_system(ship: Dictionary) -> int:
 func _event_human(e: Dictionary) -> String:
 	var kind := str(e.get("kind", ""))
 	var text := str(EVENT_TEXT.get(kind, kind.replace("_", " ").capitalize()))
+	# S3: name the actor. Diplomacy events name both parties;
+	# foreign presence events in surveyed space name the visitor.
+	var civ_name := str(e.get("civ_name", ""))
+	var other_name := str(e.get("other_civ_name", ""))
+	if kind == "first_contact" and civ_name != "" and other_name != "":
+		text += " — %s × %s" % [civ_name, other_name]
+	elif kind == "claim_contested" and civ_name != "" and other_name != "":
+		text += " — %s contests %s" % [civ_name, other_name]
+	elif civ_name != "" and e.get("civ", null) != null and int(e["civ"]) != 0:
+		text = "%s: %s" % [civ_name, text]
 	var sys_name = e.get("system_name", null)
 	if sys_name != null and str(sys_name) != "":
 		text += " — " + str(sys_name)
@@ -779,7 +853,7 @@ func _on_new_campaign_pressed() -> void:
 
 
 func _start_new_campaign(overwrite: bool) -> void:
-	var req := {"op": "new", "save": save_path, "seed": int(seed_spin.value)}
+	var req := {"op": "new", "save": save_path, "seed": int(seed_spin.value), "ai_races": int(ai_spin.value)}
 	if overwrite:
 		req["overwrite"] = true
 	var resp: Dictionary = bridge_client.call_bridge(req)
@@ -843,6 +917,7 @@ func _enter_session(resp: Dictionary) -> void:
 	menu_overlay.visible = false
 	_refresh_hud()
 	_refresh_ships_panel()
+	_refresh_diplomacy_text()
 	_rebuild_markers()
 	_rebuild_range_layer()
 	var home := int(view_data.get("home_system", 0))
@@ -874,6 +949,7 @@ func _apply_exec_response(resp: Dictionary, success_message: String = "", quiet:
 					first_error = str(r.get("error", "command failed"))
 	_refresh_hud()
 	_refresh_ships_panel()
+	_refresh_diplomacy_text()
 	_rebuild_markers()
 	_rebuild_range_layer()
 	if session_active and selected_system >= 0:
@@ -948,6 +1024,65 @@ func _on_event_log_pressed() -> void:
 
 func _on_event_log_close_pressed() -> void:
 	eventlog_overlay.visible = false
+
+
+func _on_diplomacy_pressed() -> void:
+	_refresh_diplomacy_text()
+	diplomacy_overlay.visible = true
+
+
+func _on_diplomacy_close_pressed() -> void:
+	diplomacy_overlay.visible = false
+
+
+## The diplomacy screen (design §6.3): every civilization the
+## player has met, with the legible opinion breakdown in both
+## directions and any open claim disputes. Unmet civilizations are
+## not listed — the bridge never sends them.
+func _refresh_diplomacy_text() -> void:
+	if diplomacy_text == null:
+		return
+	var civs = view_data.get("civilizations", [])
+	if not civs is Array or civs.is_empty():
+		diplomacy_text.text = "No campaign loaded."
+		return
+	var lines := PackedStringArray()
+	for c in civs:
+		if not c is Dictionary:
+			continue
+		if bool(c.get("is_player", false)):
+			lines.append("%s (you) — %d colonies · home: %s" % [
+				str(c.get("name", "?")), int(c.get("colonies", 0)), str(c.get("home_name", "?"))])
+			continue
+		lines.append("")
+		lines.append("%s — %s" % [str(c.get("name", "?")), str(c.get("archetype", ""))])
+		lines.append("  First contact: day %d · Home: %s · Colonies you know of: %d" % [
+			int(c.get("contacted_day", 0)), str(c.get("home_name", "?")), int(c.get("known_colonies", 0))])
+		var theirs = c.get("opinion_of_player", {})
+		if theirs is Dictionary and not theirs.is_empty():
+			lines.append("  Their opinion of you: %s (disposition %s · disputes %s · border friction %s)" % [
+				_fmt_signed(float(theirs.get("total", 0.0)), 1),
+				_fmt_signed(float(theirs.get("disposition", 0.0)), 1),
+				_fmt_signed(float(theirs.get("disputes", 0.0)), 1),
+				_fmt_signed(float(theirs.get("border_friction", 0.0)), 1)])
+		var ours = c.get("player_opinion", {})
+		if ours is Dictionary and not ours.is_empty():
+			lines.append("  Your opinion of them: %s (disputes %s · border friction %s)" % [
+				_fmt_signed(float(ours.get("total", 0.0)), 1),
+				_fmt_signed(float(ours.get("disputes", 0.0)), 1),
+				_fmt_signed(float(ours.get("border_friction", 0.0)), 1)])
+		var disputes = c.get("disputes", [])
+		if disputes is Array:
+			for d in disputes:
+				if d is Dictionary:
+					lines.append("  ⚠ Dispute over %s — opened day %d · tension %s" % [
+						str(d.get("system_name", "?")), int(d.get("opened_day", 0)),
+						_fmt_thousands(float(d.get("tension", 0.0)), 1)])
+	if lines.size() == 1:
+		lines.append("")
+		lines.append("No other civilization has been contacted yet.")
+		lines.append("Survey a system another civilization holds to make first contact.")
+	diplomacy_text.text = "\n".join(lines)
 
 
 func _on_menu_pressed() -> void:
@@ -1220,6 +1355,7 @@ func _refresh_system_buttons() -> void:
 	if claim_button == null:
 		return
 	claim_button.visible = false
+	contest_button.visible = false
 	build_surveyor_button.visible = false
 	build_colony_button.visible = false
 	spec_row.visible = false
@@ -1235,6 +1371,8 @@ func _refresh_system_buttons() -> void:
 	var survey := str(inspect_data.get("survey", ""))
 	if survey == "surveyed" and inspect_data.get("claimed_by", null) == null:
 		claim_button.visible = true
+	if survey == "surveyed" and inspect_data.get("claimed_by", null) != null and int(inspect_data["claimed_by"]) != 0:
+		contest_button.visible = true
 	if colony is Dictionary:
 		var sd := _find_design_by_kind("surveyor")
 		if not sd.is_empty():
@@ -1279,6 +1417,10 @@ func _target_system_id() -> int:
 
 func _on_claim_pressed() -> void:
 	_exec_commands([{"cmd": "claim", "system": _target_system_id()}], "System claimed.")
+
+
+func _on_contest_pressed() -> void:
+	_exec_commands([{"cmd": "contest", "system": _target_system_id()}], "Claim contested — a dispute is open. See Diplomacy.")
 
 
 func _on_build_surveyor_pressed() -> void:
@@ -1354,6 +1496,15 @@ func _open_catchup(catchup: Dictionary) -> void:
 	lines.append(_catchup_delta_line("Claimed", before, after, "claimed", 0))
 	lines.append(_catchup_delta_line("Colonized", before, after, "colonized", 0))
 	lines.append(_catchup_delta_line("Fuel stock", before, after, "total_fuel_stock", 1))
+	# S3 (§11.1): major AI developments surface in the same review.
+	if after.has("galaxy_colonized"):
+		lines.append("")
+		lines.append("Elsewhere in the galaxy:")
+		lines.append(_catchup_delta_line("Colonized (all civilizations)", before, after, "galaxy_colonized", 0))
+		lines.append(_catchup_delta_line("Claimed (all civilizations)", before, after, "galaxy_claimed", 0))
+		lines.append(_catchup_delta_line("Surveyed (all civilizations)", before, after, "galaxy_surveyed", 0))
+		lines.append(_catchup_delta_line("Civilizations in contact (pairs)", before, after, "contacts", 0))
+		lines.append(_catchup_delta_line("Open claim disputes", before, after, "disputes", 0))
 	var events = catchup.get("events", [])
 	if events is Array and events.is_empty():
 		lines.append("\nNo ship or colony events — the galaxy ticked quietly (economy settled monthly).")
@@ -1745,6 +1896,106 @@ func _run_verify_s2() -> void:
 		return
 	print("S2_VERIFY_PASS load_catchup days=30 day=%d->%d" % [day_before, day_after])
 	print("S2_VERIFY_PASS all")
+	get_tree().quit(0)
+
+
+# ------------------------------------------------------------- S3 verify
+
+func _run_verify_s3() -> void:
+	# S0 lines have already been printed by _run_verify_checks.
+	if not user_args.has("bridge") or str(user_args.get("bridge", "")) == "":
+		printerr("S3_VERIFY_FAIL bridge not specified")
+		get_tree().quit(1)
+		return
+	if bridge_client == null or bridge_path == "":
+		printerr("S3_VERIFY_FAIL bridge not found")
+		get_tree().quit(1)
+		return
+	var verify_dir := ProjectSettings.globalize_path("user://verify-s3/")
+	DirAccess.make_dir_recursive_absolute(verify_dir)
+	var save := verify_dir.path_join("verify-s3.mwsb")
+	if FileAccess.file_exists(save):
+		DirAccess.remove_absolute(save)
+	_s2_events.clear()
+	_s2_cursor = 0
+
+	# a) New campaign with the design's default 12 AI races (§11.3).
+	var resp: Dictionary = bridge_client.call_bridge({"op": "new", "save": save, "seed": 42, "ai_races": 12})
+	var v = resp.get("view", {})
+	var setup = resp.get("setup", {})
+	if not bool(resp.get("ok", false)) or not v is Dictionary or not setup is Dictionary:
+		printerr("S3_VERIFY_FAIL new resp=%s" % str(resp).substr(0, 400))
+		get_tree().quit(1)
+		return
+	var ai_list = setup.get("ai", [])
+	if not ai_list is Array or ai_list.size() != 12:
+		printerr("S3_VERIFY_FAIL setup ai count=%s" % str(ai_list.size() if ai_list is Array else -1))
+		get_tree().quit(1)
+		return
+	for ai in ai_list:
+		if ai is Dictionary and ai.has("home_system"):
+			printerr("S3_VERIFY_FAIL setup leaks a home system")
+			get_tree().quit(1)
+			return
+	print("S3_VERIFY_PASS setup ai=12 homes_hidden=true")
+
+	# b) Player perspective at day 0: roster of one, two ships, one
+	# known system — while the galaxy block counts 13 civilizations.
+	var civs = v.get("civilizations", [])
+	var galaxy_block = v.get("galaxy", {})
+	if not civs is Array or civs.size() != 1 \
+			or int(galaxy_block.get("civilizations", -1)) != 13 \
+			or int(galaxy_block.get("colonized", -1)) != 13 \
+			or _s2_ships(resp).size() != 2 \
+			or int(_s2_counts(resp).get("surveyed", -1)) != 1:
+		printerr("S3_VERIFY_FAIL perspective civs=%s galaxy=%s ships=%d surveyed=%s" % [
+			str(civs.size() if civs is Array else -1), str(galaxy_block),
+			_s2_ships(resp).size(), str(_s2_counts(resp).get("surveyed", -1))])
+		get_tree().quit(1)
+		return
+	print("S3_VERIFY_PASS perspective roster=1 galaxy_civs=13 ships=2 surveyed=1")
+
+	# c) A year passes: the AI civilizations survey and expand; the
+	# player's own counts stay the player's (an idle player surveys
+	# nothing new).
+	resp = _s2_exec(save, [{"cmd": "advance", "days": 365}])
+	v = resp.get("view", {})
+	galaxy_block = v.get("galaxy", {}) if v is Dictionary else {}
+	if not bool(resp.get("ok", false)) or int(v.get("day", -1)) != 365 \
+			or int(galaxy_block.get("surveyed", -1)) <= 13 \
+			or int(_s2_counts(resp).get("surveyed", -1)) != 1:
+		printerr("S3_VERIFY_FAIL advance day=%s galaxy_surveyed=%s player_surveyed=%s" % [
+			str(v.get("day", -1) if v is Dictionary else -1),
+			str(galaxy_block.get("surveyed", -1)),
+			str(_s2_counts(resp).get("surveyed", -1))])
+		get_tree().quit(1)
+		return
+	print("S3_VERIFY_PASS advance day=365 galaxy_surveyed=%d player_surveyed=1" % int(galaxy_block.get("surveyed", -1)))
+
+	# d) Contest wiring: contesting a claim on a system the player
+	# has not surveyed must fail cleanly in the results array.
+	resp = _s2_exec(save, [{"cmd": "contest", "system": 99999}])
+	var results = resp.get("results", [])
+	var contest_failed := false
+	if results is Array and not results.is_empty() and results[0] is Dictionary:
+		contest_failed = not bool(results[0].get("ok", true))
+	if not contest_failed:
+		printerr("S3_VERIFY_FAIL contest expected a refused result, resp=%s" % str(resp).substr(0, 400))
+		get_tree().quit(1)
+		return
+	print("S3_VERIFY_PASS contest refused_cleanly=true")
+
+	# e) Catch-up snapshots carry the galaxy fields the modal reads.
+	resp = bridge_client.call_bridge({"op": "load", "save": save, "elapsed_override_days": 30})
+	var catchup = resp.get("catchup", null)
+	var after = catchup.get("after", {}) if catchup is Dictionary else {}
+	if not bool(resp.get("ok", false)) or not after is Dictionary \
+			or not after.has("galaxy_colonized") or not after.has("contacts") or not after.has("disputes"):
+		printerr("S3_VERIFY_FAIL catchup fields after=%s" % str(after).substr(0, 300))
+		get_tree().quit(1)
+		return
+	print("S3_VERIFY_PASS catchup galaxy_fields=true")
+	print("S3_VERIFY_PASS all")
 	get_tree().quit(0)
 
 

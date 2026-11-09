@@ -36,13 +36,21 @@ pub struct SystemProfile {
 
 impl SystemProfile {
     pub fn homeworld() -> Self {
+        Self::homeworld_named("Earth".into())
+    }
+
+    /// The §6.1/§11.7 homeworld guarantee for a named world: an AI
+    /// civilization's home planet carries its own name ("<star>
+    /// Prime"), with the same guaranteed habitability and traits as
+    /// the player's Earth.
+    pub fn homeworld_named(planet_name: String) -> Self {
         Self {
             habitability_percent: 95.0,
             fuel_trait: 1.0,
             industry_trait: 1.0,
             exotics_trait: 0.0,
             planets: vec![PlanetProfile {
-                name: "Earth".into(),
+                name: planet_name,
                 source: PlanetSource::HomeworldSetup,
                 habitability_percent: 95.0,
                 eq_temp_k: 288.0,

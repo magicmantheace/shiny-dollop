@@ -3,9 +3,18 @@
 //! This is not the AI of design §6 (that is S3). It is the S1 harness
 //! driver: a fixed set of legible rules that expand one civilization
 //! from its homeworld under the same APIs a frontend or AI will use.
+//!
+//! S3 note: the policy drives the **player's** civilization only.
+//! Since S3 the world contains other civilizations' ships and
+//! colonies; the policy skips them (the core would refuse the
+//! commands anyway, but scanning the galaxy on behalf of a foreign
+//! surveyor was wasted work, and foreign hulls must not count
+//! toward the player's own fleet needs).
 
 use crate::catalog::Galaxy;
-use crate::state::{Campaign, Purpose, ShipKind, ShipState, Specialization, StarId, SurveyState};
+use crate::state::{
+    Campaign, Purpose, ShipKind, ShipState, Specialization, StarId, PLAYER_CIV,
+};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ScriptedPolicy;
@@ -26,6 +35,9 @@ impl ScriptedPolicy {
             let Some(state) = sim.system(system) else {
                 continue;
             };
+            if state.claimed_by != Some(PLAYER_CIV) {
+                continue;
+            }
             let Some(colony) = state.colony.as_ref() else {
                 continue;
             };
@@ -52,6 +64,9 @@ impl ScriptedPolicy {
             let Some(ship) = sim.ship(ship_id) else {
                 continue;
             };
+            if ship.owner != PLAYER_CIV {
+                continue;
+            }
             let design = sim.design(ship.design_idx).cloned();
             let Some(design) = design else { continue };
             match ship.state.clone() {
@@ -86,8 +101,10 @@ impl ScriptedPolicy {
         system: StarId,
     ) {
         let state = sim.system(system);
-        let survey = state.map(|s| s.survey).unwrap_or(SurveyState::Unknown);
-        if survey == SurveyState::Unknown {
+        // Per-civilization knowledge since S3: another civilization's
+        // survey of this system is invisible to the player, so the
+        // question is whether *the player* has surveyed it.
+        if !sim.surveyed_by(PLAYER_CIV, system) {
             let _ = sim.begin_survey(galaxy, ship_id);
             return;
         }
@@ -171,10 +188,12 @@ impl ScriptedPolicy {
                 continue;
             }
             // Build where the alloys are: richest colony first, then
-            // lowest star id for a stable tie-break.
+            // lowest star id for a stable tie-break. Only the
+            // player's own colonies can build for the player.
             let mut colonies: Vec<(StarId, f64)> = sim
                 .systems()
                 .iter()
+                .filter(|(_, state)| state.claimed_by == Some(PLAYER_CIV))
                 .filter_map(|(id, state)| state.colony.as_ref().map(|c| (*id, c.alloys_stock)))
                 .collect();
             colonies.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
@@ -189,15 +208,18 @@ impl ScriptedPolicy {
 
     fn kind_available_or_queued(&self, sim: &Campaign, wanted: ShipKind) -> bool {
         let in_fleet = sim.ships().values().any(|ship| {
-            sim.design(ship.design_idx)
-                .map(|d| d.kind == wanted)
-                .unwrap_or(false)
+            ship.owner == PLAYER_CIV
+                && sim
+                    .design(ship.design_idx)
+                    .map(|d| d.kind == wanted)
+                    .unwrap_or(false)
         });
         if in_fleet {
             return true;
         }
         sim.systems().values().any(|state| {
-            state
+            state.claimed_by == Some(PLAYER_CIV)
+                && state
                 .colony
                 .as_ref()
                 .map(|colony| {
@@ -230,12 +252,7 @@ fn nearest_unknown_within_range(
         if star.id == from {
             continue;
         }
-        if sim
-            .system(star.id)
-            .map(|s| s.survey)
-            .unwrap_or(SurveyState::Unknown)
-            == SurveyState::Surveyed
-        {
+        if sim.surveyed_by(PLAYER_CIV, star.id) {
             continue;
         }
         let distance = crate::catalog::distance_between(origin.pos_ly, star.pos_ly);
@@ -258,8 +275,8 @@ fn nearest_colonizable_within_range(
     let range = ship_range(sim, ship_id)?;
     let mut best: Option<(f64, StarId)> = None;
     for (id, state) in sim.systems() {
-        if state.survey != SurveyState::Surveyed
-            || state.claimed_by != Some(crate::state::PLAYER_CIV)
+        if !state.surveyed_by.contains(&PLAYER_CIV)
+            || state.claimed_by != Some(PLAYER_CIV)
             || state.colony.is_some()
         {
             continue;
@@ -294,7 +311,7 @@ fn nearest_colony_within_range(
     let range = ship_range(sim, ship_id)?;
     let mut best: Option<(f64, StarId)> = None;
     for (id, state) in sim.systems() {
-        if *id == from || state.colony.is_none() {
+        if *id == from || state.colony.is_none() || state.claimed_by != Some(PLAYER_CIV) {
             continue;
         }
         let Some(distance) = galaxy.distance_ly(from, *id) else {
@@ -310,12 +327,12 @@ fn nearest_colony_within_range(
     best.map(|(_, id)| id)
 }
 
-/// Distance from `from` to the nearest colonized system (0 if `from`
-/// is itself colonized).
+/// Distance from `from` to the nearest of the player's colonies
+/// (0 if `from` is itself one).
 fn nearest_colony_distance(sim: &Campaign, galaxy: &Galaxy, from: StarId) -> Option<f64> {
     let mut best: Option<f64> = None;
     for (id, state) in sim.systems() {
-        if state.colony.is_none() {
+        if state.colony.is_none() || state.claimed_by != Some(PLAYER_CIV) {
             continue;
         }
         let Some(distance) = galaxy.distance_ly(from, *id) else {

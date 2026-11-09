@@ -12,8 +12,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use mwcs_bridge::envelope::{read_envelope, read_envelope_header, write_envelope};
 use mwcs_bridge::json::{parse, Value};
-use mwcs_bridge::view::{event_json, events_since, inspect_json, snapshot_json, view_json};
-use mwcs_sim::{Campaign, Galaxy, Purpose, Specialization};
+use mwcs_bridge::view::{
+    event_json_with_names, event_visible_to_player, events_since, inspect_json, snapshot_json,
+    view_json,
+};
+use mwcs_sim::race::HomeworldRules;
+use mwcs_sim::{Campaign, Galaxy, GameSetup, Purpose, Specialization};
 
 fn error_value(message: &str) -> Value {
     Value::obj(vec![
@@ -47,6 +51,16 @@ fn opt_u64(req: &Value, key: &str) -> Result<Option<u64>, String> {
     match req.get(key) {
         Some(v) => v
             .as_u64()
+            .map(Some)
+            .map_err(|e| format!("field \"{key}\": {e}")),
+        None => Ok(None),
+    }
+}
+
+fn opt_f64(req: &Value, key: &str) -> Result<Option<f64>, String> {
+    match req.get(key) {
+        Some(v) => v
+            .as_f64()
             .map(Some)
             .map_err(|e| format!("field \"{key}\": {e}")),
         None => Ok(None),
@@ -147,6 +161,12 @@ fn exec_command(campaign: &mut Campaign, galaxy: &Galaxy, cmd: &Value) -> Result
             let system = cmd_u64(cmd, "system")? as u32;
             campaign.claim_system(system).map_err(|e| format!("{e}"))
         }
+        "contest" => {
+            let system = cmd_u64(cmd, "system")? as u32;
+            campaign
+                .contest_claim(system)
+                .map_err(|e| format!("{e}"))
+        }
         "found" => {
             let ship = cmd_u64(cmd, "ship")? as u32;
             campaign
@@ -210,6 +230,14 @@ fn op_new(galaxy: &Galaxy, req: &Value) -> Value {
         Ok(None) => 42,
         Err(e) => return error_value(&e),
     };
+    let ai_races = match opt_u64(req, "ai_races") {
+        Ok(v) => v,
+        Err(e) => return error_value(&e),
+    };
+    let ai_min_spacing = match opt_f64(req, "ai_min_spacing_ly") {
+        Ok(v) => v,
+        Err(e) => return error_value(&e),
+    };
     // Overwriting an existing campaign must be an explicit, deliberate
     // act: without "overwrite": true an occupied save path is refused,
     // so no caller can silently destroy a campaign by reusing a name.
@@ -226,9 +254,55 @@ fn op_new(galaxy: &Galaxy, req: &Value) -> Value {
         ));
     }
     let now = now_unix(req);
-    let campaign = match Campaign::new_default(galaxy, seed) {
-        Ok(c) => c,
-        Err(e) => return error_value(&format!("{e}")),
+    // S3: `ai_races` absent = the S1/S2 solo campaign, byte-for-byte
+    // the old behaviour. Present (including 0) = a §6 setup: the
+    // player at Sol plus that many AI civilizations. The frontend's
+    // setup screen owns the design's default of 12 (§11.3); the
+    // bridge defaults to solo so existing callers never change
+    // meaning under their feet. `ai_min_spacing_ly` overrides the
+    // §6.1 fairness spacing (small test galaxies need it; real games
+    // should leave it alone).
+    let (campaign, setup_json) = match ai_races {
+        None => match Campaign::new_default(galaxy, seed) {
+            Ok(c) => (c, Value::Null),
+            Err(e) => return error_value(&format!("{e}")),
+        },
+        Some(ai_count) => {
+            let mut rules = HomeworldRules::default();
+            if let Some(spacing) = ai_min_spacing {
+                rules.min_spacing_ly = spacing;
+            }
+            let setup = GameSetup {
+                ai_count: ai_count as usize,
+                home_rules: rules,
+                ..GameSetup::default()
+            };
+            match Campaign::new_game(galaxy, seed, &setup) {
+                Ok((c, report)) => {
+                    // Identities only — never home systems. Where a
+                    // rival lives is §6.1 fog-of-war knowledge, won
+                    // by contact, not read off the setup screen.
+                    let ai: Vec<Value> = report
+                        .ai
+                        .iter()
+                        .map(|ai| {
+                            Value::obj(vec![
+                                ("id", Value::from(ai.civ_id)),
+                                ("name", Value::from(ai.name.clone())),
+                                ("archetype", Value::from(ai.archetype.clone())),
+                            ])
+                        })
+                        .collect();
+                    let setup_json = Value::obj(vec![
+                        ("player_home", Value::from(report.player_home)),
+                        ("spacing_used_ly", Value::Number(report.spacing_used_ly)),
+                        ("ai", Value::Array(ai)),
+                    ]);
+                    (c, setup_json)
+                }
+                Err(e) => return error_value(&format!("{e}")),
+            }
+        }
     };
     if let Err(e) = write_envelope(Path::new(&save), now, &campaign) {
         return error_value(&e);
@@ -236,6 +310,7 @@ fn op_new(galaxy: &Galaxy, req: &Value) -> Value {
     Value::obj(vec![
         ("ok", Value::Bool(true)),
         ("view", view_json(&campaign, galaxy)),
+        ("setup", setup_json),
         ("catchup", Value::Null),
     ])
 }
@@ -276,11 +351,15 @@ fn op_load(galaxy: &Galaxy, req: &Value) -> Value {
     };
     if elapsed > 0 {
         campaign.advance(galaxy, elapsed);
+        // The catch-up review shows what the player could know:
+        // their own events, diplomacy they are party to, and
+        // foreign presence in player-surveyed space (§6.1/§11.1).
         let events: Vec<Value> = campaign
             .events()
             .iter()
             .filter(|e| e.day > day_before && e.day <= campaign.day())
-            .map(|e| event_json(galaxy, e))
+            .filter(|e| event_visible_to_player(&campaign, e))
+            .map(|e| event_json_with_names(galaxy, e, &campaign))
             .collect();
         if let Err(e) = write_envelope(Path::new(&save), anchor, &campaign) {
             return error_value(&e);

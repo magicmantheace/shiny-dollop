@@ -1,23 +1,31 @@
 //! Milky Way Colonization Simulator — deterministic headless sim core.
 //!
 //! Slice S1: one civilization, survey → claim → colonize, ship/fuel
-//! mechanics, monthly economy settlement, canonical save/load. The
-//! Godot frontend does not call this crate yet (that is S2); the CLI
-//! demo and the test suite are the S1 drivers.
+//! mechanics, monthly economy settlement, canonical save/load.
+//! Slice S2 wired the core to the Godot frontend through the bridge
+//! crate. Slice S3 adds AI civilizations (placement, personalities,
+//! per-civilization fog of war, contact and claim disputes) running
+//! the same rules through the same command surface.
 
+pub mod ai;
 pub mod catalog;
+pub mod diplomacy;
 pub mod policy;
 pub mod profile;
+pub mod race;
 pub mod rng;
 pub mod save;
 pub mod state;
 
 pub use catalog::{Galaxy, StaticPlanet, StaticStar};
+pub use diplomacy::{OpinionBreakdown, Relation};
 pub use policy::ScriptedPolicy;
 pub use profile::{PlanetProfile, PlanetSource, SystemProfile};
+pub use race::{Archetype, HomeworldRules, Personality, ARCHETYPES, DEFAULT_AI_COUNT, MAX_AI_COUNT};
 pub use rng::SeededRng;
 pub use state::{
-    Campaign, Civilization, Colony, ConstructionProject, EventKind, GameEvent, Purpose, Ship,
-    ShipDesign, ShipKind, ShipState, SimError, SimResult, Specialization, SurveyState, SystemState,
-    DAYS_PER_MONTH, DAYS_PER_YEAR, PLAYER_CIV,
+    AiCivSetup, Campaign, Civilization, Colony, ConstructionProject, Dispute, EventKind, GameEvent,
+    GameSetup, Purpose, SetupReport, Ship, ShipDesign, ShipKind, ShipState, SimError, SimResult,
+    Specialization, SurveyState, SystemState, CLAIM_COST_CREDITS, DAYS_PER_MONTH, DAYS_PER_YEAR,
+    PLAYER_CIV,
 };
