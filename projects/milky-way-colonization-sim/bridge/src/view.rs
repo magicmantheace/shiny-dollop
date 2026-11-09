@@ -13,8 +13,8 @@
 
 use mwcs_pipeline::table::{FLAG_MASS_DERIVED, FLAG_SOURCE_EXOPLANET_ARCHIVE, FLAG_TEMP_DERIVED};
 use mwcs_sim::{
-    Campaign, Colony, EventKind, Galaxy, GameEvent, PlanetSource, Purpose, ShipKind, ShipState,
-    Specialization, SurveyState, PLAYER_CIV,
+    Campaign, Colony, EventKind, Galaxy, GameEvent, PeaceTerms, PlanetSource, ProposalKind,
+    Purpose, ShipKind, ShipState, Specialization, SurveyState, TreatyKind, PLAYER_CIV,
 };
 
 use crate::json::Value;
@@ -82,6 +82,15 @@ pub fn event_kind_str(kind: EventKind) -> &'static str {
         EventKind::SpecializationSet => "specialization_set",
         EventKind::FirstContact => "first_contact",
         EventKind::ClaimContested => "claim_contested",
+        EventKind::TreatySigned => "treaty_signed",
+        EventKind::TreatyBroken => "treaty_broken",
+        EventKind::EmbargoDeclared => "embargo_declared",
+        EventKind::EmbargoLifted => "embargo_lifted",
+        EventKind::TradeRouteEstablished => "trade_route_established",
+        EventKind::TradeRouteSevered => "trade_route_severed",
+        EventKind::PeaceSettled => "peace_settled",
+        EventKind::TreatyProposed => "treaty_proposed",
+        EventKind::DealRefused => "deal_refused",
     }
 }
 
@@ -316,6 +325,8 @@ pub fn view_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
         ("events_total", Value::from(campaign.events().len())),
         ("galaxy", galaxy_json(campaign)),
         ("civilizations", civilizations_json(campaign, galaxy)),
+        ("trade_routes", trade_routes_json(campaign, galaxy)),
+        ("proposals", proposals_json(campaign, galaxy)),
     ])
 }
 
@@ -330,6 +341,9 @@ pub fn galaxy_json(campaign: &Campaign) -> Value {
         ("civilizations", Value::from(campaign.civs().len())),
         ("contacts", Value::from(campaign.contacts().len())),
         ("disputes", Value::from(campaign.disputes().len())),
+        ("treaties", Value::from(campaign.treaties().len())),
+        ("trade_routes", Value::from(campaign.trade_routes().len())),
+        ("trade_income_total", num(campaign.total_trade_income())),
     ])
 }
 
@@ -363,10 +377,19 @@ pub fn civilizations_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
             ),
             ("colonies", Value::from(campaign.colonies_of(PLAYER_CIV).len())),
             ("surveyed", Value::from(campaign.surveyed_count())),
+            (
+                "research_points",
+                num(campaign.research_points_for(PLAYER_CIV)),
+            ),
             ("contacted_day", Value::Null),
             ("opinion_of_player", Value::Null),
             ("player_opinion", Value::Null),
             ("disputes", Value::Array(vec![])),
+            ("treaties", Value::Array(vec![])),
+            ("embargo_by_me", Value::Bool(false)),
+            ("embargo_by_them", Value::Bool(false)),
+            ("diplomacy_ready", Value::Bool(false)),
+            ("translation_ready_day", Value::Null),
         ]));
     }
     for civ in campaign.civs() {
@@ -395,6 +418,16 @@ pub fn civilizations_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
                     ("challenger", Value::from(d.challenger)),
                     ("opened_day", Value::from(d.opened_day)),
                     ("tension", num(campaign.dispute_tension(d))),
+                ])
+            })
+            .collect();
+        let treaties: Vec<Value> = campaign
+            .treaties_between(PLAYER_CIV, civ.id)
+            .iter()
+            .map(|t| {
+                Value::obj(vec![
+                    ("kind", Value::from(treaty_kind_str(t.kind))),
+                    ("signed_day", Value::from(t.signed_day)),
                 ])
             })
             .collect();
@@ -428,6 +461,26 @@ pub fn civilizations_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
             ),
             ("player_opinion", opinion_json(ours.opinion)),
             ("disputes", Value::Array(disputes)),
+            ("treaties", Value::Array(treaties)),
+            (
+                "embargo_by_me",
+                Value::Bool(campaign.embargo_of(PLAYER_CIV, civ.id).is_some()),
+            ),
+            (
+                "embargo_by_them",
+                Value::Bool(campaign.embargo_of(civ.id, PLAYER_CIV).is_some()),
+            ),
+            (
+                "diplomacy_ready",
+                Value::Bool(campaign.diplomacy_open(PLAYER_CIV, civ.id)),
+            ),
+            (
+                "translation_ready_day",
+                match campaign.diplomacy_ready_day(PLAYER_CIV, civ.id) {
+                    Some(day) => Value::from(day),
+                    None => Value::Null,
+                },
+            ),
         ]));
     }
     Value::Array(out)
@@ -439,7 +492,173 @@ fn opinion_json(opinion: mwcs_sim::OpinionBreakdown) -> Value {
         ("disposition", num(opinion.disposition)),
         ("disputes", num(opinion.disputes)),
         ("border_friction", num(opinion.border_friction)),
+        ("trade_volume", num(opinion.trade_volume)),
+        ("broken_treaties", num(opinion.broken_treaties)),
     ])
+}
+
+pub fn treaty_kind_str(kind: TreatyKind) -> &'static str {
+    match kind {
+        TreatyKind::TradeAgreement => "trade_agreement",
+        TreatyKind::GateAccess => "gate_access",
+        TreatyKind::NonAggressionPact => "non_aggression_pact",
+        TreatyKind::Alliance => "alliance",
+        TreatyKind::ResearchPact => "research_pact",
+    }
+}
+
+/// The player's trade routes (§4.3): endpoints with names, the
+/// path the goods travel (star ids — the viewer draws the line
+/// along its own table), live throughput, and the ledger. Routes
+/// between other civilizations are their business, not the
+/// player's map data.
+pub fn trade_routes_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
+    let routes: Vec<Value> = campaign
+        .trade_routes()
+        .iter()
+        .filter(|r| r.civ_a == PLAYER_CIV || r.civ_b == PLAYER_CIV)
+        .map(|r| {
+            let (my_system, their_system, other, earned_by_me) = if r.civ_a == PLAYER_CIV {
+                (r.system_a, r.system_b, r.civ_b, r.earned_a)
+            } else {
+                (r.system_b, r.system_a, r.civ_a, r.earned_b)
+            };
+            Value::obj(vec![
+                ("id", Value::from(r.id)),
+                ("other_civ", Value::from(other)),
+                (
+                    "other_name",
+                    match campaign.civ(other) {
+                        Some(c) => Value::from(c.name.clone()),
+                        None => Value::Null,
+                    },
+                ),
+                ("my_system", Value::from(my_system)),
+                (
+                    "my_system_name",
+                    match star_name(galaxy, my_system) {
+                        Some(n) => Value::from(n),
+                        None => Value::Null,
+                    },
+                ),
+                ("their_system", Value::from(their_system)),
+                (
+                    "their_system_name",
+                    match star_name(galaxy, their_system) {
+                        Some(n) => Value::from(n),
+                        None => Value::Null,
+                    },
+                ),
+                (
+                    "path",
+                    Value::Array(r.path.iter().map(|&s| Value::from(s)).collect()),
+                ),
+                ("path_ly", num(r.path_ly)),
+                ("established_day", Value::from(r.established_day)),
+                (
+                    "throughput",
+                    num(campaign.live_route_throughput(r)),
+                ),
+                (
+                    "distance_factor",
+                    num(Campaign::route_distance_factor(r)),
+                ),
+                (
+                    "monthly_income",
+                    num(campaign.route_monthly_income(r)),
+                ),
+                ("earned_by_me", num(earned_by_me)),
+                ("earned_total", num(r.earned_a + r.earned_b)),
+                ("months_active", Value::from(r.months_active)),
+            ])
+        })
+        .collect();
+    Value::Array(routes)
+}
+
+fn peace_terms_json(campaign: &Campaign, galaxy: &Galaxy, terms: &PeaceTerms) -> Value {
+    let systems = |ids: &[u32]| -> Value {
+        Value::Array(
+            ids.iter()
+                .map(|&id| {
+                    Value::obj(vec![
+                        ("system", Value::from(id)),
+                        (
+                            "system_name",
+                            match star_name(galaxy, id) {
+                                Some(n) => Value::from(n),
+                                None => Value::Null,
+                            },
+                        ),
+                        (
+                            "has_colony",
+                            Value::Bool(
+                                campaign
+                                    .system(id)
+                                    .map(|s| s.colony.is_some())
+                                    .unwrap_or(false),
+                            ),
+                        ),
+                    ])
+                })
+                .collect(),
+        )
+    };
+    Value::obj(vec![
+        ("cede_to_proposer", systems(&terms.cede_to_proposer)),
+        ("cede_to_other", systems(&terms.cede_to_other)),
+        ("credits_from_proposer", num(terms.credits_from_proposer)),
+    ])
+}
+
+/// Proposals awaiting the player's answer (§6.3): who offers,
+/// what instrument or what settlement terms, the day, and the
+/// proposer's stated reasons, verbatim.
+pub fn proposals_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
+    let proposals: Vec<Value> = campaign
+        .proposals()
+        .iter()
+        .filter(|p| p.to == PLAYER_CIV)
+        .map(|p| {
+            let (kind_str, treaty_kind, terms) = match &p.kind {
+                ProposalKind::Treaty(kind) => (
+                    Value::from("treaty"),
+                    Value::from(treaty_kind_str(*kind)),
+                    Value::Null,
+                ),
+                ProposalKind::Peace(terms) => (
+                    Value::from("peace"),
+                    Value::Null,
+                    peace_terms_json(campaign, galaxy, terms),
+                ),
+            };
+            Value::obj(vec![
+                ("id", Value::from(p.id)),
+                ("from", Value::from(p.from)),
+                (
+                    "from_name",
+                    match campaign.civ(p.from) {
+                        Some(c) => Value::from(c.name.clone()),
+                        None => Value::Null,
+                    },
+                ),
+                ("kind", kind_str),
+                ("treaty_kind", treaty_kind),
+                ("terms", terms),
+                ("proposed_day", Value::from(p.proposed_day)),
+                (
+                    "reasons",
+                    Value::Array(
+                        p.reasons
+                            .iter()
+                            .map(|r| Value::from(r.clone()))
+                            .collect(),
+                    ),
+                ),
+            ])
+        })
+        .collect();
+    Value::Array(proposals)
 }
 
 pub fn event_json(galaxy: &Galaxy, event: &GameEvent) -> Value {
@@ -519,7 +738,21 @@ fn event_json_for(galaxy: &Galaxy, event: &GameEvent, campaign: Option<&Campaign
 pub fn event_visible_to_player(campaign: &Campaign, event: &GameEvent) -> bool {
     match event.kind {
         EventKind::CampaignStarted => event.civ == Some(PLAYER_CIV),
-        EventKind::FirstContact | EventKind::ClaimContested => {
+        // Relational events — contact, contests, and the whole S4
+        // diplomacy record — are visible when the player is a
+        // party to them. Diplomacy between strangers stays hidden,
+        // like everything else foreign.
+        EventKind::FirstContact
+        | EventKind::ClaimContested
+        | EventKind::TreatySigned
+        | EventKind::TreatyBroken
+        | EventKind::EmbargoDeclared
+        | EventKind::EmbargoLifted
+        | EventKind::TradeRouteEstablished
+        | EventKind::TradeRouteSevered
+        | EventKind::PeaceSettled
+        | EventKind::TreatyProposed
+        | EventKind::DealRefused => {
             event.civ == Some(PLAYER_CIV) || event.other_civ == Some(PLAYER_CIV)
         }
         _ => {
@@ -577,6 +810,15 @@ pub fn snapshot_json(campaign: &Campaign) -> Value {
         ),
         ("contacts", Value::from(campaign.contacts().len())),
         ("disputes", Value::from(campaign.disputes().len())),
+        // S4: the same review shows diplomacy that moved — treaties
+        // in force galaxy-wide, routes open, and the player's own
+        // research stockpile growing.
+        ("treaties", Value::from(campaign.treaties().len())),
+        ("trade_routes", Value::from(campaign.trade_routes().len())),
+        (
+            "research_points",
+            num(campaign.research_points_for(PLAYER_CIV)),
+        ),
     ])
 }
 

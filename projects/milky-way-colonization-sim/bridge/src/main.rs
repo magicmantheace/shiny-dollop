@@ -17,7 +17,9 @@ use mwcs_bridge::view::{
     view_json,
 };
 use mwcs_sim::race::HomeworldRules;
-use mwcs_sim::{Campaign, Galaxy, GameSetup, Purpose, Specialization};
+use mwcs_sim::{
+    Campaign, DealOutcome, Galaxy, GameSetup, PeaceTerms, Purpose, Specialization, TreatyKind,
+};
 
 fn error_value(message: &str) -> Value {
     Value::obj(vec![
@@ -113,7 +115,76 @@ fn cmd_u64(cmd: &Value, key: &str) -> Result<u64, String> {
     }
 }
 
-fn exec_command(campaign: &mut Campaign, galaxy: &Galaxy, cmd: &Value) -> Result<(), String> {
+fn parse_treaty_kind(s: &str) -> Result<TreatyKind, String> {
+    match s {
+        "trade_agreement" => Ok(TreatyKind::TradeAgreement),
+        "gate_access" => Ok(TreatyKind::GateAccess),
+        "non_aggression_pact" => Ok(TreatyKind::NonAggressionPact),
+        "alliance" => Ok(TreatyKind::Alliance),
+        "research_pact" => Ok(TreatyKind::ResearchPact),
+        other => Err(format!("unknown treaty kind \"{other}\"")),
+    }
+}
+
+fn cmd_str<'a>(cmd: &'a Value, key: &str) -> Result<&'a str, String> {
+    match cmd.get(key) {
+        Some(v) => v
+            .as_str()
+            .map_err(|e| format!("command field \"{key}\": {e}")),
+        None => Err(format!("command missing required field \"{key}\"")),
+    }
+}
+
+fn cmd_f64(cmd: &Value, key: &str) -> Result<f64, String> {
+    match cmd.get(key) {
+        Some(v) => v
+            .as_f64()
+            .map_err(|e| format!("command field \"{key}\": {e}")),
+        None => Err(format!("command missing required field \"{key}\"")),
+    }
+}
+
+fn cmd_u64_list(cmd: &Value, key: &str) -> Result<Vec<u32>, String> {
+    match cmd.get(key) {
+        Some(v) => {
+            let arr = v
+                .as_array()
+                .map_err(|e| format!("command field \"{key}\": {e}"))?;
+            let mut out = Vec::with_capacity(arr.len());
+            for item in arr {
+                out.push(
+                    item.as_u64()
+                        .map_err(|e| format!("command field \"{key}\": {e}"))? as u32,
+                );
+            }
+            Ok(out)
+        }
+        None => Ok(Vec::new()),
+    }
+}
+
+/// A deal outcome as the frontend's detail line: acceptance,
+/// pendency, and refusals all carry text — a refusal carries the
+/// counterparty's stated reasons, joined for display.
+fn outcome_detail(outcome: &DealOutcome) -> String {
+    match outcome {
+        DealOutcome::Signed => "signed".to_string(),
+        DealOutcome::Pending { proposal_id } => {
+            format!("proposal #{proposal_id} is awaiting an answer")
+        }
+        DealOutcome::Declined => "declined".to_string(),
+        DealOutcome::Refused { reasons } => format!("refused: {}", reasons.join("; ")),
+    }
+}
+
+/// Execute one frontend command. `Ok(Some(detail))` attaches a
+/// human-readable outcome line to the result (S4 deal outcomes);
+/// `Ok(None)` is the plain success every S1–S3 command returns.
+fn exec_command(
+    campaign: &mut Campaign,
+    galaxy: &Galaxy,
+    cmd: &Value,
+) -> Result<Option<String>, String> {
     let name = match cmd.get("cmd") {
         Some(v) => v
             .as_str()
@@ -125,21 +196,19 @@ fn exec_command(campaign: &mut Campaign, galaxy: &Galaxy, cmd: &Value) -> Result
         "advance" => {
             let days = cmd_u64(cmd, "days")?;
             campaign.advance(galaxy, days);
-            Ok(())
+            Ok(None)
         }
         "survey" => {
             let ship = cmd_u64(cmd, "ship")? as u32;
             campaign
                 .begin_survey(galaxy, ship)
-                .map_err(|e| format!("{e}"))
+                .map_err(|e| format!("{e}"))?;
+            Ok(None)
         }
         "dispatch" => {
             let ship = cmd_u64(cmd, "ship")? as u32;
             let to = cmd_u64(cmd, "to")? as u32;
-            let purpose_s = match cmd.get("purpose") {
-                Some(v) => v.as_str().map_err(|e| format!("command field \"purpose\": {e}"))?,
-                None => return Err("command missing required field \"purpose\"".to_string()),
-            };
+            let purpose_s = cmd_str(cmd, "purpose")?;
             let purpose = parse_purpose(purpose_s)?;
             let unchecked = match cmd.get("unchecked") {
                 Some(v) => v
@@ -150,29 +219,33 @@ fn exec_command(campaign: &mut Campaign, galaxy: &Galaxy, cmd: &Value) -> Result
             if unchecked {
                 campaign
                     .dispatch_ship_unchecked(galaxy, ship, to, purpose)
-                    .map_err(|e| format!("{e}"))
+                    .map_err(|e| format!("{e}"))?;
             } else {
                 campaign
                     .dispatch_ship(galaxy, ship, to, purpose)
-                    .map_err(|e| format!("{e}"))
+                    .map_err(|e| format!("{e}"))?;
             }
+            Ok(None)
         }
         "claim" => {
             let system = cmd_u64(cmd, "system")? as u32;
-            campaign.claim_system(system).map_err(|e| format!("{e}"))
+            campaign.claim_system(system).map_err(|e| format!("{e}"))?;
+            Ok(None)
         }
         "contest" => {
             let system = cmd_u64(cmd, "system")? as u32;
             campaign
                 .contest_claim(system)
-                .map_err(|e| format!("{e}"))
+                .map_err(|e| format!("{e}"))?;
+            Ok(None)
         }
         "found" => {
             let ship = cmd_u64(cmd, "ship")? as u32;
             campaign
                 .found_colony_with_ship(ship)
                 .map(|_| ())
-                .map_err(|e| format!("{e}"))
+                .map_err(|e| format!("{e}"))?;
+            Ok(None)
         }
         "build" => {
             let system = cmd_u64(cmd, "system")? as u32;
@@ -180,22 +253,120 @@ fn exec_command(campaign: &mut Campaign, galaxy: &Galaxy, cmd: &Value) -> Result
             campaign
                 .build_ship(system, design)
                 .map(|_| ())
-                .map_err(|e| format!("{e}"))
+                .map_err(|e| format!("{e}"))?;
+            Ok(None)
         }
         "refuel" => {
             let ship = cmd_u64(cmd, "ship")? as u32;
-            campaign.refuel_ship(ship).map(|_| ()).map_err(|e| format!("{e}"))
+            campaign
+                .refuel_ship(ship)
+                .map(|_| ())
+                .map_err(|e| format!("{e}"))?;
+            Ok(None)
         }
         "specialize" => {
             let system = cmd_u64(cmd, "system")? as u32;
-            let spec_s = match cmd.get("spec") {
-                Some(v) => v.as_str().map_err(|e| format!("command field \"spec\": {e}"))?,
-                None => return Err("command missing required field \"spec\"".to_string()),
-            };
+            let spec_s = cmd_str(cmd, "spec")?;
             let spec = parse_specialization(spec_s)?;
             campaign
                 .assign_specialization(system, spec)
-                .map_err(|e| format!("{e}"))
+                .map_err(|e| format!("{e}"))?;
+            Ok(None)
+        }
+        // ------------------------------------------------ S4 deals
+        "propose_treaty" => {
+            let civ = cmd_u64(cmd, "civ")? as u32;
+            let kind = parse_treaty_kind(cmd_str(cmd, "kind")?)?;
+            let outcome = campaign
+                .propose_treaty(galaxy, civ, kind)
+                .map_err(|e| format!("{e}"))?;
+            Ok(Some(outcome_detail(&outcome)))
+        }
+        "break_treaty" => {
+            let civ = cmd_u64(cmd, "civ")? as u32;
+            let kind = parse_treaty_kind(cmd_str(cmd, "kind")?)?;
+            campaign
+                .break_treaty(civ, kind)
+                .map_err(|e| format!("{e}"))?;
+            Ok(Some("treaty broken".to_string()))
+        }
+        "declare_embargo" => {
+            let civ = cmd_u64(cmd, "civ")? as u32;
+            campaign
+                .declare_embargo(civ)
+                .map_err(|e| format!("{e}"))?;
+            Ok(Some("embargo declared".to_string()))
+        }
+        "lift_embargo" => {
+            let civ = cmd_u64(cmd, "civ")? as u32;
+            campaign.lift_embargo(civ).map_err(|e| format!("{e}"))?;
+            Ok(Some("embargo lifted".to_string()))
+        }
+        "propose_peace" => {
+            let civ = cmd_u64(cmd, "civ")? as u32;
+            // Terms are stated from the player's chair:
+            // `cede_to_them` systems pass to the counterparty,
+            // `cede_to_me` systems pass to the player, and
+            // `credits` is what the player pays (negative: the
+            // counterparty pays the player).
+            let terms = PeaceTerms {
+                cede_to_proposer: cmd_u64_list(cmd, "cede_to_me")?,
+                cede_to_other: cmd_u64_list(cmd, "cede_to_them")?,
+                credits_from_proposer: match cmd.get("credits") {
+                    Some(_) => cmd_f64(cmd, "credits")?,
+                    None => 0.0,
+                },
+            };
+            let outcome = campaign
+                .propose_peace(galaxy, civ, terms)
+                .map_err(|e| format!("{e}"))?;
+            Ok(Some(outcome_detail(&outcome)))
+        }
+        "accept_proposal" => {
+            let proposal = cmd_u64(cmd, "proposal")? as u32;
+            let outcome = campaign
+                .respond_to_proposal(galaxy, mwcs_sim::PLAYER_CIV, proposal, true)
+                .map_err(|e| format!("{e}"))?;
+            Ok(Some(outcome_detail(&outcome)))
+        }
+        "refuse_proposal" => {
+            let proposal = cmd_u64(cmd, "proposal")? as u32;
+            let outcome = campaign
+                .respond_to_proposal(galaxy, mwcs_sim::PLAYER_CIV, proposal, false)
+                .map_err(|e| format!("{e}"))?;
+            Ok(Some(outcome_detail(&outcome)))
+        }
+        "establish_route" => {
+            let civ = cmd_u64(cmd, "civ")? as u32;
+            // Endpoints may be named explicitly; without them the
+            // bridge opens the core's suggested best route — the
+            // same suggestion the AI planner acts on.
+            let (mine, theirs) = match (cmd.get("my_system"), cmd.get("their_system")) {
+                (Some(_), Some(_)) => (
+                    cmd_u64(cmd, "my_system")? as u32,
+                    cmd_u64(cmd, "their_system")? as u32,
+                ),
+                _ => match campaign.suggest_trade_route(galaxy, mwcs_sim::PLAYER_CIV, civ) {
+                    Some((sa, sb, _, _)) => (sa, sb),
+                    None => {
+                        return Err(
+                            "no route path connects your colonies to theirs within tanker range"
+                                .to_string(),
+                        )
+                    }
+                },
+            };
+            let route_id = campaign
+                .establish_trade_route(galaxy, civ, mine, theirs)
+                .map_err(|e| format!("{e}"))?;
+            Ok(Some(format!("trade route #{route_id} opened")))
+        }
+        "sever_route" => {
+            let route = cmd_u64(cmd, "route")? as u32;
+            campaign
+                .sever_trade_route(route)
+                .map_err(|e| format!("{e}"))?;
+            Ok(Some("trade route severed".to_string()))
         }
         other => Err(format!("unknown command \"{other}\"")),
     }
@@ -238,6 +409,10 @@ fn op_new(galaxy: &Galaxy, req: &Value) -> Value {
         Ok(v) => v,
         Err(e) => return error_value(&e),
     };
+    let ai_region_radius = match opt_f64(req, "ai_region_radius_ly") {
+        Ok(v) => v,
+        Err(e) => return error_value(&e),
+    };
     // Overwriting an existing campaign must be an explicit, deliberate
     // act: without "overwrite": true an occupied save path is refused,
     // so no caller can silently destroy a campaign by reusing a name.
@@ -261,7 +436,10 @@ fn op_new(galaxy: &Galaxy, req: &Value) -> Value {
     // bridge defaults to solo so existing callers never change
     // meaning under their feet. `ai_min_spacing_ly` overrides the
     // §6.1 fairness spacing (small test galaxies need it; real games
-    // should leave it alone).
+    // should leave it alone). `ai_region_radius_ly` likewise
+    // overrides the §6.1 placement region (the S4 headless verify
+    // uses a tight region so first contact is years away, not
+    // centuries; real games should leave it alone too).
     let (campaign, setup_json) = match ai_races {
         None => match Campaign::new_default(galaxy, seed) {
             Ok(c) => (c, Value::Null),
@@ -271,6 +449,9 @@ fn op_new(galaxy: &Galaxy, req: &Value) -> Value {
             let mut rules = HomeworldRules::default();
             if let Some(spacing) = ai_min_spacing {
                 rules.min_spacing_ly = spacing;
+            }
+            if let Some(radius) = ai_region_radius {
+                rules.region_radius_ly = radius;
             }
             let setup = GameSetup {
                 ai_count: ai_count as usize,
@@ -425,10 +606,16 @@ fn op_exec(galaxy: &Galaxy, req: &Value) -> Value {
     let mut all_ok = true;
     for cmd in &commands {
         match exec_command(&mut campaign, galaxy, cmd) {
-            Ok(()) => results.push(Value::obj(vec![
-                ("ok", Value::Bool(true)),
-                ("error", Value::Null),
-            ])),
+            Ok(detail) => {
+                let mut result = vec![
+                    ("ok", Value::Bool(true)),
+                    ("error", Value::Null),
+                ];
+                if let Some(detail) = detail {
+                    result.push(("detail", Value::from(detail)));
+                }
+                results.push(Value::obj(result));
+            }
             Err(e) => {
                 results.push(Value::obj(vec![
                     ("ok", Value::Bool(false)),
