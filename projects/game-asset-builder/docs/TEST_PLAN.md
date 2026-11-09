@@ -455,6 +455,68 @@ Electron driver polled the result element the same way
   not measurable in an in-place cycle — it depends on the
   consuming game's root-motion speed matching.
 
+## Verified — 2026-11-08 (P4 follow-up: Godot playback of walk/run + hand-off re-export)
+
+Owner-directed follow-up closing the two gaps the P4 section left
+open. Suite **113/113** (`python3 -m pytest tests/`), unchanged.
+
+Hand-off re-export (build VM, from the P4-tip catalogued GLBs):
+
+- All four assets re-exported to all three targets
+  (`outputs/handoff/godot/`, `outputs/handoff/threejs/`, studio
+  export against the scratch root `outputs/handoff/studio-root/`
+  — the live studio store remains the studio side's step, as at
+  P3). Every export sha-verified against the catalog record by
+  the exporter itself, as designed.
+- Independent re-read of the packaged bytes with the stdlib clip
+  reader (`stages/animate/glb_clips.py`): **all 12 packaged GLBs
+  carry the full post-P4 clip sets** — clip names exactly the
+  catalog's, durations within 0.01 s of the catalog's frames/fps
+  (dragon hop/idle/walk 1.5/run 1.0; goblin idle/wave/walk/run;
+  triceratops bounce/idle/walk 2.0/run; chest none). The
+  godot/threejs `handoff-manifest.json` action lists match the
+  catalog. The P3 packages are current again as of the P4 tip.
+
+Godot playback of the new clips (build VM — labelled VM-only):
+
+- Where it ran, honestly: the owner's PC no longer carries a
+  Godot 4.7.2 Windows build (searched via the bridge: Program
+  Files, the user profile, both Steam libraries,
+  `D:\asset-forge-lab`, `D:\bridge-work`, `D:\shiny-dollop`,
+  registry uninstall keys, PATH, the bridge audit log — the only
+  Godot present is a 4.6.1 mono build for another project at
+  `D:\AIgame\.tools\godot`). Rather than substitute a different
+  engine version on the PC, the check ran with this VM's
+  **Godot 4.7.2.stable** headless, and is recorded as a VM run.
+  Re-running on the PC is a two-minute job once a 4.7.2 build is
+  back on it; the staged scratch files remain in the bridge file
+  root under `gab-p4/`.
+- Scratch project from `handoff/godot/` + the NEW exported
+  packages under `assets/`: `--import` exit 0, then
+  `verify_handoff.gd` — **GODOT_VERIFY_DONE ok=true**, exit 0.
+  Bone sets equal the catalog (14/13/15; chest static: mesh,
+  0 bones, 0 animations). Bone global-pose deltas for the NEW
+  clips (t=0 vs mid-clip; quarter-cycle in parentheses — the
+  anti-phase blind spot documented at P4 applies to the mid
+  figure): Ember Dragon walk Δ0.087 (Δ0.409) / run Δ0.181
+  (Δ0.504); Snow Goblin walk Δ0.273 (Δ0.486) / run Δ0.442
+  (Δ0.768); Triceratops walk Δ0.812 (Δ0.414) / run Δ0.452
+  (Δ0.688). All lengths match the catalog (walk 1.5/1.5/2.0 s,
+  run 1.0 s).
+- Cross-validation: the established clips reproduce the P3
+  owner's-PC run's numbers to the digit in this harness (dragon
+  hop Δ0.085, goblin wave Δ1.69, triceratops bounce Δ0.096,
+  idles Δ0.0062/0.035/0.156) — the VM run measures the same
+  quantity the PC proof measured.
+- Harness change (additive; P3 pass criteria unchanged):
+  `verify_handoff.gd` now also reports a quarter-cycle delta and
+  the imported `loop_mode` per clip. Every clip — new and
+  previously proven alike — imports with loop_mode 0 (none):
+  the glTF import does not flag looping. The baked cycles are
+  seamless by construction (P4 loop-closure tests); looping is
+  enabled at play time by the consuming engine/game, as with
+  the clips P3 already proved.
+
 ## Not yet verified
 
 - TRELLIS's proper textured export — blocked on the

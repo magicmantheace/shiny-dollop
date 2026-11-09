@@ -130,6 +130,18 @@ three.js playback of the new clips verified on the build VM
 full numbers and the honest limits (procedural gaits, no IK) in
 `docs/TEST_PLAN.md`.**
 
+**P4 follow-up (2026-11-08): the two open ends are closed.** The
+P3 hand-off packages were re-exported from the post-P4 GLBs —
+all 12 packaged GLBs re-read and confirmed to carry the full
+clip sets (walk/run included) — and **Godot playback of the new
+clips is verified**: Godot 4.7.2 headless played walk/run for all
+three creatures from the exported packages with large skeleton
+deltas, the established clips reproducing P3's PC deltas to the
+digit. That Godot run was on the build VM (the owner's PC no
+longer carries a 4.7.2 Windows build — only another project's
+4.6.1; see `docs/TEST_PLAN.md`), so it is labelled a VM
+verification, not an owner-hardware one. Suite 113/113.**
+
 A fully local, no-API pipeline that builds game assets — creatures included —
 on the owner's own hardware:
 

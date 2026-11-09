@@ -464,5 +464,35 @@ Next:
    seam-under-rendering question; running the studio hand-off
    into the live store.
 
+## P4 follow-up — Godot playback of walk/run + hand-off re-export (2026-11-08, same branch)
+
+Owner directed both loose ends closed the same evening:
+
+- **Hand-off packages re-exported** from the P4-tip catalogued
+  GLBs (all four assets × godot/threejs/studio-into-scratch-root,
+  under `outputs/handoff/`). Independent clip-reader re-check:
+  all 12 packaged GLBs carry the full post-P4 clip sets with
+  matching durations; manifest action lists match the catalog.
+  The P3 "stale packages" note in the P4 section above is closed.
+- **Godot playback of the new clips — VERIFIED ON THE BUILD VM**
+  (Godot 4.7.2.stable headless; `GODOT_VERIFY_DONE ok=true`
+  against the new exported packages). The owner's PC no longer
+  has a 4.7.2 Windows build (exhaustive bridge search; only a
+  4.6.1 mono build for another project), so per the project's
+  honesty rule this is recorded as a VM verification, not an
+  owner-hardware one. Walk/run deltas are large and unambiguous
+  (mid-cycle 0.087–0.812; quarter-cycle figures in TEST_PLAN),
+  and the established clips reproduce the P3 PC run's deltas to
+  the digit in the same harness, cross-validating the method.
+  Re-running on the PC takes minutes once a 4.7.2 build returns;
+  the staged scratch remains in the bridge file root (`gab-p4/`).
+- `handoff/godot/verify_handoff.gd`: quarter-cycle delta +
+  `loop_mode` now reported per clip (additive; pass criteria
+  unchanged). All clips import with loop_mode 0 — seamless
+  looping is a bake property (P4 closure tests) enabled at play
+  time, exactly as for the P3-proven clips.
+- Suite 113/113. Numbers: `docs/TEST_PLAN.md` (P4 follow-up
+  section).
+
 Boundaries: no cloud fallback exists or may be added; weights and outputs
 never enter git; GPU claims only from PC runs; merges are the owner's call.
