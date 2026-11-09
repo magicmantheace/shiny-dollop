@@ -104,7 +104,18 @@ RTX 3060 either way.
 - Captures (SwiftShader, zero console errors): `aaa2-morning`
   (ground grain + fuller grass), `aaa2-sunset2` / `aaa2-night2`
   (flame body, embers, glow). Added steady-state cost is small
-  (one 256² texture pair, one extra shader material ×3 planes,
+  (one texture pair, one extra shader material ×3 planes,
   12 sprites); the SwiftShader fps floor did not move, which
   cannot resolve deltas this small — the real-GPU number still
   waits on an owner-approved PC test.
+- **Texture audit + raise (owner's ask, same day).** The GLB
+  creature/chest maps were already 2048×2048 — above the ask.
+  The genuinely low-res maps were this stage's own ground pair
+  (256²) and the moon canvas (512²): ground raised to 1024²
+  with two extra fine octaves (features to ~5 cm; normal slope
+  rescaled for the finer texel grid), moon to 1024² (beyond
+  what its small on-screen disc can show, done for uniformity).
+  The 128² radial-gradient sprites were left alone on purpose:
+  a smooth gradient has no detail for resolution to add.
+  Verified in `aaa3-morning` (zero console errors; finer
+  foreground grain, most visible at desktop scale).
