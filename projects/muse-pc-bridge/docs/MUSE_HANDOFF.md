@@ -797,3 +797,54 @@ starts a fresh helper), while a somehow-still-live helper would
 now be reused instead of fought over. The checkout is staged at
 `6fbdd3d` for the re-issued switch; production still executes
 its previously loaded code until then.
+
+---
+
+**Shell-resolution fix (2026-11-08, night — defect found at the
+boot-core activation; the switch itself COMPLETED earlier this
+evening and production is now the session-0 core):** the
+activation verification found one defect live against the core:
+every `powershell` job (the default shell) failed at spawn with
+`[WinError 1920] The file cannot be accessed by the system`,
+while `cmd` jobs worked and the full System32 path to
+powershell.exe invoked through cmd worked. Root cause, verified
+in `agent/bridge_agent.py`: `build_command`/`shell_argv`
+resolved the executable by bare-name `shutil.which()` over the
+process PATH, which in the boot-task environment returns the
+per-user WindowsApps execution alias — a reparse stub inside
+the interactive user's profile that SYSTEM cannot execute. cmd
+survived only because it was passed bare and CreateProcess
+search order found System32\cmd.exe. Fix (commit `6855539`):
+`resolve_shell_exe()` with a pure injectable Windows seam —
+PATH hits are vetted (absolute; never under WindowsApps, a
+user profile, or per-user AppData) and the fixed System32
+locations are preferred and fallen back to; a real pwsh
+install keeps its preference, so user-session behaviour is
+unchanged in effect; `run_uia`'s lookup routes through the
+same resolver. New regression file
+`tests/test_v1_shell_resolution.py` (13 tests) pins the seam
+contract with injected env/which/exists — the SYSTEM context
+cannot be reproduced in the suite — and its `build_command`
+cases fail behaviourally pre-fix (argv[0] was the alias
+verbatim). **VM suite: 173 tests, OK (skipped=3). Owner-PC:
+checkout fast-forwarded to `6855539` as cmd jobs through the
+core (git needed a per-invocation `-c safe.directory` — the
+core is SYSTEM, the checkout is the owner's); production NOT
+restarted (status uptime 547 s → 952 s continuous). The new
+file passes standalone on the PC: 13 tests, OK (skipped=1).
+The full PC suite in the new topology: 173 tests, FAILED
+(19 failures, 1 error, 8 skips) — every failure sits in the
+desktop/session class because the suite's own test agents now
+boot in session 0 and desktop routes answer the honest 501
+(gui_spawn 7F/2E, session_broker 6F, platform screenshot/input
+3F, status_helper_timeout 2F, helper_ownership 1F), plus one
+UAC status-transition failure (deterministic 2/2 here, green
+in every interactive-session run; mechanism not pinned down in
+this pass, recorded in TEST_PLAN). None touches shell
+resolution.** Live proof of the fix — a PowerShell job
+succeeding under the core — awaits the core restarting onto
+the new code (owner's step, e.g. at the next reboot via the
+boot task); the running core still executes its pre-fix code,
+so until then powershell jobs keep failing with WinError 1920
+and cmd / full-path jobs are the working route. PR #47 stays
+open and unmerged.

@@ -60,6 +60,7 @@ PC during install verification.
 | `tests/test_script_encoding.py` (2) | every shipped `.ps1`/`.cmd` file is **pure ASCII bytes** -- Windows PowerShell 5.1 reads a BOM-less `.ps1` as ANSI, so a UTF-8 em dash decodes to bytes including a stray `"` and the whole file fails to parse (the `bridge-core.ps1` install failure on the owner's PC, 2026-11-08). The scan must find the scripts (incl. `bridge-core.ps1`) and every byte must be < 128 |
 | `tests/test_v1_status_helper_timeout.py` (2) | **status-probe deadlines vs a hung helper (Codex PR #47 re-review)**: a raw TCP listener accepts connections and never answers while a heartbeat thread keeps its registration fresh (the real failure shape — heartbeat and request handling are separate threads); `/v1/status` must answer **well inside the supervisor health check's 3 s** (asserted < 2 s), twice in a row, with local process counts intact; `GET /v1/processes` still returns the local listing. Pre-fix, status took **5.01 s** (the listing's fetch budget, synchronous in `_status_obj`) |
 | `tests/test_v1_helper_ownership.py` (5) | **single-helper ownership of the state dir (Codex PR #47 re-review)**: a second `SessionHelper` against the same state dir is refused (`HelperOwnershipError`) and the first helper's registration is untouched; `supervisor_gui.start_attach_helper` reuses a live registration (returns None, registration unchanged) and a process spawned through the surviving helper stays visible via the main agent by id and in the listing; a stale registration does not block attach; a stopped owner frees the state dir for the next helper |
+| `tests/test_v1_shell_resolution.py` (13) | **Windows shell-executable resolution (defect found at the boot-core activation)**: the pure seam `_resolve_windows_shell_exe` with injected env/which/exists — a PATH hit pointing at the per-user **WindowsApps execution alias** loses to the System32 powershell path and is never returned even when nothing "exists" (the fallback is the canonical System32 path, never the alias, never a bare name); a real pwsh install (Program Files) keeps its historical preference; hits under a user profile or per-user AppData are rejected; cmd resolves to System32; `pwsh` returns None when only an alias exists; bare/relative PATH results are rejected. Plus `build_command`/`shell_argv` integration under a simulated SYSTEM environment (patched `IS_WINDOWS`/`which`/`exists`): argv[0] is the System32 path, where pre-fix it was the alias verbatim; POSIX behaviour pinned unchanged. The SYSTEM/session-0 context itself cannot be reproduced in the suite |
 
 ### Verified so far
 
@@ -366,6 +367,64 @@ PC during install verification.
   which the staged core-switch verification covers), and the
   boot topology activation itself.
 
+- 2026-11-08 (shell resolution fix — defect found live at the
+  boot-core activation, VM + owner's PC): during the activation
+  verification, with production running as the session-0 core
+  (SYSTEM), every `powershell` job (the agent's default shell)
+  failed at spawn — `[WinError 1920] The file cannot be accessed
+  by the system` — while `cmd` jobs under the same core worked,
+  and the full System32 path to powershell.exe invoked through
+  cmd worked. Root cause, verified in `agent/bridge_agent.py`:
+  `build_command`/`shell_argv` resolved the executable with a
+  bare-name `shutil.which()` over the process PATH, which in the
+  boot-task environment returns the per-user WindowsApps
+  execution alias for powershell.exe — a reparse stub inside the
+  interactive user's profile that SYSTEM cannot execute. cmd
+  survived only because it was passed bare and Windows'
+  CreateProcess search order found System32\cmd.exe. Fix
+  (commit `6855539`): a new `resolve_shell_exe()` with a pure,
+  injectable Windows seam — PATH hits are vetted (absolute, and
+  never under WindowsApps, a user profile, or per-user AppData)
+  and the fixed System32 locations are preferred and fallen
+  back to; a real pwsh install keeps its preference, so
+  user-session behaviour is unchanged in effect; `run_uia`'s
+  lookup routes through the same resolver. The new
+  `tests/test_v1_shell_resolution.py` (13 tests) pins the seam
+  contract with injected env/which/exists (the SYSTEM context
+  cannot be reproduced in the suite), and its `build_command`
+  cases fail behaviourally pre-fix (argv[0] was the WindowsApps
+  alias verbatim). **Full suite on the VM: 173 tests, OK
+  (3 skips). Owner-PC runs (checkout fast-forwarded to
+  `6855539` through the production core as cmd jobs — git
+  needed a per-invocation `-c safe.directory` because the core
+  runs as SYSTEM against the owner's checkout; production was
+  NOT restarted, its /v1/status uptime ran 547 s → 952 s
+  continuously across the pull and all runs; Windows,
+  Python 3.14.2): the new shell-resolution file passes
+  standalone — 13 tests, OK (1 skip: the POSIX-only case). The
+  full suite in this topology ran 173 tests, FAILED
+  (19 failures, 1 error, 8 skips) in aggregate; the per-file
+  breakdown attributes the failures to the suite now executing
+  IN session 0 (the test agents it boots inherit session 0, so
+  desktop routes answer the honest 501): `test_v1_gui_spawn.py`
+  (7 failures, 2 errors), `test_v1_session_broker.py` (6),
+  `test_v1_platform.py` screenshot/input (3),
+  `test_v1_status_helper_timeout.py` (2, local process spawn
+  answered 501), `test_v1_helper_ownership.py` (1, brokered
+  spawn) — plus `test_v1_uac.py`'s status-transition test
+  (1 failure, deterministic 2/2 in this topology; no shell or
+  desktop route is involved, and its mechanism was not pinned
+  down in this pass — recorded, not absorbed). The identical
+  suite was green in the interactive-session PC runs earlier
+  the same day (160/160 under the avatar form); none of these
+  failures touches shell resolution and none is claimed as a
+  pass. Still unproven: PowerShell jobs actually spawning
+  under the core with the fix in place — that requires the
+  core to restart onto the new code, which is the owner's
+  step; until then the running core still fails powershell
+  jobs with WinError 1920, and cmd / full-path jobs are the
+  working route.**
+
 ## What the tests cannot prove
 
 These require the owner's PC and are **not** claimed by any VM test:
@@ -395,6 +454,13 @@ These require the owner's PC and are **not** claimed by any VM test:
   avatar flips to "Approval needed at PC" while a prompt is up and
   back when it clears. The VM proves the monitor logic and every
   surface with the probe stubbed — never the probe itself.
+- **v1.1 shell resolution under SYSTEM/session 0**: the
+  resolver's contract is suite-proven with injected inputs and
+  the defect it fixes was observed live at the boot-core
+  activation, but the fixed code has not yet executed under the
+  core — the running core holds its pre-fix loaded code until
+  the owner restarts it, so PowerShell jobs spawning under the
+  core with the fix in place remain unproven until then.
 - **v1.1 GUI launch on real Windows**: spawning an actual GUI
   executable (e.g. Godot) with `gui: true` — window opens, the
   tracked pid is the app, the app survives the request and agent
