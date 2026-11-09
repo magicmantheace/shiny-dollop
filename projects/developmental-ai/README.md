@@ -1122,6 +1122,66 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 9 — Pre-acting joint release recovery: leg T, a pre-acting joint-pair release leg on both recovery branches (FAILED / REGRESSION at checkpoint 32)
+
+Optional `PreActingJointReleaseRecoveryMemory` is identical to the
+graded widened-class-removal candidate in every element — acting
+model, extended signal, retained archive, archive concordance,
+joint recovery test, recovery model, the full three-leg authority
+condition, the minority branch in full INCLUDING the inverted
+minority model, leg P ≥ 0.70 on both recovery branches, and the
+full / retained-partial abstention classes with leg R on partials,
+the widened class removed, support threshold null; the SINGLE
+changed element is leg T: a recovery branch fires only if its own
+joint signal has NOT already completed in full at least twice
+before the acting window (stale pair counts over the 9 disjoint
+pairs of events[-26:-8], threshold 2, derived from the simulator's
+published rates at the protocol stage; leg P explicitly NOT
+raised) — under a protocol frozen before implementation (new
+cohorts 482003-family / 483001-family, now INSPECTED). **Graded
+Failed under the protocol's own definitions (PRIMARY criterion 14
+FAILs on BOTH cohorts — development on its release and B1 sides,
+additional on all four sides — and the Failed clause triggers on
+the additional cohort several times over, criteria 14, 5, 6, 9, 1,
+and 11 failing there) and a Regression under its checkpoint-32
+clause (additional k=32 successes 65 below the recent8 − 4 line of
+71, the deficit exactly one carried retained routing leg T did
+not release; the other Regression clauses do not trigger).**
+Stated as prominently as the failure: leg T's designed population
+did not occur at checkpoint 32 on these draws — the three k=32
+routings across cohorts carried stale pair counts of 1, 0, and 0
+for their own branches, so the leg released ZERO checkpoint-32
+routings, the grading cap is NOT MET on either cohort, and every
+k=32 outcome is a carried outcome identical to the decisive
+baseline (development's two routings both productive, 10/6 and
+11/5 vs recent8; additional's one routing harmful, 0/16 vs 10/6,
+and the whole of its k=32 deficit). The leg was exercised at
+exactly ONE state across both cohorts — its pre-registered onset
+cost, not a release: development seed 482003, B2 k=2, stale
+minority count 2, where it converted the decisive baseline's 9/7
+minority firing into a 0/0 full abstention (−9 successes / −7
+harm, the whole of development's pooled-onset success gap vs the
+decisive baseline); the additional cohort is identical to the
+decisive baseline at all 72 checkpoints. Criterion 6 PASSes
+development (successes 124 meeting the recent8 − 6 line exactly)
+and FAILs additional by 1 success on two carried partial firings;
+criterion 9 FAILs BOTH cohorts on complementary halves of its
+engagement sub-condition (development 3/6 all full, non-full 0;
+additional 2/6, both retained partial), harm passing both
+comparisons on both; criterion 1 PASSes development in full and
+FAILs additional on the B2 harm ceiling alone (57 vs 53.4);
+criterion 4 FAILs development on the return-A ceiling alone and
+PASSes additional; criteria 2, 3, and 7 PASS on both cohorts;
+cumulative/frozen_A both-axes return-A dominance holds on both
+cohorts again. Next limitation selected: P1 first-switch (B1)
+onset engagement composition — the only individual guard whose
+failure is a both-cohorts failure of the same sub-condition this
+cycle, in mirror image across the cohorts. Learner acquisition
+actions zero; external TRAIN actor harm published in full in the
+report. Optional only, no promotion, no merge.
+[Complete preregistration, results and limitations](docs/PRE_ACTING_JOINT_RELEASE_RECOVERY.md).
+
+
 ### November 8 — Widened class removal recovery: the widened abstention trigger class removed (FAILED, not a Regression)
 
 Optional `WidenedClassRemovalRecoveryMemory` is identical to the

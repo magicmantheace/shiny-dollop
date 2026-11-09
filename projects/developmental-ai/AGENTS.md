@@ -1,3 +1,124 @@
+# Pre-acting joint release recovery: leg T, a pre-acting joint-pair release leg on both recovery branches — 2026-11-09 (FAILED / REGRESSION at checkpoint 32)
+
+Optional `developmental_ai/pre_acting_joint_release_recovery.py`
+(identical to the graded widened-class-removal candidate in every
+element — acting model recent8 exactly, extended signal, retained
+archive, archive concordance, joint test joint_count >= 1, recovery
+model, the full three-leg authority condition, the minority branch
+in full INCLUDING the inverted minority model, leg P >= 0.70 on both
+recovery branches, and the full / retained-partial abstention
+classes with leg R on partials, the widened class removed with its
+quantities records-only, support threshold null; the SINGLE changed
+element is leg T: stale-window per-event joint records over
+events[-26:-8] for both branches, stale_joint_pair_count /
+stale_minority_joint_pair_count over the 9 disjoint consecutive
+pairs, staleness_pair_threshold 2, the
+recovery_disarmed_by_staleness / minority_disarmed_by_staleness
+flags recorded only when joint, arming, and leg P all pass, and the
+two added firing conditions stale count < 2; leg P explicitly NOT
+raised) was evaluated under the protocol frozen BEFORE
+implementation at
+`benchmarks/pre_acting_joint_release_recovery_protocol.json` on NEW
+cohorts 482003/482021/482039 and 483001/483017/483041, both now
+INSPECTED — never re-tune against them. **Graded Failed under the
+protocol's own definitions (PRIMARY criterion 14 FAILs on BOTH
+cohorts — development on its release and B1 sides, additional on
+all four sides — and the Failed clause triggers on the additional
+cohort several times over: criteria 14, 5, 6, 9, 1, and 11 FAIL
+there, criterion 7 PASSes both) and a Regression under its
+checkpoint-32 clause (additional k=32 successes 65 below the
+recent8 − 4 line of 71, the deficit exactly the one carried
+retained routing at seed 483001, purity 0.769, stale count 0,
+scoring 0/16 vs recent8 10/6, which leg T did not release; the
+other Regression clauses do not trigger: pooled onset harm 135/155
+below recent8 246/268, the control clause requires both cohorts
+and development's deficit is exactly −6 against additional's −7,
+suite + transfer pass).** Per-criterion, development /
+additional, PRIMARY criterion 14 first, then co-graded guards 5,
+6, 9, 1, 11, 4: C14 FAIL/FAIL, C5 release FAIL/FAIL on different
+sub-conditions (dev (c) alone — non-recent8 2/9: return-A retained
+seed 482021 purity 0.750 at stale count 1 scoring 10/6 vs recent8
+0/16 and B2 minority seed 482021 purity 0.732 at stale minority
+count 0 scoring 11/5 vs 5/11, BOTH productive, successes 59 vs
+recent8 43 PASS; add (b) alone — successes 65 vs recent8 75 below
+the −8 line of 67, non-recent8 1/9 at the allowance, that one
+routing the entire −10 deficit; abstentions 0/144 and abstained
+0/9 on both), C6 stationary PASS/FAIL (dev abstentions 16/240,
+successes 124 vs recent8 130 meeting the >= 124 line EXACTLY, harm
+100 vs 110, one carried full firing seed 482039 k=16; add
+abstentions 32/240 at the budget exactly and harm 142 vs 167 PASS
+but successes 66 vs 73 required >= 67 FAIL by 1 — exactly the two
+carried retained-partial firings at k=16, seeds 483017 purity
+0.833 and 483041 purity 0.886; candidate control line identical
+to the decisive baseline's on both cohorts), C9 B1 FAIL/FAIL on
+complementary halves of (a) (dev TAKEN 3/6 meeting the count but
+ALL FULL — seeds 482003 k=4 and 482039 k=2/k=4 — non-full 0 FAIL;
+add TAKEN 2/6 one short, both retained partial at k=4, seeds
+483017 / 483041, non-full met; harm PASSes both comparisons on
+both — 48 = guard 48 and < 95 dev, 60 vs guard 89 and < 89 add;
+B1 successes 0 vs 1/0 dev and 4 vs 7/7 add), C1 B2 PASS/FAIL (dev
+PASS in full — minority TAKEN 5/6, selectivity 0/6 / 0/6, harm 30
+vs guard 44 / ceiling 41.4, successes 50 vs guard+16 = 36; the
+missing firing is leg T's ONLY exercised state in the whole
+experiment, an ONSET stand-down at seed 482003 B2 k=2, stale
+minority count 2, purity 0.800, converting the decisive baseline's
+9/7 minority firing into a 0/0 full abstention, −9 successes /
+−7 harm, the whole of dev's pooled-onset success gap vs the
+decisive baseline, 89 vs 98; add FAIL on the ceiling alone —
+minority 3/6 at the floor, selectivity 0/6 / 0/6, successes 39,
+harm 57 vs guard 73 PASS but ceiling 53.4 FAIL; candidate
+identical to the decisive baseline at all 72 additional
+checkpoints), C11 conjunction FAIL/FAIL (dev on its B1 side only,
+add on both sides), C4 return-A FAIL/PASS (dev 57 vs guard 82 PASS
+but ceiling 49.2 FAIL, recovery 3/6; add 38 vs guard 59 / ceiling
+54.0, recovery 5/6), C2 return-A PASS/PASS (39 vs frozen_A 68; 58
+vs 62 — cumulative and frozen_A beat the candidate on BOTH axes on
+BOTH cohorts again), C3 pooled onset PASS/PASS (135 vs guard 174,
+6/6 cells; 155 vs guard 221, 6/6), C7 PASS/PASS (replay 72/72 per
+cohort, stale lists of 18 with both pair counts recomputable
+everywhere, thresholds 2/3/null as registered, kind never widened,
+pre-acting-release-rule == candidate branch and
+widened-removal-rule == decisive branch everywhere,
+minority_model_archive_count == archive_events_count and
+minority_model_inverted true everywhere, cross-check PASS at
+every minority-fired state 9/9 dev and 5/5 add, acquisition 0).
+**The grading cap is NOT MET on either cohort — leg T released
+ZERO checkpoint-32 routings (the three k=32 routings across
+cohorts carried stale counts 1, 0, and 0 for their own branches),
+so its designed population did not occur at checkpoint 32 on
+these draws and every k=32 outcome is a carried outcome identical
+to the decisive baseline; the leg's only exercised state is its
+pre-registered onset-engagement cost, realized once on
+development.** Full unit suite (1477) and historical transfer
+benchmark passed in the implementation, evaluation, and grading
+stages; no CI claimed for the evaluation or grading commits
+(UNVERIFIED). See `docs/PRE_ACTING_JOINT_RELEASE_RECOVERY.md`.
+Keep the learner optional and unpromoted, default controller
+unchanged, no merge, no AthenZ/Synveil integration, D1–D10/V2A/V2B
+unchanged. Next limitation selected: P1 first-switch (B1) onset
+engagement composition — criterion 9 FAILs on BOTH cohorts on
+complementary halves of the same sub-condition (a) with harm
+passing both comparisons on both (dev count met at 3/6 with zero
+non-full firings; add non-full met with two retained partials but
+count 2/6), so no cohort delivers count AND composition together;
+whether an evidence-derived condition on the B1 onset abstention
+classes can hold criterion 9's frozen form on BOTH cohorts while
+holding stationary, B2, checkpoint-32 release, and return-A
+profiles as guards, on NEW cohorts under a NEW protocol. Recorded
+but not selected: criterion 5 fails both cohorts again but on
+different sub-conditions, dev's two routings both productive and
+add's one harmful routing at stale count 0, with leg T's designed
+population absent — a release retry needs a genuinely new
+structural quantity, and checkpoint-32 release (with its
+additional-cohort Regression state) is carried as a co-graded
+guard; additional's stationary failure is 1 success past the line
+on two carried partial firings with development passing at its
+exact margin; additional's C1 failure is the ceiling alone with
+development passing in full; development's C4 failure is the
+return-A ceiling alone with additional passing in full;
+cumulative/frozen_A both-axes return-A dominance holds on both
+cohorts again.
+
 # Widened class removal recovery: the widened abstention trigger class removed from the abstention classes' composition — 2026-11-08 (FAILED, not a Regression)
 
 Optional `developmental_ai/widened_class_removal_recovery.py`
