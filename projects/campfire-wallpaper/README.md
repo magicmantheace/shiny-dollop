@@ -87,18 +87,28 @@ a few seconds.
     moonset within ~10 minutes (the low-precision lunar theory is
     the limit). Good enough for a wallpaper; details in
     `docs/TEST_PLAN.md`.
-  - One framing note: the camera faces north, and at 49.7° N the
-    sun and moon cross the *southern* sky — so what you mostly see
-    is their light and the sky's colour cycle; the discs themselves
-    swing through the frame mainly near rise/set in some seasons.
-- **The field is dressed, not bare.** A 190-pine instanced forest
-  edge (plus three feature trees), 950 grass tufts, ferns, berry
-  bushes, nine clusters of softly glowing mushrooms, 64 drifting
-  fireflies, log benches and stump seats around the fire, a
-  woodpile and chopping block, a worn dirt path from the field's
-  edge to the fire, hill silhouettes on the horizon, and the
-  occasional shooting star. All primitives/instancing — no
-  external assets — and the fire clearing stays readable.
+  - The camera faces **south**, so the discs cross the visible
+    sky: the sun rises on the left of frame, culminates in frame
+    at midday (23.7° at the November noon in Lethbridge), and
+    descends toward the right; the moon crosses the same band
+    whenever its transit is low enough (its high summer-evening
+    transits pass overhead, out of frame — its light still
+    arrives). One subtlety: near the new moon the disc is gated
+    invisible rather than drawn as a black circle against the
+    day sky.
+- **The field is dressed, not bare.** A 245-pine instanced forest
+  edge (plus three feature trees and four large framing pines at
+  the frame edges), 1,250 grass tufts, ferns, berry bushes, moss
+  patches, scattered rocks, two fallen logs, nine clusters of
+  softly glowing mushrooms, 64 drifting fireflies, log benches
+  and stump seats around a 16-stone fire ring, a woodpile and
+  chopping block, a worn dirt path from the field's edge to the
+  fire — and, opening to the south beyond the trees, a layered
+  mountain vista: three low-poly ridge silhouettes, the farthest
+  snow-capped, tinting with the sky (alpenglow at sunset, blue
+  distance at noon, near-black at night). All
+  primitives/instancing — no external assets — and the fire
+  clearing stays readable.
 - **Wallpaper manners:** pixel ratio capped at 1.5, ~136 fire
   particles (plus the small firefly/star point systems), no shadow
   maps, and the render loop stops entirely when the page is

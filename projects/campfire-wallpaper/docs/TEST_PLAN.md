@@ -198,3 +198,113 @@ exited instantly on the stale singleton lock while the driver
 polled a dead socket until its deadline. Both drivers now use
 a fresh `--user-data-dir` per run, and runs should be wrapped
 in a `timeout` watchdog.
+
+## Results — south-facing rotation + density pass (2026-11-08/09)
+
+Two owner-directed changes on top of the enrichment build:
+(1) the camera moved to the north side of the clearing looking
+**south** (`CAM_BASE` z +10.8 → −10.8, same distance/height;
+`CAM_LOOK.y` 1.0 → 3.0 so the frame's elevation band is roughly
+−28°…+27° instead of pitched down) so the sun/moon discs cross
+the visible sky; (2) a density pass inspired by a reference
+photo (lush forest campfire, stone-ringed fire, layered
+snow-capped vista): three `buildRidge` silhouettes to the south
+(R 118/142/168, the far ridge snow-capped above a 0.78
+snowline, gaps at |θ| = 65° so rise/set arcs are never blocked
+by a peak), 4 large framing pines at the frame edges, pines
+190 → 245 (a taller back ring), grass 950 → 1,250, ferns
+70 → 115, 46 moss discs, 30 extra rocks (some moss-tinted),
+2 fallen logs, and the fire's stone ring rebuilt as a
+16-stone InstancedMesh with per-stone scale/tilt/shade. All
+scatter respects the keep-clear guide; no new dynamic lights,
+no shadow maps. The sky math needed **no change** —
+`azElToVec` already honours compass azimuth in world space
+(N = −z, S = +z), so facing south puts east on the left
+automatically; the 2026-11-08 event-time table above therefore
+stands unmodified. Director, GLBs, fire spots, and all world
+positions are untouched — dwelling creatures now face the
+viewer across the fire.
+
+**Bug found and fixed by the rotation:** at the 2026-11-08
+13:15 capture the new moon (illumination 0.3%, el 20°) rendered
+as a solid **black disc** in the blue noon sky — invisible as
+an artifact while the moon was behind the old camera. The moon
+disc is now gated: opacity (and visibility) scale with
+`clamp((6 − sunEl)/10) × clamp(frac × 2.5)`, so the disc only
+appears when the sky is dark enough or the moon lit enough to
+read as a moon. Trade-off: a pale daytime moon is no longer
+drawn (v1 choice, deliberate).
+
+**Frame geometry (measured from the captures + the page's
+own reported el/az):** the frame spans azimuth ≈ 137–223° at
+the horizon. On 2026-11-08 the sun is inside that window from
+mid-morning until ≈ 16:25; the exact rise/set discs (az 115° /
+244.8°) fall ~22° outside the edges — the sunset capture
+instead shows the alpenglow band on the snow range, the same
+composition as the reference photo. The moon's window is the
+same; whether its disc is in frame depends on the season's
+transit elevation (probe below).
+
+**Captures** (frozen-time seam, all zero console errors, all
+templates loaded, page sky values matching the standalone
+math exactly; screenshots in the verification folder):
+
+- `final2-noon.png` — 2026-11-08 13:15: **sun disc IN FRAME**
+  at culmination (el 23.7°, az 179.9°), top-centre; no black
+  moon disc; snow reads on the far peaks only; the clearing
+  reads as an enclosed forest clearing, not a lawn.
+- `final2-sunrise.png` — 08:32: alpenglow on the snow range,
+  dragon dwelling at the fire facing the camera.
+- `final2-sunset.png` — 17:57: the reference composition —
+  fire foreground, forest frame, lit mountain vista beyond;
+  a triceratops at the fire. (This capture is also the new
+  `preview.jpg`.)
+- `final2-descent.png` — 16:40 (sun el 9.8°, az 229.2°): late
+  light raking from frame-right, snow range pink-white; the
+  disc itself has just left the frame's right edge.
+- `final2-night.png` — 2026-11-09 02:00 (moonless): ridges as
+  layered near-black silhouettes with a whisper of separation,
+  stars, fireflies, glowing mushrooms, stone ring in firelight.
+- `final-moonlit.png` — 2026-11-20 22:00 (moon el 49.2°,
+  az 174.4°, illumination 85%): the field visibly moonlit —
+  but the disc is **above the frame**, and a probe of the
+  full day (page math, 10-minute steps) shows the Nov 20 moon
+  never enters the band: it rises ENE in the afternoon,
+  transits at el 49.2°, and sets WNW. That is geometry, not a
+  rendering failure; Nov 20 remains the moon*light* case.
+- `final2-moondisc.png` — 2026-07-24 22:40 (moon el 12.6°,
+  az 187.8°, illumination 83%, sun el −10.1°): **moon disc
+  IN FRAME** above the ridge line just right of centre,
+  gibbous with halo, field moonlit — the proof the rotation
+  worked for the moon. Southern-transit moon discs occur in
+  the summer-evening geometry; winter full moons transit too
+  high for any ground-level frame.
+
+**Regression check.** The standard verify (420 harness steps
+at the live clock, ~00:00 local) re-run after both changes:
+**PASS** — all templates load, `loadErrors: []`, zero console
+errors, an entering triceratops reports clip `"walk"`, a
+goblin dwells at its fire spot, stepped status pair consistent.
+
+**Frame cost.** The density pass adds only instanced/merged
+geometry (three ribbon meshes, a few hundred extra instances
+across the instanced sets, one new 16-instance mesh); the
+SwiftShader
+page counter still reads ~22 fps (the same dt-cap artifact as
+before, not a measurement). Real-GPU cost on the owner's
+RTX 3060 remains unverified by measurement; the live-desktop
+redeploy (below) ran at 3840×2160 without visible distress,
+which is an observation, not a benchmark.
+
+**Redeploy (2026-11-09 ~00:00–00:05 local).** Changed files
+(`js/wallpaper.js` sha256 `dc180cb5…`, `preview.jpg` sha256
+`107aa39e…`) synced via the PC bridge to **both** PC copies
+(`D:\wallpapers\campfire-wallpaper` and the Lively Library
+copy) and hash-verified at all four destination files;
+Lively restarted (core + watchdog + player; UI closed again)
+and the Campfire tile re-invoked via UIA. The live desktop
+screenshot at 00:05 shows the south-facing framing on the real
+3840×2160 desktop: ridge silhouettes across the horizon, the
+16-stone ring in firelight, framing pines at the edges — a
+moonless night (new moon 2026-11-09 01:02), so the disc proof
+rests on the frozen captures above, as planned.

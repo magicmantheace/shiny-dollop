@@ -179,8 +179,20 @@ scene.fog = new THREE.FogExp2(0x131a33, 0.0135);
 
 const camera = new THREE.PerspectiveCamera(
   55, window.innerWidth / window.innerHeight, 0.1, 500);
-const CAM_BASE = new THREE.Vector3(0, 3.1, 10.8);
-const CAM_LOOK = new THREE.Vector3(0, 1.0, 0);
+// The camera sits at -z (the north side of the clearing) looking
+// toward +z — facing SOUTH across the fire. At 49.7° N the sun and
+// moon transit the southern sky, so from here their discs cross
+// the visible sky (rising at frame-left/east, setting frame-
+// right/west) instead of passing behind the viewer, as they did
+// when the camera sat at +z facing north.
+const CAM_BASE = new THREE.Vector3(0, 3.1, -10.8);
+// The look target sits almost at camera height (pitch ≈ -0.5°), not
+// down at the fire: at 49.7° N the sun's November noon culmination
+// is ~24° and the frame's top edge lands at ~27°, so the discs
+// cross the visible sky instead of skimming above it. The fire
+// reads low-centre, campfire-photo style, with the sky and the
+// mountain vista holding the upper frame.
+const CAM_LOOK = new THREE.Vector3(0, 3.0, 0);
 camera.position.copy(CAM_BASE);
 
 /* ---------------------------------------------------------- lighting */
@@ -416,7 +428,13 @@ function updateSky(nowMs) {
   }
 
   // Moon disc (phase texture refreshed at most hourly) + halo.
-  moonDisc.visible = moonEl > -1.5;
+  // The disc's opacity is gated two ways: by daylight (the drawn
+  // dark side reads correctly only against a dark sky — against
+  // blue noon sky an ungated new moon would print as a black
+  // circle) and by the illuminated fraction itself.
+  const moonGate = THREE.MathUtils.clamp((6 - sunEl) / 10, 0, 1) *
+                   THREE.MathUtils.clamp(ill.fraction * 2.5, 0, 1);
+  moonDisc.visible = moonEl > -1.5 && moonGate > 0.02;
   const hourKey = Math.floor(nowMs / 3600000);
   if (hourKey !== moonTexHour) {
     moonTexHour = hourKey;
@@ -435,11 +453,12 @@ function updateSky(nowMs) {
     moonDisc.lookAt(0, 0, 0);
     const bright = THREE.MathUtils.clamp(0.2 + moonEl / 25, 0.15, 1) *
                    (0.3 + 0.7 * ill.fraction);
+    moonMat.opacity = moonGate;
     moonMat.color.setScalar(Math.max(0.06, bright));
     const halo = moonDisc.userData.halo;
     halo.position.copy(_v1);
     halo.lookAt(0, 0, 0);
-    moonHaloMat.opacity = 0.4 * bright * THREE.MathUtils.clamp((moonEl + 1) / 6, 0, 1);
+    moonHaloMat.opacity = 0.4 * bright * moonGate * THREE.MathUtils.clamp((moonEl + 1) / 6, 0, 1);
   } else {
     moonHaloMat.opacity = 0;
   }
@@ -636,9 +655,10 @@ function updateDressing(t, dt) {
   }
 
   /* Forest edge: two instanced meshes (trunks, merged-cone foliage)
-     sharing per-instance matrices — a ring of pines at r 44–81 over
-     the lone scattered pines, thinning the "few trees in a void"
-     feel into an actual treeline. */
+     sharing per-instance matrices — 245 pines at r 44–84 over the
+     lone scattered pines, thinning the "few trees in a void" feel
+     into an actual treeline; the outermost ring stands tallest so
+     the forest reads as a wall, not a hedge. */
   {
     const trunkGeo = new THREE.CylinderGeometry(0.09, 0.15, 1.2, 6);
     trunkGeo.translate(0, 0.6, 0);
@@ -647,9 +667,9 @@ function updateDressing(t, dt) {
     const cone3 = new THREE.ConeGeometry(0.48, 2.4, 8); cone3.translate(0, 3.65, 0);
     const folGeo = mergeGeometries([cone1, cone2, cone3]);
     const trunks = instanced(trunkGeo,
-      new THREE.MeshStandardMaterial({ color: 0x33261a, roughness: 1 }), 190);
+      new THREE.MeshStandardMaterial({ color: 0x33261a, roughness: 1 }), 245);
     const fols = instanced(folGeo,
-      new THREE.MeshStandardMaterial({ color: 0x1c3020, roughness: 1 }), 190);
+      new THREE.MeshStandardMaterial({ color: 0x1c3020, roughness: 1 }), 245);
     let i = 0;
     for (; i < 160; i++) {                 // the distant ring
       const a = layoutRand() * Math.PI * 2;
@@ -669,6 +689,16 @@ function updateDressing(t, dt) {
       setInst(trunks, i, x, z, s, 0.12);
       fols.setMatrixAt(i, dummy.matrix);
       tint.setHSL(0.32, 0.25, 0.42 + layoutRand() * 0.2);
+      fols.setColorAt(i, tint);
+    }
+    for (; i < 245; i++) {                 // a taller back wall (density pass)
+      const a = layoutRand() * Math.PI * 2;
+      const r = 66 + Math.pow(layoutRand(), 1.2) * 18;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      const s = 1.5 + layoutRand() * 1.2;
+      setInst(trunks, i, x, z, s, 0.12);
+      fols.setMatrixAt(i, dummy.matrix);
+      tint.setHSL(0.32, 0.25, 0.36 + layoutRand() * 0.18);
       fols.setColorAt(i, tint);
     }
     trunks.instanceMatrix.needsUpdate = true;
@@ -729,8 +759,9 @@ function updateDressing(t, dt) {
     scene.add(snag);
   }
 
-  /* Grass tufts: instanced five-blade cones, ~950 of them. Sparse
-     in the clearing, none on the path. */
+  /* Grass tufts: instanced five-blade cones — 950 spread through
+     the field, plus 300 more ringing the clearing (density pass).
+     Sparse in the clearing, none on the path. */
   {
     const blades = [];
     for (let k = 0; k < 5; k++) {
@@ -744,12 +775,13 @@ function updateDressing(t, dt) {
     }
     const tuftGeo = mergeGeometries(blades);
     const grass = instanced(tuftGeo,
-      new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), 950);
+      new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), 1250);
     const gA = new THREE.Color(0x39512a), gB = new THREE.Color(0x5a7a3c);
     let placed = 0, guard = 0;
-    while (placed < 950 && guard++ < 7000) {
+    while (placed < 1250 && guard++ < 11000) {
       const a = layoutRand() * Math.PI * 2;
-      const r = 3 + Math.pow(layoutRand(), 0.75) * 49;
+      const r = placed < 950 ? 3 + Math.pow(layoutRand(), 0.75) * 49
+                             : 6 + Math.pow(layoutRand(), 0.8) * 16;
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
       if (r < 7 && layoutRand() < 0.55) continue;
       if (distToPath(x, z) < 0.8) continue;
@@ -763,7 +795,8 @@ function updateDressing(t, dt) {
     if (grass.instanceColor) grass.instanceColor.needsUpdate = true;
   }
 
-  /* Ferns: squashed-cone rosettes, ~70, mid-field. */
+  /* Ferns: squashed-cone rosettes, ~115, biased toward the
+     clearing edge (density pass), the rest mid-field. */
   {
     const fronds = [];
     for (let k = 0; k < 6; k++) {
@@ -777,11 +810,12 @@ function updateDressing(t, dt) {
     }
     const fernGeo = mergeGeometries(fronds);
     const ferns = instanced(fernGeo,
-      new THREE.MeshStandardMaterial({ color: 0x2a4a26, roughness: 1, flatShading: true }), 70);
+      new THREE.MeshStandardMaterial({ color: 0x2a4a26, roughness: 1, flatShading: true }), 115);
     let placed = 0, guard = 0;
-    while (placed < 70 && guard++ < 900) {
+    while (placed < 115 && guard++ < 1600) {
       const a = layoutRand() * Math.PI * 2;
-      const r = 6 + layoutRand() * 40;
+      const r = layoutRand() < 0.55 ? 5.5 + layoutRand() * 10.5
+                                    : 6 + layoutRand() * 40;
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
       if (distToPath(x, z) < 0.9) continue;
       setInst(ferns, placed, x, z, 0.6 + layoutRand() * 0.75, 0.02);
@@ -992,6 +1026,181 @@ function updateDressing(t, dt) {
     }
   }
 
+  /* Mountain vista to the south (density pass — Adam's reference
+     photo: a fire in a forest clearing, a layered snow-capped
+     range beyond the trees). Three ridge silhouettes span the
+     facing horizon: a dark forested ridge, a blue mid ridge, and
+     a far snow-capped range. Each is a skyline ribbon with baked
+     vertex colours (rock gradient; snow above a jagged snowline
+     on the far range only), tinted per frame from the sky
+     palette like the hills — warm at sunset, blue distance at
+     noon, near-black at night. Aligned notches at ±65° leave a
+     pass on each side where the rising/setting sun can still
+     touch the horizon line. */
+  function buildRidge(R, baseY, peakY, cols, snowline, jag, tintFn) {
+    const span = 1.40, steps = 88;
+    const bumps = [];
+    for (let k = 0; k < 8; k++) {
+      bumps.push({
+        c: -span + (2 * span) * (k + 0.2 + layoutRand() * 0.6) / 8,
+        w: (0.15 + layoutRand() * 0.24) * jag,
+        h: 0.40 + layoutRand() * 0.60,
+      });
+    }
+    const prof = (th) => {
+      let y = 0.10;
+      for (const b of bumps) {
+        const d = (th - b.c) / b.w;
+        y += b.h * Math.exp(-d * d);
+      }
+      y *= 1 + 0.10 * Math.sin(th * 61 + R) * Math.sin(th * 23 + 1.7);
+      const notch = Math.exp(-Math.pow((Math.abs(th) - 1.13) / 0.10, 2));
+      y *= 1 - 0.78 * notch;
+      return baseY + (Math.min(y, 1.25) / 1.25) * (peakY - baseY);
+    };
+    const pos = [], col = [], idx = [];
+    const cBase = new THREE.Color(cols[0]), cMid = new THREE.Color(cols[1]),
+          cTop = new THREE.Color(cols[2]), cSnow = new THREE.Color(0xeef2fa),
+          cc = new THREE.Color();
+    for (let i = 0; i <= steps; i++) {
+      const th = -span + (2 * span * i) / steps;
+      const x = Math.sin(th) * R, z = Math.cos(th) * R;
+      const y = prof(th);
+      const h01 = THREE.MathUtils.clamp((y - baseY) / (peakY - baseY), 0, 1);
+      cc.copy(cBase).lerp(cMid, Math.min(h01 * 1.6, 1))
+        .lerp(cTop, Math.max(0, h01 * 1.4 - 0.4));
+      if (snowline !== null &&
+          h01 > snowline + 0.07 * Math.sin(th * 34) + layoutRand() * 0.05) {
+        cc.copy(cSnow);
+      }
+      pos.push(x, y, z); col.push(cc.r, cc.g, cc.b);
+      pos.push(x, -8, z); col.push(cc.r * 0.75, cc.g * 0.75, cc.b * 0.75);
+      if (i < steps) {
+        const b = i * 2;
+        idx.push(b, b + 1, b + 2, b + 1, b + 3, b + 2);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(col), 3));
+    g.setIndex(idx);
+    const mat = new THREE.MeshBasicMaterial({
+      vertexColors: true, fog: false, side: THREE.DoubleSide,
+    });
+    skyFollowers.push((P) => tintFn(mat, P));
+    const mesh = new THREE.Mesh(g, mat);
+    mesh.frustumCulled = false;
+    scene.add(mesh);
+  }
+  buildRidge(118, 3, 24, [0x2a3324, 0x39443a, 0x4c5c50], null, 1.0,
+    (mat, P) => mat.color.copy(P.fog).lerp(P.mid, 0.3).multiplyScalar(0.6));
+  buildRidge(142, 4, 34, [0x39445c, 0x5a6a86, 0x8294b2], null, 0.9,
+    (mat, P) => mat.color.copy(P.mid).lerp(P.top, 0.35).multiplyScalar(0.95));
+  buildRidge(168, 5, 45, [0x46536e, 0x71809c, 0xa9b8d0], 0.78, 0.7,
+    (mat, P) => mat.color.copy(P.hor).lerp(P.top, 0.35).multiplyScalar(1.15));
+
+  /* Foreground framing pines (density pass): four large pines
+     close around the camera, trunks crossing the frame edges like
+     the reference photo — the clearing is now seen INTO a forest,
+     not across a lawn. */
+  {
+    const trunkGeo = new THREE.CylinderGeometry(0.11, 0.18, 1.2, 6);
+    trunkGeo.translate(0, 0.6, 0);
+    const cone1 = new THREE.ConeGeometry(0.88, 2.4, 8); cone1.translate(0, 1.95, 0);
+    const cone2 = new THREE.ConeGeometry(0.68, 2.4, 8); cone2.translate(0, 2.8, 0);
+    const cone3 = new THREE.ConeGeometry(0.48, 2.4, 8); cone3.translate(0, 3.65, 0);
+    const folGeo = mergeGeometries([cone1, cone2, cone3]);
+    const trunks = instanced(trunkGeo,
+      new THREE.MeshStandardMaterial({ color: 0x33261a, roughness: 1 }), 4);
+    const fols = instanced(folGeo,
+      new THREE.MeshStandardMaterial({ color: 0x1c3020, roughness: 1 }), 4);
+    const frames = [[-5.4, -3.4, 2.5], [5.6, -4.2, 2.85],
+                    [-9.2, -8.8, 3.2], [9.8, -9.6, 3.0]];
+    frames.forEach(([x, z, s], i) => {
+      setInst(trunks, i, x, z, s, 0.12);
+      fols.setMatrixAt(i, dummy.matrix);
+      tint.setHSL(0.32, 0.25, 0.30 + layoutRand() * 0.12);
+      fols.setColorAt(i, tint);
+    });
+    trunks.instanceMatrix.needsUpdate = true;
+    fols.instanceMatrix.needsUpdate = true;
+    if (fols.instanceColor) fols.instanceColor.needsUpdate = true;
+  }
+
+  /* Moss patches: dark-green discs mottling the forest floor —
+     outside the clearing and off the path (density pass). */
+  {
+    const mossGeo = new THREE.CircleGeometry(1, 10);
+    mossGeo.rotateX(-Math.PI / 2);
+    const moss = instanced(mossGeo, new THREE.MeshStandardMaterial({
+      color: 0x2a4423, roughness: 1,
+      polygonOffset: true, polygonOffsetFactor: -1,
+    }), 46);
+    let placed = 0, guard = 0;
+    while (placed < 46 && guard++ < 900) {
+      const a = layoutRand() * Math.PI * 2;
+      const r = 4.6 + Math.pow(layoutRand(), 0.8) * 35;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      if (distToPath(x, z) < 1.1) continue;
+      setInst(moss, placed, x, z, 0.5 + layoutRand() * 1.2, -0.015);
+      placed++;
+    }
+    moss.count = placed;
+    moss.instanceMatrix.needsUpdate = true;
+  }
+
+  /* More scattered rocks, two in five moss-tinted (density pass). */
+  {
+    const rocks = instanced(new THREE.DodecahedronGeometry(1, 0),
+      new THREE.MeshStandardMaterial({ roughness: 0.95, flatShading: true }), 30);
+    const grey = new THREE.Color(0x5d6068), mossy = new THREE.Color(0x51603c);
+    let placed = 0, guard = 0;
+    while (placed < 30 && guard++ < 700) {
+      const a = layoutRand() * Math.PI * 2;
+      const r = 4.6 + layoutRand() * 41;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      if (distToPath(x, z) < 1.0) continue;
+      const s = 0.18 + layoutRand() * 0.55;
+      dummy.position.set(x, groundH(x, z) - s * 0.3, z);
+      dummy.rotation.set(layoutRand() * 3, layoutRand() * 3, layoutRand() * 3);
+      dummy.scale.set(s, s * (0.55 + layoutRand() * 0.4), s * (0.7 + layoutRand() * 0.5));
+      dummy.updateMatrix();
+      rocks.setMatrixAt(placed, dummy.matrix);
+      tint.copy(layoutRand() < 0.4 ? mossy : grey)
+        .multiplyScalar(0.8 + layoutRand() * 0.4);
+      rocks.setColorAt(placed, tint);
+      placed++;
+    }
+    rocks.count = placed;
+    rocks.instanceMatrix.needsUpdate = true;
+    if (rocks.instanceColor) rocks.instanceColor.needsUpdate = true;
+  }
+
+  /* Two fallen logs resting at the clearing edge (density pass). */
+  {
+    const barkMat = new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 1 });
+    const endMat = new THREE.MeshStandardMaterial({ color: 0xa9834f, roughness: 0.9 });
+    const logMats = [barkMat, endMat, endMat];
+    function fallenLog(x, z, rotY, len) {
+      const g = new THREE.Group();
+      const trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.17, 0.21, len, 8), logMats);
+      trunk.rotation.z = Math.PI / 2;
+      trunk.position.y = 0.17;
+      g.add(trunk);
+      const stub = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.05, 0.07, 0.7, 6), barkMat);
+      stub.position.set(len * 0.22, 0.42, 0.08);
+      stub.rotation.z = -0.7;
+      g.add(stub);
+      g.position.set(x, groundH(x, z), z);
+      g.rotation.y = rotY;
+      scene.add(g);
+    }
+    fallenLog(-8.2, 5.5, 0.9, 2.6);
+    fallenLog(10.5, -2.5, -0.6, 2.2);
+  }
+
   /* An occasional shooting star: one additive sprite streaking the
      upper sky every ~10–25 s. Pure decoration, zero steady cost. */
   {
@@ -1063,17 +1272,30 @@ function resetParticle(sys, p, randomAge) {
   const fire = new THREE.Group();
   scene.add(fire);
 
-  // Stone ring.
-  const stoneGeo = new THREE.DodecahedronGeometry(0.16, 0);
-  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x6a6d74, roughness: 1, flatShading: true });
-  for (let i = 0; i < 9; i++) {
-    const a = (i / 9) * Math.PI * 2 + 0.2;
-    const st = new THREE.Mesh(stoneGeo, stoneMat);
-    st.position.set(Math.cos(a) * 0.88, 0.07, Math.sin(a) * 0.88);
-    st.rotation.set(i * 1.7, i * 2.3, i * 0.9);
-    st.scale.setScalar(0.8 + (i % 3) * 0.25);
-    fire.add(st);
+  // Stone ring: sixteen individual rocks around the pit, varied
+  // in size, shape, tilt and shade (instanced; density pass).
+  const stoneGeo = new THREE.DodecahedronGeometry(0.17, 0);
+  const stoneMat = new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true });
+  const stones = new THREE.InstancedMesh(stoneGeo, stoneMat, 16);
+  stones.frustumCulled = false;
+  {
+    const sd = new THREE.Object3D(), sc = new THREE.Color();
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2 + 0.2 + (layoutRand() - 0.5) * 0.18;
+      const r = 0.92 + layoutRand() * 0.14;
+      const s = 0.75 + layoutRand() * 0.75;
+      sd.position.set(Math.cos(a) * r, 0.05, Math.sin(a) * r);
+      sd.rotation.set(layoutRand() * 3, layoutRand() * 3, layoutRand() * 3);
+      sd.scale.set(s, s * (0.6 + layoutRand() * 0.35), s * (0.75 + layoutRand() * 0.4));
+      sd.updateMatrix();
+      stones.setMatrixAt(i, sd.matrix);
+      sc.setHSL(0.08, 0.03 + layoutRand() * 0.05, 0.34 + layoutRand() * 0.16);
+      stones.setColorAt(i, sc);
+    }
+    stones.instanceMatrix.needsUpdate = true;
+    if (stones.instanceColor) stones.instanceColor.needsUpdate = true;
   }
+  fire.add(stones);
   // Log pile: a low teepee of cylinders plus two crossed logs.
   const logGeo = new THREE.CylinderGeometry(0.075, 0.09, 1.15, 7);
   const logMat = new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 1 });
@@ -1098,8 +1320,9 @@ function resetParticle(sys, p, randomAge) {
   fireLight = new THREE.PointLight(0xff8a3d, 26, 34, 2);
   fireLight.position.set(0, 0.85, 0);
   fire.add(fireLight);
-  // A whisper of warm bounce on the camera side of the fire, so the
-  // gathered creatures read as more than silhouettes.
+  // A whisper of warm bounce on the spots side of the fire, so the
+  // gathered creatures' flame-lit faces read as more than
+  // silhouettes from the south-facing camera.
   bounceLight = new THREE.PointLight(0xff9a50, 5, 13, 2);
   bounceLight.position.set(0, 0.6, 1.9);
   fire.add(bounceLight);
@@ -1247,8 +1470,9 @@ function placeChest() {
 
 /* ------------------------------------------------------ fire spots */
 
-// Gathering spots on the camera side of the fire, so the creatures
-// face the flames (and mostly the viewer). One creature per spot.
+// Gathering spots on the far side of the fire from the camera, so
+// the creatures face the flames (and mostly the viewer). One
+// creature per spot.
 const SPOTS = [-1.05, -0.52, 0, 0.52, 1.05].map((a) => ({
   pos: new THREE.Vector3(Math.sin(a) * 2.75, 0, Math.cos(a) * 2.75),
   takenBy: null,

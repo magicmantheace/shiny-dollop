@@ -1,11 +1,14 @@
 # Handoff — Campfire Companions
 
-**State (2026-11-08): initial build + scene enrichment + real-clock
-celestial cycle, all on branch `campfire-wallpaper/initial-build`,
-draft PR #49 open, NOT merged.** Deployed live on the owner's PC
-2026-11-08 (Lively Wallpaper 2.2.1.0, "Campfire Companions" active
-on the primary display); the enrichment + celestial build was
-redeployed over both PC copies the same night (see Deployment).
+**State (2026-11-09): initial build + scene enrichment +
+real-clock celestial cycle + south-facing rotation and density
+pass, all on branch `campfire-wallpaper/initial-build`, draft
+PR #49 open, NOT merged.** Deployed live on the owner's PC
+2026-11-08 (Lively Wallpaper 2.2.1.0, "Campfire Companions"
+active on the primary display); the enrichment + celestial
+build was redeployed over both PC copies the same night, and
+the south-facing + density build again on 2026-11-09 ~00:00
+(see Deployment).
 
 ## What it is
 
@@ -39,8 +42,11 @@ and the hashes above are the post-P4 ones. The chest is unchanged.
 
 ## Director behaviour (as built)
 
-- Max 3 concurrent creatures; 5 fire spots on the camera side of
-  the fire, never double-booked.
+- Max 3 concurrent creatures; 5 fire spots at r 2.75 on the +z
+  side of the fire, never double-booked. (World positions never
+  moved; since the 2026-11-09 rotation the camera sits at −z,
+  so the spots are across the fire from the viewer and dwelling
+  creatures face the camera.)
 - Travel clip: `walk` when the GLB provides one (all three do);
   fallback per-creature gait from the signature clip (dragon hop /
   trike bounce surge-and-lift synced to the clip cycle; goblin
@@ -57,7 +63,7 @@ and the hashes above are the post-P4 ones. The chest is unchanged.
   shadows (no shadow maps), render loop fully stopped while the
   page is hidden.
 
-## Scene dressing (2026-11-08 enrichment)
+## Scene dressing (2026-11-08 enrichment, 2026-11-09 density pass)
 
 Dressing only — the director, GLBs, and fire-spot semantics are
 untouched, and the fire clearing stays readable. Everything is
@@ -65,26 +71,47 @@ primitives/instancing; per-frame updates run through a
 `dressingUpdaters` hook list called from the main tick.
 
 - **Forest edge:** one merged-cone foliage geometry + one trunk
-  geometry as two InstancedMeshes sharing matrices — 190 pines
-  (160 at r 54–81, scale 0.95–2.1; 30 in a r 44–58 blending band),
-  per-instance colour tint. Feature trees: broad oak at
-  (−10.5, −5.5), tall 4-cone pine at (11, −7.5), dead snag at
-  (−16, 8).
-- **Ground life:** 950 instanced grass tufts (r 3–52, sparse
-  inside r 7, none within 0.8 of the path); 70 instanced ferns;
-  10 extra bushes, 7 carrying 63 instanced berries.
+  geometry as two InstancedMeshes sharing matrices — 245 pines
+  after the density pass (160 at r 54–81, scale 0.95–2.1; 30 in
+  a r 44–58 blending band; 55 taller back-ring pines at
+  r 66–84, scale 1.5–2.7), per-instance colour tint. Feature
+  trees: broad oak at (−10.5, −5.5), tall 4-cone pine at
+  (11, −7.5), dead snag at (−16, 8).
+- **Ground life:** 1,250 instanced grass tufts (r 3–52, sparse
+  inside r 7, none within 0.8 of the path); 115 instanced
+  ferns (biased to the clearing edge); 10 extra bushes, 7
+  carrying 63 instanced berries; 46 moss discs and 30 extra
+  rocks (some moss-tinted) outside the keep-clear guide; 2
+  fallen logs.
 - **Whimsy:** 9 glowing-mushroom clusters (~40 instanced stems +
   emissive caps, one additive glow sprite per cluster, pulsing);
   64 fireflies (one Points system, sine wander + twinkle).
 - **Fire furniture:** 2 log benches (angles ±1.75, r 3.5), 3
   stump seats (r 3.2), a 6-log woodpile at (4.7, 2.1), chopping
-  block + split log at (3.9, 3.3).
+  block + split log at (3.9, 3.3); the fire pit itself is
+  ringed by a 16-stone InstancedMesh (r 0.92–1.06, per-stone
+  scale/tilt/shade).
+- **Foreground framing (density pass):** 4 large pines close
+  to the camera at the frame edges — (−5.4, −3.4, s 2.5),
+  (5.6, −4.2, s 2.85), (−9.2, −8.8, s 3.2), (9.8, −9.6, s 3.0)
+  — instanced through the same trunk/foliage pair as the
+  forest edge.
 - **Dirt path:** terrain-following ribbon along a quadratic
   Bézier from (17, 36) to (2.3, 4.6); its 61 samples double as
   the keep-clear guide (`distToPath`) for grass/fern scatter.
 - **Horizon:** 6 hill domes (MeshBasicMaterial, unfogged) whose
   colour follows the sky palette via `skyFollowers` (below);
   one shooting-star sprite on a ~9–25 s cycle.
+- **Mountain vista (density pass):** three layered low-poly
+  ridge ribbons (`buildRidge`, full ring so no azimuth reads
+  empty; the composition reads to the south) at R 118 (peaks
+  ~24, dark green), R 142 (peaks ~34, blue) and R 168 (peaks
+  ~45, snow above a jagged 0.78 snowline, snow vertex colour
+  0xeef2fa). Vertex-colour gradients tint from the same sky
+  palette via `skyFollowers` (fog:false, so they read as
+  distance, not fog) — alpenglow at sunset, blue at noon,
+  near-black silhouettes at night. Aligned notches at
+  |θ| = 65° keep the rise/set arcs unobstructed.
 
 ## Celestial cycle (2026-11-08)
 
@@ -108,6 +135,11 @@ America/Edmonton; Alberta Time is UTC−6 year-round). No network.
   (`drawMoonPhase`, redrawn at most hourly) rotated so the bright
   limb faces the sun (bright-limb angle − parallactic angle),
   brightness scaled by elevation × (0.3 + 0.7·illumination).
+  **Moon gate (2026-11-09):** disc opacity/visibility also scale
+  with `clamp((6 − sunEl)/10) × clamp(frac × 2.5)` — without it,
+  the near-new moon drew as a solid black disc in the day sky
+  (a latent bug the south rotation exposed). Deliberate v1
+  trade-off: no pale daytime moon.
 - **Directional light** (`skyLight`): contribution-weighted blend
   of sun and moon — warm low sun (twilight-aware ramp so dawn/dusk
   aren't black), white midday, cool dim moonlight, 0.12 floor.
@@ -115,12 +147,18 @@ America/Edmonton; Alberta Time is UTC−6 year-round). No network.
   fire burns around the clock but its light/flame presence scales
   to ~0.35 in full day; fireflies and mushroom glow are
   night-gated by `nightFactor`; stars fade in as the sun drops.
-- **Framing caveat:** the camera faces north (−z); at 49.7° N the
-  bodies transit the *southern* sky, so in-frame disc appearances
-  are limited to rise/set seasons — the visible product is the
-  light and colour cycle. Verified states + accuracy table
-  (sun events ≤ ~1.5 min vs timeanddate.com; moon events ≤
-  ~10 min) are in `docs/TEST_PLAN.md`.
+- **Framing (2026-11-09, supersedes the old north-facing
+  caveat):** the camera sits at (0, 3.1, −10.8) looking south
+  (`CAM_LOOK` (0, 3.0, 0); frame ≈ az 137–223°, el −28°…+27°),
+  so the discs cross the frame: sun disc captured in frame at
+  the 2026-11-08 noon culmination (el 23.7°, az 179.9°), moon
+  disc captured in frame on the summer-transit geometry
+  (2026-07-24 22:40, el 12.6°, az 187.8°). Winter full moons
+  and dates like 2026-11-20 (transit el 49.2°) pass above the
+  frame — moonlight only, by geometry. Azimuth was already
+  honoured in world space (`azElToVec`: N = −z, S = +z), so
+  the rotation needed no sky-math change and the event-time
+  accuracy table in `docs/TEST_PLAN.md` stands.
 - **Harness seam:** `?harness=1&time=<epoch ms | ISO>` freezes
   the celestial computation; `#status`/`window.__campfireStatus`
   now include a `sky` object (sun/moon el+az, moon fraction).
@@ -137,7 +175,17 @@ the folder into the Library, restarting Lively, and invoking the
 library tile (UIA). The enrichment + celestial redeploy synced
 the changed files to both copies (hash-verified) and restarted
 Lively; the live desktop was screenshot-verified on the real
-clock (night state at redeploy time).
+clock (night state at redeploy time). The south-facing +
+density redeploy (2026-11-09 ~00:00) repeated the route for
+`js/wallpaper.js` (sha256 `dc180cb5ba044eacf1081cf481d6bf46da8635493085c75c11ba31a35f86bc0a`) and `preview.jpg` (sha256 `107aa39e8d82fb6a592f9524ab150d364d7e1cb228fff8d0b453cb8af06f43ab`): staged through the bridge file API, copied by a staged
+`.cmd` (inline quoted paths get mangled by the bridge's cmd
+wrapping — scripts on disk are the reliable route; destination
+hashes for the spaced Library paths were verified by copying
+the files back into the sandbox and hashing there), Lively
+killed and relaunched, tile re-invoked via UIA, UI process
+closed afterwards leaving core + watchdog + player. Final
+live screenshot (00:05, moonless night) shows the south-facing
+framing with ridge silhouettes on the real 3840×2160 desktop.
 
 ## Verification (see docs/TEST_PLAN.md for the full record)
 
@@ -168,14 +216,29 @@ folder over HTTP:
   timeanddate.com and the moon-phase texture grid are recorded
   in TEST_PLAN. The standard 420-step verify was re-run after
   the changes as a regression check.
+- South-facing rotation + density pass (2026-11-09, same
+  harness): seven frozen captures, all zero console errors —
+  **sun disc in frame** at the Nov 8 noon culmination and
+  **moon disc in frame** on the 2026-07-24 summer transit;
+  sunset capture echoes the density reference (fire foreground,
+  forest frame, alpenglow on the snow range); the Nov 20 case
+  probed as moonlight-only by transit geometry (el 49.2°,
+  above the frame). The pass also caught and fixed a latent
+  bug: the near-new moon rendering as a black disc in the day
+  sky (now gated). Standard 420-step verify at the live clock
+  re-run: **PASS** (walk-in on `"walk"`, dwell observed,
+  `loadErrors: []`). Full record in TEST_PLAN.
 
 Screenshots live outside the repo in the build worktree:
 `~/workspace/_build-wallpaper-verification/` — `shot-a.png` /
 `shot-b.png` (initial proof-of-life pair), `sky-noon.png`,
 `sky-sunrise.png`, `sky-sunset.png`, `sky-night.png`,
 `sky-moonlit.png`, `moon-phase-grid.png` (enrichment/celestial
-pass). `preview.jpg` in the project is the sunset capture,
-used as the Lively thumbnail.
+pass), and `final2-noon.png`, `final2-sunrise.png`,
+`final2-sunset.png`, `final2-descent.png`, `final2-night.png`,
+`final2-moondisc.png`, `final-moonlit.png` (south-facing +
+density pass). `preview.jpg` in the project is the south-facing
+sunset capture, used as the Lively thumbnail.
 
 ## Harness notes for the next verifier
 
