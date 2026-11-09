@@ -1,0 +1,279 @@
+{
+ "entry_version": 1,
+ "name": "Crow Postman",
+ "slug": "crow-postman",
+ "source_concept": "media-generation-media-generation-crow-postman-0-4b87b877-f163-4e3b-ad03-7243ffb87da0.webp",
+ "asset_file": "crow-postman.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "310942604e8623a07185e6bc03458a83ecf77eb7ca7181304a1d605c2be637a5",
+ "bytes": 21106560,
+ "counts": {
+  "verts": 52537,
+  "faces": 99779,
+  "raw_mesh_verts": 534328,
+  "raw_mesh_faces": 684152
+ },
+ "bones": [
+  "root",
+  "spine",
+  "head",
+  "arm.L",
+  "arm2.L",
+  "arm.R",
+  "arm2.R",
+  "leg.L",
+  "leg2.L",
+  "leg.R",
+  "leg2.R"
+ ],
+ "actions": [
+  "bow",
+  "idle",
+  "run",
+  "walk"
+ ],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": true,
+  "rig_template": "biped",
+  "signature_clip": "bow",
+  "weight_method": "distance-to-bone fallback (heat result rejected by skin_policy)",
+  "segmentation": {
+   "model": "P3-SAM (Tencent Hunyuan3D-Part)",
+   "parts": 13,
+   "proxy_faces": 50000,
+   "islands_relabelled": 96,
+   "separated_verts_added": 2782,
+   "labelled_verts": 52537
+  },
+  "label_map": {
+   "0": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm2.R",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "1": {
+    "dominant": "leg2.R",
+    "allowed": [
+     "head",
+     "leg.R",
+     "leg2.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm2.R",
+     "leg.L",
+     "leg2.L"
+    ]
+   },
+   "2": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm2.R",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "3": {
+    "dominant": "leg2.R",
+    "allowed": [
+     "head",
+     "leg.R",
+     "leg2.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm2.R",
+     "leg.L",
+     "leg2.L"
+    ]
+   },
+   "4": {
+    "dominant": "leg2.L",
+    "allowed": [
+     "arm2.L",
+     "head",
+     "leg.L",
+     "leg2.L",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm2.R",
+     "leg2.R"
+    ]
+   },
+   "5": {
+    "dominant": "head",
+    "allowed": [
+     "arm.L",
+     "arm.R",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm2.R",
+     "leg.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "6": {
+    "dominant": "leg2.L",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg2.L",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm2.R",
+     "leg2.R"
+    ]
+   },
+   "7": {
+    "dominant": "leg2.L",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg2.L",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm2.R",
+     "leg2.R"
+    ]
+   },
+   "8": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm2.R",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "9": {
+    "dominant": "arm2.R",
+    "allowed": [
+     "arm.R",
+     "arm2.R",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "10": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm2.R",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "11": {
+    "dominant": "leg.L",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "leg2.L",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm2.R",
+     "leg2.R"
+    ]
+   },
+   "12": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm2.R",
+     "leg2.L",
+     "leg2.R"
+    ]
+   }
+  },
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ },
+ "clips": {
+  "bow": {
+   "frames": 62,
+   "fps": 24,
+   "seconds": 2.58
+  },
+  "idle": {
+   "frames": 115,
+   "fps": 24,
+   "seconds": 4.79
+  },
+  "run": {
+   "frames": 24,
+   "fps": 24,
+   "seconds": 1.0
+  },
+  "walk": {
+   "frames": 36,
+   "fps": 24,
+   "seconds": 1.5
+  }
+ }
+}
