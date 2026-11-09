@@ -67,6 +67,7 @@ import binascii
 import hashlib
 import hmac
 import json
+import ntpath
 import os
 import platform
 import re
@@ -195,12 +196,112 @@ def init_config(config_path: Path) -> str:
 # Process helpers (shared by jobs, processes, sessions)
 # --------------------------------------------------------------------------
 
+# -- Shell executable resolution -------------------------------------------
+#
+# Why this exists (defect found live at the v1.1 boot-core activation,
+# 2026-11-08): under the session-0 core running as SYSTEM, every
+# PowerShell job failed at spawn with WinError 1920 ("The file cannot
+# be accessed by the system") while cmd jobs under the same core
+# worked. build_command resolved the PowerShell executable with a
+# bare-name shutil.which() over the process PATH, and in the
+# boot-task environment that search returns the per-user WindowsApps
+# execution alias for powershell.exe -- a reparse stub inside the
+# interactive user's profile that no other account (SYSTEM included)
+# can execute. cmd survived only because it was passed bare and
+# Windows' own CreateProcess search order found System32\cmd.exe.
+# Resolution therefore never trusts a PATH hit that lives under
+# WindowsApps or any user profile, and prefers the fixed System32
+# locations outright.
+
+def _shell_path_is_blocked(path: str, env) -> bool:
+    """True if a resolved shell path must never be spawned: a
+    WindowsApps execution alias, or anything under a user profile /
+    per-user AppData. Such paths are per-user reparse stubs or
+    profile content that a service account cannot (or must not)
+    execute."""
+    norm = str(path).replace("/", "\\").lower()
+    if "\\windowsapps\\" in norm or norm.endswith("\\windowsapps"):
+        return True
+    if re.search(r"\\users\\[^\\]+\\appdata\\", norm):
+        return True
+    for var in ("USERPROFILE", "LOCALAPPDATA", "APPDATA"):
+        base = str(env.get(var) or "").replace("/", "\\").rstrip("\\").lower()
+        if base and norm.startswith(base + "\\"):
+            return True
+    return False
+
+
+def _resolve_windows_shell_exe(shell: str, env, which, exists) -> str | None:
+    """Resolve a Windows shell name to an absolute executable path.
+
+    Pure seam: env/which/exists are injected so the contract is
+    testable off-Windows (the SYSTEM context itself cannot be
+    reproduced in the suite). Preference order for "powershell": a
+    vetted pwsh on PATH (unchanged from the historical behaviour),
+    then the fixed System32 WindowsPowerShell path, then a vetted
+    PATH hit for powershell; if nothing exists, the System32 path is
+    returned anyway -- it is present on every Windows install, and a
+    genuinely missing shell must fail against its real path, never
+    against an alias stub. "cmd": System32 first, then a vetted PATH
+    hit, then System32 regardless. "pwsh": a vetted, existing PATH
+    hit or None.
+    """
+    system_root = str(env.get("SystemRoot") or env.get("windir")
+                      or r"C:\Windows")
+    system32 = system_root.rstrip("\\") + r"\System32"
+    ps_system32 = system32 + r"\WindowsPowerShell\v1.0\powershell.exe"
+    cmd_system32 = system32 + r"\cmd.exe"
+
+    def vetted(candidate):
+        if not candidate or not ntpath.isabs(candidate):
+            return None
+        if _shell_path_is_blocked(candidate, env):
+            return None
+        return candidate
+
+    if shell == "powershell":
+        for candidate in (vetted(which("pwsh")), ps_system32,
+                          vetted(which("powershell"))):
+            if candidate and exists(candidate):
+                return candidate
+        return ps_system32
+    if shell == "pwsh":
+        candidate = vetted(which("pwsh"))
+        return candidate if candidate and exists(candidate) else None
+    if shell == "cmd":
+        for candidate in (cmd_system32, vetted(which("cmd"))):
+            if candidate and exists(candidate):
+                return candidate
+        return cmd_system32
+    return None
+
+
+def resolve_shell_exe(shell: str) -> str | None:
+    """Absolute executable for a shell name, or None if unavailable.
+
+    On Windows this is the vetted, System32-first resolution above.
+    Off Windows (dev machines), "posix" keeps its fixed location and
+    powershell/cmd keep the historical PATH behaviour.
+    """
+    if IS_WINDOWS:
+        return _resolve_windows_shell_exe(
+            shell, os.environ, shutil.which, os.path.exists)
+    if shell == "posix":
+        return "/bin/sh"
+    if shell in ("powershell", "pwsh"):
+        return shutil.which("pwsh") or shutil.which("powershell")
+    if shell == "cmd":
+        return shutil.which("cmd")
+    return None
+
+
 def build_command(shell: str, command: str) -> list[str]:
     if shell == "powershell":
-        exe = shutil.which("pwsh") or shutil.which("powershell") or "powershell"
+        exe = resolve_shell_exe("powershell") or "powershell"
         return [exe, "-NoProfile", "-NonInteractive", "-Command", command]
     if shell == "cmd":
-        return ["cmd", "/d", "/s", "/c", command]
+        exe = resolve_shell_exe("cmd") or "cmd"
+        return [exe, "/d", "/s", "/c", command]
     if shell == "posix":
         return ["/bin/sh", "-c", command]
     raise ValueError(f"unknown shell: {shell!r}")
@@ -209,10 +310,11 @@ def build_command(shell: str, command: str) -> list[str]:
 def shell_argv(shell: str) -> list[str]:
     """Argv for an interactive shell of the given kind."""
     if shell == "powershell":
-        exe = shutil.which("pwsh") or shutil.which("powershell") or "powershell"
+        exe = resolve_shell_exe("powershell") or "powershell"
         return [exe, "-NoProfile", "-NoExit", "-Command", "-"]
     if shell == "cmd":
-        return ["cmd"]
+        exe = resolve_shell_exe("cmd") or "cmd"
+        return [exe]
     if shell == "posix":
         return ["/bin/sh", "-i"]
     raise ValueError(f"unknown shell: {shell!r}")
@@ -2286,7 +2388,7 @@ def run_uia(core: "BridgeCore", payload: dict) -> dict:
     helper = agent_dir() / "helpers" / "uia.ps1"
     if not helper.exists():
         raise PlatformUnavailable(f"UIA helper not installed: {helper}")
-    exe = shutil.which("pwsh") or shutil.which("powershell")
+    exe = resolve_shell_exe("powershell")
     if not exe:
         raise PlatformUnavailable("PowerShell not found")
     action = str(payload.get("action", ""))
