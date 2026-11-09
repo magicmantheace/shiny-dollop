@@ -5,10 +5,15 @@
 // again. Built for Lively Wallpaper (web type) and equally happy opened
 // in a browser over HTTP as a preview.
 //
-// Resource manners matter: capped pixel ratio, modest particle counts,
-// no shadow maps (blob shadows instead), and the render loop stops
-// entirely while the page is hidden (Lively pauses wallpapers behind
-// fullscreen apps; a hidden preview tab costs nothing either).
+// AAA GRAPHICS EXPERIMENT (branch campfire-wallpaper/aaa-graphics-
+// experiment, owner-directed 2026-11-09; the bookmarked build at tag
+// campfire-wallpaper/bookmark-definition-pass keeps the classic
+// manners): this variant deliberately relaxes the no-shadow-maps
+// rule — real-time sun/moon shadows, PMREM environment lighting,
+// and a bloom post chain — to probe how far the scene can go toward
+// a modern AAA look. Everything else still holds: capped pixel
+// ratio, modest particle counts, and the render loop stops entirely
+// while the page is hidden. See docs/AAA_EXPERIMENT.md.
 //
 // The creature director prefers a clip whose name contains "walk" for
 // travel whenever a creature's GLB provides one. The GAB P4 animation
@@ -22,6 +27,10 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 /* ---------------------------------------------------------- utilities */
 
@@ -202,6 +211,8 @@ try {
   throw e;
 }
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.3;
@@ -239,6 +250,59 @@ scene.add(hemiLight);
 const skyLight = new THREE.DirectionalLight(0x8fa3cc, 0.75);
 skyLight.position.set(-18, 26, -12);
 scene.add(skyLight);
+// AAA experiment: the sky light casts the scene's one real shadow
+// map (sun by day, moon by night — it already follows whichever
+// dominates). The ortho box covers the clearing and mid-field;
+// the far treeline falls outside and stays unshadowed.
+skyLight.castShadow = true;
+skyLight.shadow.mapSize.set(2048, 2048);
+skyLight.shadow.camera.left = -42;
+skyLight.shadow.camera.right = 42;
+skyLight.shadow.camera.top = 42;
+skyLight.shadow.camera.bottom = -42;
+skyLight.shadow.camera.near = 5;
+skyLight.shadow.camera.far = 150;
+skyLight.shadow.bias = -0.0003;
+skyLight.shadow.normalBias = 0.05;
+scene.add(skyLight.target);
+
+// AAA experiment: image-based lighting. A PMREM environment is
+// generated from a miniature of the sky dome (the same gradient
+// uniforms, shared by reference so the colours always match) plus
+// a dark ground disc, and regenerated only when the sun's
+// elevation bucket changes — a few times an hour of page time.
+const pmrem = new THREE.PMREMGenerator(renderer);
+let envRT = null, lastEnvBucket = null;
+function refreshEnvironment() {
+  const envScene = new THREE.Scene();
+  const envSky = new THREE.Mesh(
+    new THREE.SphereGeometry(50, 32, 16),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false,
+      uniforms: {
+        top: skyUniforms.top, mid: skyUniforms.mid,
+        horizon: skyUniforms.horizon,
+      },
+      vertexShader: `varying vec3 vP; void main(){ vP = position;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: `varying vec3 vP; uniform vec3 top; uniform vec3 mid; uniform vec3 horizon;
+        void main(){ float h = normalize(vP).y;
+          vec3 c = h > 0.22 ? mix(mid, top, smoothstep(0.22, 0.8, h))
+                            : mix(horizon, mid, smoothstep(-0.03, 0.22, h));
+          gl_FragColor = vec4(c, 1.0); }`,
+    }));
+  envScene.add(envSky);
+  const envGround = new THREE.Mesh(
+    new THREE.CircleGeometry(48, 24),
+    new THREE.MeshBasicMaterial({ color: 0x2e4724 }));
+  envGround.rotation.x = -Math.PI / 2;
+  envGround.position.y = -2;
+  envScene.add(envGround);
+  const next = pmrem.fromScene(envScene, 0.04);
+  if (envRT) envRT.dispose();
+  envRT = next;
+  scene.environment = envRT.texture;
+}
 // The fire light is created with the campfire and flickers per-frame.
 
 // Time-of-day balances read by the fire and the dressing updaters:
@@ -434,14 +498,34 @@ function updateSky(nowMs) {
   };
 
   const P = paletteAt(sunEl);
-  skyUniforms.top.value.copy(P.top);
-  skyUniforms.mid.value.copy(P.mid);
-  skyUniforms.horizon.value.copy(P.hor);
+  // AAA experiment: the sky dome is a ShaderMaterial, which the
+  // direct renderer used to emit raw; through the composer the
+  // OutputPass sRGB-encodes it, washing the tuned palette pale.
+  // Converting the colours as-if-sRGB -> linear pre-compensates,
+  // landing the dome back on its tuned values (ACES still applies
+  // on top, a small residual shift accepted for stage 1).
+  skyUniforms.top.value.copy(P.top).convertSRGBToLinear();
+  skyUniforms.mid.value.copy(P.mid).convertSRGBToLinear();
+  skyUniforms.horizon.value.copy(P.hor).convertSRGBToLinear();
   scene.fog.color.copy(P.fog);
   scene.fog.density = P.fogDen;
   hemiLight.color.copy(P.hs);
   hemiLight.groundColor.copy(P.hg);
   hemiLight.intensity = P.hi;
+
+  // AAA experiment: refresh the PMREM environment only when the
+  // sun crosses a 3-degree bucket (a few times an hour), and keep
+  // its contribution modest so the stylized palette stays in charge.
+  const envBucket = Math.round(sunEl / 3);
+  if (envBucket !== lastEnvBucket) {
+    lastEnvBucket = envBucket;
+    refreshEnvironment();
+  }
+  scene.environmentIntensity = 0.15;
+  // The IBL ambient stacks on the hemisphere light; trim the
+  // hemisphere so the pair lands near the bookmark build's
+  // ambient level instead of washing the field flat.
+  hemiLight.intensity *= 0.8;
 
   // Sun disc + halo.
   const sunVis = THREE.MathUtils.clamp((sunEl + 2.5) / 5, 0, 1);
@@ -805,6 +889,7 @@ function updateDressing(t, dt) {
     const tuftGeo = mergeGeometries(blades);
     const grass = instanced(tuftGeo,
       new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), 1250);
+    grass.name = 'grassTufts';   // receives shadows; does not cast
     const gA = new THREE.Color(0x39512a), gB = new THREE.Color(0x5a7a3c);
     let placed = 0, guard = 0;
     while (placed < 1250 && guard++ < 11000) {
@@ -1486,6 +1571,9 @@ function loadTemplate(cfg) {
 function placeChest() {
   loader.load('assets/treasure-chest.glb', (gltf) => {
     sharpenTextures(gltf.scene);
+    gltf.scene.traverse((o) => {
+      if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
+    });
     const box = new THREE.Box3().setFromObject(gltf.scene);
     const size = box.getSize(new THREE.Vector3());
     gltf.scene.scale.setScalar(0.72 / (size.y || 1));
@@ -1524,11 +1612,16 @@ class Creature {
 
     this.group = new THREE.Group();          // ground position + yaw
     this.model = SkeletonUtils.clone(tpl.holder);
+    // AAA experiment: creatures cast and receive real shadows; the
+    // painted blob stays only as a faint contact grounding (0.22).
+    this.model.traverse((o) => {
+      if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
+    });
     this.group.add(this.model);
     const shadow = new THREE.Mesh(
       new THREE.PlaneGeometry(1, 1),
       new THREE.MeshBasicMaterial({
-        map: blobTex, transparent: true, depthWrite: false, opacity: 0.55 }));
+        map: blobTex, transparent: true, depthWrite: false, opacity: 0.22 }));
     shadow.rotation.x = -Math.PI / 2;
     shadow.position.y = 0.02;
     shadow.scale.setScalar(this.cfg.height * 1.5);
@@ -1641,7 +1734,7 @@ class Creature {
         pos.x += Math.sin(heading) * speed * dt;
         pos.z += Math.cos(heading) * speed * dt;
         pos.y = groundH(pos.x, pos.z) + bob;
-        this.shadow.material.opacity = 0.55 - bob * 0.7;
+        this.shadow.material.opacity = 0.22 - bob * 0.28;
       }
     } else { // dwell
       pos.y = groundH(pos.x, pos.z);
@@ -1736,7 +1829,7 @@ function tick() {
     CAM_BASE.z);
   camera.lookAt(CAM_LOOK);
 
-  renderer.render(scene, camera);
+  composer.render();
   if (firstFrame) {
     firstFrame = false;
     loadingEl.classList.add('done');
@@ -1773,6 +1866,7 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
 });
 
 /* ------------------------------------------- verification harness */
@@ -1794,11 +1888,45 @@ if (PAGE_PARAMS.has('harness')) {
     updateSky(FROZEN_TIME ?? Date.now());
     camera.position.copy(CAM_BASE);
     camera.lookAt(CAM_LOOK);
-    renderer.render(scene, camera);
+    composer.render();
     publishStatus();
     return window.__campfireStatus;
   };
 }
+
+/* ------------------------------------- AAA experiment: shadows */
+
+// One policy pass over the static scene: every lit mesh casts and
+// receives. Unlit materials (sky shader, sun/moon discs, halos,
+// glow planes, blob shadows) are skipped; grass receives but does
+// not cast (1,250 tufts of shadow acne help no one). Creatures and
+// the chest opt in at load time instead.
+scene.traverse((o) => {
+  if (!o.isMesh) return;
+  const m = o.material;
+  if (m && (m.isMeshBasicMaterial || m.isShaderMaterial)) return;
+  o.receiveShadow = true;
+  o.castShadow = o.name !== 'grassTufts';
+});
+
+/* ---------------------------------- AAA experiment: post chain */
+
+// HDR composer: scene -> bloom (the 0.85 threshold keeps it to the
+// fire, the glow mushrooms, and the sky discs) -> OutputPass (tone
+// mapping and sRGB live there when a composer is in use). The
+// HalfFloat target with 4x MSAA keeps edges clean without the
+// renderer's own antialias, which the composer bypasses.
+const composer = new EffectComposer(renderer,
+  new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight,
+    { type: THREE.HalfFloatType, samples: 4 }));
+composer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+composer.setSize(window.innerWidth, window.innerHeight);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  0.3, 0.55, 0.9);
+composer.addPass(bloomPass);
+composer.addPass(new OutputPass());
 
 /* -------------------------------------------------------------- boot */
 
