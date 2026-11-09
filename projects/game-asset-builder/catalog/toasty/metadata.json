@@ -1,0 +1,189 @@
+{
+ "entry_version": 1,
+ "name": "Toasty",
+ "slug": "toasty",
+ "source_concept": "media-generation-toasty-reference-0-c499c12f-7eba-4d9a-ace4-3387d2c29fd3.webp",
+ "asset_file": "toasty.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "62289b927b6c161b968726fb8455987de5ca397a3947f812f93de719c59d043e",
+ "bytes": 21960832,
+ "counts": {
+  "verts": 50794,
+  "faces": 99640,
+  "raw_mesh_verts": 762980,
+  "raw_mesh_faces": 997532
+ },
+ "bones": [
+  "root",
+  "spine",
+  "head",
+  "arm.L",
+  "arm2.L",
+  "arm.R",
+  "arm2.R",
+  "leg.L",
+  "leg2.L",
+  "leg.R",
+  "leg2.R"
+ ],
+ "actions": [
+  "bounce",
+  "idle",
+  "run",
+  "walk"
+ ],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": true,
+  "rig_template": "biped",
+  "signature_clip": "bounce",
+  "weight_method": "bone-heat (automatic weights); geodesic distance veto (factor 0.85, floor 0.19); label-aware veto (P3-SAM parts, 55536 entries vetoed by label); distance rescue on 3559 verts",
+  "segmentation": {
+   "model": "P3-SAM (Tencent Hunyuan3D-Part)",
+   "parts": 7,
+   "proxy_faces": 53085,
+   "islands_relabelled": 21,
+   "separated_verts_added": 1060,
+   "labelled_verts": 50794
+  },
+  "label_map": {
+   "0": {
+    "dominant": "arm.L",
+    "allowed": [
+     "arm.L",
+     "arm2.L",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.R",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "1": {
+    "dominant": "arm.R",
+    "allowed": [
+     "arm.R",
+     "arm2.R",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "2": {
+    "dominant": "leg2.R",
+    "allowed": [
+     "head",
+     "leg.R",
+     "leg2.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R",
+     "leg2.L"
+    ]
+   },
+   "3": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "4": {
+    "dominant": "leg2.L",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg2.L",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R",
+     "leg2.R"
+    ]
+   },
+   "5": {
+    "dominant": "leg2.R",
+    "allowed": [
+     "head",
+     "leg.R",
+     "leg2.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R",
+     "leg2.L"
+    ]
+   },
+   "6": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R",
+     "leg2.L",
+     "leg2.R"
+    ]
+   }
+  },
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ },
+ "clips": {
+  "bounce": {
+   "frames": 30,
+   "fps": 24,
+   "seconds": 1.25
+  },
+  "idle": {
+   "frames": 115,
+   "fps": 24,
+   "seconds": 4.79
+  },
+  "run": {
+   "frames": 24,
+   "fps": 24,
+   "seconds": 1.0
+  },
+  "walk": {
+   "frames": 36,
+   "fps": 24,
+   "seconds": 1.5
+  }
+ }
+}
