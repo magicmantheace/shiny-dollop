@@ -154,3 +154,34 @@ against a richer frame. Remaining stylization, honestly: the
 low-poly geometry itself, and the flat ridge backdrops (the
 bright snow band is the most graphic element left). Closing
 those would mean new backdrop art, not more tuning.
+
+## Stage 4 — art redo (owner: "Redo the art", 2026-11-09)
+
+- **Painted textures.** A seeded dab-painting generator
+  (1,100+ soft ellipses per canvas, 3×3 wrap so they tile)
+  produced per-family maps: needle greens for foliage, rock
+  greys, streaked bark browns, and a pale rock for the ridges.
+  They replace stage 3's neutral grain on pines, bushes, oak
+  leaves, rocks, trunks, logs, and fire stones; material
+  colours went near-white so the painting carries the hue.
+- **Organic silhouettes.** Pine tiers are radially jittered
+  by a smooth angular wave and their shade is a continuous
+  height gradient (the hard per-tier bands are gone); rocks
+  and bushes are displaced ±10–13% by a position hash, so no
+  two read as stamped from the same mould.
+- **Ridges rebuilt.** The flat cards became five-row slopes
+  leaning toward the viewer, textured with the pale rock,
+  with a smooth-blended snowline instead of the hard switch.
+  First cut made them lit standard materials — and the
+  sunset alpenglow died to black, because the glow was the
+  palette tint acting on an unlit surface. Final call: unlit
+  textured geometry (geometry + texture were the win; the
+  tint system keeps the day/night life). Hills got the same
+  texture on their unlit domes.
+- Verified in `aaa5-morning2` / `aaa5-sunset2` (zero console
+  errors): snowy textured ranges with soft snow, glowing at
+  dusk again; near pines rich and painted; lumpy bushes.
+  Remaining tells, honestly: the mid-distance treeline still
+  reads pale through the haze (near trees carry the detail),
+  and up close the geometry is still stylized low-poly —
+  that is the scene's skeleton, not its skin.

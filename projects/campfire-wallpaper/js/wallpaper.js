@@ -75,26 +75,62 @@ function groundH(x, z) {
 // over a ~1.2-tall trunk.
 function makePineFoliageGeo() {
   const tiers = [
-    // [radius, height, centreY, shade]
-    [1.04, 1.50, 1.55, 0.42],
-    [0.87, 1.40, 2.25, 0.55],
-    [0.70, 1.30, 2.90, 0.68],
-    [0.52, 1.20, 3.50, 0.82],
-    [0.33, 1.15, 4.08, 1.00],
+    // [radius, height, centreY]
+    [1.04, 1.50, 1.55],
+    [0.87, 1.40, 2.25],
+    [0.70, 1.30, 2.90],
+    [0.52, 1.20, 3.50],
+    [0.33, 1.15, 4.08],
   ];
-  const parts = tiers.map(([r, h, cy, shade], k) => {
+  const parts = tiers.map(([r, h, cy], k) => {
     const g = new THREE.ConeGeometry(r, h, 14);
     g.rotateY(k * 0.38);
     g.translate(0, cy, 0);
-    const n = g.getAttribute('position').count;
+    // AAA experiment stage 4: break the perfect cones. Each
+    // vertex is pushed radially by a smooth angular wave (an
+    // integer frequency, so the seam stays closed) and the
+    // shade is now a continuous height gradient with a whisper
+    // of per-vertex variation — the hard per-tier bands were a
+    // cartoon tell.
+    const p = g.getAttribute('position');
+    const n = p.count;
     const col = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+      const ang = Math.atan2(z, x);
+      const jr = 1 + 0.085 * Math.sin(ang * 3 + cy * 2 + k * 1.7) *
+                     Math.sin(y * 4.2 + k * 3.1);
+      p.setX(i, x * jr);
+      p.setZ(i, z * jr);
+      p.setY(i, y + 0.03 * Math.sin(ang * 5 + k * 2.3));
+      const shade = THREE.MathUtils.clamp(
+        0.45 + 0.55 * (y - 0.8) / 3.9 +
+        0.05 * Math.sin(ang * 7 + y * 6 + k), 0.3, 1.05);
       col[i * 3] = shade; col[i * 3 + 1] = shade; col[i * 3 + 2] = shade;
     }
     g.setAttribute('color', new THREE.BufferAttribute(col, 3));
     return g;
   });
   return mergeGeometries(parts);
+}
+
+// AAA experiment stage 4: organic silhouettes for the primitive
+// rocks and bushes — vertices pushed along their own direction
+// by a position hash, so no two look stamped from the same
+// mould. The polyhedron geometries' smooth sphere-projected
+// normals are kept (recomputing would facet them); ±10%
+// displacement does not stale them visibly.
+function displaceGeo(geo, amt, freq) {
+  const p = geo.attributes.position, v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    const n = Math.sin(v.x * freq * 3.1 + v.y * freq * 1.7) *
+              Math.sin(v.y * freq * 2.3 + v.z * freq * 2.9) *
+              Math.sin(v.z * freq * 3.7 + v.x * freq * 1.3);
+    v.multiplyScalar(1 + amt * n);
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  return geo;
 }
 
 function radialSpriteTexture(inner, outer) {
@@ -755,6 +791,51 @@ function makeDetailTexture() {
 }
 const detailTex = makeDetailTexture();
 
+// AAA experiment stage 4 (art redo): painted textures. The
+// creatures are painted models; stage 3's neutral grain only
+// went halfway. These canvases are dabbed like paint — over a
+// thousand soft overlapping ellipses in a small tone family,
+// drawn with the 3x3 wrap trick so they still tile, from a
+// fixed seed so the art is reproducible — and each material
+// family gets its own: needle greens, rock greys, bark browns,
+// and a pale rock for the far ridges (whose vertex colours were
+// tuned as near-final colours, so their map must stay light).
+function makePaintedTexture(tones, { size = 512, dabs = 1100, streak = 0 } = {}) {
+  const cv = document.createElement('canvas'); cv.width = cv.height = size;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = tones[0]; ctx.fillRect(0, 0, size, size);
+  let seed = 1234567;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  for (let i = 0; i < dabs; i++) {
+    const tone = tones[1 + Math.floor(rnd() * (tones.length - 1))];
+    const x = rnd() * size, y = rnd() * size;
+    const rx = 4 + rnd() * 16;
+    const ry = streak ? rx * (0.25 + rnd() * 0.3) : 3 + rnd() * 10;
+    const rot = streak ? (rnd() - 0.5) * 0.5 : rnd() * Math.PI;
+    ctx.fillStyle = tone;
+    ctx.globalAlpha = 0.16 + rnd() * 0.22;
+    for (const ox of [-size, 0, size]) for (const oy of [-size, 0, size]) {
+      ctx.beginPath();
+      ctx.ellipse(x + ox, y + oy, rx, ry, rot, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+  const tex = new THREE.CanvasTexture(cv);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return tex;
+}
+const foliageTex = makePaintedTexture(
+  ['#263d20', '#1d3319', '#2c4a24', '#3a5c2e', '#4a7038', '#5d7a36']);
+const rockTex = makePaintedTexture(
+  ['#5a5e64', '#494c52', '#686c72', '#787d84', '#6e675c']);
+const barkTex = makePaintedTexture(
+  ['#3a2a1a', '#2c1e12', '#4c3822', '#5d4630', '#6b543a'], { streak: 1 });
+const ridgeTex = makePaintedTexture(
+  ['#cfd2d6', '#bcc0c5', '#dde0e3', '#c3c9cd', '#d5d2c8']);
+
 {
   const geo = new THREE.PlaneGeometry(170, 170, 170, 170);
   geo.rotateX(-Math.PI / 2);
@@ -786,14 +867,14 @@ const detailTex = makeDetailTexture();
 // geometries/materials, seeded placement, clearing kept free.
 {
   const trunkGeo = new THREE.CylinderGeometry(0.09, 0.14, 1.1, 8);
-  const rockGeo = new THREE.DodecahedronGeometry(1, 1);
-  const bushGeo = new THREE.IcosahedronGeometry(1, 2);
-  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 1, map: detailTex });
+  const rockGeo = displaceGeo(new THREE.DodecahedronGeometry(1, 1), 0.10, 1.4);
+  const bushGeo = displaceGeo(new THREE.IcosahedronGeometry(1, 2), 0.13, 1.1);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0xf5efe8, roughness: 1, map: barkTex });
   const pineMat = new THREE.MeshStandardMaterial({
-    color: 0x2f5233, roughness: 1, vertexColors: true, map: detailTex });
+    color: 0xe6ebdd, roughness: 1, vertexColors: true, map: foliageTex });
   const pineFoliageGeo = makePineFoliageGeo();
-  const rockMat = new THREE.MeshStandardMaterial({ color: 0x5d6068, roughness: 0.95, map: detailTex });
-  const bushMat = new THREE.MeshStandardMaterial({ color: 0x243d22, roughness: 1, map: detailTex });
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.95, map: rockTex });
+  const bushMat = new THREE.MeshStandardMaterial({ color: 0xd8dcc8, roughness: 1, map: foliageTex });
 
   function scatterPos(minR, maxR) {
     const a = layoutRand() * Math.PI * 2;
@@ -932,7 +1013,7 @@ function updateDressing(t, dt) {
       new THREE.MeshStandardMaterial({ color: 0x33261a, roughness: 1 }), 245);
     const fols = instanced(folGeo,
       new THREE.MeshStandardMaterial({
-        color: 0x2f5233, roughness: 1, vertexColors: true, map: detailTex }), 245);
+        color: 0xe6ebdd, roughness: 1, vertexColors: true, map: foliageTex }), 245);
     let i = 0;
     for (; i < 160; i++) {                 // the distant ring
       const a = layoutRand() * Math.PI * 2;
@@ -971,8 +1052,8 @@ function updateDressing(t, dt) {
 
   /* Two nearer feature trees + a dead snag, hand-placed. */
   {
-    const barkMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 1 });
-    const leafMat = new THREE.MeshStandardMaterial({ color: 0x22391f, roughness: 1, map: detailTex });
+    const barkMat = new THREE.MeshStandardMaterial({ color: 0xf5efe8, roughness: 1, map: barkTex });
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0xd8dcc8, roughness: 1, map: foliageTex });
     // Broad oak, left mid-field.
     const oak = new THREE.Group();
     const otrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.46, 2.3, 10), barkMat);
@@ -996,7 +1077,7 @@ function updateDressing(t, dt) {
     pine.add(ptrunk);
     const pfol = new THREE.Mesh(makePineFoliageGeo(),
       new THREE.MeshStandardMaterial({
-        color: 0x2f5233, roughness: 1, vertexColors: true, map: detailTex }));
+        color: 0xe6ebdd, roughness: 1, vertexColors: true, map: foliageTex }));
     pfol.scale.setScalar(1.25);
     pfol.position.y = 1.15;
     pine.add(pfol);
@@ -1113,7 +1194,7 @@ function updateDressing(t, dt) {
      berry mesh shared across all seven). */
   {
     const bushGeo2 = new THREE.IcosahedronGeometry(1, 2);
-    const bushMat2 = new THREE.MeshStandardMaterial({ color: 0x27401f, roughness: 1, map: detailTex });
+    const bushMat2 = new THREE.MeshStandardMaterial({ color: 0xd8dcc8, roughness: 1, map: foliageTex });
     const berrySpots = [];
     for (let i = 0; i < 10; i++) {
       const a = layoutRand() * Math.PI * 2;
@@ -1244,7 +1325,7 @@ function updateDressing(t, dt) {
      three stump seats behind, a woodpile + chopping block to the
      right. All outside the spot ring (r 2.75) and off the path. */
   {
-    const barkMat = new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 1 });
+    const barkMat = new THREE.MeshStandardMaterial({ color: 0xf5efe8, roughness: 1, map: barkTex });
     const endMat = new THREE.MeshStandardMaterial({ color: 0xa9834f, roughness: 0.9 });
     const logMats = [barkMat, endMat, endMat];
     function bench(a, r) {
@@ -1295,7 +1376,7 @@ function updateDressing(t, dt) {
      follows the sky palette (registered as a sky follower) so they
      silhouette at dusk and haze blue-grey by day. */
   {
-    const hillMat = new THREE.MeshBasicMaterial({ color: 0x0c1428, fog: false });
+    const hillMat = new THREE.MeshBasicMaterial({ map: ridgeTex, fog: false });
     skyFollowers.push((P) => {
       hillMat.color.copy(P.hor).lerp(P.mid, 0.75).multiplyScalar(0.34);
     });
@@ -1342,34 +1423,60 @@ function updateDressing(t, dt) {
       y *= 1 - 0.78 * notch;
       return baseY + (Math.min(y, 1.25) / 1.25) * (peakY - baseY);
     };
-    const pos = [], col = [], idx = [];
+    const pos = [], col = [], uv = [], idx = [];
     const cBase = new THREE.Color(cols[0]), cMid = new THREE.Color(cols[1]),
-          cTop = new THREE.Color(cols[2]), cSnow = new THREE.Color(0xeef2fa),
+          cTop = new THREE.Color(cols[2]), cSnow = new THREE.Color(0xe9eae2),
           cc = new THREE.Color();
+    // AAA experiment stage 4: the ridges stop being flat cards.
+    // Five rows per column lean the face toward the viewer like
+    // a real slope, the material is lit and textured (the pale
+    // ridge rock), and the snowline is a soft blend instead of
+    // a hard vertex-colour switch. (The snow jitter is pure sin
+    // now, not layoutRand — downstream scatter lands in new
+    // spots, same in kind.)
+    const rowsT = [0, 0.22, 0.45, 0.7, 1];
     for (let i = 0; i <= steps; i++) {
       const th = -span + (2 * span * i) / steps;
       const x = Math.sin(th) * R, z = Math.cos(th) * R;
       const y = prof(th);
-      const h01 = THREE.MathUtils.clamp((y - baseY) / (peakY - baseY), 0, 1);
-      cc.copy(cBase).lerp(cMid, Math.min(h01 * 1.6, 1))
-        .lerp(cTop, Math.max(0, h01 * 1.4 - 0.4));
-      if (snowline !== null &&
-          h01 > snowline + 0.07 * Math.sin(th * 34) + layoutRand() * 0.05) {
-        cc.copy(cSnow);
+      const snowEdge = snowline === null ? 2 :
+        snowline + 0.07 * Math.sin(th * 34) + 0.04 * Math.sin(th * 91 + R);
+      for (let r = 0; r < rowsT.length; r++) {
+        const t = rowsT[r];
+        const ry = y + t * (-8 - y);
+        const rz = z - t * R * 0.10;
+        const h01 = THREE.MathUtils.clamp((ry - baseY) / (peakY - baseY), 0, 1);
+        cc.copy(cBase).lerp(cMid, Math.min(h01 * 1.6, 1))
+          .lerp(cTop, Math.max(0, h01 * 1.4 - 0.4));
+        if (snowline !== null) {
+          cc.lerp(cSnow, THREE.MathUtils.smoothstep(h01, snowEdge - 0.05, snowEdge + 0.06));
+        }
+        if (r === rowsT.length - 1) cc.multiplyScalar(0.75);
+        pos.push(x, ry, rz); col.push(cc.r, cc.g, cc.b);
+        uv.push(i / steps * 30, t * 3);
       }
-      pos.push(x, y, z); col.push(cc.r, cc.g, cc.b);
-      pos.push(x, -8, z); col.push(cc.r * 0.75, cc.g * 0.75, cc.b * 0.75);
       if (i < steps) {
-        const b = i * 2;
-        idx.push(b, b + 1, b + 2, b + 1, b + 3, b + 2);
+        for (let r = 0; r < rowsT.length - 1; r++) {
+          const a = i * rowsT.length + r, b = a + 1, c = a + rowsT.length, d = b + rowsT.length;
+          idx.push(a, b, c, b, d, c);
+        }
       }
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
     g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(col), 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uv), 2));
     g.setIndex(idx);
+    g.computeVertexNormals();
+    // Unlit on purpose: the ridges are backdrop, and their
+    // day/night life (alpenglow at dusk, blue distance at noon)
+    // comes from the palette tint, not from scene light. Stage
+    // 4's first cut made them lit standard materials and the
+    // sunset alpenglow died to black — the win was the geometry
+    // and texture, not the lighting, so the lighting went back.
     const mat = new THREE.MeshBasicMaterial({
-      vertexColors: true, fog: false, side: THREE.DoubleSide,
+      vertexColors: true, map: ridgeTex, fog: false,
+      side: THREE.DoubleSide,
     });
     skyFollowers.push((P) => tintFn(mat, P));
     const mesh = new THREE.Mesh(g, mat);
@@ -1443,7 +1550,7 @@ function updateDressing(t, dt) {
 
   /* Two fallen logs resting at the clearing edge (density pass). */
   {
-    const barkMat = new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 1 });
+    const barkMat = new THREE.MeshStandardMaterial({ color: 0xf5efe8, roughness: 1, map: barkTex });
     const endMat = new THREE.MeshStandardMaterial({ color: 0xa9834f, roughness: 0.9 });
     const logMats = [barkMat, endMat, endMat];
     function fallenLog(x, z, rotY, len) {
@@ -1544,7 +1651,7 @@ function resetParticle(sys, p, randomAge) {
   // Stone ring: sixteen individual rocks around the pit, varied
   // in size, shape, tilt and shade (instanced; density pass).
   const stoneGeo = new THREE.DodecahedronGeometry(0.17, 1);
-  const stoneMat = new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true, map: detailTex });
+  const stoneMat = new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true, map: rockTex });
   const stones = new THREE.InstancedMesh(stoneGeo, stoneMat, 16);
   stones.frustumCulled = false;
   {
@@ -1567,7 +1674,7 @@ function resetParticle(sys, p, randomAge) {
   fire.add(stones);
   // Log pile: a low teepee of cylinders plus two crossed logs.
   const logGeo = new THREE.CylinderGeometry(0.075, 0.09, 1.15, 10);
-  const logMat = new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 1, map: detailTex });
+  const logMat = new THREE.MeshStandardMaterial({ color: 0xf5efe8, roughness: 1, map: barkTex });
   for (let i = 0; i < 5; i++) {
     const a = (i / 5) * Math.PI * 2;
     const log = new THREE.Mesh(logGeo, logMat);
