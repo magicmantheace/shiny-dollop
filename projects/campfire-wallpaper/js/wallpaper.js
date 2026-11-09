@@ -21,6 +21,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 /* ---------------------------------------------------------- utilities */
 
@@ -67,6 +68,93 @@ function radialSpriteTexture(inner, outer) {
   return tex;
 }
 
+/* ------------------------------------------- celestial (real clock) */
+
+// The sky follows the real sun and moon for the owner's location,
+// computed locally from the system clock with the standard
+// NOAA/SunCalc-style solar math and the matching lunar
+// approximation — no network, no libraries. Behaviour is driven by
+// elevation/azimuth every frame; sunrise, sunset, moonrise and
+// moonset fall out of the curves rather than being special-cased.
+const HOME = { lat: 49.6942, lon: -112.8456 };   // Lethbridge, Alberta
+const PAGE_PARAMS = new URLSearchParams(location.search);
+// Verification seam: &time=<epoch ms | ISO string> freezes the
+// celestial computation at that instant. Lively never passes it.
+const _tp = PAGE_PARAMS.get('time');
+const _frozenMs = _tp == null || _tp.trim() === '' ? NaN
+  : (Number.isFinite(+_tp) ? +_tp : Date.parse(_tp));
+const FROZEN_TIME = Number.isFinite(_frozenMs) ? _frozenMs : null;
+
+const RAD = Math.PI / 180;
+const DAY_MS = 86400000, J1970 = 2440588, J2000 = 2451545;
+const OBL = RAD * 23.4397;                       // ecliptic obliquity
+
+function toDays(date) { return date.valueOf() / DAY_MS - 0.5 + J1970 - J2000; }
+function siderealTime(d, lw) { return RAD * (280.16 + 360.9856235 * d) - lw; }
+
+function sunCoords(d) {
+  const M = RAD * (357.5291 + 0.98560028 * d);                  // mean anomaly
+  const L = M + RAD * (1.9148 * Math.sin(M) + 0.02 * Math.sin(2 * M) +
+                       0.0003 * Math.sin(3 * M)) + RAD * 102.9372 + Math.PI;
+  return {
+    dec: Math.asin(Math.sin(L) * Math.sin(OBL)),
+    ra: Math.atan2(Math.sin(L) * Math.cos(OBL), Math.cos(L)),
+  };
+}
+function moonCoords(d) {
+  const L = RAD * (218.316 + 13.176396 * d);                    // mean longitude
+  const M = RAD * (134.963 + 13.064993 * d);                    // mean anomaly
+  const F = RAD * (93.272 + 13.229350 * d);                     // mean distance
+  const lon = L + RAD * 6.289 * Math.sin(M);                    // ecliptic longitude
+  const lat = RAD * 5.128 * Math.sin(F);                        // ecliptic latitude
+  return {
+    ra: Math.atan2(Math.sin(lon) * Math.cos(OBL) - Math.tan(lat) * Math.sin(OBL),
+                   Math.cos(lon)),
+    dec: Math.asin(Math.sin(lat) * Math.cos(OBL) +
+                   Math.cos(lat) * Math.sin(OBL) * Math.sin(lon)),
+    dist: 385001 - 20905 * Math.cos(M),                         // km
+  };
+}
+// Compass azimuth (radians, 0 = north) and elevation for a body
+// with equatorial coordinates {ra, dec} at the given instant.
+function bodyPosition(date, coords) {
+  const lw = RAD * -HOME.lon, phi = RAD * HOME.lat;
+  const H = siderealTime(toDays(date), lw) - coords.ra;
+  return {
+    az: Math.atan2(Math.sin(H),
+      Math.cos(H) * Math.sin(phi) - Math.tan(coords.dec) * Math.cos(phi)) + Math.PI,
+    el: Math.asin(Math.sin(phi) * Math.sin(coords.dec) +
+                  Math.cos(phi) * Math.cos(coords.dec) * Math.cos(H)),
+    hourAngle: H,
+  };
+}
+function sunPosition(date) { return bodyPosition(date, sunCoords(toDays(date))); }
+function moonPosition(date) { return bodyPosition(date, moonCoords(toDays(date))); }
+
+function moonIllumination(date) {
+  const d = toDays(date);
+  const s = sunCoords(d), m = moonCoords(d);
+  const sdist = 149598000;                                      // Earth–Sun, km
+  const phi = Math.acos(Math.sin(s.dec) * Math.sin(m.dec) +
+    Math.cos(s.dec) * Math.cos(m.dec) * Math.cos(s.ra - m.ra));
+  const inc = Math.atan2(sdist * Math.sin(phi), m.dist - sdist * Math.cos(phi));
+  const angle = Math.atan2(
+    Math.cos(s.dec) * Math.sin(s.ra - m.ra),
+    Math.sin(s.dec) * Math.cos(m.dec) - Math.cos(s.dec) * Math.sin(m.dec) * Math.cos(s.ra - m.ra));
+  return {
+    fraction: (1 + Math.cos(inc)) / 2,
+    phase: 0.5 + 0.5 * inc * (angle < 0 ? -1 : 1) / Math.PI,
+    angle,                                                      // bright-limb position angle
+  };
+}
+
+// Scene direction for a compass azimuth + elevation: north is -z
+// (into the screen), east is +x.
+function azElToVec(az, el, r, out) {
+  const ce = Math.cos(el);
+  return out.set(r * ce * Math.sin(az), r * Math.sin(el), -r * ce * Math.cos(az));
+}
+
 /* ------------------------------------------------------------- setup */
 
 const statusEl = document.getElementById('status');
@@ -97,13 +185,37 @@ camera.position.copy(CAM_BASE);
 
 /* ---------------------------------------------------------- lighting */
 
-scene.add(new THREE.HemisphereLight(0x2c3a5e, 0x191008, 1.15));
-const moonLight = new THREE.DirectionalLight(0x8fa3cc, 0.75);
-moonLight.position.set(-18, 26, -12);
-scene.add(moonLight);
+// Both lights are steered every frame by updateSky(): the hemisphere
+// follows the sky palette, and the directional follows whichever of
+// the sun / moon is contributing (warm low sun, white day sun, cool
+// dim moonlight). Initial values are the dusk set.
+const hemiLight = new THREE.HemisphereLight(0x2c3a5e, 0x191008, 1.15);
+scene.add(hemiLight);
+const skyLight = new THREE.DirectionalLight(0x8fa3cc, 0.75);
+skyLight.position.set(-18, 26, -12);
+scene.add(skyLight);
 // The fire light is created with the campfire and flickers per-frame.
 
+// Time-of-day balances read by the fire and the dressing updaters:
+// fireScale shrinks the fire's presence in daylight; nightFactor
+// gates fireflies and the mushroom glow.
+let fireScale = 1, nightFactor = 1;
+let skyState = { sunEl: -20, sunAz: 0, moonEl: -20, moonAz: 0, moonFrac: 0 };
+// Scene elements created later (e.g. the horizon hills) register a
+// callback here to be tinted by the sky palette each frame.
+const skyFollowers = [];
+
 /* --------------------------------------------------------------- sky */
+
+let skyUniforms, starMat;
+let sunDisc, sunHaloMat, moonDisc, moonMat, moonHaloMat;
+const moonCanvas = document.createElement('canvas');
+moonCanvas.width = moonCanvas.height = 256;
+const moonCtx = moonCanvas.getContext('2d');
+const moonTex = new THREE.CanvasTexture(moonCanvas);
+moonTex.colorSpace = THREE.SRGBColorSpace;
+moonTex.center.set(0.5, 0.5);
+let moonTexHour = -1;
 
 {
   const skyMat = new THREE.ShaderMaterial({
@@ -121,6 +233,7 @@ scene.add(moonLight);
                           : mix(horizon, mid, smoothstep(-0.03, 0.22, h));
         gl_FragColor = vec4(c, 1.0); }`,
   });
+  skyUniforms = skyMat.uniforms;
   scene.add(new THREE.Mesh(new THREE.SphereGeometry(230, 24, 16), skyMat));
 
   // Stars.
@@ -140,28 +253,225 @@ scene.add(moonLight);
   }
   starGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   starGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
+  starMat = new THREE.PointsMaterial({
     size: 1.5, sizeAttenuation: false, vertexColors: true, fog: false,
     transparent: true, opacity: 0.9, depthWrite: false,
-  }));
-  scene.add(stars);
+  });
+  scene.add(new THREE.Points(starGeo, starMat));
 
-  // Moon: a pale disc with a soft halo.
-  const moon = new THREE.Mesh(
-    new THREE.CircleGeometry(7, 32),
-    new THREE.MeshBasicMaterial({ color: 0xdfe8f5, fog: false }));
-  moon.position.set(-40, 42, -125);
-  moon.lookAt(0, 4, 0);
-  scene.add(moon);
-  const halo = new THREE.Mesh(
-    new THREE.PlaneGeometry(46, 46),
-    new THREE.MeshBasicMaterial({
-      map: radialSpriteTexture('rgba(190,205,240,0.55)', 'rgba(190,205,240,0)'),
-      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
-    }));
-  halo.position.copy(moon.position);
-  halo.lookAt(0, 4, 0);
-  scene.add(halo);
+  // Sun: warm disc + halo, positioned by updateSky().
+  sunDisc = new THREE.Mesh(
+    new THREE.CircleGeometry(5, 32),
+    new THREE.MeshBasicMaterial({ color: 0xffdf9e, fog: false }));
+  scene.add(sunDisc);
+  sunHaloMat = new THREE.MeshBasicMaterial({
+    map: radialSpriteTexture('rgba(255,205,130,0.6)', 'rgba(255,205,130,0)'),
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+  });
+  const sunHalo = new THREE.Mesh(new THREE.PlaneGeometry(52, 52), sunHaloMat);
+  sunHalo.name = 'sunHalo';
+  scene.add(sunHalo);
+  sunDisc.userData.halo = sunHalo;
+
+  // Moon: the disc texture is a canvas redrawn (at most hourly)
+  // from the real phase; placement and brightness come from
+  // updateSky(). Plus a soft halo.
+  moonMat = new THREE.MeshBasicMaterial({
+    map: moonTex, transparent: true, fog: false,
+  });
+  moonDisc = new THREE.Mesh(new THREE.CircleGeometry(6.5, 32), moonMat);
+  scene.add(moonDisc);
+  moonHaloMat = new THREE.MeshBasicMaterial({
+    map: radialSpriteTexture('rgba(190,205,240,0.55)', 'rgba(190,205,240,0)'),
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+  });
+  const moonHalo = new THREE.Mesh(new THREE.PlaneGeometry(46, 46), moonHaloMat);
+  scene.add(moonHalo);
+  moonDisc.userData.halo = moonHalo;
+}
+
+// Draw the moon's lit region for a phase (0 = new, 0.5 = full):
+// the limb semicircle on the lit side plus the terminator ellipse.
+// Maria are a fixed hint pattern under the lit paint.
+function drawMoonPhase(phase) {
+  const s = 256, c = s / 2, r = c - 4;
+  const g = moonCtx;
+  g.clearRect(0, 0, s, s);
+  g.beginPath(); g.arc(c, c, r, 0, Math.PI * 2);
+  g.fillStyle = '#131a2c';                       // earthshine-dark side
+  g.fill();
+  g.save();
+  g.beginPath(); g.arc(c, c, r, 0, Math.PI * 2); g.clip();
+  const k = Math.cos(2 * Math.PI * phase);
+  g.beginPath();
+  if (phase <= 0.5) {                            // waxing: lit right
+    g.arc(c, c, r, -Math.PI / 2, Math.PI / 2, false);
+    g.ellipse(c, c, r * Math.abs(k), r, 0, Math.PI / 2, -Math.PI / 2, k > 0);
+  } else {                                       // waning: lit left
+    g.arc(c, c, r, Math.PI / 2, Math.PI * 1.5, false);
+    g.ellipse(c, c, r * Math.abs(k), r, 0, Math.PI * 1.5, Math.PI / 2, k > 0);
+  }
+  g.closePath();
+  const grad = g.createRadialGradient(c - r * 0.3, c - r * 0.3, r * 0.2, c, c, r);
+  grad.addColorStop(0, '#f2f5fa');
+  grad.addColorStop(1, '#c3ccd9');
+  g.fillStyle = grad;
+  g.fill();
+  g.fillStyle = 'rgba(105,118,140,0.32)';
+  for (const [mx, my, mr] of [[-0.25, -0.3, 0.28], [0.15, -0.05, 0.22],
+                              [-0.05, 0.3, 0.18], [0.3, 0.35, 0.14]]) {
+    g.beginPath(); g.arc(c + mx * r, c + my * r, mr * r, 0, Math.PI * 2); g.fill();
+  }
+  g.restore();
+  g.beginPath(); g.arc(c, c, r - 1, 0, Math.PI * 2);
+  g.strokeStyle = 'rgba(220,228,240,0.22)';
+  g.lineWidth = 2;
+  g.stroke();
+}
+
+// Sky/light palettes by sun elevation (degrees). The 0° stop IS the
+// original dusk look this wallpaper shipped with — it is now the
+// sunset/sunrise state instead of the permanent one.
+const _C = (h) => new THREE.Color(h);
+const SKY_STOPS = [
+  { el: -18, top: _C(0x03061a), mid: _C(0x0a1128), hor: _C(0x1f1c30), fog: _C(0x0a1128), fogDen: 0.0135, hs: _C(0x2c3f6e), hg: _C(0x181209), hi: 0.9 },
+  { el: -8,  top: _C(0x060b26), mid: _C(0x16203f), hor: _C(0x3c2c40), fog: _C(0x111a33), fogDen: 0.0135, hs: _C(0x3d5484), hg: _C(0x1e150c), hi: 1.05 },
+  { el: 0,   top: _C(0x070d29), mid: _C(0x1b2547), hor: _C(0x93502f), fog: _C(0x131a33), fogDen: 0.0135, hs: _C(0x8fa3cc), hg: _C(0x2e4a2a), hi: 1.15 },
+  { el: 6,   top: _C(0x2c4d7d), mid: _C(0x7d90b4), hor: _C(0xe09a52), fog: _C(0x5f6a80), fogDen: 0.009,  hs: _C(0x8093b8), hg: _C(0x2e2415), hi: 1.45 },
+  { el: 18,  top: _C(0x2f6bb8), mid: _C(0x79aede), hor: _C(0xc8dfeb), fog: _C(0x9db8cc), fogDen: 0.0055, hs: _C(0xbfd8f0), hg: _C(0x44543c), hi: 1.7 },
+  { el: 40,  top: _C(0x2a63c4), mid: _C(0x74aae6), hor: _C(0xd2e6f2), fog: _C(0xa8c4d8), fogDen: 0.005,  hs: _C(0xcfe4f4), hg: _C(0x4a5c40), hi: 1.85 },
+];
+const _pal = {
+  top: new THREE.Color(), mid: new THREE.Color(), hor: new THREE.Color(),
+  fog: new THREE.Color(), hs: new THREE.Color(), hg: new THREE.Color(),
+  fogDen: 0.0135, hi: 1,
+};
+function paletteAt(elDeg) {
+  let a = SKY_STOPS[0], b = SKY_STOPS[SKY_STOPS.length - 1];
+  for (let i = 0; i < SKY_STOPS.length - 1; i++) {
+    if (elDeg >= SKY_STOPS[i].el && elDeg <= SKY_STOPS[i + 1].el) {
+      a = SKY_STOPS[i]; b = SKY_STOPS[i + 1]; break;
+    }
+  }
+  let t = b.el === a.el ? 0 : THREE.MathUtils.clamp((elDeg - a.el) / (b.el - a.el), 0, 1);
+  t = t * t * (3 - 2 * t);
+  _pal.top.lerpColors(a.top, b.top, t);
+  _pal.mid.lerpColors(a.mid, b.mid, t);
+  _pal.hor.lerpColors(a.hor, b.hor, t);
+  _pal.fog.lerpColors(a.fog, b.fog, t);
+  _pal.hs.lerpColors(a.hs, b.hs, t);
+  _pal.hg.lerpColors(a.hg, b.hg, t);
+  _pal.fogDen = a.fogDen + (b.fogDen - a.fogDen) * t;
+  _pal.hi = a.hi + (b.hi - a.hi) * t;
+  return _pal;
+}
+
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3();
+const _sunWarm = new THREE.Color(0xff9448), _sunWhite = new THREE.Color(0xfff4e2);
+const _moonCol = new THREE.Color(0x93a7d4);
+const _sunColNow = new THREE.Color(), _mixCol = new THREE.Color(),
+      _moonScaled = new THREE.Color();
+
+// Steer every time-of-day element from the real positions. Called
+// each frame from the main loop (and by the harness step seam).
+function updateSky(nowMs) {
+  const date = new Date(nowMs);
+  const d = toDays(date);
+  const sun = bodyPosition(date, sunCoords(d));
+  const mc = moonCoords(d);
+  const moon = bodyPosition(date, mc);
+  const ill = moonIllumination(date);
+  const sunEl = sun.el / RAD, moonEl = moon.el / RAD;
+  skyState = {
+    sunEl: +sunEl.toFixed(2), sunAz: +(sun.az / RAD).toFixed(1),
+    moonEl: +moonEl.toFixed(2), moonAz: +(moon.az / RAD).toFixed(1),
+    moonFrac: +ill.fraction.toFixed(3),
+  };
+
+  const P = paletteAt(sunEl);
+  skyUniforms.top.value.copy(P.top);
+  skyUniforms.mid.value.copy(P.mid);
+  skyUniforms.horizon.value.copy(P.hor);
+  scene.fog.color.copy(P.fog);
+  scene.fog.density = P.fogDen;
+  hemiLight.color.copy(P.hs);
+  hemiLight.groundColor.copy(P.hg);
+  hemiLight.intensity = P.hi;
+
+  // Sun disc + halo.
+  const sunVis = THREE.MathUtils.clamp((sunEl + 2.5) / 5, 0, 1);
+  sunDisc.visible = sunEl > -2.5;
+  if (sunDisc.visible) {
+    azElToVec(sun.az, sun.el, 192, _v1);
+    sunDisc.position.copy(_v1);
+    sunDisc.lookAt(0, 0, 0);
+    sunDisc.material.color.set(0xffdf9e)
+      .lerp(_sunWarm, THREE.MathUtils.clamp(1 - sunEl / 10, 0, 1));
+    const halo = sunDisc.userData.halo;
+    halo.position.copy(_v1);
+    halo.lookAt(0, 0, 0);
+    sunHaloMat.opacity = 0.5 * sunVis;
+  } else {
+    sunHaloMat.opacity = 0;
+  }
+
+  // Moon disc (phase texture refreshed at most hourly) + halo.
+  moonDisc.visible = moonEl > -1.5;
+  const hourKey = Math.floor(nowMs / 3600000);
+  if (hourKey !== moonTexHour) {
+    moonTexHour = hourKey;
+    drawMoonPhase(ill.phase);
+    moonTex.needsUpdate = true;
+  }
+  if (moonDisc.visible) {
+    // Rotate the disc so the bright limb faces the sun: bright-limb
+    // position angle minus the parallactic angle.
+    const q = Math.atan2(Math.sin(moon.hourAngle),
+      Math.tan(RAD * HOME.lat) * Math.cos(mc.dec) -
+      Math.sin(mc.dec) * Math.cos(moon.hourAngle));
+    moonTex.rotation = ill.angle - q;
+    azElToVec(moon.az, moon.el, 192, _v1);
+    moonDisc.position.copy(_v1);
+    moonDisc.lookAt(0, 0, 0);
+    const bright = THREE.MathUtils.clamp(0.2 + moonEl / 25, 0.15, 1) *
+                   (0.3 + 0.7 * ill.fraction);
+    moonMat.color.setScalar(Math.max(0.06, bright));
+    const halo = moonDisc.userData.halo;
+    halo.position.copy(_v1);
+    halo.lookAt(0, 0, 0);
+    moonHaloMat.opacity = 0.4 * bright * THREE.MathUtils.clamp((moonEl + 1) / 6, 0, 1);
+  } else {
+    moonHaloMat.opacity = 0;
+  }
+
+  // Directional light: contribution-weighted blend of the two
+  // bodies, so dawn/dusk hand over without a pop.
+  const sunI = sunEl > -4
+    ? 2.2 * Math.pow(THREE.MathUtils.clamp((Math.sin(sun.el) + 0.06) / 0.38, 0, 1), 0.7) : 0;
+  const moonI = (0.15 + 0.55 * ill.fraction) *
+    THREE.MathUtils.clamp(Math.sin(moon.el), 0, 1) *
+    THREE.MathUtils.clamp((1 - sunEl) / 5, 0, 1);
+  if (sunI + moonI > 0.002) {
+    azElToVec(sun.az, sun.el, 60, _v1).multiplyScalar(sunI);
+    azElToVec(moon.az, moon.el, 60, _v2).multiplyScalar(moonI);
+    skyLight.position.copy(_v1.add(_v2).normalize().multiplyScalar(60));
+    skyLight.intensity = sunI + moonI;
+    _sunColNow.lerpColors(_sunWarm, _sunWhite,
+      THREE.MathUtils.clamp(sunEl / 16, 0, 1));
+    _mixCol.copy(_sunColNow).multiplyScalar(sunI)
+      .add(_moonScaled.copy(_moonCol).multiplyScalar(moonI))
+      .multiplyScalar(1 / (sunI + moonI));
+    skyLight.color.copy(_mixCol);
+  } else {
+    skyLight.intensity = 0.12;
+    skyLight.color.copy(_moonCol);
+  }
+
+  // Stars, fireflies, mushrooms, and the fire's presence.
+  starMat.opacity = 0.9 * THREE.MathUtils.clamp((-1 - sunEl) / 6, 0, 1);
+  nightFactor = THREE.MathUtils.clamp((-0.5 - sunEl) / 5, 0, 1);
+  fireScale = 0.35 + 0.65 * THREE.MathUtils.clamp((6 - sunEl) / 14, 0, 1);
+  for (const f of skyFollowers) f(P, sunEl);
 }
 
 /* -------------------------------------------------------------- field */
@@ -244,10 +554,482 @@ scene.add(moonLight);
   }
 }
 
+/* --------------------------------------------------- scene dressing */
+
+// Ambient animation hooks (fireflies, mushroom glow, shooting star)
+// registered by the dressing block below and run from the main loop.
+// Everything here is static instancing or a handful of sprites — no
+// extra dynamic lights, no shadow maps.
+const dressingUpdaters = [];
+function updateDressing(t, dt) {
+  for (const u of dressingUpdaters) u(t, dt);
+}
+
+// Dressing pass: the field was bare — a forest edge, ground life,
+// whimsy, and furniture around the fire fill it in. All placement is
+// seeded, the fire clearing (the 5 spots at r 2.75) stays readable,
+// and dressing lives in the mid-field and at the edges.
+{
+  const dummy = new THREE.Object3D();
+  const tint = new THREE.Color();
+
+  function instanced(geo, mat, count) {
+    const m = new THREE.InstancedMesh(geo, mat, count);
+    m.frustumCulled = false;
+    scene.add(m);
+    return m;
+  }
+  function setInst(mesh, i, x, z, s, sink = 0) {
+    dummy.position.set(x, groundH(x, z) - sink, z);
+    dummy.rotation.set(0, layoutRand() * Math.PI * 2, 0);
+    dummy.scale.setScalar(s);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+  }
+
+  /* The worn dirt path: a flat ribbon following the terrain from
+     the front-right field edge into the fire clearing. The sample
+     points double as a keep-clear guide for grass and ferns. */
+  const pathCurve = new THREE.QuadraticBezierCurve3(
+    new THREE.Vector3(17, 0, 36),
+    new THREE.Vector3(6.5, 0, 15),
+    new THREE.Vector3(2.3, 0, 4.6));
+  const pathPts = pathCurve.getPoints(60);
+  function distToPath(x, z) {
+    let d = Infinity;
+    for (const p of pathPts) {
+      const dd = (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z);
+      if (dd < d) d = dd;
+    }
+    return Math.sqrt(d);
+  }
+  {
+    const rows = 44, posArr = [], colArr = [], idx = [];
+    const cMid = new THREE.Color(0x503d27), cEdge = new THREE.Color(0x3a4526);
+    for (let i = 0; i <= rows; i++) {
+      const p = pathCurve.getPoint(i / rows);
+      const tan = pathCurve.getTangent(i / rows);
+      const px = -tan.z, pz = tan.x;
+      const w = 0.62 + 0.22 * Math.sin(i * 1.7) + layoutRand() * 0.16;
+      for (const side of [-1, 0, 1]) {
+        const x = p.x + px * w * side, z = p.z + pz * w * side;
+        posArr.push(x, groundH(x, z) + 0.02, z);
+        const c = side === 0 ? cMid : cEdge;
+        colArr.push(c.r, c.g, c.b);
+      }
+      if (i < rows) {
+        const b = i * 3;
+        idx.push(b, b + 3, b + 1, b + 1, b + 3, b + 4,
+                 b + 1, b + 4, b + 2, b + 2, b + 4, b + 5);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(posArr), 3));
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colArr), 3));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    const path = new THREE.Mesh(g, new THREE.MeshStandardMaterial({
+      vertexColors: true, roughness: 1, metalness: 0,
+      polygonOffset: true, polygonOffsetFactor: -1,
+    }));
+    scene.add(path);
+  }
+
+  /* Forest edge: two instanced meshes (trunks, merged-cone foliage)
+     sharing per-instance matrices — a ring of pines at r 44–81 over
+     the lone scattered pines, thinning the "few trees in a void"
+     feel into an actual treeline. */
+  {
+    const trunkGeo = new THREE.CylinderGeometry(0.09, 0.15, 1.2, 6);
+    trunkGeo.translate(0, 0.6, 0);
+    const cone1 = new THREE.ConeGeometry(0.88, 2.4, 8); cone1.translate(0, 1.95, 0);
+    const cone2 = new THREE.ConeGeometry(0.68, 2.4, 8); cone2.translate(0, 2.8, 0);
+    const cone3 = new THREE.ConeGeometry(0.48, 2.4, 8); cone3.translate(0, 3.65, 0);
+    const folGeo = mergeGeometries([cone1, cone2, cone3]);
+    const trunks = instanced(trunkGeo,
+      new THREE.MeshStandardMaterial({ color: 0x33261a, roughness: 1 }), 190);
+    const fols = instanced(folGeo,
+      new THREE.MeshStandardMaterial({ color: 0x1c3020, roughness: 1 }), 190);
+    let i = 0;
+    for (; i < 160; i++) {                 // the distant ring
+      const a = layoutRand() * Math.PI * 2;
+      const r = 54 + Math.pow(layoutRand(), 1.3) * 27;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      const s = 0.95 + layoutRand() * 1.15;
+      setInst(trunks, i, x, z, s, 0.12);
+      fols.setMatrixAt(i, dummy.matrix);
+      tint.setHSL(0.32, 0.25, 0.42 + layoutRand() * 0.2);
+      fols.setColorAt(i, tint);
+    }
+    for (; i < 190; i++) {                 // a nearer blending band
+      const a = layoutRand() * Math.PI * 2;
+      const r = 44 + layoutRand() * 14;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      const s = 0.85 + layoutRand() * 0.8;
+      setInst(trunks, i, x, z, s, 0.12);
+      fols.setMatrixAt(i, dummy.matrix);
+      tint.setHSL(0.32, 0.25, 0.42 + layoutRand() * 0.2);
+      fols.setColorAt(i, tint);
+    }
+    trunks.instanceMatrix.needsUpdate = true;
+    fols.instanceMatrix.needsUpdate = true;
+    if (fols.instanceColor) fols.instanceColor.needsUpdate = true;
+  }
+
+  /* Two nearer feature trees + a dead snag, hand-placed. */
+  {
+    const barkMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 1 });
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x22391f, roughness: 1, flatShading: true });
+    // Broad oak, left mid-field.
+    const oak = new THREE.Group();
+    const otrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.46, 2.3, 7), barkMat);
+    otrunk.position.y = 1.1;
+    oak.add(otrunk);
+    const blobGeo = new THREE.IcosahedronGeometry(1, 1);
+    for (const [bx, by, bz, bs] of [[0, 3.4, 0, 2.2], [1.3, 2.9, 0.4, 1.6],
+                                    [-1.2, 3.0, -0.5, 1.7], [0.2, 2.7, 1.1, 1.4]]) {
+      const b = new THREE.Mesh(blobGeo, leafMat);
+      b.position.set(bx, by, bz);
+      b.scale.set(bs, bs * 0.78, bs);
+      oak.add(b);
+    }
+    oak.position.set(-10.5, groundH(-10.5, -5.5), -5.5);
+    oak.rotation.y = 0.7;
+    scene.add(oak);
+    // Tall pine, right mid-field.
+    const pine = new THREE.Group();
+    const ptrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.2, 2.2, 6), barkMat);
+    ptrunk.position.y = 1.1;
+    pine.add(ptrunk);
+    const pconeGeo = new THREE.ConeGeometry(1, 2.6, 8);
+    const pfolMat = new THREE.MeshStandardMaterial({ color: 0x1d3320, roughness: 1 });
+    for (let k = 0; k < 4; k++) {
+      const cone = new THREE.Mesh(pconeGeo, pfolMat);
+      cone.scale.set(1.15 - k * 0.2, 1.15, 1.15 - k * 0.2);
+      cone.position.y = 2.2 + k * 1.15;
+      pine.add(cone);
+    }
+    pine.position.set(11, groundH(11, -7.5) - 0.1, -7.5);
+    scene.add(pine);
+    // Dead snag, back-left — bare trunk, two branch stubs.
+    const snag = new THREE.Group();
+    const strunk = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.17, 3.4, 6),
+      new THREE.MeshStandardMaterial({ color: 0x6b5a44, roughness: 1 }));
+    strunk.position.y = 1.7;
+    snag.add(strunk);
+    for (const [ry, rz, len] of [[2.3, 0.7, 0.9], [2.9, -0.5, 0.65]]) {
+      const br = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, len, 5),
+        strunk.material);
+      br.position.set(0.3, ry, 0);
+      br.rotation.z = rz;
+      snag.add(br);
+    }
+    snag.position.set(-16, groundH(-16, 8), 8);
+    snag.rotation.z = 0.05;
+    scene.add(snag);
+  }
+
+  /* Grass tufts: instanced five-blade cones, ~950 of them. Sparse
+     in the clearing, none on the path. */
+  {
+    const blades = [];
+    for (let k = 0; k < 5; k++) {
+      const b = new THREE.ConeGeometry(0.05, 0.42, 4);
+      b.translate(0, 0.21, 0);
+      const m = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(
+        Math.cos(k * 2.4) * 0.32, k * 1.257, Math.sin(k * 2.4) * 0.32));
+      m.setPosition(Math.cos(k * 1.257) * 0.07, 0, Math.sin(k * 1.257) * 0.07);
+      b.applyMatrix4(m);
+      blades.push(b);
+    }
+    const tuftGeo = mergeGeometries(blades);
+    const grass = instanced(tuftGeo,
+      new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), 950);
+    const gA = new THREE.Color(0x39512a), gB = new THREE.Color(0x5a7a3c);
+    let placed = 0, guard = 0;
+    while (placed < 950 && guard++ < 7000) {
+      const a = layoutRand() * Math.PI * 2;
+      const r = 3 + Math.pow(layoutRand(), 0.75) * 49;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      if (r < 7 && layoutRand() < 0.55) continue;
+      if (distToPath(x, z) < 0.8) continue;
+      setInst(grass, placed, x, z, 0.7 + layoutRand() * 0.95, 0.02);
+      tint.copy(gA).lerp(gB, layoutRand());
+      grass.setColorAt(placed, tint);
+      placed++;
+    }
+    grass.count = placed;
+    grass.instanceMatrix.needsUpdate = true;
+    if (grass.instanceColor) grass.instanceColor.needsUpdate = true;
+  }
+
+  /* Ferns: squashed-cone rosettes, ~70, mid-field. */
+  {
+    const fronds = [];
+    for (let k = 0; k < 6; k++) {
+      const f = new THREE.ConeGeometry(0.3, 0.55, 5);
+      f.applyMatrix4(new THREE.Matrix4().makeScale(1, 0.5, 1));
+      const m = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(
+        Math.cos(k * 1.047) * 0.95, 0, Math.sin(k * 1.047) * 0.95));
+      m.setPosition(Math.cos(k * 1.047) * 0.13, 0.1, Math.sin(k * 1.047) * 0.13);
+      f.applyMatrix4(m);
+      fronds.push(f);
+    }
+    const fernGeo = mergeGeometries(fronds);
+    const ferns = instanced(fernGeo,
+      new THREE.MeshStandardMaterial({ color: 0x2a4a26, roughness: 1, flatShading: true }), 70);
+    let placed = 0, guard = 0;
+    while (placed < 70 && guard++ < 900) {
+      const a = layoutRand() * Math.PI * 2;
+      const r = 6 + layoutRand() * 40;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      if (distToPath(x, z) < 0.9) continue;
+      setInst(ferns, placed, x, z, 0.6 + layoutRand() * 0.75, 0.02);
+      placed++;
+    }
+    ferns.count = placed;
+    ferns.instanceMatrix.needsUpdate = true;
+  }
+
+  /* More bushes, seven of them dotted with berries (one instanced
+     berry mesh shared across all seven). */
+  {
+    const bushGeo2 = new THREE.IcosahedronGeometry(1, 1);
+    const bushMat2 = new THREE.MeshStandardMaterial({ color: 0x27401f, roughness: 1, flatShading: true });
+    const berrySpots = [];
+    for (let i = 0; i < 10; i++) {
+      const a = layoutRand() * Math.PI * 2;
+      const r = 6.5 + layoutRand() * 26;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      const s = 0.55 + layoutRand() * 0.85;
+      const bush = new THREE.Mesh(bushGeo2, bushMat2);
+      bush.scale.set(s, s * 0.62, s);
+      bush.position.set(x, groundH(x, z) + s * 0.25, z);
+      bush.rotation.y = layoutRand() * Math.PI * 2;
+      scene.add(bush);
+      if (i < 7) {
+        for (let k = 0; k < 9; k++) {
+          const th = layoutRand() * Math.PI * 2, ph = layoutRand() * 1.1;
+          berrySpots.push([
+            x + Math.cos(th) * Math.sin(ph) * s * 0.92,
+            bush.position.y + Math.cos(ph) * s * 0.55,
+            z + Math.sin(th) * Math.sin(ph) * s * 0.92]);
+        }
+      }
+    }
+    const berries = instanced(new THREE.SphereGeometry(0.038, 6, 5),
+      new THREE.MeshStandardMaterial({ color: 0x8e2430, emissive: 0x38060c, roughness: 0.5 }),
+      berrySpots.length);
+    berrySpots.forEach(([x, y, z], i) => {
+      dummy.position.set(x, y, z);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.setScalar(0.8 + layoutRand() * 0.5);
+      dummy.updateMatrix();
+      berries.setMatrixAt(i, dummy.matrix);
+    });
+    berries.instanceMatrix.needsUpdate = true;
+  }
+
+  /* Glowing mushrooms: instanced stems + emissive caps in nine
+     clusters, one soft glow sprite per cluster (additive sprites,
+     not lights). */
+  {
+    const anchors = [[-9.2, -3.4], [12.3, -6.2], [5.8, -3.4], [-6.4, 6.8],
+                     [14.5, 3.5], [-15, -1.5], [2.5, -10.5], [19, -7], [-3.5, 12.5]];
+    const stemGeo = new THREE.CylinderGeometry(0.035, 0.055, 0.17, 6);
+    stemGeo.translate(0, 0.085, 0);
+    const capGeo = new THREE.SphereGeometry(0.115, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2);
+    capGeo.translate(0, 0.15, 0);
+    const spots = [];
+    for (const [ax, az] of anchors) {
+      const n = 3 + Math.floor(layoutRand() * 4);
+      for (let k = 0; k < n; k++) {
+        const a = layoutRand() * Math.PI * 2, rr = layoutRand() * 0.55;
+        spots.push([ax + Math.cos(a) * rr, az + Math.sin(a) * rr,
+                    0.6 + layoutRand() * 1.1]);
+      }
+    }
+    const stems = instanced(stemGeo,
+      new THREE.MeshStandardMaterial({ color: 0xcfc4a5, roughness: 0.9 }), spots.length);
+    const capMat = new THREE.MeshStandardMaterial({
+      color: 0x1d3a30, emissive: 0x5fe8c0, emissiveIntensity: 1.15, roughness: 0.6,
+    });
+    const caps = instanced(capGeo, capMat, spots.length);
+    spots.forEach(([x, z, s], i) => {
+      setInst(stems, i, x, z, s, 0.01);
+      caps.setMatrixAt(i, dummy.matrix);
+    });
+    stems.instanceMatrix.needsUpdate = true;
+    caps.instanceMatrix.needsUpdate = true;
+
+    const glowTex = radialSpriteTexture('rgba(140,255,215,0.85)', 'rgba(140,255,215,0)');
+    const glows = [];
+    anchors.forEach(([ax, az], ci) => {
+      const sm = new THREE.SpriteMaterial({
+        map: glowTex, color: 0x86ffd9, transparent: true, opacity: 0.2,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      });
+      const spr = new THREE.Sprite(sm);
+      spr.position.set(ax, groundH(ax, az) + 0.32, az);
+      spr.scale.set(1.5, 1.5, 1);
+      scene.add(spr);
+      glows.push({ sm, phase: ci * 1.37 });
+    });
+    dressingUpdaters.push((t) => {
+      // Glow only reads after dark; by day the caps go quiet too.
+      const f = 0.1 + 0.9 * nightFactor;
+      for (const g of glows) g.sm.opacity = (0.16 + 0.08 * Math.sin(t * 1.4 + g.phase)) * f;
+      capMat.emissiveIntensity = 0.15 + 1.0 * nightFactor;
+    });
+  }
+
+  /* Fireflies: one Points cloud, ~64 motes wandering the mid-field
+     on slow sine paths with individual twinkles. */
+  {
+    const N = 64;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({
+      size: 0.14, map: radialSpriteTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0)'),
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      vertexColors: true, sizeAttenuation: true,
+    }));
+    pts.frustumCulled = false;
+    scene.add(pts);
+    const motes = Array.from({ length: N }, () => {
+      const a = layoutRand() * Math.PI * 2, r = 5 + layoutRand() * 33;
+      return {
+        x: Math.cos(a) * r, z: Math.sin(a) * r,
+        y: 0.4 + layoutRand() * 1.8,
+        seed: layoutRand() * 100, speed: 0.5 + layoutRand() * 0.9,
+      };
+    });
+    const posA = geo.attributes.position, colA = geo.attributes.color;
+    dressingUpdaters.push((t) => {
+      for (let i = 0; i < N; i++) {
+        const m = motes[i];
+        posA.setXYZ(i,
+          m.x + Math.sin(t * 0.31 * m.speed + m.seed) * 0.9,
+          m.y + Math.sin(t * 0.53 * m.speed + m.seed * 1.7) * 0.28,
+          m.z + Math.cos(t * 0.26 * m.speed + m.seed * 0.6) * 0.9);
+        const tw = nightFactor *
+          (0.25 + 0.75 * Math.pow(0.5 + 0.5 * Math.sin(t * m.speed * 2.2 + m.seed * 3), 2));
+        colA.setXYZ(i, tw, tw * 0.82, tw * 0.38);
+      }
+      posA.needsUpdate = true;
+      colA.needsUpdate = true;
+    });
+  }
+
+  /* Fire-circle furniture: two log benches flanking the gathering,
+     three stump seats behind, a woodpile + chopping block to the
+     right. All outside the spot ring (r 2.75) and off the path. */
+  {
+    const barkMat = new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 1 });
+    const endMat = new THREE.MeshStandardMaterial({ color: 0xa9834f, roughness: 0.9 });
+    const logMats = [barkMat, endMat, endMat];
+    function bench(a, r) {
+      const g = new THREE.Group();
+      const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 1.7, 8), logMats);
+      seat.rotation.z = Math.PI / 2;
+      seat.position.y = 0.46;
+      g.add(seat);
+      for (const sx of [-0.55, 0.55]) {
+        const sup = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.34, 7), logMats);
+        sup.position.set(sx, 0.17, 0);
+        g.add(sup);
+      }
+      const x = Math.sin(a) * r, z = Math.cos(a) * r;
+      g.position.set(x, groundH(x, z), z);
+      g.rotation.y = a;
+      scene.add(g);
+    }
+    bench(1.75, 3.5);
+    bench(-1.75, 3.5);
+    for (const a of [2.6, -2.6, Math.PI]) {
+      const x = Math.sin(a) * 3.2, z = Math.cos(a) * 3.2;
+      const stump = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 0.48, 9), logMats);
+      stump.position.set(x, groundH(x, z) + 0.24, z);
+      scene.add(stump);
+    }
+    const pile = new THREE.Group();
+    const logGeo2 = new THREE.CylinderGeometry(0.11, 0.11, 1.15, 7);
+    for (const [lx, ly] of [[-0.24, 0.11], [0, 0.11], [0.24, 0.11],
+                            [-0.12, 0.3], [0.12, 0.3], [0, 0.49]]) {
+      const log = new THREE.Mesh(logGeo2, logMats);
+      log.rotation.x = Math.PI / 2;
+      log.position.set(lx, ly, 0);
+      pile.add(log);
+    }
+    pile.position.set(4.7, groundH(4.7, 2.1), 2.1);
+    pile.rotation.y = -0.5;
+    scene.add(pile);
+    const block = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 0.5, 9), logMats);
+    block.position.set(3.9, groundH(3.9, 3.3) + 0.25, 3.3);
+    scene.add(block);
+    const split = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.5, 7), logMats);
+    split.position.set(3.9, groundH(3.9, 3.3) + 0.72, 3.3);
+    scene.add(split);
+  }
+
+  /* Distant hills: squashed domes on the horizon. Their colour
+     follows the sky palette (registered as a sky follower) so they
+     silhouette at dusk and haze blue-grey by day. */
+  {
+    const hillMat = new THREE.MeshBasicMaterial({ color: 0x0c1428, fog: false });
+    skyFollowers.push((P) => {
+      hillMat.color.copy(P.hor).lerp(P.mid, 0.75).multiplyScalar(0.34);
+    });
+    const hillGeo = new THREE.SphereGeometry(1, 24, 12);
+    for (const [hx, hz, w, h] of [[-95, -105, 62, 13], [15, -130, 80, 17],
+                                  [100, -90, 55, 11], [-135, -25, 48, 9],
+                                  [135, -35, 52, 10], [-40, -145, 70, 14]]) {
+      const hill = new THREE.Mesh(hillGeo, hillMat);
+      hill.position.set(hx, -1.5, hz);
+      hill.scale.set(w, h, w * 0.55);
+      scene.add(hill);
+    }
+  }
+
+  /* An occasional shooting star: one additive sprite streaking the
+     upper sky every ~10–25 s. Pure decoration, zero steady cost. */
+  {
+    const sm = new THREE.SpriteMaterial({
+      map: radialSpriteTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0)'),
+      color: 0xdfe9ff, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+      rotation: -0.24,
+    });
+    const star = new THREE.Sprite(sm);
+    star.scale.set(4.6, 0.5, 1);
+    star.position.set(0, 60, -150);
+    scene.add(star);
+    const st = { next: 6 + layoutRand() * 10, t0: -1, from: new THREE.Vector3() };
+    dressingUpdaters.push((t) => {
+      if (st.t0 < 0 && t >= st.next) {
+        st.t0 = t;
+        st.from.set(40 + layoutRand() * 60, 52 + layoutRand() * 20, -150);
+      }
+      if (st.t0 >= 0) {
+        const p = (t - st.t0) / 0.9;
+        if (p >= 1) {
+          st.t0 = -1;
+          st.next = t + 9 + layoutRand() * 16;
+          sm.opacity = 0;
+        } else {
+          star.position.set(st.from.x - 58 * p, st.from.y - 13 * p, -150);
+          sm.opacity = Math.sin(p * Math.PI) * 0.8;
+        }
+      }
+    });
+  }
+}
+
 /* ----------------------------------------------------------- campfire */
 
 const FIRE_POS = new THREE.Vector3(0, 0, 0);
-let fireLight, glowDisc;
+let fireLight, glowDisc, bounceLight;
 const flameSystems = [];
 
 function makeParticles(count, size, color, blending) {
@@ -318,9 +1100,9 @@ function resetParticle(sys, p, randomAge) {
   fire.add(fireLight);
   // A whisper of warm bounce on the camera side of the fire, so the
   // gathered creatures read as more than silhouettes.
-  const bounce = new THREE.PointLight(0xff9a50, 5, 13, 2);
-  bounce.position.set(0, 0.6, 1.9);
-  fire.add(bounce);
+  bounceLight = new THREE.PointLight(0xff9a50, 5, 13, 2);
+  bounceLight.position.set(0, 0.6, 1.9);
+  fire.add(bounceLight);
 
   // Flames: short-lived particles that narrow and redden as they rise.
   const flames = makeParticles(90, 0.62);
@@ -344,8 +1126,12 @@ const _fc = new THREE.Color(), _fc2 = new THREE.Color();
 function updateFire(t, dt) {
   const flicker = 0.82 + 0.18 * (Math.sin(t * 11.3) * 0.4 + Math.sin(t * 23.7 + 1.7) * 0.35 +
                                  Math.sin(t * 5.1 + 0.4) * 0.45);
-  fireLight.intensity = 26 * flicker;
-  glowDisc.material.opacity = 0.75 + 0.25 * flicker;
+  // The fire burns around the clock, but daylight shrinks its
+  // presence: fireScale (from updateSky) is 1.0 at night, ~0.35 by
+  // day. The flicker rides on top either way.
+  fireLight.intensity = 26 * flicker * fireScale;
+  bounceLight.intensity = 5 * fireScale;
+  glowDisc.material.opacity = (0.75 + 0.25 * flicker) * (0.3 + 0.7 * fireScale);
   const gs = 1 + 0.05 * Math.sin(t * 7.3);
   glowDisc.scale.set(gs, gs, 1);
 
@@ -361,13 +1147,14 @@ function updateFire(t, dt) {
         p.y += dt * p.vy * (1.05 - n * 0.35);
         p.x *= (1 - 0.9 * dt * n); p.z *= (1 - 0.9 * dt * n);
         _fc.setRGB(1, 0.82, 0.35).lerp(_fc2.setRGB(0.9, 0.25, 0.03), n);
-        _fc.multiplyScalar((1 - n) * (0.75 + 0.25 * flicker));
+        _fc.multiplyScalar((1 - n) * (0.75 + 0.25 * flicker) * (0.35 + 0.65 * fireScale));
       } else {
         p.y += dt * p.vy;
         p.x += Math.sin(p.age * 2.1 + p.seed) * 0.25 * dt;
         p.z += Math.cos(p.age * 1.7 + p.seed) * 0.25 * dt;
         const tw = 0.6 + 0.4 * Math.sin(p.age * 9 + p.seed * 3);
-        _fc.setRGB(1, 0.5, 0.12).multiplyScalar(Math.max(0, 1 - n * 1.15) * tw);
+        _fc.setRGB(1, 0.5, 0.12).multiplyScalar(
+          Math.max(0, 1 - n * 1.15) * tw * (0.35 + 0.65 * fireScale));
       }
       pos.setXYZ(i, p.x, p.y, p.z);
       col.setXYZ(i, _fc.r, _fc.g, _fc.b);
@@ -682,8 +1469,10 @@ function tick() {
   perfNow = performance.now();
   const t = clock.elapsedTime;
 
+  updateSky(FROZEN_TIME ?? Date.now());
   updateFire(t, dt);
   updateDirector(dt);
+  updateDressing(t, dt);
 
   // Very slight camera drift — alive, never seasick.
   camera.position.set(
@@ -711,6 +1500,7 @@ function publishStatus() {
     ready: true, fps,
     loaded: [...templates.keys()],
     loadErrors,
+    sky: skyState,
     creatures: active.map((c) => ({
       slug: c.cfg.slug, state: c.state, clip: c.currentRole,
       x: +c.group.position.x.toFixed(2), z: +c.group.position.z.toFixed(2),
@@ -736,8 +1526,9 @@ window.addEventListener('resize', () => {
 // never passes it): step the simulation deterministically, without
 // depending on how fast the host can composite frames — headless
 // software renderers manage a frame every few seconds, which would
-// otherwise make a travelling creature look parked.
-if (new URLSearchParams(location.search).has('harness')) {
+// otherwise make a travelling creature look parked. Combine with
+// &time=<epoch ms | ISO> to freeze the sun/moon at a chosen instant.
+if (PAGE_PARAMS.has('harness')) {
   window.__campfireStep = (steps, dt) => {
     for (let i = 0; i < steps; i++) {
       perfNow += dt * 1000;
@@ -745,6 +1536,7 @@ if (new URLSearchParams(location.search).has('harness')) {
       updateFire(t, dt);
       updateDirector(dt);
     }
+    updateSky(FROZEN_TIME ?? Date.now());
     camera.position.copy(CAM_BASE);
     camera.lookAt(CAM_LOOK);
     renderer.render(scene, camera);
@@ -766,5 +1558,6 @@ if (new URLSearchParams(location.search).has('harness')) {
     spawn('dwell');
     spawn('near');
   }
+  updateSky(FROZEN_TIME ?? Date.now());
   renderer.setAnimationLoop(tick);
 })();
