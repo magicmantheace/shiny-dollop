@@ -189,6 +189,17 @@ killed and relaunched, tile re-invoked via UIA, UI process
 closed afterwards leaving core + watchdog + player. Final
 live screenshot (00:05, moonless night) shows the south-facing
 framing with ridge silhouettes on the real 3840×2160 desktop.
+The tree-fix redeploy (2026-11-09 ~05:58) repeated the route
+for `js/wallpaper.js` (sha256 `e1a18b87b985acabafbada93dbc97cd1bd8ebd28b8498d3919f9a8d74aba227b`) and `preview.jpg` (sha256 `46a646d0d07c9b14a51a18e63e5dfccfa90b447087cb944ede653d4901ad6584`):
+staged through the bridge file API, copied by a staged
+`.cmd` to both copies, destination hashes verified from
+certutil output read back over the bridge, Lively killed
+and relaunched, the Campfire Companions tile re-invoked via
+UIA, and the UI process (Lively.UI.WinUI.exe) closed
+afterwards leaving core + watchdog + player. The final live
+screenshot (06:00, moonless night) shows the open frame and
+the tiered treeline on the real desktop — see
+docs/TEST_PLAN.md, "tree fix pass".
 
 ## Verification (see docs/TEST_PLAN.md for the full record)
 

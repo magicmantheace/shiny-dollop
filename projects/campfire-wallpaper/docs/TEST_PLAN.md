@@ -308,3 +308,77 @@ screenshot at 00:05 shows the south-facing framing on the real
 16-stone ring in firelight, framing pines at the edges — a
 moonless night (new moon 2026-11-09 01:02), so the disc proof
 rests on the frozen captures above, as planned.
+
+## Results — tree fix pass (2026-11-09)
+
+Owner-directed (2026-11-09 05:43): "Remove the trees from the
+front and make the trees in the back have more detail. Right
+now they look inverted." Diagnosis from the `final2-noon`
+capture: the four density-pass framing pines filled the frame
+edges with black bulk, and the forest edge's merged 3-cone
+foliage read at distance as plain dark triangles — tiers
+invisible, trunks unreadable, no internal shading.
+
+Changes (`js/wallpaper.js`, plus a regenerated `preview.jpg`):
+
+- The foreground framing-pines block is deleted outright;
+  the clearing is viewed across open field again. (Seeded-
+  layout note: scatter placed after that block — moss, extra
+  rocks, fallen logs — lands in new positions; the treeline,
+  placed earlier in the sequence, is unchanged.)
+- All pine foliage now comes from `makePineFoliageGeo()`:
+  five flat stepped tiers (radii 1.04 → 0.33, heights
+  1.15–1.50) with per-tier Y rotation and a baked
+  vertex-colour shade gradient (0.42 at the bottom shelf →
+  1.00 at the tip), rendered with a flat-shaded,
+  vertex-coloured material in a slightly lighter green.
+  The one geometry serves the 245 instanced forest-edge
+  pines, the 15 scattered ring pines, and the hand-placed
+  tall pine. Instance counts and draw structure unchanged;
+  no new lights, no shadow maps.
+
+**Captures** (frozen-time seam, zero console errors, all
+templates loaded; screenshots in the verification folder):
+
+- `trees-noon.png` — 2026-11-08 13:15: framing pines gone;
+  treeline and mid-field pines show stepped tiers with
+  faceted shading and visible trunks; sun disc in frame.
+- `trees-sunset.png` — 17:57: tiered treeline against the
+  alpenglow ridges, dragon at the fire. This capture is the
+  new `preview.jpg`.
+- `trees-night.png` — 2026-11-09 02:00 (moonless): tiered
+  silhouettes, fireflies, glowing mushrooms, fire pool.
+
+**Regression check.** Standard verify at the live clock
+(~05:53, night): **PASS** — all templates load,
+`loadErrors: []`, zero console errors, one triceratops
+dwelling at its fire spot, an entering triceratops reporting
+clip `"walk"` and moving between the two status reads.
+
+**Frame cost.** Foliage geometry grows modestly (5 tiers of
+9-segment cones vs 3 of 8; one shared geometry per pine
+system). SwiftShader counter still ~20–22 fps (the known
+dt-cap artifact, not a measurement). Real-GPU cost on the
+RTX 3060 remains unverified by measurement.
+
+**Harness note:** `/opt/meta-chromium/chrome` currently
+refuses raw CDP launches ("Hatch WebGL domain policy is
+required for browser startup"); the drivers were run with
+`CHROME_PATH` pointed at the Chrome-for-Testing headless
+shell in the verification folder (`chs/`), as in the initial
+build.
+
+**Redeploy (2026-11-09 ~05:58–06:00 local).**
+`js/wallpaper.js` (sha256
+`e1a18b87b985acabafbada93dbc97cd1bd8ebd28b8498d3919f9a8d74aba227b`)
+and `preview.jpg` (sha256
+`46a646d0d07c9b14a51a18e63e5dfccfa90b447087cb944ede653d4901ad6584`)
+synced via the bridge to both PC copies and hash-verified at
+all four destination files (certutil output read back over
+the bridge); Lively killed (UI + watchdog + player) and
+relaunched, the Campfire Companions tile re-invoked via
+UIA, the UI process closed afterwards leaving core +
+watchdog + player. The final live screenshot (06:00, real
+clock, moonless night) shows the new scene on the real
+3840×2160 desktop: open frame edges, tiered treeline
+silhouettes, a triceratops at the fire.
