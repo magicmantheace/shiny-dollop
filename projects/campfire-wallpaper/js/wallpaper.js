@@ -54,6 +54,39 @@ function groundH(x, z) {
           Math.sin((x + z) * 0.06) * 0.6) * 0.5 * s;
 }
 
+// Pine foliage whose silhouette reads as a tree rather than a
+// plain triangle: five flat, stepped tiers — a wide shelf at the
+// bottom narrowing to the tip — each tier rotated a few degrees
+// against its neighbours so the outline breaks up, plus a baked
+// vertical shade gradient (dark under the shelves, lightest at
+// the tip) carried as a vertex colour. Materials using this
+// geometry need vertexColors: true (and flatShading suits it).
+// Local units match the pine trunks: foliage spans y 0.8–4.65
+// over a ~1.2-tall trunk.
+function makePineFoliageGeo() {
+  const tiers = [
+    // [radius, height, centreY, shade]
+    [1.04, 1.50, 1.55, 0.42],
+    [0.87, 1.40, 2.25, 0.55],
+    [0.70, 1.30, 2.90, 0.68],
+    [0.52, 1.20, 3.50, 0.82],
+    [0.33, 1.15, 4.08, 1.00],
+  ];
+  const parts = tiers.map(([r, h, cy, shade], k) => {
+    const g = new THREE.ConeGeometry(r, h, 9);
+    g.rotateY(k * 0.38);
+    g.translate(0, cy, 0);
+    const n = g.getAttribute('position').count;
+    const col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      col[i * 3] = shade; col[i * 3 + 1] = shade; col[i * 3 + 2] = shade;
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    return g;
+  });
+  return mergeGeometries(parts);
+}
+
 function radialSpriteTexture(inner, outer) {
   const c = document.createElement('canvas');
   c.width = c.height = 128;
@@ -521,11 +554,12 @@ function updateSky(nowMs) {
 // geometries/materials, seeded placement, clearing kept free.
 {
   const trunkGeo = new THREE.CylinderGeometry(0.09, 0.14, 1.1, 6);
-  const coneGeo = new THREE.ConeGeometry(1, 2.2, 8);
   const rockGeo = new THREE.DodecahedronGeometry(1, 0);
   const bushGeo = new THREE.IcosahedronGeometry(1, 1);
   const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 1 });
-  const pineMat = new THREE.MeshStandardMaterial({ color: 0x1d3320, roughness: 1 });
+  const pineMat = new THREE.MeshStandardMaterial({
+    color: 0x2f5233, roughness: 1, flatShading: true, vertexColors: true });
+  const pineFoliageGeo = makePineFoliageGeo();
   const rockMat = new THREE.MeshStandardMaterial({ color: 0x5d6068, roughness: 0.95, flatShading: true });
   const bushMat = new THREE.MeshStandardMaterial({ color: 0x243d22, roughness: 1, flatShading: true });
 
@@ -545,12 +579,10 @@ function updateSky(nowMs) {
     const trunk = new THREE.Mesh(trunkGeo, trunkMat);
     trunk.position.y = 0.5; trunk.scale.setScalar(h / 3);
     tree.add(trunk);
-    for (let k = 0; k < 3; k++) {
-      const cone = new THREE.Mesh(coneGeo, pineMat);
-      cone.scale.set(0.75 - k * 0.16, h / 2.6, 0.75 - k * 0.16);
-      cone.position.y = 0.9 + k * (h / 3.4);
-      tree.add(cone);
-    }
+    const fol = new THREE.Mesh(pineFoliageGeo, pineMat);
+    fol.scale.setScalar(h / 3.4);
+    fol.position.y = 0.35;
+    tree.add(fol);
     tree.rotation.y = layoutRand() * Math.PI * 2;
     place(tree, x, z);
   }
@@ -654,22 +686,21 @@ function updateDressing(t, dt) {
     scene.add(path);
   }
 
-  /* Forest edge: two instanced meshes (trunks, merged-cone foliage)
-     sharing per-instance matrices — 245 pines at r 44–84 over the
-     lone scattered pines, thinning the "few trees in a void" feel
-     into an actual treeline; the outermost ring stands tallest so
+  /* Forest edge: two instanced meshes (trunks, stepped-tier
+     foliage — see makePineFoliageGeo) sharing per-instance
+     matrices — 245 pines at r 44–84 over the lone scattered
+     pines, thinning the "few trees in a void" feel into an
+     actual treeline; the outermost ring stands tallest so
      the forest reads as a wall, not a hedge. */
   {
     const trunkGeo = new THREE.CylinderGeometry(0.09, 0.15, 1.2, 6);
     trunkGeo.translate(0, 0.6, 0);
-    const cone1 = new THREE.ConeGeometry(0.88, 2.4, 8); cone1.translate(0, 1.95, 0);
-    const cone2 = new THREE.ConeGeometry(0.68, 2.4, 8); cone2.translate(0, 2.8, 0);
-    const cone3 = new THREE.ConeGeometry(0.48, 2.4, 8); cone3.translate(0, 3.65, 0);
-    const folGeo = mergeGeometries([cone1, cone2, cone3]);
+    const folGeo = makePineFoliageGeo();
     const trunks = instanced(trunkGeo,
       new THREE.MeshStandardMaterial({ color: 0x33261a, roughness: 1 }), 245);
     const fols = instanced(folGeo,
-      new THREE.MeshStandardMaterial({ color: 0x1c3020, roughness: 1 }), 245);
+      new THREE.MeshStandardMaterial({
+        color: 0x2f5233, roughness: 1, flatShading: true, vertexColors: true }), 245);
     let i = 0;
     for (; i < 160; i++) {                 // the distant ring
       const a = layoutRand() * Math.PI * 2;
@@ -731,14 +762,12 @@ function updateDressing(t, dt) {
     const ptrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.2, 2.2, 6), barkMat);
     ptrunk.position.y = 1.1;
     pine.add(ptrunk);
-    const pconeGeo = new THREE.ConeGeometry(1, 2.6, 8);
-    const pfolMat = new THREE.MeshStandardMaterial({ color: 0x1d3320, roughness: 1 });
-    for (let k = 0; k < 4; k++) {
-      const cone = new THREE.Mesh(pconeGeo, pfolMat);
-      cone.scale.set(1.15 - k * 0.2, 1.15, 1.15 - k * 0.2);
-      cone.position.y = 2.2 + k * 1.15;
-      pine.add(cone);
-    }
+    const pfol = new THREE.Mesh(makePineFoliageGeo(),
+      new THREE.MeshStandardMaterial({
+        color: 0x2f5233, roughness: 1, flatShading: true, vertexColors: true }));
+    pfol.scale.setScalar(1.25);
+    pfol.position.y = 1.15;
+    pine.add(pfol);
     pine.position.set(11, groundH(11, -7.5) - 0.1, -7.5);
     scene.add(pine);
     // Dead snag, back-left — bare trunk, two branch stubs.
@@ -1099,33 +1128,14 @@ function updateDressing(t, dt) {
   buildRidge(168, 5, 45, [0x46536e, 0x71809c, 0xa9b8d0], 0.78, 0.7,
     (mat, P) => mat.color.copy(P.hor).lerp(P.top, 0.35).multiplyScalar(1.15));
 
-  /* Foreground framing pines (density pass): four large pines
-     close around the camera, trunks crossing the frame edges like
-     the reference photo — the clearing is now seen INTO a forest,
-     not across a lawn. */
-  {
-    const trunkGeo = new THREE.CylinderGeometry(0.11, 0.18, 1.2, 6);
-    trunkGeo.translate(0, 0.6, 0);
-    const cone1 = new THREE.ConeGeometry(0.88, 2.4, 8); cone1.translate(0, 1.95, 0);
-    const cone2 = new THREE.ConeGeometry(0.68, 2.4, 8); cone2.translate(0, 2.8, 0);
-    const cone3 = new THREE.ConeGeometry(0.48, 2.4, 8); cone3.translate(0, 3.65, 0);
-    const folGeo = mergeGeometries([cone1, cone2, cone3]);
-    const trunks = instanced(trunkGeo,
-      new THREE.MeshStandardMaterial({ color: 0x33261a, roughness: 1 }), 4);
-    const fols = instanced(folGeo,
-      new THREE.MeshStandardMaterial({ color: 0x1c3020, roughness: 1 }), 4);
-    const frames = [[-5.4, -3.4, 2.5], [5.6, -4.2, 2.85],
-                    [-9.2, -8.8, 3.2], [9.8, -9.6, 3.0]];
-    frames.forEach(([x, z, s], i) => {
-      setInst(trunks, i, x, z, s, 0.12);
-      fols.setMatrixAt(i, dummy.matrix);
-      tint.setHSL(0.32, 0.25, 0.30 + layoutRand() * 0.12);
-      fols.setColorAt(i, tint);
-    });
-    trunks.instanceMatrix.needsUpdate = true;
-    fols.instanceMatrix.needsUpdate = true;
-    if (fols.instanceColor) fols.instanceColor.needsUpdate = true;
-  }
+  /* No foreground framing pines: the density pass planted four
+     large pines around the camera to frame the view, and the
+     owner asked for them gone (2026-11-09) — the clearing is
+     viewed across open field again, the forest edge and the
+     ridges carry the frame. (Removing the block shifts the
+     seeded layout sequence for the scatter placed after it —
+     moss, rocks, logs land in new spots; the treeline, placed
+     earlier, is unchanged.) */
 
   /* Moss patches: dark-green discs mottling the forest floor —
      outside the clearing and off the path (density pass). */

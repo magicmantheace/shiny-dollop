@@ -70,13 +70,17 @@ untouched, and the fire clearing stays readable. Everything is
 primitives/instancing; per-frame updates run through a
 `dressingUpdaters` hook list called from the main tick.
 
-- **Forest edge:** one merged-cone foliage geometry + one trunk
-  geometry as two InstancedMeshes sharing matrices — 245 pines
-  after the density pass (160 at r 54–81, scale 0.95–2.1; 30 in
-  a r 44–58 blending band; 55 taller back-ring pines at
-  r 66–84, scale 1.5–2.7), per-instance colour tint. Feature
-  trees: broad oak at (−10.5, −5.5), tall 4-cone pine at
-  (11, −7.5), dead snag at (−16, 8).
+- **Forest edge:** one foliage geometry + one trunk geometry
+  as two InstancedMeshes sharing matrices — 245 pines after
+  the density pass (160 at r 54–81, scale 0.95–2.1; 30 in a
+  r 44–58 blending band; 55 taller back-ring pines at
+  r 66–84, scale 1.5–2.7), per-instance colour tint. The
+  foliage is `makePineFoliageGeo()` (tree-fix pass,
+  2026-11-09): five flat stepped tiers with per-tier rotation
+  and a baked vertex-colour shade gradient, flat-shaded — the
+  same geometry serves the 15 scattered ring pines and the
+  feature pine. Feature trees: broad oak at (−10.5, −5.5),
+  tall pine at (11, −7.5), dead snag at (−16, 8).
 - **Ground life:** 1,250 instanced grass tufts (r 3–52, sparse
   inside r 7, none within 0.8 of the path); 115 instanced
   ferns (biased to the clearing edge); 10 extra bushes, 7
@@ -91,11 +95,10 @@ primitives/instancing; per-frame updates run through a
   block + split log at (3.9, 3.3); the fire pit itself is
   ringed by a 16-stone InstancedMesh (r 0.92–1.06, per-stone
   scale/tilt/shade).
-- **Foreground framing (density pass):** 4 large pines close
-  to the camera at the frame edges — (−5.4, −3.4, s 2.5),
-  (5.6, −4.2, s 2.85), (−9.2, −8.8, s 3.2), (9.8, −9.6, s 3.0)
-  — instanced through the same trunk/foliage pair as the
-  forest edge.
+- **Foreground framing:** the density pass's 4 large pines at
+  the frame edges were **removed 2026-11-09 at the owner's
+  request** — the view across the clearing is open; the
+  forest edge and ridges carry the frame.
 - **Dirt path:** terrain-following ribbon along a quadratic
   Bézier from (17, 36) to (2.3, 4.6); its 61 samples double as
   the keep-clear guide (`distToPath`) for grass/fern scatter.
