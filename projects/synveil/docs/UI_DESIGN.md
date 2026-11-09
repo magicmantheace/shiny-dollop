@@ -129,6 +129,22 @@ standard chrome.
   session machinery exposes no logout/lock to offer. Accepted
   in QEMU 2026-11-07; see
   `docs/validation/shell-d526e55/README.md`.
+- Shell polish (2026-11-08): the letter tiles and generic
+  task glyphs are replaced by an original geometric icon
+  set drawn in the shell helper; the panel gains a status
+  tray whose only sources are existing read-only surfaces —
+  network from `/sys/class/net/*/operstate` (carrier is
+  unreadable while an interface is administratively down),
+  update state from the A/B agent's existing status query
+  (slot hidden when no agent answers — never faked); the
+  Start menu slides at this spec's 200 ms ease-out, emerging
+  from behind the strip; buttons carry pressed states in
+  the tokens (accent-pressed) and tooltips. The stock
+  default-launcher fallback is gone — the menu owns
+  launching. Full sweep green on the polished image; see
+  `docs/validation/shell-polish-54203de/README.md` for what
+  is and is not proven (tray up/pending states render via
+  shared paths but are not separately asserted in-guest).
 - No compositor-level slide for window map/minimize in stock
   Weston; `zoom`/`fade` springs are the available motion.
 - Chromium and weston-terminal interiors are unchanged.
