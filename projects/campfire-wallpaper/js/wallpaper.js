@@ -322,7 +322,7 @@ const skyFollowers = [];
 let skyUniforms, starMat;
 let sunDisc, sunHaloMat, moonDisc, moonMat, moonHaloMat;
 const moonCanvas = document.createElement('canvas');
-moonCanvas.width = moonCanvas.height = 512;
+moonCanvas.width = moonCanvas.height = 1024;
 const moonCtx = moonCanvas.getContext('2d');
 const moonTex = new THREE.CanvasTexture(moonCanvas);
 moonTex.colorSpace = THREE.SRGBColorSpace;
@@ -406,7 +406,7 @@ let moonTexHour = -1;
 // the limb semicircle on the lit side plus the terminator ellipse.
 // Maria are a fixed hint pattern under the lit paint.
 function drawMoonPhase(phase) {
-  const s = 512, c = s / 2, r = c - 4;
+  const s = 1024, c = s / 2, r = c - 4;
   const g = moonCtx;
   g.clearRect(0, 0, s, s);
   g.beginPath(); g.arc(c, c, r, 0, Math.PI * 2);
@@ -623,9 +623,12 @@ function updateSky(nowMs) {
 // Tiled across the field; the vertex-colour macro pattern breaks
 // up any visible repetition.
 function makeGroundTextures() {
-  const S = 256;
+  // 1024² (1080p-class): at 256² the foreground ground stretched
+  // one texel over ~10 screen pixels on a 4K desktop; 1024 with
+  // two extra fine octaves brings real detail to ~5 cm features.
+  const S = 1024;
   const height = new Float32Array(S * S);
-  const octaves = [[4, 0.5], [8, 0.28], [16, 0.16], [32, 0.09]];
+  const octaves = [[4, 0.5], [8, 0.28], [16, 0.16], [32, 0.09], [64, 0.05], [128, 0.028]];
   const lattices = octaves.map(([f]) => {
     const g = new Float32Array(f * f);
     for (let i = 0; i < g.length; i++) g[i] = Math.random();
@@ -657,7 +660,10 @@ function makeGroundTextures() {
     dimg.data[i * 4 + 2] = lum * 0.9; dimg.data[i * 4 + 3] = 255;
     const hx = height[y * S + (x + 1) % S] - height[y * S + (x - 1 + S) % S];
     const hy = height[((y + 1) % S) * S + x] - height[((y - 1 + S) % S) * S + x];
-    let nx = -hx * 2.2, ny = hy * 2.2, nz = 1;
+    // Slope scale compensates the finer texel grid (per-pixel
+    // height deltas shrink as S grows); the fine octaves add
+    // their own real slope on top.
+    let nx = -hx * 6.0, ny = hy * 6.0, nz = 1;
     const il = 1 / Math.hypot(nx, ny, nz);
     nimg.data[i * 4] = (nx * il * 0.5 + 0.5) * 255;
     nimg.data[i * 4 + 1] = (ny * il * 0.5 + 0.5) * 255;
