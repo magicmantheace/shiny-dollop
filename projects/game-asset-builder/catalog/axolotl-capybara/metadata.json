@@ -1,0 +1,317 @@
+{
+ "entry_version": 1,
+ "name": "Axolotl-Capybara",
+ "slug": "axolotl-capybara",
+ "source_concept": "media-generation-media-generation-axolotl-capyb-0-4786cd7d-68d6-4acd-9691-4ba6920dff23.webp",
+ "asset_file": "axolotl-capybara.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "7658b7db08dec348fdf04747fd211a53232421bd59e841102548351e96688adc",
+ "bytes": 19525868,
+ "counts": {
+  "verts": 44246,
+  "faces": 85430,
+  "raw_mesh_verts": 548677,
+  "raw_mesh_faces": 691694
+ },
+ "bones": [
+  "root",
+  "spine",
+  "hips",
+  "neck",
+  "head",
+  "leg.FL",
+  "leg2.FL",
+  "leg.HL",
+  "leg2.HL",
+  "leg.FR",
+  "leg2.FR",
+  "leg.HR",
+  "leg2.HR",
+  "tail.1",
+  "tail.2"
+ ],
+ "actions": [
+  "idle",
+  "run",
+  "walk",
+  "wiggle"
+ ],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": true,
+  "rig_template": "quadruped",
+  "signature_clip": "wiggle",
+  "weight_method": "bone-heat (automatic weights); geodesic distance veto (factor 0.85, floor 0.19); label-aware veto (P3-SAM parts, 14755 entries vetoed by label); distance rescue on 12612 verts",
+  "segmentation": {
+   "model": "P3-SAM (Tencent Hunyuan3D-Part)",
+   "parts": 12,
+   "proxy_faces": 49999,
+   "islands_relabelled": 82,
+   "separated_verts_added": 1554,
+   "labelled_verts": 44246
+  },
+  "label_map": {
+   "0": {
+    "dominant": "leg.FL",
+    "allowed": [
+     "head",
+     "leg.FL",
+     "leg2.FL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FR",
+     "leg2.FR"
+    ]
+   },
+   "1": {
+    "dominant": "leg.FL",
+    "allowed": [
+     "head",
+     "leg.FL",
+     "leg2.FL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FR",
+     "leg2.FR"
+    ]
+   },
+   "2": {
+    "dominant": "leg.FL",
+    "allowed": [
+     "head",
+     "leg.FL",
+     "leg2.FL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FR",
+     "leg2.FR"
+    ]
+   },
+   "3": {
+    "dominant": "leg.FL",
+    "allowed": [
+     "head",
+     "leg.FL",
+     "leg2.FL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FR",
+     "leg2.FR"
+    ]
+   },
+   "4": {
+    "dominant": "leg.FR",
+    "allowed": [
+     "head",
+     "leg.FR",
+     "leg2.FR",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FL",
+     "leg2.FL"
+    ]
+   },
+   "5": {
+    "dominant": "leg2.FL",
+    "allowed": [
+     "head",
+     "leg.FL",
+     "leg2.FL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FR",
+     "leg2.FR"
+    ]
+   },
+   "6": {
+    "dominant": "leg.FL",
+    "allowed": [
+     "head",
+     "leg.FL",
+     "leg.HL",
+     "leg2.FL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FR",
+     "leg2.FR"
+    ]
+   },
+   "7": {
+    "dominant": "leg.FL",
+    "allowed": [
+     "head",
+     "leg.FL",
+     "leg2.FL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FR",
+     "leg2.FR"
+    ]
+   },
+   "8": {
+    "dominant": "leg2.FR",
+    "allowed": [
+     "head",
+     "leg.FR",
+     "leg2.FR",
+     "leg2.HL",
+     "leg2.HR",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FL",
+     "leg2.FL"
+    ]
+   },
+   "9": {
+    "dominant": "leg2.FL",
+    "allowed": [
+     "head",
+     "leg.FL",
+     "leg2.FL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FR",
+     "leg2.FR"
+    ]
+   },
+   "10": {
+    "dominant": "leg.FR",
+    "allowed": [
+     "head",
+     "leg.FR",
+     "leg2.FR",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FL",
+     "leg2.FL"
+    ]
+   },
+   "11": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "hips",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FL",
+     "leg.FR",
+     "leg2.FL",
+     "leg2.FR"
+    ]
+   }
+  },
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "runner": {
+    "name": "axolotl-capybara_shape",
+    "exit_code": 0,
+    "seconds": 295.48,
+    "baseline_vram_mib": 972,
+    "peak_vram_mib": 7776,
+    "peak_delta_mib": 6804,
+    "vram_after_exit_mib": 1333,
+    "n_samples": 607,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"axolotl-capybara_shape\", \"exit_code\": 0, \"seconds\": 295.48, \"baseline_vram_mib\": 972, \"peak_vram_mib\": 7776, \"peak_delta_mib\": 6804, \"vram_after_exit_mib\": 1333, \"n_samples\": 607}\r\n"
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 345961,
+    "faces": 691698,
+    "load_s": 95.47,
+    "inference_s": 181.91,
+    "total_s": 277.45,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\axolotl-capybara\\shape.glb"
+   }
+  },
+  "texture_stage": {
+   "runner": {
+    "name": "axolotl-capybara_texture",
+    "exit_code": 0,
+    "seconds": 763.33,
+    "baseline_vram_mib": 1333,
+    "peak_vram_mib": 12079,
+    "peak_delta_mib": 10746,
+    "vram_after_exit_mib": 878,
+    "n_samples": 1594,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"axolotl-capybara_texture\", \"exit_code\": 0, \"seconds\": 763.33, \"baseline_vram_mib\": 1333, \"peak_vram_mib\": 12079, \"peak_delta_mib\": 10746, \"vram_after_exit_mib\": 878, \"n_samples\": 1594}\r\n"
+   },
+   "stats": {
+    "stage": "texture",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+    "verts": 548677,
+    "faces": 691698,
+    "load_s": 105.01,
+    "texture_s": 630.31,
+    "total_s": 736.18,
+    "torch_peak_mib": 9945.6,
+    "output": "D:\\asset-forge-lab\\out\\gab\\axolotl-capybara\\textured.glb"
+   }
+  }
+ },
+ "clips": {
+  "idle": {
+   "frames": 115,
+   "fps": 24,
+   "seconds": 4.79
+  },
+  "run": {
+   "frames": 24,
+   "fps": 24,
+   "seconds": 1.0
+  },
+  "walk": {
+   "frames": 48,
+   "fps": 24,
+   "seconds": 2.0
+  },
+  "wiggle": {
+   "frames": 58,
+   "fps": 24,
+   "seconds": 2.42
+  }
+ }
+}
