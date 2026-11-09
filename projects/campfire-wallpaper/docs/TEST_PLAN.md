@@ -430,3 +430,21 @@ the finer ground grain, smoother rocks and bushes, and
 the smoother ridge skyline. `preview.jpg` regenerated
 from the new build's golden-sunset capture
 (`def-sunset-gold.png`, sun just below the horizon).
+
+**Redeploy (2026-11-09 ~11:51–11:53 local).**
+`js/wallpaper.js` (sha256
+`54ae175c934cd67a7c8fc4ac326cb7c6ea362972d0b16431af6e29bef66b06b1`)
+and `preview.jpg` (sha256
+`3367c20a890a3b6b32c0f9d4ddf3704d530c38535cc3c9449c057057381de865`)
+synced via the bridge to both PC copies and hash-verified
+at all four destination files; Lively killed and
+relaunched, the Campfire Companions tile re-invoked via
+UIA, the UI process closed afterwards. The final live
+screenshot (10:59 PC clock, morning sun) shows the
+higher-definition scene on the real 3840×2160 desktop:
+a triceratops and the ember dragon at the fire, a snow
+goblin walking in, smoother rocks and ridgeline, crisper
+creature textures. (Bridge note: quoted paths inline in
+exec commands get mangled by the cmd wrapping — the
+certutil verification ran from a staged `.cmd`; unquoted
+space-free paths work inline.)

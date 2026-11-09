@@ -200,6 +200,25 @@ afterwards leaving core + watchdog + player. The final live
 screenshot (06:00, moonless night) shows the open frame and
 the tiered treeline on the real desktop — see
 docs/TEST_PLAN.md, "tree fix pass".
+The definition pass (2026-11-09, owner-directed: "increase
+the definition of everything") raised fidelity across the
+board — ground mesh at 170×170 segments, higher segment
+counts on every primitive family, rocks and bushes one
+subdivision richer, ridge steps 88 → 160, moon texture
+512², pixel-ratio cap raised to 2, and anisotropic
+filtering (≤ 8) applied to the GLB textures at load.
+Measured on frozen-noon probe copies: 217,024 → 311,626
+triangles at an unchanged 119 draw calls, SwiftShader fps
+22 → 22. Its redeploy (2026-11-09 ~11:51) repeated the
+route for `js/wallpaper.js` (sha256
+`54ae175c934cd67a7c8fc4ac326cb7c6ea362972d0b16431af6e29bef66b06b1`)
+and `preview.jpg` (sha256
+`3367c20a890a3b6b32c0f9d4ddf3704d530c38535cc3c9449c057057381de865`):
+destination hashes verified at all four files, Lively
+relaunched, tile re-invoked, UI closed after. The final
+live screenshot (10:59 PC clock, morning sun) shows a
+triceratops and the ember dragon at the fire — see
+docs/TEST_PLAN.md, "definition pass".
 
 ## Verification (see docs/TEST_PLAN.md for the full record)
 
