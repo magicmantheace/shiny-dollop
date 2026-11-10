@@ -1,0 +1,190 @@
+{
+ "entry_version": 1,
+ "name": "Mandrake Toddler",
+ "slug": "mandrake-toddler",
+ "source_concept": "media-generation-media-generation-mandrake-todd-0-92537b0a-a935-4625-8c75-df3aba105ca8.webp",
+ "asset_file": "mandrake-toddler.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "c9010c3a7ccd1625f661c134417dcf769567bc808e2eb08a089ff7c919b738b0",
+ "bytes": 20635552,
+ "counts": {
+  "verts": 45013,
+  "faces": 87389,
+  "raw_mesh_verts": 558050,
+  "raw_mesh_faces": 710862
+ },
+ "bones": [
+  "root",
+  "spine",
+  "head",
+  "arm.L",
+  "arm2.L",
+  "arm.R",
+  "arm2.R",
+  "leg.L",
+  "leg2.L",
+  "leg.R",
+  "leg2.R"
+ ],
+ "actions": [
+  "idle",
+  "run",
+  "scream",
+  "walk"
+ ],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": true,
+  "rig_template": "biped",
+  "signature_clip": "scream",
+  "weight_method": "bone-heat (automatic weights); geodesic distance veto (factor 0.85, floor 0.19); label-aware veto (P3-SAM parts, 335 entries vetoed by label); distance rescue on 1595 verts",
+  "segmentation": {
+   "model": "P3-SAM (Tencent Hunyuan3D-Part)",
+   "parts": 9,
+   "proxy_faces": 49997,
+   "islands_relabelled": 35,
+   "separated_verts_added": 1375,
+   "labelled_verts": 45013
+  },
+  "label_map": {
+   "0": {
+    "dominant": "head",
+    "allowed": [
+     "arm.L",
+     "arm.R",
+     "arm2.L",
+     "arm2.R",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg2.R"
+    ]
+   },
+   "1": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg2.R"
+    ]
+   },
+   "2": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg2.R"
+    ]
+   },
+   "3": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg2.R"
+    ]
+   },
+   "4": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg2.R"
+    ]
+   },
+   "5": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg2.R"
+    ]
+   },
+   "6": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg2.R"
+    ]
+   },
+   "7": {
+    "dominant": "leg2.R",
+    "allowed": [
+     "arm2.R",
+     "head",
+     "leg.R",
+     "leg2.L",
+     "leg2.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "8": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg2.R"
+    ]
+   }
+  },
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ },
+ "clips": {
+  "idle": {
+   "frames": 115,
+   "fps": 24,
+   "seconds": 4.79
+  },
+  "run": {
+   "frames": 24,
+   "fps": 24,
+   "seconds": 1.0
+  },
+  "scream": {
+   "frames": 72,
+   "fps": 24,
+   "seconds": 3.0
+  },
+  "walk": {
+   "frames": 36,
+   "fps": 24,
+   "seconds": 1.5
+  }
+ }
+}

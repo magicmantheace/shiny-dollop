@@ -159,7 +159,12 @@ killed at 2h33m and ~60 min) and the **Mandrake Toddler** (retry
 paint died mid-bake without a traceback after its first attempt
 was killed on a memory criterion the pack's own evidence later
 disproved — both failures are written up in their
-`outputs/<slug>/attempt1-texture-note.txt`). The pack's main
+`outputs/<slug>/attempt1-texture-note.txt`).
+**Update (2026-11-10): the Mandrake verdict was wrong — its retry
+paint had succeeded and the finished texture was recovered from
+the lab; the remaining stages then ran and the Mandrake Toddler
+is catalogued (7 of 8), leaving only the Ember Owl-Cat
+unfinished.** The pack's main
 operational finding: the paint bake's ~17.7 GB private-memory
 plateau is its fixed footprint on large meshes, not a runaway;
 the completed paints ran 763–2,524 runner-seconds, the tortoise

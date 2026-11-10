@@ -722,3 +722,15 @@ cost of the new creatures in the wallpaper scene.
   fallen-log v2, stump — all read as their subjects.
 - Not verified: Godot playback of the pack GLBs; in-scene wallpaper
   captures (integration step, gated-load caveat in MUSE_HANDOFF).
+
+## Mandrake Toddler finish (2026-11-10)
+
+- Resumed from the recovered textured.glb (see the correction in
+  `docs/PAINT_STALL.md`): segment → rig → animate → catalog in
+  380 s. Catalog-verify sha256 MATCH.
+- Rig: biped template, 11 bones, bone-heat weights with the
+  label-aware veto; weight coverage 1.0, unweighted 0.0%.
+- Clips in the final GLB: idle, walk, run, scream.
+- Renders inspected: rest pose reads as the character; the
+  scream pose tears at the papery shell skirt (disclosed).
+- Suite: 134 passed (test_ui catalog set + bone count updated).

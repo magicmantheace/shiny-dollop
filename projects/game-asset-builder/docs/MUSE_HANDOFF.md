@@ -467,7 +467,7 @@ Next:
 Boundaries: no cloud fallback exists or may be added; weights and outputs
 never enter git; GPU claims only from PC runs; merges are the owner's call.
 
-## P5 campfire creatures — COMPLETE, 6 of 8 (2026-11-09, branch game-asset-builder/p5-campfire-creatures, stacked on P4)
+## P5 campfire creatures — COMPLETE, 6 of 8 (2026-11-09, branch game-asset-builder/p5-campfire-creatures, stacked on P4) — 7 of 8 after the 2026-11-10 Mandrake finish (see the last section)
 
 Owner commissioned eight "weird smashup" creatures for the
 campfire wallpaper (2026-11-08): batch 1 = Moth-Hart, Toasty,
@@ -759,3 +759,23 @@ What is NOT proven / failed honestly:
   only); wallpaper integration is a separate step (the pack was
   built for the campfire scene; the pine section's harness
   gated-load caveat still applies there).
+
+## Mandrake Toddler — FINISHED (2026-11-10, branch game-asset-builder/mandrake-finish, stacked on env-pack)
+
+The P5 verdict for Mandrake was corrected on 2026-11-10 (see
+`docs/PAINT_STALL.md` and `outputs/mandrake-toddler/CORRECTION-2026-11-10.md`):
+its retry paint had actually succeeded (967.81 s, exit 0) and the
+textured GLB was recovered from the lab. At the owner's direction
+the remaining stages then ran from that file (`--resume`, biped,
+signature `scream`): segment (P3-SAM) → rig → animate → catalog,
+380 s total. Result: **catalogued, catalog-verify sha256 MATCH**;
+11-bone biped rig with bone-heat weights (coverage 1.0; head
+dominance 0.98, hands 0.92, feet 0.92 — no distance fallback);
+clips idle / walk / run / `scream`. Rest and scream renders
+inspected — a grumpy purple-white mandrake with green sprout
+hair; the scream pose deforms its papery shell skirt, disclosed
+as-is. The P5 pack now stands at **7 of 8 catalogued**; only the
+Ember Owl-Cat remains unfinished (its paint failure is genuine —
+same VAE stall as the pine, see PAINT_STALL.md). Mandrake also
+joined the campfire wallpaper roster the same day (wallpaper
+project records). Suite: 134 passed (catalog-set test updated).
