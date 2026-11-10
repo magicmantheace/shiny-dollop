@@ -331,3 +331,21 @@ unmeasured, as before.
    creature is the same drop-in: new GLB + one config row; re-sync
    BOTH PC copies and re-apply in Lively afterwards.
 2. PR #49 stays draft until the owner says merge.
+
+
+## Ember Owl-Cat joins the roster (2026-11-10)
+
+The last commissioned creature is in. The builder fixed its
+Hunyuan paint stall (a CUDA caching-allocator pathology, cured by
+`expandable_segments` — builder `docs/PAINT_STALL.md`), and the
+Ember Owl-Cat finished segment → rig → animate → catalog
+(catalog-verify MATCH). Roster row: height 1.0, speed 0.9,
+`bounce` travel, signature `headturn`, bobAmp 0.06. GLB in
+`assets/` is the byte-for-byte catalog copy, sha256
+`f5a642353fa8cc892ed4a1f95c2b44805ed922ae0e496f31be738d831eea5500`
+(20,053,292 bytes — the largest template; on-stage count is still
+capped by MAX_ACTIVE = 3). Gated golden-hour harness capture:
+all eleven templates loaded with zero errors, Owl-Cat entering
+on `walk`. **The roster is complete: 11 creatures** (the original
+three + all eight P5 smashups). Deployed live the same day —
+both PC copies re-synced and hash-verified, Lively re-applied.

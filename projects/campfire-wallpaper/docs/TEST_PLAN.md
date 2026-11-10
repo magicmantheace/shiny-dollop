@@ -517,3 +517,22 @@ the real desktop.
   loaded, zero load/console errors; Lantern Snail dwelling at
   the fire (lantern shell lit even at noon), Axolotl-Capybara
   and Crow Postman entering on `walk`.
+
+
+## Ember Owl-Cat joins the roster (2026-11-10)
+
+- The builder's paint fix (CUDA allocator; builder project
+  records) let the Owl-Cat finish: catalog-verify MATCH, 14-bone
+  winged-creature rig, clips idle/walk/run/`headturn`. Its GLB is
+  in `assets/` byte-for-byte from the catalog (sha256
+  `f5a642353fa8cc892ed4a1f95c2b44805ed922ae0e496f31be738d831eea5500`,
+  20,053,292 bytes — the largest template; MAX_ACTIVE still caps
+  on-stage creatures at 3, so steady-state cost is unchanged
+  beyond one more template in memory).
+- Gated golden-hour capture (`owlcat-golden.png`): **all eleven
+  templates loaded, zero load/console errors**; the Owl-Cat was
+  on stage entering on its `walk` clip (director status), the
+  Mandrake dwelling at the fire. Harness fps 22 (SwiftShader,
+  indicative only; real-GPU frame cost still unmeasured).
+- The commissioned roster is now complete: all eight P5 smashup
+  creatures plus the original three are in the scene.

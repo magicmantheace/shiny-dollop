@@ -1929,6 +1929,8 @@ const CREATURES = [
     speed: 1.2, travelStyle: 'glide', signature: 'bow', bobAmp: 0.03 },
   { slug: 'mandrake-toddler', file: 'assets/mandrake-toddler.glb', height: 0.95,
     speed: 1.1, travelStyle: 'bounce', signature: 'scream', bobAmp: 0.09 },
+  { slug: 'ember-owl-cat', file: 'assets/ember-owl-cat.glb', height: 1.0,
+    speed: 0.9, travelStyle: 'bounce', signature: 'headturn', bobAmp: 0.06 },
 ];
 const MAX_ACTIVE = 3;
 const SPAWN_RADIUS = 30;
