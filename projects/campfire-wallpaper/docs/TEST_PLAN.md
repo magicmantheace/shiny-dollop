@@ -471,3 +471,16 @@ space-free paths work inline.)
   fps unchanged at 22 (software renderer — indicative only);
   real-GPU frame cost still unmeasured, same standing limit as
   the AAA experiment itself.
+
+**Pack redeploy (2026-11-10 ~08:25 local).** `js/wallpaper.js`
+(sha256 `318cf774ca6f86faab6de54b432d223211677d68b629f7663b820ab7b32bcb92`)
+plus the seven pack GLBs synced via the bridge to both PC copies;
+all 16 destination files hash-verified against the repo copies.
+Lively killed and relaunched, Campfire Companions re-invoked via
+UIA, UI process closed afterwards. The live screenshot (PC clock
+3:34 AM, night) shows the pack in place on the real 3840×2160
+desktop: builder stump seats at the fire, glowing mushroom
+clusters, ferns, berry bushes, the mid-field boulder and detailed
+pines against the fog forest wall. No creature was in frame at
+the capture instant (the director had the circle momentarily
+empty; creatures spawn at the edges and walk in).
