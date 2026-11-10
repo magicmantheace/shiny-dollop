@@ -65,7 +65,11 @@ a few seconds.
   (Ember Dragon, Snow Goblin, Triceratops) plus the six P5 weird
   smashups: Moth-Hart, Toasty, Lantern Snail (no walk clip — it
   travels on its idle, glide-style, and retracts as its signature),
-  Axolotl-Capybara, Geode Tortoise, and Crow Postman. The fallback, for any future GLB
+  Axolotl-Capybara, Geode Tortoise, and Crow Postman — plus the
+  Mandrake Toddler, whose builder run was finished on 2026-11-10
+  after its paint was recovered (signature: `scream`). Only the
+  Ember Owl-Cat of the commissioned eight is still missing; its
+  paint failure is genuine and awaits the paint fix. The fallback, for any future GLB
   without a walk clip, is each creature's natural gait: the dragon
   hops, the triceratops bounces, the goblin glides. Adding a creature
   later needs no director change — drop the GLB in `assets/`, add a

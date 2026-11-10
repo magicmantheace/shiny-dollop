@@ -507,3 +507,13 @@ all 14 destination files hash-verified. Lively relaunched and
 re-applied; live screenshots show the Lantern Snail glowing at
 the fire beside the Ember Dragon — the new roster is on stage on
 the real desktop.
+
+## Mandrake Toddler joins the roster (2026-11-10)
+
+- The builder finished the Mandrake (catalog-verify MATCH,
+  11-bone biped, clips idle/walk/run/`scream`); added to
+  `CREATURES` with the catalog-byte-identical GLB.
+- Gated noon capture (`mandrake-noon.png`): all ten templates
+  loaded, zero load/console errors; Lantern Snail dwelling at
+  the fire (lantern shell lit even at noon), Axolotl-Capybara
+  and Crow Postman entering on `walk`.

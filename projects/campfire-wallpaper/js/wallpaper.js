@@ -1927,6 +1927,8 @@ const CREATURES = [
     speed: 0.5, travelStyle: 'bounce', signature: 'shiver', bobAmp: 0.04 },
   { slug: 'crow-postman', file: 'assets/crow-postman.glb', height: 1.15,
     speed: 1.2, travelStyle: 'glide', signature: 'bow', bobAmp: 0.03 },
+  { slug: 'mandrake-toddler', file: 'assets/mandrake-toddler.glb', height: 0.95,
+    speed: 1.1, travelStyle: 'bounce', signature: 'scream', bobAmp: 0.09 },
 ];
 const MAX_ACTIVE = 3;
 const SPAWN_RADIUS = 30;
