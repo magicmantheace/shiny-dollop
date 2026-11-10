@@ -536,3 +536,13 @@ the real desktop.
   indicative only; real-GPU frame cost still unmeasured).
 - The commissioned roster is now complete: all eight P5 smashup
   creatures plus the original three are in the scene.
+
+**Owl-Cat redeploy (2026-11-10 ~15:40 local).** `js/wallpaper.js`
+(sha256 `293e822accef919ea01f8cdba11c30eb53b5b057153eefd407f40648d3929bdb`)
+plus `assets/ember-owl-cat.glb` synced via the bridge to both PC
+copies; all 4 destination files hash-verified (GLB
+`f5a642353fa8…`). Lively relaunched and re-applied; live
+screenshot shows the afternoon scene running on the real desktop.
+(The roster is stochastic — no creature was in the foreground
+for this capture; the Owl-Cat's on-stage `walk` entry is proven
+by the gated harness capture above.)
