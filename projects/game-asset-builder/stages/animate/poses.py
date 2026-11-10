@@ -599,10 +599,12 @@ TEMPLATE_RECIPES["snail"] = {
 def winged_headturn(t: float) -> dict:
     """Ember Owl-Cat signature: a real owl head-turn — swing to one
     side and HOLD, sweep to the other side and hold, then settle
-    back to centre, with a small two-beat wing shuffle. (The first
-    version's 0.55 rad sine read as a polite tilt once the
-    distance-fallback weights smeared it; 1.05 rad plateaus read
-    as a turn.)"""
+    back to centre, with a small two-beat wing shuffle. (Amplitude
+    history: the original 0.55 rad sine read as a polite tilt; a
+    ±1.05 rad plateau version still read tilted because the
+    bone-local Z axis is canted and dipped the beak ~0.25 as it
+    turned — the animate stage now drives head_yaw about the
+    armature's vertical axis instead, so the turn stays level.)"""
     period = 3.2
     ph = t / period
     tt = t % period

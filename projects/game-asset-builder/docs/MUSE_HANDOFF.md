@@ -844,3 +844,30 @@ neck tearing; action-frame ground dip −0.024, negligible. A new
 test locks the plateaus (`test_headturn_is_a_real_turn_with_holds`);
 suite 135 passed. The wallpaper copy was re-synced the same day
 (wallpaper project records).
+
+
+## Headturn correction (2026-11-10, later) — the turn is now a turn
+
+Correction to the entry above: the owner rejected the ±1.05 rad
+version too — measured against his definition (an owl turn is a
+level horizontal swivel; what he saw was a tilt), he was right.
+Landmark measurement on the baked clip (beak-tip vertex, world
+space) showed the bone-local Z rotation produced yaw +92°/−66°
+**with the beak dipping 0.25–0.30** — the head bone's local Z is
+canted, so the "turn" was a dipping cone sweep. A pitch-compensation
+sweep proved euler channels cannot cancel the dip. Fix: the
+animate stage's driver table now maps the winged-creature
+`head_yaw` channel to a new `world_z` axis kind — `set_pose`
+conjugates the armature-vertical rotation by the bone's rest
+orientation (folding in the pitch accent), so the head rotates
+about the world vertical. Re-measured on the re-baked clip:
+**yaw −55.0° / +57.7° at the two holds, beak height change
++0.001 / −0.005** — level. The apex render now shows a
+near-profile side-look, head upright. Animate-only again (rig
+untouched; pre-fix GLB backed up under
+`outputs/ember-owl-cat/backup-pre-world-yaw/`). New catalog
+sha256 `98bc4f3f5c25f9ecb941a0d63ab387e14139fa808f2d16f4fcf779d2dad7102f`;
+catalog-verify MATCH; suite 135 passed. Note for future
+templates: any bone-local yaw on a canted bone has the same
+trap — prefer `world_z` for head turns. The wallpaper copy was
+re-synced the same day (wallpaper project records).

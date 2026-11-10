@@ -772,3 +772,20 @@ cost of the new creatures in the wallpaper scene.
 - Apex render inspected: clear side-look, no neck tearing.
 - Catalog-verify sha256 MATCH (`2bd78ce04579…`); suite 135
   passed (new plateau test added).
+
+
+## Headturn correction — world-axis yaw (2026-11-10)
+
+- Owner rejected the plateau version as still a tilt. Landmark
+  measurement (beak-tip vertex in world space) on the baked
+  clip: yaw +92°/−66° but beak dip −0.25/−0.30 — the canted
+  bone-local Z axis sweeps a cone. Pitch compensation sweep:
+  dip is euler-uncancellable (stays ≈ −0.24…−0.34 at all
+  pitch values).
+- Fix: `head_yaw` for winged-creature now uses a `world_z`
+  driver (animate stage conjugates the armature-vertical
+  rotation by the bone's rest orientation).
+- Re-measured on the re-baked clip: yaw −55.0° / +57.7°,
+  beak height Δ +0.001 / −0.005. Apex render: near-profile,
+  level head. Catalog-verify MATCH (`98bc4f3f5c25…`); suite
+  135 passed.

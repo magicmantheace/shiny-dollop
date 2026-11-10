@@ -66,7 +66,7 @@ FPS = 24
 DRIVERS = {
     "winged-creature": [
         ("head", "head_pitch", "x", 1.0),
-        ("head", "head_yaw", "z", 1.0),
+        ("head", "head_yaw", "world_z", 1.0),
         ("ear.L", "ear_pitch", "x", 1.0),
         ("ear.R", "ear_pitch", "x", 1.0),
         ("wing.L", "wing_pitch", "x", 1.0),
@@ -193,6 +193,9 @@ def set_pose(arm, pose, lift_axis, template):
             continue  # template option off (e.g. no ears) — skip
         key = (bone_name, axis)
         totals[key] = totals.get(key, 0.0) + pose.get(channel, 0.0) * scale
+    world_yaws = {}
+    for key in [k for k in totals if k[1] == "world_z"]:
+        world_yaws[key[0]] = totals.pop(key)
     for (bone_name, axis), value in totals.items():
         bone = pb[bone_name]
         if axis == "x":
@@ -201,6 +204,23 @@ def set_pose(arm, pose, lift_axis, template):
             bone.rotation_euler.y = value
         else:
             bone.rotation_euler.z = value
+    for bone_name, yaw in world_yaws.items():
+        # "world_z" drivers rotate the bone about the ARMATURE's
+        # vertical axis, not the bone's own (possibly canted) local
+        # axis: conjugate the world rotation by the bone's rest
+        # orientation. A bone-local Z turn on a leaning head bone
+        # yaws the face but also dips it — it reads as a tilt/bow,
+        # not an owl turn (owner correction, 2026-11-10). The
+        # bone's x-channel total (a pitch accent) is folded into
+        # the world rotation before conjugation.
+        from mathutils import Matrix
+        bone = pb[bone_name]
+        pitch = totals.get((bone_name, "x"), 0.0)
+        rest = bone.bone.matrix_local.to_3x3()
+        world = (Matrix.Rotation(yaw, 3, "Z")
+                 @ Matrix.Rotation(pitch, 3, "X"))
+        bone.rotation_euler = (rest.transposed() @ world
+                               @ rest).to_euler("XYZ")
     root = pb.get("root")
     if root is not None:
         if lift_axis == "y":
