@@ -819,3 +819,28 @@ Owl-Cat also joined the campfire wallpaper roster the same day
 (wallpaper project records). Suite: 134 passed (catalog-set test
 updated with the owl-cat at 14 bones). Still not verified: Godot
 playback of the owl-cat GLB (three.js/Cycles only).
+
+
+## Headturn rework (2026-11-10, branch game-asset-builder/mandrake-finish)
+
+The owner looked at the Owl-Cat's signature render and called it
+"a tilt more than a turn" — fair: 0.55 rad of sine yaw, smeared
+by the distance-fallback weights, read as a polite cock of the
+head. `winged_headturn` in `stages/animate/poses.py` is reworked
+to a true owl turn: swing to −1.05 rad and hold, sweep to
++1.05 rad and hold, settle back to centre (smoothstep segments,
+same 3.2 s period; wing/ear/tail accents unchanged). Rework was
+animate-only — the proven rig was kept: `animate_blender.py`
+re-baked the clips from the existing `rigged.glb`, then
+`render_verify.py` re-verified and re-rendered; catalog metadata
+and the run manifest's animate/catalog/verify records were
+updated to the new GLB (the pre-rework GLB + metadata are backed
+up under `outputs/ember-owl-cat/backup-pre-headturn-fix/`).
+New catalog sha256 `2bd78ce04579dbc605c7bcaf198ffa57c399165cec166ba6702f22c9e5844b3a`
+(same 20,053,292 bytes — only animation data changed);
+catalog-verify MATCH; weight coverage still 1.0; the apex render
+(frame 27, mid-hold) now shows an unmistakable side-look with no
+neck tearing; action-frame ground dip −0.024, negligible. A new
+test locks the plateaus (`test_headturn_is_a_real_turn_with_holds`);
+suite 135 passed. The wallpaper copy was re-synced the same day
+(wallpaper project records).

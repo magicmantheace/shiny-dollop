@@ -760,3 +760,15 @@ cost of the new creatures in the wallpaper scene.
   pose turns the head without tearing.
 - Suite: 134 passed (test_ui catalog set + owl-cat bone count).
 - Not verified: Godot playback of the owl-cat GLB.
+
+
+## Headturn rework (2026-11-10)
+
+- `winged_headturn` reshaped from a 0.55 rad sine to ±1.05 rad
+  plateaus with holds (owner: the sine read as "a tilt").
+- Animate-only regeneration from the catalogued rig; verify
+  re-run: coverage 1.0, clips idle/walk/run/headturn, apex frame
+  27 (mid-hold), action ground −0.024.
+- Apex render inspected: clear side-look, no neck tearing.
+- Catalog-verify sha256 MATCH (`2bd78ce04579…`); suite 135
+  passed (new plateau test added).

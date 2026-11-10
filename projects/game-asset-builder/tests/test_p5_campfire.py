@@ -114,6 +114,15 @@ class SignatureShapeTests(unittest.TestCase):
         self.assertGreater(max(values), 0.45)
         self.assertLess(min(values), -0.45)
 
+    def test_headturn_is_a_real_turn_with_holds(self):
+        # 2026-11-10 rework: the owner called the original 0.55 rad
+        # sine "a tilt more than a turn". The signature now swings
+        # to +/-1.05 rad plateaus and holds them.
+        fn, _ = poses.SIGNATURES["winged-creature"]["headturn"]
+        self.assertAlmostEqual(fn(0.85)["head_yaw"], -1.05, places=6)
+        self.assertAlmostEqual(fn(2.0)["head_yaw"], 1.05, places=6)
+        self.assertAlmostEqual(fn(3.1)["head_yaw"], 0.0, places=6)
+
     def test_biped_bounce_lifts_like_the_quadruped_one(self):
         fn, _ = poses.SIGNATURES["biped"]["bounce"]
         peak = max(fn(t / 100)["root_y"] for t in range(0, 125))

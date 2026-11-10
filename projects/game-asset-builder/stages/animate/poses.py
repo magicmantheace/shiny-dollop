@@ -597,13 +597,35 @@ TEMPLATE_RECIPES["snail"] = {
 # --- per-creature signatures for the existing templates --------------
 
 def winged_headturn(t: float) -> dict:
-    """Ember Owl-Cat signature: one slow full head-turn, left to
-    right and back, with a small two-beat wing shuffle."""
+    """Ember Owl-Cat signature: a real owl head-turn — swing to one
+    side and HOLD, sweep to the other side and hold, then settle
+    back to centre, with a small two-beat wing shuffle. (The first
+    version's 0.55 rad sine read as a polite tilt once the
+    distance-fallback weights smeared it; 1.05 rad plateaus read
+    as a turn.)"""
     period = 3.2
     ph = t / period
+    tt = t % period
+    amp = 1.05
+
+    def ease(x: float) -> float:
+        return _smoothstep(min(max(x, 0.0), 1.0))
+
+    if tt < 0.55:
+        yaw = -amp * ease(tt / 0.55)
+    elif tt < 1.15:
+        yaw = -amp
+    elif tt < 1.75:
+        yaw = amp * (2.0 * ease((tt - 1.15) / 0.6) - 1.0)
+    elif tt < 2.35:
+        yaw = amp
+    elif tt < 2.9:
+        yaw = amp * (1.0 - ease((tt - 2.35) / 0.55))
+    else:
+        yaw = 0.0
     return {
         **REST,
-        "head_yaw": 0.55 * math.sin(TAU * ph),
+        "head_yaw": yaw,
         "head_pitch": 0.03 * math.sin(2 * TAU * ph),
         "wing_pitch": 0.07 * math.sin(2 * TAU * ph),
         "wing2_pitch": 0.05 * math.sin(2 * TAU * ph - 0.6),
