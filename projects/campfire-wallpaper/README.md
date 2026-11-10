@@ -66,6 +66,13 @@ a few seconds.
   hops, the triceratops bounces, the goblin glides. Adding a creature
   later needs no director change — drop the GLB in `assets/`, add a
   config row, reload.
+- **The clearing's models are Game Asset Builder work.** The pines,
+  boulders, bushes, ferns, mushroom clusters, fallen logs, and stump
+  seats are the builder's catalogued environment pack (byte-for-byte
+  GLB copies in `assets/`), swapped in at the same spots the
+  procedural dressing used. The sky, ridges, ground, and fire stay
+  code. Rocks past 30 units stay procedural — the builder boulder
+  reads as a dark ball against the fog wall at range.
 - **The sky runs on the real clock.** Sun and moon positions are
   computed in the page (standard SunCalc/NOAA-style solar math and
   the standard lunar approximation) for **Lethbridge, Alberta —

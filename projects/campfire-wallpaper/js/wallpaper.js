@@ -893,6 +893,15 @@ const ridgeTex = makePaintedTexture(
     })));
 }
 
+/* Builder environment pack (Game Asset Builder, 2026-11-10): the
+   procedural dressing registers its placements here; once the
+   catalogued GLBs load, placeBuilderPack() swaps them in at the same
+   spots. Registration only records — the seeded layout RNG stream is
+   untouched, so every other placement in the scene is unchanged. */
+const BUILDER_SWAPS = { meshes: [], fernSpots: [], fernMesh: null,
+  mushroomMeshes: [], mushroomAnchors: [] };
+const builderPack = { pending: 0, done: false };
+
 // Scattered primitive set dressing: pines, rocks, bushes. Shared
 // geometries/materials, seeded placement, clearing kept free.
 {
@@ -928,6 +937,7 @@ const ridgeTex = makePaintedTexture(
     tree.add(fol);
     tree.rotation.y = layoutRand() * Math.PI * 2;
     place(tree, x, z);
+    BUILDER_SWAPS.meshes.push({ obj: tree, kind: 'pine' });
   }
   for (let i = 0; i < 18; i++) {           // rocks
     const [x, z] = scatterPos(5.5, 55);
@@ -937,6 +947,7 @@ const ridgeTex = makePaintedTexture(
     rock.rotation.set(layoutRand() * 3, layoutRand() * 3, layoutRand() * 3);
     place(rock, x, z);
     rock.position.y -= s * 0.25;
+    BUILDER_SWAPS.meshes.push({ obj: rock, kind: 'rock' });
   }
   for (let i = 0; i < 14; i++) {           // bushes
     const [x, z] = scatterPos(6, 48);
@@ -945,6 +956,7 @@ const ridgeTex = makePaintedTexture(
     bush.scale.set(s, s * 0.62, s);
     place(bush, x, z);
     bush.position.y += s * 0.25;
+    BUILDER_SWAPS.meshes.push({ obj: bush, kind: 'bush' });
   }
 }
 
@@ -1213,11 +1225,14 @@ function updateDressing(t, dt) {
                                     : 6 + layoutRand() * 40;
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
       if (distToPath(x, z) < 0.9) continue;
-      setInst(ferns, placed, x, z, 0.6 + layoutRand() * 0.75, 0.02);
+      const fs = 0.6 + layoutRand() * 0.75;
+      setInst(ferns, placed, x, z, fs, 0.02);
+      BUILDER_SWAPS.fernSpots.push([x, z, fs]);
       placed++;
     }
     ferns.count = placed;
     ferns.instanceMatrix.needsUpdate = true;
+    BUILDER_SWAPS.fernMesh = ferns;
   }
 
   /* More bushes, seven of them dotted with berries (one instanced
@@ -1236,6 +1251,7 @@ function updateDressing(t, dt) {
       bush.position.set(x, groundH(x, z) + s * 0.25, z);
       bush.rotation.y = layoutRand() * Math.PI * 2;
       scene.add(bush);
+      BUILDER_SWAPS.meshes.push({ obj: bush, kind: 'bush' });
       if (i < 7) {
         for (let k = 0; k < 9; k++) {
           const th = layoutRand() * Math.PI * 2, ph = layoutRand() * 1.1;
@@ -1290,6 +1306,8 @@ function updateDressing(t, dt) {
     });
     stems.instanceMatrix.needsUpdate = true;
     caps.instanceMatrix.needsUpdate = true;
+    BUILDER_SWAPS.mushroomMeshes = [stems, caps];
+    BUILDER_SWAPS.mushroomAnchors = anchors;
 
     const glowTex = radialSpriteTexture('rgba(140,255,215,0.85)', 'rgba(140,255,215,0)');
     const glows = [];
@@ -1381,6 +1399,7 @@ function updateDressing(t, dt) {
       const stump = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 0.48, 12), logMats);
       stump.position.set(x, groundH(x, z) + 0.24, z);
       scene.add(stump);
+      BUILDER_SWAPS.meshes.push({ obj: stump, kind: 'stump' });
     }
     const pile = new THREE.Group();
     const logGeo2 = new THREE.CylinderGeometry(0.11, 0.11, 1.15, 10);
@@ -1397,6 +1416,7 @@ function updateDressing(t, dt) {
     const block = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 0.5, 12), logMats);
     block.position.set(3.9, groundH(3.9, 3.3) + 0.25, 3.3);
     scene.add(block);
+    BUILDER_SWAPS.meshes.push({ obj: block, kind: 'stump' });
     const split = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.5, 10), logMats);
     split.position.set(3.9, groundH(3.9, 3.3) + 0.72, 3.3);
     scene.add(split);
@@ -1598,6 +1618,7 @@ function updateDressing(t, dt) {
       g.position.set(x, groundH(x, z), z);
       g.rotation.y = rotY;
       scene.add(g);
+      BUILDER_SWAPS.meshes.push({ obj: g, kind: 'log', len });
     }
     fallenLog(-8.2, 5.5, 0.9, 2.6);
     fallenLog(10.5, -2.5, -0.6, 2.2);
@@ -1993,6 +2014,142 @@ function placeChest() {
 // Gathering spots on the far side of the fire from the camera, so
 // the creatures face the flames (and mostly the viewer). One
 // creature per spot.
+// Builder environment pack: swap the registered procedural dressing
+// for the catalogued Game Asset Builder GLBs at the same spots. Each
+// GLB loads once and is cloned per spot; a failed load simply leaves
+// the procedural dressing in place. The hero pines keep the spots the
+// pine proof used.
+function groundPackClone(srcScene, place) {
+  const inner = srcScene.clone(true);
+  inner.traverse((o) => {
+    if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
+  });
+  place(inner);
+  const b2 = new THREE.Box3().setFromObject(inner);
+  inner.position.y -= b2.min.y;
+  const g = new THREE.Group();
+  g.add(inner);
+  return g;
+}
+
+function swapIn(srcScene, entry) {
+  const obj = entry.obj;
+  const wp = new THREE.Vector3();
+  obj.getWorldPosition(wp);
+  const size = new THREE.Box3().setFromObject(obj)
+    .getSize(new THREE.Vector3());
+  const rotY = obj.rotation.y || 0;
+  const rockRot = entry.kind === 'rock'
+    ? [obj.rotation.x, obj.rotation.y, obj.rotation.z] : null;
+  scene.remove(obj);
+  const g = groundPackClone(srcScene, (inner) => {
+    const s0 = new THREE.Box3().setFromObject(inner)
+      .getSize(new THREE.Vector3());
+    if (entry.kind === 'log') {
+      if (s0.z > s0.x) inner.rotation.y = Math.PI / 2;
+      inner.scale.setScalar(entry.len / Math.max(s0.x, s0.z));
+    } else {
+      inner.scale.setScalar((size.y || 1) / (s0.y || 1));
+    }
+    if (rockRot) inner.rotation.set(rockRot[0], rockRot[1], rockRot[2]);
+  });
+  g.position.set(wp.x, groundH(wp.x, wp.z) - 0.05, wp.z);
+  if (!rockRot) g.rotation.y = rotY;
+  scene.add(g);
+}
+
+function placeBuilderPack() {
+  const swapKind = (srcScene, kind) => {
+    for (const e of BUILDER_SWAPS.meshes) {
+      if (e.kind !== kind) continue;
+      // Far rocks stay procedural: the builder boulder is a smooth
+      // round form that reads as a dark ball against the fog wall at
+      // range; up close it reads as a rock. (Noon capture, 2026-11-10.)
+      if (kind === 'rock') {
+        const p = e.obj.position;
+        if (Math.hypot(p.x, p.z) > 30) continue;
+      }
+      swapIn(srcScene, e);
+    }
+  };
+  const jobs = [
+    ['pine-tree', (srcScene) => {
+      const spots = [
+        { x: 11,   z: -7.5, h: 30, rot: 0.4 },   // the hero spot
+        { x: 7.5,  z: -14,  h: 27, rot: 1.7 },
+        { x: -14,  z: -11,  h: 28, rot: 2.9 },
+        { x: 18,   z: -20,  h: 29, rot: 0.9 },
+        { x: -6,   z: -22,  h: 4.9, rot: 2.1 },
+        { x: 24,   z: -9,   h: 4.4, rot: 1.2 },
+      ];
+      for (const s of spots) {
+        const g = groundPackClone(srcScene, (inner) => {
+          const s0 = new THREE.Box3().setFromObject(inner)
+            .getSize(new THREE.Vector3());
+          inner.scale.setScalar(s.h / (s0.y || 1));
+        });
+        g.position.set(s.x, groundH(s.x, s.z) - 0.05, s.z);
+        g.rotation.y = s.rot;
+        scene.add(g);
+      }
+      swapKind(srcScene, 'pine');
+    }],
+    ['boulder', (srcScene) => swapKind(srcScene, 'rock')],
+    ['bush', (srcScene) => swapKind(srcScene, 'bush')],
+    ['fern', (srcScene) => {
+      if (BUILDER_SWAPS.fernMesh) BUILDER_SWAPS.fernMesh.count = 0;
+      BUILDER_SWAPS.fernSpots.forEach(([x, z, fs], i) => {
+        if (i % 4 !== 0) return;
+        const g = groundPackClone(srcScene, (inner) => {
+          const s0 = new THREE.Box3().setFromObject(inner)
+            .getSize(new THREE.Vector3());
+          inner.scale.setScalar((fs * 0.95) / (s0.y || 1));
+        });
+        g.position.set(x, groundH(x, z) - 0.03, z);
+        g.rotation.y = Math.random() * Math.PI * 2;
+        scene.add(g);
+      });
+    }],
+    ['mushroom-cluster', (srcScene) => {
+      srcScene.traverse((o) => {
+        if (o.isMesh && o.material) {
+          o.material = o.material.clone();
+          o.material.emissive = new THREE.Color(0x0d4038);
+          o.material.emissiveIntensity = 0.6;
+        }
+      });
+      for (const m of BUILDER_SWAPS.mushroomMeshes) m.visible = false;
+      for (const [ax, az] of BUILDER_SWAPS.mushroomAnchors) {
+        const g = groundPackClone(srcScene, (inner) => {
+          const s0 = new THREE.Box3().setFromObject(inner)
+            .getSize(new THREE.Vector3());
+          inner.scale.setScalar(0.6 / (s0.y || 1));
+        });
+        g.position.set(ax, groundH(ax, az) - 0.03, az);
+        g.rotation.y = Math.random() * Math.PI * 2;
+        scene.add(g);
+      }
+    }],
+    ['fallen-log', (srcScene) => swapKind(srcScene, 'log')],
+    ['stump', (srcScene) => swapKind(srcScene, 'stump')],
+  ];
+  builderPack.pending = jobs.length;
+  for (const [slug, fn] of jobs) {
+    loader.load('assets/' + slug + '.glb', (gltf) => {
+      try { fn(gltf.scene); } catch (e) {
+        console.log('PACK_SWAP_ERROR ' + slug + ' ' + e);
+      }
+      if (--builderPack.pending <= 0) {
+        builderPack.done = true;
+        console.log('PACK_LOAD_OK');
+      }
+    }, undefined, (e) => {
+      console.log('PACK_LOAD_ERROR ' + slug + ' ' + e);
+      if (--builderPack.pending <= 0) builderPack.done = true;
+    });
+  }
+}
+
 const SPOTS = [-1.05, -0.52, 0, 0.52, 1.05].map((a) => ({
   pos: new THREE.Vector3(Math.sin(a) * 2.75, 0, Math.cos(a) * 2.75),
   takenBy: null,
@@ -2248,6 +2405,7 @@ function tick() {
 function publishStatus() {
   const s = {
     ready: true, fps,
+    builderDone: builderPack.done,
     loaded: [...templates.keys()],
     loadErrors,
     sky: skyState,
@@ -2280,6 +2438,7 @@ window.addEventListener('resize', () => {
 // otherwise make a travelling creature look parked. Combine with
 // &time=<epoch ms | ISO> to freeze the sun/moon at a chosen instant.
 if (PAGE_PARAMS.has('harness')) {
+  window.__scene = scene;
   window.__campfireStep = (steps, dt) => {
     for (let i = 0; i < steps; i++) {
       perfNow += dt * 1000;
@@ -2359,6 +2518,7 @@ composer.addPass(new OutputPass());
   // needless memory spike for a wallpaper that should sip resources.
   for (const cfg of CREATURES) await loadTemplate(cfg);
   placeChest();
+  placeBuilderPack();
   // Open mid-scene: one creature already warming itself, one on its
   // way in, and the director tops up from there.
   if (templates.size) {

@@ -298,6 +298,30 @@ sunset capture, used as the Lively thumbnail.
   than labelled; the page math itself was never wrong (its
   reported values matched the standalone math at both offsets).
 
+## Builder environment pack (2026-11-10)
+
+The foreground/mid-field dressing is now the Game Asset Builder's
+environment pack (pine-tree, boulder, bush, fern, mushroom-cluster,
+fallen-log, stump — catalogued GLBs, byte-for-byte copies in
+`assets/`). Mechanism: the procedural dressing blocks register their
+placements in `BUILDER_SWAPS` (record-only — the seeded layout RNG
+stream is untouched); `placeBuilderPack()` loads each GLB once and
+swaps clones in at the recorded spots, matching each procedural
+object's world height (length for the logs). Ferns swap every 4th
+instanced spot (~29 larger clones; the instanced mesh is emptied);
+mushroom clusters keep their glow sprites and gain a low teal
+emissive so the builder caps still read at night; rocks beyond
+30 units stay procedural (the round boulder reads as a dark ball
+against the fog wall at range — noon capture, 2026-11-10). The
+harness status now reports `builderDone`, and the sky-capture
+driver waits for it, which also fixes the static-load race that
+used to cost the treasure chest its screenshot. Verified: gated
+captures at noon, golden hour, and night with zero console errors,
+plus a scene-graph audit of all 107 pack placements. Cost: ~99
+extra draw calls and ~455k static vertices; the SwiftShader
+harness fps was unchanged (22), but real-GPU frame cost remains
+unmeasured, as before.
+
 ## Next steps (not done here)
 
 1. Possible v2: Lively properties (creature toggles, fire size),

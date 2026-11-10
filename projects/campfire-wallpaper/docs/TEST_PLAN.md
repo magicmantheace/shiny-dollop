@@ -448,3 +448,26 @@ creature textures. (Bridge note: quoted paths inline in
 exec commands get mangled by the cmd wrapping — the
 certutil verification ran from a staged `.cmd`; unquoted
 space-free paths work inline.)
+
+## Builder environment pack (2026-11-10)
+
+- Gated sky captures against the pack build (the driver now waits
+  for `builderDone` in the status JSON, so static GLB loads cannot
+  race the screenshot): noon (`pack-noon2.png`), golden hour
+  (`pack-golden.png`, `pack-aaa-golden.png`), night
+  (`pack-night.png`) — all with zero console errors and all three
+  creature templates loaded.
+- Scene-graph audit (headless, harness mode): all 107 pack
+  placements present with sane world scales/positions — 21 pines
+  (6 hero + 15 ring), 10 near boulders, 24 bushes, 29 ferns,
+  9 mushroom clusters, 2 fallen logs, 4 stumps. First noon capture
+  showed far boulders reading as dark balls against the fog wall;
+  rocks past 30 units now stay procedural and the re-capture is
+  clean.
+- Night capture confirms the mushroom glow survives the swap
+  (sprites kept; builder caps carry a low teal emissive).
+- Cost accounting: ~99 additional draw calls and ~455k static
+  vertices versus the procedural dressing. SwiftShader harness
+  fps unchanged at 22 (software renderer — indicative only);
+  real-GPU frame cost still unmeasured, same standing limit as
+  the AAA experiment itself.
