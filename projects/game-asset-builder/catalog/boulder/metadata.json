@@ -1,0 +1,46 @@
+{
+ "entry_version": 1,
+ "name": "Boulder",
+ "slug": "boulder",
+ "source_concept": "media-generation-envpack-rock-reference-0-03ce558c-e7c3-45cf-9f2b-360d876d3c63.webp",
+ "asset_file": "boulder.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "0d393bfe23cb1aff7898ad4b0e6b498ffd86bfb960858fa804c5e85e76fee855",
+ "bytes": 216276,
+ "counts": {
+  "verts": 4512,
+  "faces": 8962,
+  "raw_mesh_verts": 45013,
+  "raw_mesh_faces": 89997
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "procedural vertex-color (Blender) \u2014 Hunyuan3D paint not used for this asset (see texture_stage)",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "stage": "mesh",
+   "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+   "verts": 701344,
+   "faces": 1402670,
+   "load_s": 114.23,
+   "inference_s": 299.37,
+   "total_s": 413.78,
+   "torch_peak_mib": 5707.8,
+   "output": "D:\\asset-forge-lab\\out\\gab\\boulder\\shape.glb"
+  },
+  "texture_stage": {
+   "method": "procedural-vertex-color",
+   "tool": "Blender paint_env.py (generalized pack painter), run by Nyx 2026-11-10",
+   "input_mesh": "shape.glb: the Hunyuan shape (701,344 verts) decimated in Blender to 45,013 verts with custom split normals cleared and smooth shading restored (welded export verified: 45,013 verts, 8 components)",
+   "reason": "Hunyuan3D paint stalls inside its VAE encode on this machine (data-independent; investigation 2026-11-10, fix deferred at the owner's direction). Per the owner's 2026-11-10 directive the environment pack is painted procedurally; this is NOT Hunyuan paint output."
+  }
+ }
+}

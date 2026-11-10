@@ -1,0 +1,46 @@
+{
+ "entry_version": 1,
+ "name": "Fallen Log",
+ "slug": "fallen-log",
+ "source_concept": "media-generation-envpack-fallen-log-reference-0-552a9003-b383-42c9-965b-500e22fc21d4.webp",
+ "asset_file": "fallen-log.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "6af3ab2d7cce3bd5f57a8d9810a7cef4b8400cc0db7b7b2f391efdd72ebc6d72",
+ "bytes": 212532,
+ "counts": {
+  "verts": 4530,
+  "faces": 8848,
+  "raw_mesh_verts": 45023,
+  "raw_mesh_faces": 89973
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "procedural vertex-color (Blender) \u2014 Hunyuan3D paint not used for this asset (see texture_stage)",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "stage": "mesh",
+   "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+   "verts": 189602,
+   "faces": 379136,
+   "load_s": 110.26,
+   "inference_s": 296.17,
+   "total_s": 406.47,
+   "torch_peak_mib": 5707.8,
+   "output": "D:\\asset-forge-lab\\out\\gab\\fallen-log\\shape.glb"
+  },
+  "texture_stage": {
+   "method": "procedural-vertex-color",
+   "tool": "Blender paint_env.py (generalized pack painter), run by Nyx 2026-11-10",
+   "input_mesh": "shape.glb: the Hunyuan shape (189,602 verts) decimated in Blender to 45,023 verts with custom split normals cleared and smooth shading restored (welded export verified)",
+   "reason": "Hunyuan3D paint stalls inside its VAE encode on this machine (data-independent; investigation 2026-11-10, fix deferred at the owner's direction). Per the owner's 2026-11-10 directive the environment pack is painted procedurally; this is NOT Hunyuan paint output."
+  }
+ }
+}

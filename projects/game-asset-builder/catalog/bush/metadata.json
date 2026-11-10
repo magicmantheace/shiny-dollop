@@ -1,0 +1,46 @@
+{
+ "entry_version": 1,
+ "name": "Bush",
+ "slug": "bush",
+ "source_concept": "media-generation-envpack-bush-reference-0-3f6c8f4b-0d3b-460a-90ac-fd51497ce9d5.webp",
+ "asset_file": "bush.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "4ae69d8260bb39f3f0d7f38b43488629256fa6d0c80166ba616f6ec39cee6b4c",
+ "bytes": 218908,
+ "counts": {
+  "verts": 4918,
+  "faces": 9690,
+  "raw_mesh_verts": 44910,
+  "raw_mesh_faces": 89960
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "procedural vertex-color (Blender) \u2014 Hunyuan3D paint not used for this asset (see texture_stage)",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "stage": "mesh",
+   "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+   "verts": 955147,
+   "faces": 1910492,
+   "load_s": 113.29,
+   "inference_s": 298.1,
+   "total_s": 411.66,
+   "torch_peak_mib": 5707.8,
+   "output": "D:\\asset-forge-lab\\out\\gab\\bush\\shape.glb"
+  },
+  "texture_stage": {
+   "method": "procedural-vertex-color",
+   "tool": "Blender paint_env.py (generalized pack painter), run by Nyx 2026-11-10",
+   "input_mesh": "shape.glb: the Hunyuan shape (955,147 verts) decimated in Blender to 44,910 verts with custom split normals cleared and smooth shading restored (welded export verified: 44,910 verts, 165 components \u2014 foliage shells)",
+   "reason": "Hunyuan3D paint stalls inside its VAE encode on this machine (data-independent; investigation 2026-11-10, fix deferred at the owner's direction). Per the owner's 2026-11-10 directive the environment pack is painted procedurally; this is NOT Hunyuan paint output."
+  }
+ }
+}

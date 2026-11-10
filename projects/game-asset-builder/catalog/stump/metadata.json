@@ -1,0 +1,46 @@
+{
+ "entry_version": 1,
+ "name": "Stump",
+ "slug": "stump",
+ "source_concept": "media-generation-envpack-stump-reference-0-20796546-00f3-46a1-99ea-fd614e825a4d.webp",
+ "asset_file": "stump.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "61a123077f830cf1d7bf0fac8c1aeb1c73d7e28dcbe9c132053b5891a5c13ffe",
+ "bytes": 213632,
+ "counts": {
+  "verts": 4503,
+  "faces": 8876,
+  "raw_mesh_verts": 45003,
+  "raw_mesh_faces": 89997
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "procedural vertex-color (Blender) \u2014 Hunyuan3D paint not used for this asset (see texture_stage)",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "stage": "mesh",
+   "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+   "verts": 288671,
+   "faces": 577336,
+   "load_s": 113.51,
+   "inference_s": 300.29,
+   "total_s": 413.85,
+   "torch_peak_mib": 5707.8,
+   "output": "D:\\asset-forge-lab\\out\\gab\\stump\\shape.glb"
+  },
+  "texture_stage": {
+   "method": "procedural-vertex-color",
+   "tool": "Blender paint_env.py (generalized pack painter), run by Nyx 2026-11-10",
+   "input_mesh": "shape.glb: the Hunyuan shape decimated in Blender to ~45k verts with custom split normals cleared and smooth shading restored (welded export verified in paint_env.py output)",
+   "reason": "Hunyuan3D paint stalls inside its VAE encode on this machine (data-independent; investigation 2026-11-10, fix deferred at the owner's direction). Per the owner's 2026-11-10 directive the environment pack is painted procedurally; this is NOT Hunyuan paint output."
+  }
+ }
+}

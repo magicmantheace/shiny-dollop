@@ -1,0 +1,46 @@
+{
+ "entry_version": 1,
+ "name": "Fern",
+ "slug": "fern",
+ "source_concept": "media-generation-envpack-fern-reference-0-798b27f1-d9fc-404d-bb21-ba7a843a5af3.webp",
+ "asset_file": "fern.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "d7fd47df18085d2310c23a3b436f45a92ed6ac3d88557b347964afa1cd9d9648",
+ "bytes": 233708,
+ "counts": {
+  "verts": 4842,
+  "faces": 9958,
+  "raw_mesh_verts": 44838,
+  "raw_mesh_faces": 90034
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "procedural vertex-color (Blender) \u2014 Hunyuan3D paint not used for this asset (see texture_stage)",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "stage": "mesh",
+   "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+   "verts": 379017,
+   "faces": 758396,
+   "load_s": 112.79,
+   "inference_s": 297.73,
+   "total_s": 410.61,
+   "torch_peak_mib": 5707.8,
+   "output": "D:\\asset-forge-lab\\out\\gab\\fern\\shape.glb"
+  },
+  "texture_stage": {
+   "method": "procedural-vertex-color",
+   "tool": "Blender paint_env.py (generalized pack painter), run by Nyx 2026-11-10",
+   "input_mesh": "shape.glb: the Hunyuan shape decimated in Blender to ~45k verts with custom split normals cleared and smooth shading restored (welded export verified in paint_env.py output)",
+   "reason": "Hunyuan3D paint stalls inside its VAE encode on this machine (data-independent; investigation 2026-11-10, fix deferred at the owner's direction). Per the owner's 2026-11-10 directive the environment pack is painted procedurally; this is NOT Hunyuan paint output."
+  }
+ }
+}

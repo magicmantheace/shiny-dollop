@@ -726,3 +726,36 @@ What is NOT proven / failed honestly:
   lose. The three.js mini-scene proof above is the current
   evidence; a roster-style gated load or a harness settle-wait is
   the fix when the full environment pack is attempted.
+
+## Environment pack — COMPLETE (2026-11-10, branch game-asset-builder/env-pack, stacked on env-pine-proof)
+
+- Owner's directive (2026-11-10): after the paint investigation was
+  stopped, build the full environment pack with procedural paint; fix
+  Hunyuan paint later. The investigation's findings are summarised in
+  `docs/PAINT_STALL.md`.
+- **Catalogued (all sha256-verified, suite 134/134): pine-tree (from
+  the proof) + boulder, bush, fern, mushroom-cluster, fallen-log,
+  stump** — every one builder-shaped (Hunyuan3D-2 dit-v2-0 on the
+  owner's PC) and procedurally vertex-colour painted in Blender.
+  Per-asset Cycles renders were inspected: boulder (deepened grey +
+  moss palette v2 after v1 washed out), bush (layered leaf clusters),
+  fern (chunky arching fronds), mushroom-cluster (full teal caps via
+  an edge-relaxed normal/height field — a plain normal mask only
+  dusted the cap tops), fallen log + stump (deepened bark, moss,
+  pale ringed tops).
+- Production route per asset (the pack pattern): full pipeline run
+  for prep+mesh; the texture stage is then killed on the PC (it
+  stalls per PAINT_STALL.md) and the client stopped; paint runs via
+  `tools/paint_env.py` (decimate to ~45k in Blender, weld, clear
+  split normals, smooth shading, per-asset palette — flat shading was
+  rejected because the glTF exporter splits verts for it); finish
+  with `--resume`; restore truthful provenance with
+  `tools/fix_provenance.py` (the resume overwrites run-1 manifest
+  records with placeholders and the catalog would otherwise credit
+  Hunyuan paint — mesh records are restored from the lab stage
+  result + log). The painter's own export is re-imported and
+  verified (verts/components/Color attribute) before the finish.
+- Not verified: Godot playback of the pack GLBs (three.js/Cycles
+  only); wallpaper integration is a separate step (the pack was
+  built for the campfire scene; the pine section's harness
+  gated-load caveat still applies there).

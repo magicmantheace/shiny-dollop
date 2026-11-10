@@ -39,6 +39,13 @@ arm-weighted, so poses well beyond the shipped wave drag fur.
 Catalogue records: `catalog/triceratops/`, `catalog/snow-goblin/`,
 `catalog/treasure-chest/` (GLBs in local `outputs/`, sha-pinned).**
 
+**Environment pack (2026-11-10): seven unrigged props for scene work —
+pine-tree, boulder, bush, fern, mushroom-cluster, fallen-log, stump.**
+Builder-shaped on the owner's PC; painted procedurally (vertex
+colours) because the Hunyuan paint stage stalls on this machine —
+see `docs/PAINT_STALL.md`. Catalogue records under `catalog/<slug>/`.
+
+
 **P1.1 update (2026-11-06): the weight-distance veto is now part of
 the rig stage** (owner-flagged on the goblin's wave render: the body
 texture stretched with the raised arm). After bone heat, any

@@ -705,3 +705,20 @@ cost of the new creatures in the wallpaper scene.
   runs, never VM runs.
 - Bake-off scores are recorded in `benchmarks/pip/scores.md` in the same
   commit series that produces them, failures included.
+
+## Environment pack (2026-11-10)
+
+- Suite on branch `game-asset-builder/env-pack`: **134 passed** (the
+  catalog-set test now expects the seven pack props alongside the ten
+  proven assets, all unrigged).
+- `catalog-verify` MATCH for all seven: pine-tree, boulder, bush,
+  fern, mushroom-cluster, fallen-log, stump.
+- Each painter export was re-imported and verified before the finish
+  (vertex count, connected components, `Color` attribute present);
+  the first boulder attempt caught the split-vertex failure mode this
+  way (89,955 components) and was repainted welded.
+- Per-asset Cycles renders inspected (in the goal workspace):
+  boulder v2, bush, fern, mushroom-cluster v2 (cap field fix),
+  fallen-log v2, stump — all read as their subjects.
+- Not verified: Godot playback of the pack GLBs; in-scene wallpaper
+  captures (integration step, gated-load caveat in MUSE_HANDOFF).

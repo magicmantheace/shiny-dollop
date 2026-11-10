@@ -95,7 +95,10 @@ class CatalogDataTests(unittest.TestCase):
                                           "moth-hart", "toasty",
                                           "lantern-snail",
                                           "axolotl-capybara",
-                                          "geode-tortoise", "crow-postman"})
+                                          "geode-tortoise", "crow-postman",
+                                          "pine-tree", "boulder", "bush",
+                                          "fern", "mushroom-cluster",
+                                          "fallen-log", "stump"})
         self.assertEqual(summaries["ember-dragon"]["bone_count"], 14)
         self.assertEqual(summaries["moth-hart"]["bone_count"], 21)
         self.assertEqual(summaries["toasty"]["bone_count"], 11)
@@ -104,6 +107,9 @@ class CatalogDataTests(unittest.TestCase):
         self.assertEqual(summaries["geode-tortoise"]["bone_count"], 15)
         self.assertEqual(summaries["crow-postman"]["bone_count"], 11)
         self.assertFalse(summaries["treasure-chest"]["rigged"])
+        for slug in ("pine-tree", "boulder", "bush", "fern",
+                     "mushroom-cluster", "fallen-log", "stump"):
+            self.assertFalse(summaries[slug]["rigged"])
 
     def test_preview_path_rejects_traversal_and_non_png(self):
         self.assertIsNotNone(catalog_data.preview_path(
