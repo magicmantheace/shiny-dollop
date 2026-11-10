@@ -617,6 +617,34 @@ Axolotl-Capybara completed the same night and the
 1,643,448-face Tortoise completed outright); real-GPU frame
 cost of the new creatures in the wallpaper scene.
 
+## Environment proof: pine tree (2026-11-09, branch game-asset-builder/env-pine-proof)
+
+- Shape stage on the owner's PC: exit 0, 476.53 s, peak VRAM
+  9,209 MiB; output 243,514 verts / 487,126 faces, 13 components
+  (verified by re-import: 730,674 edges — a welded mesh, not soup).
+- Prop finish on the VM: 39,956 -> 4,961 verts / 9,940 faces at the
+  5,000-vert target; vertex colours survive the prop decimation;
+  `catalog-verify --slug pine-tree` = sha256 MATCH.
+- Painted-asset renders (Blender Cycles, real material): the
+  4,961-vert catalogued GLB reads as a stylized pine — deep-green
+  clustered canopy, visible tapered trunk (palette v2; v1 was
+  rejected as pale under AgX and re-authored deeper).
+- three.js load proof (VM, Chrome headless, SwiftShader, the
+  wallpaper project's own vendored three 0.180 + GLTFLoader): five
+  clones of the catalogued GLB at scene-scale heights (4.7-6.3)
+  beside the catalogued treasure chest — all load, vertex colours
+  render, real-time shadows cast/receive. Status gate was the
+  page's own load callback (PINES_READY), not a timer.
+- Paint stage failures (owner's PC, recorded not hidden): attempt
+  1 exit 1 after 10,801 s (killed at an owner-approved cap, flat
+  memory plateau throughout); attempt 2 invalid (vertex-split
+  export defect, see HANDOFF) killed at 3,243 s; attempt 3 on the
+  corrected welded 80k-face mesh exit 1 after 7,728.62 s (killed
+  at the 23:30 deadline; peak VRAM 12,021 MiB, same plateau). The
+  paint stage log stayed 0 bytes in every attempt; no textured
+  output was ever produced (lab output dir holds only the shape
+  inputs).
+
 ## Not yet verified
 
 - TRELLIS's proper textured export — blocked on the
@@ -658,6 +686,14 @@ cost of the new creatures in the wallpaper scene.
   and the animation studio's register/promote flow (the P3 studio
   export is files in its intake format, status candidate —
   promotion is the studio's own gated process and was not run).
+- The Hunyuan paint stage on ANY environment/foliage subject:
+  three attempts on the pine produced no result (see above);
+  whether a further-reduced mesh, a different concept, or a
+  paint-pipeline change unblocks it is untested.
+- Builder environment assets in the full campfire scene: the
+  harness's creature-ready screenshot races static GLB loads
+  (baseline chest included), so in-scene blending at production
+  scale is unjudged; only the gated mini-scene proof exists.
 - The cleanup's debris-shell rule (< 0.5% of the largest shell) on a
   mesh whose small shells are real anatomy (detached eyes, teeth,
   held props): unexercised — on both current meshes the dropped

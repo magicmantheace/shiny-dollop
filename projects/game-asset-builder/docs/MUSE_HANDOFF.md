@@ -659,3 +659,70 @@ new GLBs (three.js only so far), campfire-wallpaper roster
 integration of the pack (a separate step), and the
 Owl-Cat/Mandrake paint root cause (unproven; face count
 excluded as the sole cause).
+
+## Environment proof: pine tree — SHAPE PROVEN, PAINT OPEN (2026-11-09, branch game-asset-builder/env-pine-proof, stacked on P5)
+
+Commissioned as a one-asset proof for "can the builder furnish the
+campfire wallpaper's environment, not just its creatures?" — one
+stylized pine through the prop path (`--prop --prop-target-verts
+5000`) from a generated concept.
+
+What is proven:
+- The Hunyuan SHAPE stage handles foliage subjects: 243,514 verts /
+  487,126 faces in 476.53 s on the owner's PC (peak VRAM 9,209 MiB),
+  a single welded mesh in 13 components (one 242k-vert shell plus
+  small debris) whose clay renders read unmistakably as the concept
+  pine — tall trunk, pointed leader, bottom-heavy clustered canopy.
+- The prop finish (weld/decimate/cleanup) takes the painted mesh to
+  4,961 verts / 9,940 faces, and `catalog-verify` MATCHES the
+  catalogued `pine-tree` entry (catalogue carries the entry; the
+  run manifest records each stage).
+- The catalogued GLB loads and renders in the campfire wallpaper's
+  own vendored three.js stack (GLTFLoader, ACES tone mapping,
+  shadow-casting) at scene scale next to the treasure chest — see
+  TEST_PLAN. Vertex colours carry the paint (no UV map).
+
+What is NOT proven / failed honestly:
+- The Hunyuan PAINT stage produced no result on this asset.
+  Attempt 1 (full-res shape) ran 10,801 s at a flat ~12 GB VRAM /
+  100% GPU plateau and was killed at an owner-approved cap; its
+  wrapper then recorded exit 1. Attempt 2 was invalidated by an
+  operator error (below) and killed at 3,243 s. Attempt 3 — on
+  the corrected, verified-welded 80k-face mesh — ran 7,728.62 s
+  at the same flat ~12 GB VRAM plateau, produced no textured
+  output, and was killed at the 23:30 hard deadline the same
+  night (result archived, exit 1). The failure is therefore NOT
+  explained by mesh weight or by the export defect: the same
+  stage stalled on a 487k-face input and on a clean 80k-face
+  input alike. Root cause for the
+  stalls is UNPROVEN — same open category as the Owl-Cat/Mandrake
+  texture failures; the subject's thin, high-surface-area foliage
+  geometry is the standing suspicion, not a finding.
+- Operator error, recorded plainly: the attempt-2 input was
+  decimated in Blender and exported WITHOUT clearing the mesh's
+  custom split normals, so the GLB exporter split every vertex —
+  the "80k-face" file was 79,999 disconnected triangles (239,371
+  verts, ~79,686 components), a worse paint input than the
+  original. The corrected decimation (split normals cleared, smooth
+  shading) verifies in-file at 39,956 verts / 120,000 edges /
+  79,999 faces / the same 13 components. Any future pre-paint
+  decimation MUST clear split normals before export and re-verify
+  component counts in the exported file.
+- The catalogued pine's paint is therefore PROCEDURAL, not Hunyuan:
+  per-vertex colours computed in Blender (height-graded greens,
+  fbm cluster patchiness + needle noise, interior/underside
+  shading, tapered trunk mask with streaked bark; palette v2
+  deepened after v1 rendered pale under AgX). The catalogue
+  provenance and the run manifest say so explicitly; the pipeline's
+  default provenance text was corrected by hand where it would
+  otherwise have credited the paint model. Treat this asset as
+  "builder-shaped, hand-painted" — it proves the environment SHAPE
+  pipeline end-to-end and keeps the paint question open.
+- Full-scene wallpaper A/B (builder pines swapped into the live
+  scene) is NOT yet demonstrated: the verification harness
+  screenshots on creature-ready, and static GLB loads (the
+  builder pines AND the pre-existing treasure chest, on the
+  unmodified baseline build too) race that screenshot and usually
+  lose. The three.js mini-scene proof above is the current
+  evidence; a roster-style gated load or a harness settle-wait is
+  the fix when the full environment pack is attempted.

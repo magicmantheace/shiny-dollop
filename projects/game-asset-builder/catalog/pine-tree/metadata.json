@@ -1,0 +1,46 @@
+{
+ "entry_version": 1,
+ "name": "pine-tree",
+ "slug": "pine-tree",
+ "source_concept": "media-generation-pine-tree-reference-0-a81e7e89-c72d-4988-8fab-88a7b4c46141.webp",
+ "asset_file": "pine-tree.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "e81270befaba6b101ede18980377afbb1aa16363e637b5c4a095b553c221f725",
+ "bytes": 237440,
+ "counts": {
+  "verts": 4961,
+  "faces": 9940,
+  "raw_mesh_verts": 39956,
+  "raw_mesh_faces": 79999
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "procedural vertex-color (Blender) \u2014 Hunyuan3D paint did not complete for this asset",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "stage": "mesh",
+   "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+   "verts": 243514,
+   "faces": 487126,
+   "load_s": 123.91,
+   "inference_s": 298.66,
+   "total_s": 422.64,
+   "torch_peak_mib": 5707.8,
+   "output": "D:\\asset-forge-lab\\out\\gab\\pine-tree\\shape.glb"
+  },
+  "texture_stage": {
+   "method": "procedural-vertex-color",
+   "tool": "Blender paint_pine_vcolor.py (palette v2), run by Nyx 2026-11-09",
+   "input_mesh": "shape-fixed.glb: the Hunyuan shape decimated 487,126 -> 79,999 faces with custom split normals cleared (welded; 13 components; 39,956 verts)",
+   "reason": "Hunyuan3D paint produced no result on this asset in three attempts (10,801 s killed at owner-approved cap; 3,243 s killed after a vertex-split export defect was found in the retry input; third attempt still running at record time). The pipeline finish was completed with this procedural vertex-color paint so the proof could proceed; it is NOT Hunyuan paint output."
+  }
+ }
+}

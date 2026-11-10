@@ -160,6 +160,21 @@ at 1,643,448 faces the longest legitimate paint in project
 history. Suite **134/134**. Full record in
 `docs/MUSE_HANDOFF.md` and `docs/TEST_PLAN.md`.**
 
+**Environment proof (2026-11-09): the first environment asset — a
+stylized pine for the campfire wallpaper** (branch
+`game-asset-builder/env-pine-proof`, stacked on the P5 branch).
+The Hunyuan shape stage produced the tree in one pass (243,514
+verts, 13 components, clay-verified), the prop path finished it
+to 4,961 verts, and it is catalogued (`catalog/pine-tree/`,
+catalog-verify MATCH) and proven to load and render in the
+wallpaper's own three.js stack. **The paint is procedural vertex
+colour, not Hunyuan paint**: the paint stage produced no result
+on this foliage subject across repeated attempts (root cause
+unproven — see the HANDOFF), so the asset ships honestly labelled
+"builder-shaped, hand-painted" and the environment-paint question
+stays open. Full record in `docs/MUSE_HANDOFF.md` and
+`docs/TEST_PLAN.md`.**
+
 A fully local, no-API pipeline that builds game assets — creatures included —
 on the owner's own hardware:
 
