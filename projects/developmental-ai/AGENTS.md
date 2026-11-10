@@ -1,3 +1,121 @@
+# Companion concordance partial recovery: leg C, a companion-concordance corroboration leg for partial abstention triggers — 2026-11-10 (FAILED / REGRESSION at checkpoint 32)
+
+Optional `developmental_ai/companion_concordance_partial_recovery.py`
+(identical to the graded pre-acting candidate in every element —
+acting model recent8 exactly, extended signal, retained archive,
+archive concordance, joint test joint_count >= 1, recovery model,
+the full three-leg authority condition, the minority branch in
+full INCLUDING the inverted minority model, leg T on both recovery
+branches, leg P >= 0.70, and the full / retained-partial abstention
+classes with leg R on partials, the widened class removed with its
+quantities records-only, support threshold null; the SINGLE
+changed element is leg C: a partial trigger fires behind leg P
+when leg R OR leg C is armed, leg C armed iff the partial pair's
+non-opposed companion event is not reference-concordant —
+companion = the non-opposed event when opposed_count == 1,
+concordant iff matched AND not opposed, armed iff NOT concordant,
+fallback false/false/false outside a partial trigger; leg C is
+binary, no numeric threshold; new decision-record fields
+companion_matched / companion_concordant / companion_armed /
+companion_threshold null / abstention_disarmed_by_companion;
+leg P / leg R / leg T explicitly NOT re-tuned) was evaluated under
+the protocol frozen BEFORE implementation at
+`benchmarks/companion_concordance_partial_recovery_protocol.json`
+on NEW cohorts 492003/492021/492039 and 493001/493017/493041, both
+now INSPECTED — never re-tune against them. **Graded Failed under
+the protocol's own definitions (PRIMARY criterion 15 FAILs on
+BOTH cohorts — development on its B1 and release sides, additional
+on its stationary side — and the Failed clause triggers on the
+additional cohort several times over: criteria 15, 6, and 11 FAIL
+there, criterion 7 PASSes both) and a Regression under its
+checkpoint-32 clause (development k=32 successes 47 below the
+recent8 − 4 line of 56, the deficit exactly the two carried
+retained routings at seed 492003, purity 0.737 / 0.711, stale
+counts 0/0, each scoring 0/16 vs recent8 1/15 and 12/4, which
+neither leg C nor leg T touches; the other Regression clauses do
+not trigger: pooled onset harm 153/69 below recent8 242/223, the
+control clause requires both cohorts and development is +3
+against additional's −7, suite + transfer pass).** Per-criterion,
+development / additional, PRIMARY criterion 15 first, then
+co-graded guards 9, 6, 1, 5, 11, 4: C15 FAIL/FAIL, C9 FAIL/PASS
+(dev TAKEN 2/6 — 1 full + 1 retained partial armed through leg R
+AND leg C both — count one short, non-full met, harm 63 vs guard
+70 and < recent8 86 PASS both comparisons, B1 successes 1 vs
+10/10; add TAKEN 5/6 — 2 full + 3 partial, paths R+C / R+C / C —
+harm 13 vs guard 45 / recent8 76, successes 3 vs 20/19), C6
+PASS/FAIL (dev abstentions 0/240, successes 143 vs 140, harm 97
+vs 100 — no control firing at all; add abstentions 16/240 and
+harm 136 vs 145 PASS but successes 88 vs 95 required >= 89 FAIL
+by 1 — exactly ONE carried FULL firing, seed 493001 k=2 purity
+0.806, decisive identical there), C1 PASS/PASS (minority TAKEN
+6/6 on BOTH, selectivity 0/6 / 0/6 both, harm 36 vs guard 38 /
+ceiling 43.8 dev and 26 vs guard 60 / ceiling 48.0 add,
+successes 60 vs 26 and 70 vs 20), C5 FAIL/PASS (dev on (b) AND
+(c) — successes 47 vs line 52, non-recent8 2/9, both routings
+above; abstentions 0/144 and abstained 0/9 both; add in full —
+successes 84 = recent8 84, non-recent8 0/9, abstained 0/9, with
+one leg-C-pattern k=32 state BLOCKED by leg P at purity 0.625,
+seed 493001 B1), C11 FAIL/FAIL (dev on its B1 side only, add on
+its stationary side only), C4 FAIL/PASS (dev 54 vs guard 61 PASS
+but ceiling 49.8 FAIL at fully engaged return-A states, recovery
+6/6; add 30 vs guard 46 / ceiling 40.2, recovery 6/6), C2
+PASS/PASS (42 vs frozen_A 58; 66 vs 76 — frozen_A beats the
+candidate on BOTH axes on BOTH cohorts again, cumulative does
+the same on development and exactly ties on additional), C3
+PASS/PASS (153 vs guard 169, 6/6 cells; 69 vs guard 151, 6/6),
+C7 PASS/PASS (replay 72/72 per cohort, companion fields
+recomputable at every partial state and at fallback elsewhere,
+companion_threshold null everywhere, gate recomputable incl.
+leg C everywhere, companion-rule == candidate branch and
+pre-acting-release-rule == decisive branch everywhere,
+minority_model_archive_count == archive_events_count and
+minority_model_inverted true everywhere, cross-check PASS at
+every minority-fired state 13/9, acquisition 0). **The grading
+cap is MET — leg C was exercised at exactly ONE graded state
+across both cohorts, additional seed 493041 B1 k=2 (partial,
+preceding 0, companion unmatched, purity 0.929), where the
+decisive baseline acted on recent8 (0/16) and the candidate took
+the retained-partial abstention (0/0): that firing is the whole
+pooled-onset harm gap vs the decisive baseline on additional
+(69 vs 85) and its B1 count step 4/6 → 5/6, at zero success
+cost; two further leg-C firings at ungraded checkpoint 0 on the
+same seed make the whole additional score difference 3/72. On
+development leg C was never the deciding leg at any graded
+state — both leg-R-blocked B1 partials (492021 k=2 purity 0.857,
+492039 k=4 purity 0.892) had CONCORDANT companions, so both
+corroboration legs failed; the candidate is score-identical to
+the decisive baseline at 0/72 differing checkpoints there. Leg T
+disarmed ZERO states on either cohort; leg C's stationary price
+on graded control states was ZERO on both cohorts.** Full unit
+suite (1554) and historical transfer benchmark passed in the
+implementation, evaluation, and grading stages; no CI claimed
+for the evaluation or grading commits (UNVERIFIED). See
+`docs/COMPANION_CONCORDANCE_PARTIAL_RECOVERY.md`. Keep the
+learner optional and unpromoted, default controller unchanged,
+no merge, no AthenZ/Synveil integration, D1–D10/V2A/V2B
+unchanged. Next limitation selected: P1 checkpoint-32 release —
+criterion 5 fails development on two sub-conditions and carries
+this cycle's Regression, and both of its routings are HARMFUL
+retained routings at stale counts 0/0 (the changed shape versus
+the pre-acting cycle, whose development routings were both
+productive), a population neither leg T — whose designed
+population was again absent — nor leg C touches; whether an
+evidence-derived condition on the recovery branches' late
+routings, a genuinely new structural quantity and not a
+threshold variant of leg T, can hold criterion 5's frozen form
+on BOTH cohorts while holding B1 engagement (leg C carried),
+stationary, B2, and return-A profiles as guards, on NEW cohorts
+under a NEW protocol. Recorded but not selected: development's
+B1 failure is now a both-legs failure (leg C demonstrated its
+designed work on additional; a further B1 retry needs a
+corroboration quantity beyond the newest pair's companion event,
+which no graded population this cycle identifies); additional's
+stationary failure is 1 success on one carried full firing with
+development at zero firings; development's C4 failure is the
+return-A ceiling alone at fully engaged states with additional
+passing in full; frozen_A both-axes return-A dominance holds on
+both cohorts again.
+
 # Pre-acting joint release recovery: leg T, a pre-acting joint-pair release leg on both recovery branches — 2026-11-09 (FAILED / REGRESSION at checkpoint 32)
 
 Optional `developmental_ai/pre_acting_joint_release_recovery.py`

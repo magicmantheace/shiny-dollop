@@ -1122,6 +1122,64 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 10 — Companion concordance partial recovery: leg C, a companion-concordance corroboration leg for partial abstention triggers (FAILED / REGRESSION at checkpoint 32)
+
+Optional `CompanionConcordancePartialRecoveryMemory` is identical to
+the graded pre-acting candidate in every element — acting model,
+extended signal, retained archive, archive concordance, joint
+recovery test, recovery model, the full three-leg authority
+condition, the minority branch in full INCLUDING the inverted
+minority model, leg T on both recovery branches, leg P ≥ 0.70, and
+the full / retained-partial abstention classes with leg R on
+partials, the widened class removed, support threshold null; the
+SINGLE changed element is leg C: a partial abstention trigger
+fires behind leg P when leg R OR leg C is armed, leg C armed iff
+the partial pair's non-opposed companion event is not
+reference-concordant (binary; no numeric threshold; leg P / leg R /
+leg T explicitly NOT re-tuned) — under a protocol frozen before
+implementation (new cohorts 492003-family / 493001-family, now
+INSPECTED). **Graded Failed under the protocol's own definitions
+(PRIMARY criterion 15 FAILs on BOTH cohorts — development on its
+B1 and release sides, additional on its stationary side — and the
+Failed clause triggers on the additional cohort several times
+over, criteria 15, 6, and 11 failing there) and a Regression under
+its checkpoint-32 clause (development k=32 successes 47 below the
+recent8 − 4 line of 56, the deficit exactly the two carried
+retained routings at seed 492003, purity 0.737 / 0.711, stale
+counts 0/0, each scoring 0/16, which neither leg C nor leg T
+touches; the other Regression clauses do not trigger).** Stated
+as prominently as the failure: leg C was exercised at exactly ONE
+graded state across both cohorts and did exactly its designed
+work there — additional seed 493041, B1 k=2, preceding 0,
+companion unmatched, purity 0.929: the decisive baseline acted on
+recent8 (0/16), the candidate took the retained-partial
+abstention (0/0), worth the whole pooled-onset harm gap vs the
+decisive baseline on that cohort (69 vs 85) and the B1 count step
+4/6 → 5/6 at zero success cost — **the grading cap is MET via
+that state**. On development leg C changed NO graded state: both
+leg-R-blocked partials had CONCORDANT companions, so both
+corroboration legs failed and development's B1 count failure
+(2/6, harm passing both comparisons) is a both-legs failure, the
+candidate score-identical to the decisive baseline at all 72
+checkpoints. Criterion 1 PASSes BOTH cohorts in full (minority
+6/6 both, harm inside guard and ceiling both); criterion 6
+PASSes development with zero control firings and FAILs additional
+by 1 success on ONE carried full firing; criterion 5 PASSes
+additional in full (k=32 successes 84 = recent8) and FAILs
+development on successes and routing count; criterion 4 FAILs
+development on the return-A ceiling alone and PASSes additional;
+criteria 2, 3, and 7 PASS on both cohorts; leg T disarmed zero
+states on either cohort; leg C's stationary price on graded
+control states was zero on both. Next limitation selected: P1
+checkpoint-32 release — development's two harmful retained
+routings at stale counts 0/0 are a population neither carried leg
+addresses, and a release retry needs a genuinely new structural
+quantity, not a threshold variant of leg T. Learner acquisition
+actions zero; external TRAIN actor harm published in full in the
+report.
+[Complete preregistration, results and limitations](docs/COMPANION_CONCORDANCE_PARTIAL_RECOVERY.md).
+
+
 ### November 9 — Pre-acting joint release recovery: leg T, a pre-acting joint-pair release leg on both recovery branches (FAILED / REGRESSION at checkpoint 32)
 
 Optional `PreActingJointReleaseRecoveryMemory` is identical to the
