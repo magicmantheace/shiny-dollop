@@ -60,8 +60,12 @@ a few seconds.
   then wanders off and despawns. Spots are never double-booked.
 - The director **prefers a `walk` clip** for travel whenever a
   creature's model provides one — and since the Game Asset Builder's
-  P4 animation slice, all three catalog creatures do (they also carry
-  an unused-for-now `run` clip). The fallback, for any future GLB
+  P4 animation slice, all nine catalog creatures do (they also carry
+  an unused-for-now `run` clip). The roster is the original three
+  (Ember Dragon, Snow Goblin, Triceratops) plus the six P5 weird
+  smashups: Moth-Hart, Toasty, Lantern Snail (no walk clip — it
+  travels on its idle, glide-style, and retracts as its signature),
+  Axolotl-Capybara, Geode Tortoise, and Crow Postman. The fallback, for any future GLB
   without a walk clip, is each creature's natural gait: the dragon
   hops, the triceratops bounces, the goblin glides. Adding a creature
   later needs no director change — drop the GLB in `assets/`, add a

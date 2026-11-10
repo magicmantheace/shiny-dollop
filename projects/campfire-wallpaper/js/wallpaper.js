@@ -1915,6 +1915,18 @@ const CREATURES = [
     speed: 1.3, travelStyle: 'glide', signature: 'wave', bobAmp: 0.03 },
   { slug: 'triceratops', file: 'assets/triceratops.glb', height: 1.3,
     speed: 0.9, travelStyle: 'bounce', signature: 'bounce', bobAmp: 0.11 },
+  { slug: 'moth-hart', file: 'assets/moth-hart.glb', height: 1.45,
+    speed: 0.95, travelStyle: 'glide', signature: 'fan', bobAmp: 0.04 },
+  { slug: 'toasty', file: 'assets/toasty.glb', height: 1.05,
+    speed: 1.25, travelStyle: 'bounce', signature: 'bounce', bobAmp: 0.12 },
+  { slug: 'lantern-snail', file: 'assets/lantern-snail.glb', height: 0.8,
+    speed: 0.45, travelStyle: 'glide', signature: 'retract', bobAmp: 0.02 },
+  { slug: 'axolotl-capybara', file: 'assets/axolotl-capybara.glb', height: 0.95,
+    speed: 0.8, travelStyle: 'bounce', signature: 'wiggle', bobAmp: 0.07 },
+  { slug: 'geode-tortoise', file: 'assets/geode-tortoise.glb', height: 0.9,
+    speed: 0.5, travelStyle: 'bounce', signature: 'shiver', bobAmp: 0.04 },
+  { slug: 'crow-postman', file: 'assets/crow-postman.glb', height: 1.15,
+    speed: 1.2, travelStyle: 'glide', signature: 'bow', bobAmp: 0.03 },
 ];
 const MAX_ACTIVE = 3;
 const SPAWN_RADIUS = 30;

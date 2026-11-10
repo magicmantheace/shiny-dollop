@@ -484,3 +484,18 @@ clusters, ferns, berry bushes, the mid-field boulder and detailed
 pines against the fog forest wall. No creature was in frame at
 the capture instant (the director had the circle momentarily
 empty; creatures spawn at the edges and walk in).
+
+## P5 roster joins the wallpaper (2026-11-10)
+
+- The six P5 creatures (Moth-Hart, Toasty, Lantern Snail,
+  Axolotl-Capybara, Geode Tortoise, Crow Postman) added to
+  `CREATURES` with per-creature height/speed/gait/signature rows;
+  their GLBs are byte-for-byte the builder catalog files
+  (catalog-verify sha256 MATCH for all six before copying).
+- Gated golden-hour capture (`roster-golden.png`): all nine
+  templates in the status `loaded` list, zero load errors, zero
+  console errors. On stage in the capture: Toasty dwelling at the
+  fire, a Geode Tortoise entering on its `walk` clip.
+- Not yet observed directly: the other four newcomers on stage
+  (the director rotates three at a time), and Godot playback of
+  the P5 GLBs remains unverified in the builder project.

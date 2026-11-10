@@ -324,8 +324,10 @@ unmeasured, as before.
 
 ## Next steps (not done here)
 
-1. Possible v2: Lively properties (creature toggles, fire size),
-   the commissioned weird-roster creatures as the GAB makes them
-   (drop-in: new GLB + one config row in `CREATURES`; re-sync
-   BOTH PC copies and re-apply in Lively afterwards).
+1. Possible v2: Lively properties (creature toggles, fire size).
+   The commissioned weird roster joined the scene 2026-11-10 (see
+   the pack section above): all six P5 creatures are in `CREATURES`
+   with catalog-byte-identical GLBs in `assets/`. Any future
+   creature is the same drop-in: new GLB + one config row; re-sync
+   BOTH PC copies and re-apply in Lively afterwards.
 2. PR #49 stays draft until the owner says merge.
