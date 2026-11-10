@@ -1,0 +1,16 @@
+# Rust
+sim/target/
+**/target/
+Cargo.lock.orig
+
+# Saves and local state (never commit runtime data)
+*.save.json
+saves/
+
+# Godot (future frontend)
+.godot/
+*.import
+
+# OS / editor
+.DS_Store
+*.swp
