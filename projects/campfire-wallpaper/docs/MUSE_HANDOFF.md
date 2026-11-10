@@ -361,3 +361,17 @@ data only — same mesh, texture, rig, byte size); current
 `2bd78ce04579dbc605c7bcaf198ffa57c399165cec166ba6702f22c9e5844b3a`,
 superseding `f5a642353fa8…` recorded above. Re-deployed live the
 same day (both PC copies hash-verified, Lively re-applied).
+
+
+## Owl-Cat headturn correction synced (2026-11-10)
+
+The owner rejected the plateau version as still a tilt, and
+measurement proved him right (bone-local yaw dipped the beak
+~0.25–0.30). The builder now drives the turn about the world
+vertical (builder HANDOFF has the details); the catalog GLB
+changed again — current `assets/ember-owl-cat.glb` sha256 is
+`98bc4f3f5c25f9ecb941a0d63ab387e14139fa808f2d16f4fcf779d2dad7102f`,
+superseding `2bd78ce04579…`. Measured on the baked clip: yaw
+−55°/+57.7° at the holds, beak height level (±0.005).
+Re-deployed live the same day (both PC copies hash-verified,
+Lively re-applied).

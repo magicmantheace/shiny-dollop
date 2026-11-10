@@ -557,3 +557,14 @@ by the gated harness capture above.)
   eleven templates loaded, zero load/console errors.
 - Redeployed live: GLB synced to both PC copies and
   hash-verified; Lively re-applied; live screenshot checked.
+
+
+## Owl-Cat headturn correction (2026-11-10)
+
+- Builder corrected the turn to a world-vertical yaw (see the
+  builder TEST_PLAN); new catalog GLB sha256 `98bc4f3f5c25…`
+  copied byte-for-byte into `assets/`.
+- Gated golden-hour capture (`owlcat-turn2-golden.png`): all
+  eleven templates loaded, zero load/console errors.
+- Redeployed live: GLB synced to both PC copies and
+  hash-verified; Lively re-applied; live screenshot checked.
