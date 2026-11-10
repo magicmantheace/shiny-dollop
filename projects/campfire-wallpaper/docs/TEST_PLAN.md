@@ -499,3 +499,11 @@ empty; creatures spawn at the edges and walk in).
 - Not yet observed directly: the other four newcomers on stage
   (the director rotates three at a time), and Godot playback of
   the P5 GLBs remains unverified in the builder project.
+
+**Roster redeploy (2026-11-10 ~09:05 local).** `js/wallpaper.js`
+(sha256 `bee3348dac8f4f147f7b0061c4c8bf5f5f5315b80fb1c61e3640438d2a6becc3`)
+plus the six roster GLBs synced via the bridge to both PC copies;
+all 14 destination files hash-verified. Lively relaunched and
+re-applied; live screenshots show the Lantern Snail glowing at
+the fire beside the Ember Dragon — the new roster is on stage on
+the real desktop.
