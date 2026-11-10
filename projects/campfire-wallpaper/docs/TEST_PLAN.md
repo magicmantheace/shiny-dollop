@@ -546,3 +546,14 @@ screenshot shows the afternoon scene running on the real desktop.
 (The roster is stochastic — no creature was in the foreground
 for this capture; the Owl-Cat's on-stage `walk` entry is proven
 by the gated harness capture above.)
+
+
+## Owl-Cat headturn rework (2026-11-10)
+
+- Builder-side signature rework (poses only; rig/mesh/texture
+  untouched): new catalog GLB sha256 `2bd78ce04579…`, copied
+  byte-for-byte into `assets/`.
+- Gated golden-hour capture (`owlcat-turn-golden.png`): all
+  eleven templates loaded, zero load/console errors.
+- Redeployed live: GLB synced to both PC copies and
+  hash-verified; Lively re-applied; live screenshot checked.

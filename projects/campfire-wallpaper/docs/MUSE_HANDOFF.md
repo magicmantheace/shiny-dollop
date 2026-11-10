@@ -349,3 +349,15 @@ all eleven templates loaded with zero errors, Owl-Cat entering
 on `walk`. **The roster is complete: 11 creatures** (the original
 three + all eight P5 smashups). Deployed live the same day —
 both PC copies re-synced and hash-verified, Lively re-applied.
+
+
+## Owl-Cat headturn rework synced (2026-11-10)
+
+The builder reworked the Owl-Cat's signature at the owner's
+direction (the original read as a tilt): `headturn` is now a
+±1.05 rad turn with holds. The catalog GLB changed (animation
+data only — same mesh, texture, rig, byte size); current
+`assets/ember-owl-cat.glb` sha256 is
+`2bd78ce04579dbc605c7bcaf198ffa57c399165cec166ba6702f22c9e5844b3a`,
+superseding `f5a642353fa8…` recorded above. Re-deployed live the
+same day (both PC copies hash-verified, Lively re-applied).
