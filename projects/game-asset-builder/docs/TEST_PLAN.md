@@ -734,3 +734,29 @@ cost of the new creatures in the wallpaper scene.
 - Renders inspected: rest pose reads as the character; the
   scream pose tears at the papery shell skirt (disclosed).
 - Suite: 134 passed (test_ui catalog set + bone count updated).
+
+
+## Paint fix + Ember Owl-Cat finish (2026-11-10)
+
+- Root-cause probes (owner's PC, bridge-dispatched): standalone
+  VAE batch-6 encode OK (~1.9 s); cudnn.benchmark=True slower
+  (11–12 s), not a fix; full-pipeline batch-1 ×6 OK (3.67 s);
+  full-pipeline batch-6 STALLS in the VAE encoder's first
+  down-block conv (faulthandler); full-pipeline batch-6 with
+  `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` OK in 2.63 s.
+- Fix in `stages/texture/hunyuan_paint.py`: the variable is set
+  via `os.environ.setdefault` at import, before CUDA init.
+- Production proof: Ember Owl-Cat texture stage exit 0 —
+  texturing 6,202.2 s on the 1,405,816-face mesh, peak VRAM
+  11,910 MiB. Textured GLB verified in Blender (1,092,321 verts,
+  UVMap, 2048×2048 texture).
+- Finish (`--resume`): segment → rig → animate → catalog.
+  Catalog-verify sha256 MATCH (`f5a642353fa8…`). Rig:
+  winged-creature, 14 bones, distance-fallback weights (bone-heat
+  rejected by skin policy, disclosed), coverage 1.0. Clips:
+  idle, walk, run, headturn.
+- Renders inspected: rest pose reads as the character (ember
+  plumage, glowing heart chest marking, curled tail); headturn
+  pose turns the head without tearing.
+- Suite: 134 passed (test_ui catalog set + owl-cat bone count).
+- Not verified: Godot playback of the owl-cat GLB.

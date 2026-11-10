@@ -1,0 +1,140 @@
+{
+ "entry_version": 1,
+ "name": "Ember Owl-Cat",
+ "slug": "ember-owl-cat",
+ "source_concept": "media-generation-media-generation-ember-owl-cat-0-02c1a56f-1e90-4e2d-98cc-079dfcafcfe9.webp",
+ "asset_file": "ember-owl-cat.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "f5a642353fa8cc892ed4a1f95c2b44805ed922ae0e496f31be738d831eea5500",
+ "bytes": 20053292,
+ "counts": {
+  "verts": 43316,
+  "faces": 85674,
+  "raw_mesh_verts": 1092321,
+  "raw_mesh_faces": 1405814
+ },
+ "bones": [
+  "root",
+  "spine",
+  "head",
+  "wing.L",
+  "wing2.L",
+  "wing.R",
+  "wing2.R",
+  "arm.L",
+  "arm.R",
+  "leg.L",
+  "leg.R",
+  "tail.1",
+  "tail.2",
+  "tail.3"
+ ],
+ "actions": [
+  "headturn",
+  "idle",
+  "run",
+  "walk"
+ ],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": true,
+  "rig_template": "winged-creature",
+  "signature_clip": "headturn",
+  "weight_method": "distance-to-bone fallback (heat result rejected by skin_policy)",
+  "segmentation": {
+   "model": "P3-SAM (Tencent Hunyuan3D-Part)",
+   "parts": 4,
+   "proxy_faces": 59356,
+   "islands_relabelled": 24,
+   "separated_verts_added": 564,
+   "labelled_verts": 43316
+  },
+  "label_map": {
+   "0": {
+    "dominant": "leg.R",
+    "allowed": [
+     "head",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.L"
+    ]
+   },
+   "1": {
+    "dominant": "head",
+    "allowed": [
+     "arm.L",
+     "arm.R",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.L",
+     "leg.R"
+    ]
+   },
+   "2": {
+    "dominant": "leg.L",
+    "allowed": [
+     "head",
+     "leg.L",
+     "root",
+     "spine",
+     "tail.2",
+     "tail.3"
+    ],
+    "forbidden": [
+     "leg.R"
+    ]
+   },
+   "3": {
+    "dominant": "leg.L",
+    "allowed": [
+     "head",
+     "leg.L",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.R"
+    ]
+   }
+  },
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ },
+ "clips": {
+  "headturn": {
+   "frames": 77,
+   "fps": 24,
+   "seconds": 3.21
+  },
+  "idle": {
+   "frames": 115,
+   "fps": 24,
+   "seconds": 4.79
+  },
+  "run": {
+   "frames": 24,
+   "fps": 24,
+   "seconds": 1.0
+  },
+  "walk": {
+   "frames": 36,
+   "fps": 24,
+   "seconds": 1.5
+  }
+ }
+}

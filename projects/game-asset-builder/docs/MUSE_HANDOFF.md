@@ -779,3 +779,43 @@ Ember Owl-Cat remains unfinished (its paint failure is genuine —
 same VAE stall as the pine, see PAINT_STALL.md). Mandrake also
 joined the campfire wallpaper roster the same day (wallpaper
 project records). Suite: 134 passed (catalog-set test updated).
+
+
+## Paint stall — FIXED; Ember Owl-Cat — FINISHED (2026-11-10, branch game-asset-builder/mandrake-finish)
+
+The Hunyuan paint stall (this doc's open item since the pine) is
+resolved; full write-up in `docs/PAINT_STALL.md`. Controlled probes
+on the owner's PC isolated it: the standalone VAE encodes batch-6
+fine and batch-1 through the full pipeline is fine (3.67 s), but
+batch-6 inside the full resident pipeline never returns from the
+VAE encoder's first down-block convolution. Setting
+`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` cures it
+(batch-6 encode 2.63 s) — a CUDA caching-allocator pathology, not
+the VAE math and not cuDNN benchmarking (benchmark mode was
+slower). `stages/texture/hunyuan_paint.py` now sets that variable
+via `setdefault` at import, before CUDA initializes; an
+operator-provided value is respected.
+
+Proof is the production stage itself: the **Ember Owl-Cat** — the
+creature whose paint genuinely stalled on two attempts — ran its
+texture stage to exit 0 (loaded 104.5 s; texturing 6,202.2 s on
+the 1,405,816-face mesh; peak VRAM 11,910 MiB, released after
+exit). Two VM-side client deaths during adoption (runtime
+restarts; the PC-side stage was unharmed both times) were worked
+through with the standing recovery: the textured GLB was fetched
+from the lab and verified in Blender (1,092,321 verts, UVMap,
+2048² texture), then a `--resume` run completed segment (P3-SAM)
+→ rig → animate → catalog. Result: **catalogued, catalog-verify
+sha256 MATCH** (`f5a642353fa8…`); winged-creature rig, 14 bones
+(root/spine/head/wing.L/wing2.L/wing.R/wing2.R/arm.L/arm.R/leg.L/
+leg.R/tail.1–3); weights are the distance-to-bone fallback
+(bone-heat rejected by skin policy — same disclosed situation as
+the Crow Postman), coverage 1.0; clips idle / walk / run /
+`headturn`. Rest and headturn renders inspected: a plump ember
+owl-cat with ear tufts, a glowing heart marking on its chest,
+folded feathered wings and a long curled tail — reads exactly as
+commissioned. **The P5 pack is complete: 8 of 8 catalogued.** The
+Owl-Cat also joined the campfire wallpaper roster the same day
+(wallpaper project records). Suite: 134 passed (catalog-set test
+updated with the owl-cat at 14 bones). Still not verified: Godot
+playback of the owl-cat GLB (three.js/Cycles only).

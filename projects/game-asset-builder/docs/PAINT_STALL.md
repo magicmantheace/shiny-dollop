@@ -46,3 +46,44 @@ a valid `textured.glb` in the lab, which was never fetched. The GLB
 was recovered and verified (558,050 verts, UVs, 2048² texture, Cycles
 render inspected). Its remaining stages (segment/rig/animate/catalog)
 were never run — finishing it is the owner's call.
+
+
+## RESOLVED (2026-11-10) — CUDA caching-allocator pathology
+
+The stall is fixed. Root cause, established by controlled probes on
+the owner's PC (RTX 3060, torch 2.14.1+cu126, driver 610.62):
+
+- The standalone VAE encodes a batch-6 (6,3,512,512) tensor fine
+  (~1.9 s). `cudnn.benchmark=True` is NOT the fix (11–12 s, slower).
+- Inside the **full paint pipeline** (all models resident), the same
+  batch-6 encode never returns: a faulthandler dump places the main
+  thread in the first down-block convolution of the VAE encoder,
+  GPU pinned at 100% / ~73 W.
+- The identical pipeline encoding **batch-1 six times** completes in
+  3.67 s. Batch size is the trigger, in-process, once the paint
+  models are resident.
+- Setting **`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`**
+  makes the batch-6 encode complete in **2.63 s** in the full
+  pipeline. Verdict: a pathology of the default CUDA caching
+  allocator in this resident-memory state — not the VAE math, not
+  cuDNN. (Why it spins rather than errors is not proven beyond that;
+  not over-claimed.)
+
+**The fix:** `stages/texture/hunyuan_paint.py` now sets
+`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` via
+`os.environ.setdefault` at import, before torch initializes CUDA;
+an operator-provided value is respected.
+
+**End-to-end proof (production stage, not a probe):** the Ember
+Owl-Cat — whose paint stalled on two prior attempts — completed its
+texture stage with exit 0: loaded in 104.5 s, "texturing in
+6202.2 s" on the 1,405,816-face mesh, peak VRAM 11,910 MiB, cleanly
+released after exit. The run then continued segment → rig →
+animate → catalog; catalog-verify sha256 MATCH. The stage remains
+slow on very large meshes (tortoise: ~2,524 s at 1.64M faces; the
+owl-cat's 6,202 s is the current worst case) and the ~17 GB
+private-memory plateau remains its normal footprint — the
+corrected kill criteria in this document still apply. The earlier
+"standing suspicion" (Downsample2D pad/stride path) is superseded:
+the dump did place the hang at the down-block, but the allocator
+setting is what cures it.

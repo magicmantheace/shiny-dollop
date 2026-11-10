@@ -8,14 +8,27 @@ subfolder='hunyuan3d-paint-v2-0')``, ``pipeline(mesh, image=RGBA)``.
 Usage (PC): hunyuan_paint.py <shape.glb> <cutout.png> <out.glb>
 The Hunyuan repo path comes from GAB_HUNYUAN_REPO (default: the lab's).
 Prints a final ``STAGE_JSON {...}`` line with counts and timings.
-Note: the texturing phase is CPU-bound for ~20 minutes on a ~1M-face
-shape and logs nothing while it works — that is normal, not a hang.
+Note: the texturing phase logs nothing while it works — silence for
+tens of minutes on a ~1M-face shape is normal. A run that exceeds the
+success curve (see docs/PAINT_STALL.md) by an order of magnitude is
+NOT normal: that was the allocator stall fixed below.
 """
 
 import json
 import os
 import sys
 import time
+
+# PAINT STALL FIX (2026-11-10, docs/PAINT_STALL.md): with the paint
+# pipeline's models resident, the batch-6 VAE encode inside
+# pipe(mesh, image) could spin forever in the default CUDA caching
+# allocator (GPU pinned at 100% but ~70 W, one CPU core busy).
+# Expandable segments change the allocation strategy and the encode
+# completes in seconds. Must be set before torch initializes CUDA,
+# so it lives here at module import, ahead of main()'s torch import.
+# An operator-provided PYTORCH_CUDA_ALLOC_CONF is respected.
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF",
+                      "expandable_segments:True")
 
 REPO = os.environ.get("GAB_HUNYUAN_REPO",
                       r"D:\asset-forge-lab\repos\Hunyuan3D-2")

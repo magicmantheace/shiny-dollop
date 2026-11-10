@@ -164,7 +164,13 @@ disproved — both failures are written up in their
 paint had succeeded and the finished texture was recovered from
 the lab; the remaining stages then ran and the Mandrake Toddler
 is catalogued (7 of 8), leaving only the Ember Owl-Cat
-unfinished.** The pack's main
+unfinished.** **Update (2026-11-10, later): the paint stall is
+FIXED (see `docs/PAINT_STALL.md` — a CUDA caching-allocator
+pathology, cured by `expandable_segments` in the paint stage) and
+the Ember Owl-Cat finished end to end: texture stage exit 0
+(6,202 s on the 1.41M-face mesh), then segment → rig → animate →
+catalog, catalog-verify MATCH. The P5 pack is complete: 8 of 8.**
+The pack's main
 operational finding: the paint bake's ~17.7 GB private-memory
 plateau is its fixed footprint on large meshes, not a runaway;
 the completed paints ran 763–2,524 runner-seconds, the tortoise
