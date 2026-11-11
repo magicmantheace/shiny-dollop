@@ -1,0 +1,46 @@
+{
+ "entry_version": 1,
+ "name": "Cot",
+ "slug": "cot",
+ "source_concept": "media-generation-underreach-cot-reference-0-89740d94-780a-45a3-8bbf-2c64e8733ebd.webp",
+ "asset_file": "cot.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "67e070f2012f416f96b202fe0cb419255b5f57a72b83053f916ba22ca1659ef7",
+ "bytes": 239740,
+ "counts": {
+  "verts": 4983,
+  "faces": 9982,
+  "raw_mesh_verts": 44985,
+  "raw_mesh_faces": 90005
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "procedural vertex-color (Blender) \u2014 Hunyuan3D paint not used for this asset (see texture_stage)",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "stage": "mesh",
+   "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+   "verts": 250331,
+   "faces": 500698,
+   "load_s": 117.63,
+   "inference_s": 354.91,
+   "total_s": 472.63,
+   "torch_peak_mib": 5707.8,
+   "output": "D:\\asset-forge-lab\\out\\gab\\cot\\shape.glb"
+  },
+  "texture_stage": {
+   "method": "procedural-vertex-color",
+   "tool": "Blender paint_prop.py (queue painter written for the Underreach resume, run by Nyx 2026-11-10)",
+   "input_mesh": "outputs/cot/shape.glb (Hunyuan shape, 250,331 verts) decimated to ~45k in Blender",
+   "reason": "The Hunyuan texture stage was killed during its load phase by the operator, by design: the same stage had already spun (Gloam Lurker attempt 1, Lantern attempt 1) and crashed (Gloam attempt 2) that night. Per the owner's environment-pack route, this prop is painted procedurally; this is NOT Hunyuan paint output. See outputs/cot/texture-route-note.txt."
+  }
+ }
+}
