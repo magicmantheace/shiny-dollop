@@ -1,3 +1,130 @@
+# Acting window joint breadth recovery: leg W, an acting-window joint-breadth leg on both recovery branches — 2026-11-11 (FAILED, not a Regression)
+
+Optional `developmental_ai/acting_window_joint_breadth_recovery.py`
+(identical to the graded companion candidate in every element —
+acting model recent8 exactly, extended signal, retained archive,
+archive concordance, joint test joint_count >= 1, recovery model,
+the full three-leg authority condition, the minority branch in
+full INCLUDING the inverted minority model, leg T on both recovery
+branches, leg P >= 0.70, leg R and leg C on partial abstention
+triggers, and the full / retained-partial abstention classes with
+the widened class removed records-only, support threshold null;
+the SINGLE changed element is leg W: a recovery branch fires only
+if its own joint count over the acting window events[-8:] reaches
+acting_joint_threshold 3, shared by both branches; a branch
+blocked only by leg W is recorded
+recovery_disarmed_by_acting_breadth /
+minority_disarmed_by_acting_breadth and falls through exactly as
+a purity- or staleness-disarmed branch does; leg P / leg R /
+leg T / leg C explicitly NOT re-tuned) was evaluated under the
+protocol frozen BEFORE implementation at
+`benchmarks/acting_window_joint_breadth_recovery_protocol.json`
+on NEW cohorts 502003/502021/502039 and 503001/503017/503041, both
+now INSPECTED — never re-tune against them. **Graded Failed under
+the protocol's own definitions (PRIMARY criterion 16 FAILs on the
+development cohort on its B2 side alone — release, B1, and
+stationary sides all PASS there, and all four sides PASS on the
+additional cohort — and the Failed clause triggers on the
+additional cohort several times over: criteria 4 and 2 FAIL
+there, criterion 7 PASSes both) and NOT a Regression (no clause
+triggers: pooled onset harm 123/120 below recent8 232/244,
+stationary-control successes at exact parity development and −4
+additional against a both-cohorts clause, k=32 successes 56/85
+above the recent8 − 4 lines of 52/81, suite + transfer pass).**
+Per-criterion, development / additional, PRIMARY criterion 16
+first, then co-graded guards 5, 9, 6, 1, 11, 4: C16 FAIL/PASS,
+C5 PASS/PASS (abstentions 0/144 and abstained 0/9 both; successes
+56 = recent8 56 dev with NO routing drawn at all, 85 = recent8 85
+add; non-recent8 0/9 both — additional's sole routing, seed
+503017 B2 minority purity 0.750 stale_min 0 acting_min 1, was
+released through leg W, decisive 14/2 vs candidate / recent8 8/8,
+a PRODUCTIVE routing given back, +6 harm vs decisive at k=32),
+C9 PASS/PASS (dev TAKEN 4/6 — 1 full + 3 partial all through leg
+C only — harm 31 vs guard 95 / recent8 95, successes 1 vs 1/1;
+add TAKEN 5/6 all partial, paths C / R+C / R+C / C / R, harm 9 vs
+guard 81 / recent8 81, successes 7 vs 15/15; candidate identical
+to the decisive baseline at every B1 state on both cohorts), C6
+PASS/PASS (dev abstentions 0/240, successes 149 = 149, harm 91 =
+91 — exact parity, no control firing; add abstentions 16/240,
+successes 118 vs 122 required >= 116, harm 106 vs 118 — ONE
+carried partial firing seed 503041 k=16 purity 0.870, identical
+to decisive; leg W control diffs 0/15 both cohorts), C1 FAIL/PASS
+(dev FAIL on (a), (c)-guard, and (d): minority TAKEN 2/6 vs
+decisive 5/6 — stand-downs 502003 k=4 count 2 released to recent8
+10/6 vs 13/3, 502021 k=2 and 502039 k=2 count 2 falling through
+to full abstentions 0/0 vs 9/7 and 8/8; selectivity 0/6 / 0/6;
+harm 35 vs guard 34 FAIL by 1, ceiling 43.2 PASS; successes 29 vs
+guard+16 = 30 FAIL by 1; add PASS in full — TAKEN 3/6 AT the
+floor with two stand-downs, selectivity 0/6 / 0/6, harm 49 vs
+guard 95 / ceiling 57.0, successes 31 vs 17; cross-check PASS at
+every minority-fired state 6/6 per cohort), C11 PASS/PASS, C4
+FAIL/FAIL (the only individual guard failing both cohorts, on
+the ceiling (b) alone with the guard (a) PASSing both: dev harm
+57 vs guard 58 but ceiling 39.0, regular TAKEN 3/6 vs decisive
+5/6, stand-downs 502021 k=2 10/6 → 1/15 and 502039 k=2 12/4 →
+0/16, candidate RA harm 57 vs decisive 36; add harm 62 vs guard
+68 but ceiling 40.8, regular TAKEN 2/6 vs decisive 6/6, FOUR
+stand-downs all released to recent8 — 503001 k=4 11/5 → 8/8,
+503017 k=2 14/2 → 0/16, 503041 k=2 9/7 → 1/15, 503041 k=4 9/7 →
+0/16 — candidate RA harm 62 vs decisive 28), C2 PASS/FAIL (dev
+39 vs frozen_A 62 floor 24.8 and guard+16 = 38 PASS by 1; add 34
+vs floor 30.4 PASS but guard+16 = 44 FAIL by 10 — frozen_A and
+cumulative beat the candidate on BOTH axes at return-A on BOTH
+cohorts again), C3 PASS/PASS (123 vs guard 187, cells 6/6 dev;
+120 vs guard 244, cells 5/6 add at the >= 5 line — return-A k=2
+cell 36 vs recent8 33; pooled onset harm ABOVE decisive on both,
+123 vs 114 and 120 vs 80, stated in full), C7 PASS/PASS (replay
+72/72 per cohort, acting lists of 8 with both counts recomputable
+and both breadth flags recomputed everywhere with 0 mismatches,
+acting_joint_threshold 3 everywhere, acting-breadth-rule ==
+candidate branch and companion-rule == decisive branch
+everywhere, companion fields recomputable at every partial state,
+kind never widened, stale lists of 18 recomputable, thresholds
+2/3/1/null as registered, minority_model_archive_count ==
+archive_events_count and minority_model_inverted true everywhere,
+cross-check PASS at every minority-fired state, acquisition 0).
+**The grading cap is MET — leg W released exactly one
+checkpoint-32 routing across both cohorts (additional seed
+503017 B2 k=32 above, stale count below 2, acting count below 3,
+every other carried condition met), so the release side is an
+exercised release, not a null; on development the cap's
+population never occurred (no routing drawn). The cap's
+satisfaction does not rescue the verdict: the released routing
+was productive, and leg W's pre-registered onset price realized
+at or above its adjusted severity — eleven graded onset
+stand-downs across both cohorts, every one a correct-rule firing
+of the decisive baseline (minority 5, regular 6). Leg T disarmed
+ZERO states on either cohort for the third consecutive cycle.**
+Full unit suite (1642) and historical transfer benchmark passed
+in the implementation, evaluation, and grading stages; no CI
+claimed for the evaluation or grading commits (UNVERIFIED). See
+`docs/ACTING_WINDOW_JOINT_BREADTH_RECOVERY.md`. Keep the learner
+optional and unpromoted, default controller unchanged, no merge,
+no AthenZ/Synveil integration, D1–D10/V2A/V2B unchanged. Next
+limitation selected: P1 return-A onset harm — criterion 4 FAILs
+on BOTH cohorts on sub-condition (b) alone (57 vs ceiling 39.0
+dev, 62 vs ceiling 40.8 add) with the guard comparison passing
+both, and its mechanism is entirely leg W's regular-branch
+stand-downs at return-A onset falling through to recent8;
+whether an evidence-derived condition on the regular recovery
+branch's onset behaviour (its breadth composition or its
+fall-through at return-A) can hold criterion 4's frozen form on
+BOTH cohorts while holding checkpoint-32 release (criterion 5,
+now PASSing both with the cap met), B1 engagement (criterion 9),
+stationary selectivity (criterion 6), and B2 protection
+(criterion 1) as co-graded guards, on NEW cohorts under a NEW
+protocol. Recorded but not selected: development's C1 B2 failure
+is single-cohort and narrow (count cut by the same leg's minority
+stand-downs; harm and successes each short by exactly 1;
+additional passes C1 in full at the floor) and is carried as a
+guard; additional's C2 failure is driven by the same return-A
+stand-downs as the selected limitation; checkpoint-32 release
+passes both with the cap met but its exercised population was one
+productive routing given back and an empty development
+population — no release population to retry; frozen_A /
+cumulative both-axes return-A dominance holds on both cohorts
+again.
+
 # Companion concordance partial recovery: leg C, a companion-concordance corroboration leg for partial abstention triggers — 2026-11-10 (FAILED / REGRESSION at checkpoint 32)
 
 Optional `developmental_ai/companion_concordance_partial_recovery.py`

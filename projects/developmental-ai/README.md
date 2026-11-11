@@ -1122,6 +1122,59 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 11 — Acting window joint breadth recovery: leg W, an acting-window joint-breadth leg on both recovery branches (FAILED, not a Regression)
+
+Optional `ActingWindowJointBreadthRecoveryMemory` is identical to
+the graded companion candidate in every element — acting model,
+extended signal, retained archive, archive concordance, joint
+recovery test, recovery model, the full three-leg authority
+condition, the minority branch in full INCLUDING the inverted
+minority model, leg T on both recovery branches, leg P ≥ 0.70, leg
+R and leg C on partial abstention triggers, and the full /
+retained-partial abstention classes with the widened class removed,
+support threshold null; the SINGLE changed element is leg W: a
+recovery branch fires only if its own joint count over the acting
+window events[-8:] reaches acting_joint_threshold 3, shared by both
+branches (leg P / leg R / leg T / leg C explicitly NOT re-tuned) —
+under a protocol frozen before implementation (new cohorts
+502003-family / 503001-family, now INSPECTED). **Graded Failed
+under the protocol's own definitions (PRIMARY criterion 16 FAILs
+on the development cohort on its B2 side alone, and the Failed
+clause triggers on the additional cohort several times over —
+criteria 4 and 2 FAIL there, criterion 7 PASSes both); NOT a
+Regression (pooled onset harm 123/120 below recent8 232/244,
+control successes at parity / −4, k=32 successes 56/85 above the
+recent8 − 4 lines of 52/81, suite + transfer pass).** Stated as
+prominently as the failure: criterion 5 PASSes on BOTH cohorts in
+full — the first checkpoint-32 release pass on both in this line —
+with criteria 9, 6, and 11 also passing on both, and **the grading
+cap is MET**: leg W released exactly the one checkpoint-32 routing
+these cohorts drew (additional seed 503017, B2 k=32, minority,
+purity 0.750, stale minority count 0, acting minority count 1) —
+but that routing was PRODUCTIVE for the decisive baseline
+(14/2 vs released 8/8, a 6-success / 6-harm give-back landing the
+candidate exactly on recent8's k=32 line), and development drew no
+routing at all. The leg's onset price was the cycle's dominant
+fact: eleven graded onset stand-downs of correct-rule firings
+(5 development, 6 additional) — B2 minority TAKEN cut to 2/6 on
+development (criterion 1 FAILs on count, on harm vs the guard by
+1, and on successes by 1; additional passes at the 3/6 floor) and
+return-A regular recovery cut to 3/6 and 2/6, the fall-throughs to
+recent8 pushing return-A harm past the frozen ceiling on BOTH
+cohorts (criterion 4 FAILs on the ceiling alone on both, guard
+passing both) and pooled onset harm ABOVE the decisive baseline on
+both (123 vs 114; 120 vs 80) despite criterion 3 passing. Leg T
+disarmed zero states for the third consecutive cycle. Next
+limitation selected: P1 return-A onset harm — criterion 4's
+ceiling failure on both cohorts is entirely leg W's regular-branch
+stand-downs at return-A onset, and a retry needs an
+evidence-derived condition on the regular branch's onset behaviour
+or fall-through, on NEW cohorts under a NEW protocol. Learner
+acquisition actions zero; external TRAIN actor harm published in
+full in the report.
+[Complete preregistration, results and limitations](docs/ACTING_WINDOW_JOINT_BREADTH_RECOVERY.md).
+
+
 ### November 10 — Companion concordance partial recovery: leg C, a companion-concordance corroboration leg for partial abstention triggers (FAILED / REGRESSION at checkpoint 32)
 
 Optional `CompanionConcordancePartialRecoveryMemory` is identical to
