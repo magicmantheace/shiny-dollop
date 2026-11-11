@@ -1,0 +1,383 @@
+{
+ "entry_version": 1,
+ "name": "Delver",
+ "slug": "delver",
+ "source_concept": "media-generation-underreach-delver-apose2-0-714bfec5-47ff-4f2f-8198-ca412be4e789.webp",
+ "asset_file": "delver.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "7ab7262b7eeb5716c23bd0494f133a7674a0f858cd4a839bd80c8ca7e8b7edc4",
+ "bytes": 20417188,
+ "counts": {
+  "verts": 47479,
+  "faces": 89320,
+  "raw_mesh_verts": 524499,
+  "raw_mesh_faces": 669558
+ },
+ "bones": [
+  "root",
+  "spine",
+  "head",
+  "arm.L",
+  "arm2.L",
+  "arm.R",
+  "arm2.R",
+  "leg.L",
+  "leg2.L",
+  "leg.R",
+  "leg2.R"
+ ],
+ "actions": [
+  "bounce",
+  "idle",
+  "run",
+  "walk"
+ ],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": true,
+  "rig_template": "biped",
+  "signature_clip": "bounce",
+  "weight_method": "distance-to-bone fallback (heat result rejected by skin_policy)",
+  "segmentation": {
+   "model": "P3-SAM (Tencent Hunyuan3D-Part)",
+   "parts": 19,
+   "proxy_faces": 49998,
+   "islands_relabelled": 94,
+   "separated_verts_added": 2829,
+   "labelled_verts": 47479
+  },
+  "label_map": {
+   "0": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "1": {
+    "dominant": "arm.L",
+    "allowed": [
+     "arm.L",
+     "arm2.L",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.R",
+     "leg.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "2": {
+    "dominant": "arm.R",
+    "allowed": [
+     "arm.R",
+     "arm2.R",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "leg.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "3": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R",
+     "leg.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "4": {
+    "dominant": "arm.L",
+    "allowed": [
+     "arm.L",
+     "arm2.L",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.R",
+     "leg.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "5": {
+    "dominant": "leg.L",
+    "allowed": [
+     "arm2.L",
+     "arm2.R",
+     "head",
+     "leg.L",
+     "leg.R",
+     "leg2.L",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R",
+     "leg2.R"
+    ]
+   },
+   "6": {
+    "dominant": "leg2.L",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg2.L",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R",
+     "leg2.R"
+    ]
+   },
+   "7": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R",
+     "leg.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "8": {
+    "dominant": "leg2.R",
+    "allowed": [
+     "head",
+     "leg.R",
+     "leg2.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R",
+     "leg.L",
+     "leg2.L"
+    ]
+   },
+   "9": {
+    "dominant": "spine",
+    "allowed": [
+     "arm.L",
+     "arm.R",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "10": {
+    "dominant": "arm.L",
+    "allowed": [
+     "arm.L",
+     "arm2.L",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.R",
+     "leg.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "11": {
+    "dominant": "arm.R",
+    "allowed": [
+     "arm.R",
+     "arm2.R",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "leg.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "12": {
+    "dominant": "arm.R",
+    "allowed": [
+     "arm.R",
+     "arm2.R",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "leg.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "13": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R",
+     "leg.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "14": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R",
+     "leg.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "15": {
+    "dominant": "arm.L",
+    "allowed": [
+     "arm.L",
+     "arm2.L",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.R",
+     "leg.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "16": {
+    "dominant": "arm.R",
+    "allowed": [
+     "arm.R",
+     "arm2.R",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "leg.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "17": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R",
+     "leg.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "18": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R",
+     "leg.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   }
+  },
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ },
+ "clips": {
+  "bounce": {
+   "frames": 30,
+   "fps": 24,
+   "seconds": 1.25
+  },
+  "idle": {
+   "frames": 115,
+   "fps": 24,
+   "seconds": 4.79
+  },
+  "run": {
+   "frames": 24,
+   "fps": 24,
+   "seconds": 1.0
+  },
+  "walk": {
+   "frames": 36,
+   "fps": 24,
+   "seconds": 1.5
+  }
+ }
+}
