@@ -871,3 +871,40 @@ catalog-verify MATCH; suite 135 passed. Note for future
 templates: any bone-local yaw on a canted bone has the same
 trap — prefer `world_z` for head turns. The wallpaper copy was
 re-synced the same day (wallpaper project records).
+
+## Arm-separation rebuilds (2026-11-11, branch game-asset-builder/arm-separation-fixes)
+
+Outcome: 0 of 6 rebuilds shipped; deployed catalog untouched. Failure
+modes, in the order a future retry will meet them:
+
+1. **Concept gate is bodyplan-bound.** Biped preflight daylight caps at
+   ~0.31 for single-bulb bodies (mandrake: 8 attempts). The passing
+   mandrake concept is a TWO-bulb redesign (head bulb + belly bulb,
+   arms attach at the waist pinch) at 0.4437. Owl-cat down-wings cap
+   ~0.38 (best of 9: 0.3799) — unpassed; a future attempt needs the
+   25–40% rows (wings raised beside the head) or a narrower belly.
+   Humanoid/thin-limbed plans pass easily (crow 0.4957, toasty 0.7697,
+   goblin 0.4125, axolotl quad 5 components / 0.0213 gap).
+2. **Posed gate can fail on weights alone.** Mandrake's mesh was
+   genuinely separated, but bone heat was rejected (torso arm share
+   0.60) and the distance fallback couples belly + feet to the arms:
+   the scream tears at 1.50 rad, deforms at ×0.35, smears feet at
+   ×0.18. Bulb bodies + fallback weights + big arm clips do not mix.
+3. **The paint stage is the systemic blocker.** After the delver and
+   mandrake succeeded early in the combined queues, EVERY later
+   texture (goblin ×2, crow, toasty, axolotl, plus the Underreach
+   gloam/lantern) froze or spun at "[paint] input mesh" — log frozen
+   at exactly 1,419 bytes, GPU 100% at ~60 W (one goblin bake ran
+   ~100 min at full power, still no output). Successful paints peaked
+   11.9 GiB of 12.3 GiB VRAM. Root cause NOT proven; a PC reboot /
+   driver-state reset is the untested first suspect for a retry.
+4. **Bridge tracking limits corrupt runs silently.** The client
+   abandons stages at ~15–25 min while the stage lives on; a client
+   that then fetches gets the PREVIOUS build's lab file and will
+   catalogue a Frankenstein (happened to the goblin; reverted).
+   Discipline for any retry: judge stages by the lab result JSON
+   CONTENT and sha256 of lab outputs (staged hash script), never by
+   file dates (the PC clock is unreliable) or fetch freshness;
+   verify every fetched GLB's sha before letting a resume proceed;
+   a local textured.glb whose provenance is not hash-verified must be
+   deleted before --resume, or the resume skips texture silently.

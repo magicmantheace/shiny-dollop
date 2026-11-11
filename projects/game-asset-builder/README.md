@@ -257,3 +257,38 @@ cloud-generated reference Pip the owner already has.
   failed at the texture stage and are catalogued as failures, not
   assets (see the P5 status note above; branch
   `game-asset-builder/p5-campfire-creatures`).
+
+## Arm-separation rebuilds (2026-11-11)
+
+Adam's requirement (2026-11-10): arms/limbs must not be fused to the body
+along their length — a hard gate, not an advisory warning. The wallpaper
+audit found six deployed creatures in violation. All six were attempted
+on branch `game-asset-builder/arm-separation-fixes`; **none passed both
+finish gates (catalog-verify + posed-render check), so no deployed
+creature was replaced and no catalog entry changed.** Verified state:
+
+- **Mandrake Toddler** — new two-bulb A-pose concept passed preflight
+  (arm daylight 0.4437; the single-bulb bodyplan caps at ~0.31). Mesh is
+  genuinely separated (rest renders show arms in daylight; bleed ~1%).
+  **FAILED the posed gate:** bone heat rejected (torso arm share 0.60) →
+  distance-fallback weights drag the belly at any scream amplitude
+  (stock 1.50 rad catastrophic; ×0.35 belly-disc; ×0.18 feet smear).
+- **Snow Goblin** — concept passed (0.4125), mesh passed; **texture
+  stage failed twice** (freeze at "[paint] input mesh", then a
+  ~100 min full-power bake with no output). Not catalogued.
+- **Ember Owl-Cat** — **concept gate not passed** (best 0.3799 of nine
+  attempts; down-wings cap ~0.38 on this bodyplan). No build started.
+- **Crow Postman** — concept passed (0.4957), mesh passed and
+  render-verified A-pose; **texture stage froze** (~65 min, no output).
+- **Toasty** — concept passed (0.7697, best of the queue), mesh passed;
+  **texture stage froze** at the same point.
+- **Axolotl-Capybara** — concept passed (5 leg components, gap 0.0213),
+  mesh passed; **texture stage froze** at the same point.
+
+The Hunyuan paint stage degraded across the night: the delver and
+mandrake textured fine early; goblin/crow/toasty/axolotl all froze at
+"[paint] input mesh" (log frozen at 1,419 bytes, GPU 100% at ~60 W).
+Root cause unproven (VRAM headroom suspected — successful paints peaked
+~11.9/12.3 GiB). All failed assets keep genuine prep/mesh artifacts in
+`outputs/<slug>/` with `ARMFIX-FAILURE-2026-11-11.md` notes for a future
+retry. NOT verified: Godot playback (unchanged from before).

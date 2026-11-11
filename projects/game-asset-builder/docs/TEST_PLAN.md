@@ -789,3 +789,40 @@ cost of the new creatures in the wallpaper scene.
   beak height Δ +0.001 / −0.005. Apex render: near-profile,
   level head. Catalog-verify MATCH (`98bc4f3f5c25…`); suite
   135 passed.
+
+## Arm-separation rebuilds (2026-11-11) — verification record
+
+Per-creature gates (concept preflight → catalog-verify → posed renders):
+
+- Mandrake Toddler: preflight PASS 0.4437 (two-bulb concept; eight
+  single-bulb attempts 0.066–0.317 — structural cap ~0.31 measured).
+  catalog-verify MATCH on the built GLB (9ec4f425…) — but the POSED
+  gate FAILED: audit-renderer scream apex at stock amplitude tore the
+  belly into a sail (posed_delta_max 1.5944); re-bakes at ×0.35
+  (0.5731) and ×0.18 (0.3621) still deformed belly/feet. Catalog
+  metadata from the run was REVERTED; deployed entry unchanged.
+  Weight record: bone heat rejected (torso arm share 0.6029), fallback
+  shipped in the (unshipped) build; distal bleed arm2.L 1.6% / R 0.6%.
+- Snow Goblin: preflight PASS 0.4125; mesh runner exit 0 (418,465
+  verts). Texture: attempt 1 froze at input-mesh (log 1,419 bytes,
+  ~45 min, killed); attempt 2 baked ~100 min at full power, no output
+  (lab textured.glb sha-verified unchanged), killed. No catalog.
+  Incident: a tracking-limit client fetched the STALE textured.glb and
+  catalogued a build on the old geometry (sha a8decc6e…) — reverted
+  via git checkout; derived artifacts deleted. See
+  outputs/snow-goblin/OVERLAP-INCIDENT-2026-11-11.md.
+- Ember Owl-Cat: preflight NOT passed — nine attempts, best 0.3799
+  (armfix-owlcat-apose2). No GPU stage started.
+- Crow Postman: preflight PASS 0.4957; mesh recovered from the lab and
+  sha-verified (ddb8cb4c…, 10,180,736 B); Cycles render of the raw
+  shape confirms A-pose separation. Texture froze (~65 min, log shows
+  no run progress; lab textured.glb sha-verified unchanged). No catalog.
+- Toasty: preflight PASS 0.7697; mesh exit 0 (420,711 verts). Texture
+  froze at input-mesh (log 1,419 bytes), killed ~35 min. No catalog.
+- Axolotl-Capybara: preflight PASS (5 leg components after erosion,
+  min_leg_gap_frac 0.0213, belly_row_frac 0.8054); mesh exit 0
+  (266,844 verts). Texture froze at input-mesh (log 1,419 bytes),
+  killed ~35 min. No catalog.
+- Suite after the queue: 135 passed (no catalog changes landed).
+- Final PC sweep: zero asset-forge processes, bridge jobs 0, GPU at
+  desktop baseline. Godot playback still NOT verified.
