@@ -1,9 +1,14 @@
-//! The scripted S1 scenario: a small Shallows colony — camp chamber,
-//! shaft, tunnel, ore face. The tunnel starts carved but **unlit**:
-//! the face is unreachable until the player extends the lantern
-//! network. Used by the scenario binary and the acceptance tests.
+//! Scripted scenarios.
+//!
+//! S1: a small Shallows colony — camp chamber, shaft, tunnel, ore
+//! face. The tunnel starts carved but **unlit**: the face is
+//! unreachable until the player extends the lantern network.
+//!
+//! S2: the same colony grown up — three delvers with jobs (miner,
+//! farmer, hauler), mushroom plots at camp, and a recruitment
+//! arrival scheduled while the colony looks viable.
 
-use crate::sim::{Delver, DelverState, Sim, Stores};
+use crate::sim::{Delver, Face, Job, Sim, Stores};
 use crate::world::{Cell, Pos, World};
 
 pub const CAMP_LANTERN: Pos = Pos { x: 4, y: 3, z: 4 };
@@ -11,7 +16,7 @@ pub const SHAFT_LANTERN: Pos = Pos { x: 4, y: 7, z: 4 };
 pub const TUNNEL_LANTERN_A: Pos = Pos { x: 10, y: 8, z: 4 };
 pub const TUNNEL_LANTERN_B: Pos = Pos { x: 13, y: 8, z: 4 };
 
-pub fn build_scenario() -> Sim {
+fn shallows_world() -> World {
     let mut world = World::new(24, 12, 8, Cell::Stone);
     for x in 0..24 {
         for z in 0..8 {
@@ -35,37 +40,108 @@ pub fn build_scenario() -> Sim {
     }
     world.set(Pos::new(15, 8, 4), Cell::Ore);
     world.set(Pos::new(16, 8, 4), Cell::Ore);
+    world
+}
 
-    let delver = Delver {
-        name: "Bram".to_string(),
-        pos: Pos::new(3, 3, 4),
-        energy: 100.0,
-        hunger: 100.0,
-        mining_xp: 0,
-        hauling_xp: 0,
-        carrying: 0,
-        state: DelverState::Idle,
-        path: Vec::new(),
-        mine_progress: 0.0,
-        blocked_logged: false,
-    };
+fn the_face() -> Face {
+    Face {
+        rock: Pos::new(15, 8, 4),
+        stand: Pos::new(14, 8, 4),
+        ore: 12,
+        cache: 0,
+    }
+}
 
+pub fn build_scenario() -> Sim {
+    let bram = Delver::new(0, "Bram", Pos::new(3, 3, 4), Job::Miner);
     let mut sim = Sim::new(
-        world,
-        delver,
-        Pos::new(3, 3, 4),  // stockpile
-        Pos::new(2, 3, 3),  // bed
-        Pos::new(15, 8, 4), // ore face
-        Pos::new(14, 8, 4), // stand cell in front of the face
-        12,                 // ore in the face
+        shallows_world(),
+        vec![bram],
+        Pos::new(3, 3, 4), // stockpile
+        vec![Pos::new(2, 3, 3)],
+        vec![the_face()],
+        Pos::new(6, 3, 4), // gate
         Stores {
             ore: 0,
             goods: 0,
             food: 10,
         },
+        0x5EED_0001,
+        u64::MAX, // the S1 scenario takes no recruits
+        false,    // and the dark does not bite yet
     );
     // The camp lantern is pipe-fed for scenario purposes.
     sim.place_lantern(CAMP_LANTERN, 1, 1_000_000.0);
+    sim
+}
+
+pub fn build_scenario_s2() -> Sim {
+    let delvers = vec![
+        Delver::new(0, "Bram", Pos::new(3, 3, 4), Job::Miner),
+        Delver::new(1, "Sella", Pos::new(4, 3, 5), Job::Farmer),
+        Delver::new(2, "Hale", Pos::new(4, 3, 3), Job::Hauler),
+    ];
+    let mut sim = Sim::new(
+        shallows_world(),
+        delvers,
+        Pos::new(3, 3, 4), // stockpile
+        vec![Pos::new(2, 3, 3), Pos::new(2, 3, 5), Pos::new(6, 3, 5)],
+        vec![the_face()],
+        Pos::new(6, 3, 4), // gate
+        Stores {
+            ore: 0,
+            goods: 0,
+            food: 12,
+        },
+        0x5EED_0002,
+        1500, // first recruit is due at tick 1500 if the colony is fed
+        false,
+    );
+    sim.place_lantern(CAMP_LANTERN, 1, 1_000_000.0);
+    // Mushroom plots in the camp chamber.
+    sim.plant_plot(Pos::new(5, 3, 3));
+    sim.plant_plot(Pos::new(6, 3, 3));
+    sim
+}
+
+/// S3: the S2 colony, a richer face, and a dark gallery running
+/// parallel to the tunnel — carved, unlit, and connected. Things
+/// come out of it.
+pub fn build_scenario_s3() -> Sim {
+    let mut world = shallows_world();
+    // The parallel gallery at depth 8, z=6, with three connectors.
+    for x in 8..=18 {
+        world.carve(Pos::new(x, 8, 6));
+    }
+    for x in [8, 14, 18] {
+        world.carve(Pos::new(x, 8, 5));
+    }
+    let delvers = vec![
+        Delver::new(0, "Bram", Pos::new(3, 3, 4), Job::Miner),
+        Delver::new(1, "Sella", Pos::new(4, 3, 5), Job::Farmer),
+        Delver::new(2, "Hale", Pos::new(4, 3, 3), Job::Hauler),
+    ];
+    let mut face = the_face();
+    face.ore = 40;
+    let mut sim = Sim::new(
+        world,
+        delvers,
+        Pos::new(3, 3, 4),
+        vec![Pos::new(2, 3, 3), Pos::new(2, 3, 5), Pos::new(6, 3, 5)],
+        vec![face],
+        Pos::new(6, 3, 4),
+        Stores {
+            ore: 0,
+            goods: 0,
+            food: 12,
+        },
+        0x5EED_0003,
+        1500,
+        true, // the dark bites
+    );
+    sim.place_lantern(CAMP_LANTERN, 1, 1_000_000.0);
+    sim.plant_plot(Pos::new(5, 3, 3));
+    sim.plant_plot(Pos::new(6, 3, 3));
     sim
 }
 

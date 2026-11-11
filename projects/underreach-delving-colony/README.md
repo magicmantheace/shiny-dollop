@@ -44,10 +44,11 @@ Verified: `cargo test` in `sim/` (unit + scenario tests), and the
 `scenario` binary's two-phase run (blocked in the dark → lit → producing).
 
 **Not yet built:** rendering/frontend (Godot 4, a later slice), combat,
-creatures, hazards, rescue gameplay, the other depth bands, co-op,
-villager breadth (S1 has one delver; full-ASKA needs/moods are designed,
-not yet simulated beyond energy/hunger). No frame or performance claims
-exist — nothing has run on owner hardware.
+the other depth bands (the Fungal Reaches arrive in S5), co-op, and
+children/generations. S2 added the colony (multiple delvers, jobs,
+morale, camp farming, recruitment); S3 added creatures, combat,
+lantern-clock strandings, rescue runs, and permadeath. No frame or
+performance claims exist — nothing has run on owner hardware.
 
 ## Layout
 

@@ -41,7 +41,7 @@ fn phase2_first_light_and_production() {
         sim.ledger
     );
     assert!(sim.stores.goods >= 2, "goods={}", sim.stores.goods);
-    assert!(sim.delver.mining_xp > 0);
+    assert!(sim.delvers[0].mining_xp > 0);
 }
 
 #[test]
@@ -56,7 +56,7 @@ fn save_load_roundtrip_and_deterministic_continuation() {
     loop {
         sim.tick();
         guard += 1;
-        if sim.delver.state == DelverState::Idle && sim.delver.path.is_empty() {
+        if sim.delvers[0].state == DelverState::Idle && sim.delvers[0].path.is_empty() {
             break;
         }
         assert!(guard < 4000, "never reached a quiescent state");

@@ -1,6 +1,8 @@
 //! Simulation core: lanterns and light, pathing through the lit
-//! network, one delver running delve → haul → convert, the Deep
-//! Ledger, and canonical save/load with a state hash.
+//! network, the Deep Ledger, and canonical save/load with a state
+//! hash. S2 grows the S1 single-delver loop into a colony: multiple
+//! delvers with jobs (miner / hauler / farmer), morale, camp food
+//! production, and surface recruitment.
 //!
 //! The design rules encoded here (owner decisions, see
 //! docs/MUSE_HANDOFF.md):
@@ -9,6 +11,10 @@
 //! - Placing light records **first light** per depth in the Ledger.
 //! - Lantern fuel burns; a dead lantern's light goes with it (the seed
 //!   of the rescue clock).
+//! - Food is produced at camp by farmers tending mushroom plots;
+//!   miners fill a cache at the face, haulers run it home.
+//! - Recruitment arrives from the surface on a schedule while the
+//!   colony looks viable (food in stores), named by the seeded RNG.
 
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 
@@ -134,6 +140,14 @@ pub enum LedgerKind {
     HaulDelivered,
     Converted,
     LanternOut,
+    Harvested,
+    RecruitArrived,
+    SpiritsFallen,
+    CreatureSpotted,
+    CreatureSlain,
+    DelverDowned,
+    DelverRescued,
+    DelverLost,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -142,6 +156,41 @@ pub struct LedgerEntry {
     pub kind: LedgerKind,
     pub detail: String,
 }
+
+// ---------------------------------------------------------------------------
+// Jobs, faces, plots
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum Job {
+    Unassigned,
+    Miner,
+    Hauler,
+    Farmer,
+}
+
+/// An ore face: the rock cell being worked, the carved cell the
+/// delver stands on, the ore still in the rock, and the mined cache
+/// waiting at the face for a hauler.
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct Face {
+    pub rock: Pos,
+    pub stand: Pos,
+    pub ore: u32,
+    pub cache: u32,
+}
+
+/// A camp mushroom plot. Growth runs 0..10; at 10 it is ready to
+/// harvest. Plots grow slowly untended and fast under a farmer.
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct Plot {
+    pub pos: Pos,
+    pub growth: f32,
+}
+
+pub const PLOT_READY: f32 = 10.0;
+pub const PLOT_PASSIVE_GROWTH: f32 = 0.002;
+pub const PLOT_YIELD: u32 = 2;
 
 // ---------------------------------------------------------------------------
 // Delver
@@ -158,31 +207,98 @@ pub enum DelverState {
     Resting,
     Eating,
     Blocked,
+    ToPlot,
+    Tending,
+    /// Incapacitated (hp spent). The rescue clock is running.
+    Downed,
+    /// Heading to a downed delver to carry them home.
+    ToRescue,
+    /// Carrying a downed delver back to camp (half speed).
+    Rescuing,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Delver {
+    pub id: u32,
     pub name: String,
     pub pos: Pos,
     /// 0..100 — spent by work, restored by rest.
     pub energy: f32,
     /// 0..100 — 100 is fully fed; restored by eating from stores.
     pub hunger: f32,
+    /// 0..100 — drifts toward a target set by how fed and rested the
+    /// delver is (plus a small colony-prosperity term); scales work.
+    pub morale: f32,
     pub mining_xp: u32,
     pub hauling_xp: u32,
+    pub farming_xp: u32,
     pub carrying: u32,
+    pub carrying_food: u32,
+    /// 0..100 — spent in combat and accidents; a delver at 0 is
+    /// Downed, not dead: the rescue clock decides which.
+    pub hp: f32,
+    pub combat_xp: u32,
+    pub fight_cd: u32,
+    /// Ticks of survival left while downed or cut off in the dark.
+    /// `None` while safe.
+    pub dark_clock: Option<u32>,
+    /// The delver id this delver is rescuing, if any.
+    pub rescue_target: Option<u32>,
+    pub job: Job,
     pub state: DelverState,
     pub path: Vec<Pos>,
     pub mine_progress: f32,
+    pub convert_progress: f32,
+    pub target_face: Option<usize>,
+    pub target_plot: Option<usize>,
     pub blocked_logged: bool,
+    pub low_morale_logged: bool,
 }
 
 impl Delver {
+    pub fn new(id: u32, name: &str, pos: Pos, job: Job) -> Self {
+        Self {
+            id,
+            name: name.to_string(),
+            pos,
+            energy: 100.0,
+            hunger: 100.0,
+            morale: 60.0,
+            mining_xp: 0,
+            hauling_xp: 0,
+            farming_xp: 0,
+            carrying: 0,
+            carrying_food: 0,
+            hp: 100.0,
+            combat_xp: 0,
+            fight_cd: 0,
+            dark_clock: None,
+            rescue_target: None,
+            job,
+            state: DelverState::Idle,
+            path: Vec::new(),
+            mine_progress: 0.0,
+            convert_progress: 0.0,
+            target_face: None,
+            target_plot: None,
+            blocked_logged: false,
+            low_morale_logged: false,
+        }
+    }
+
     pub fn mining_level(&self) -> u32 {
         self.mining_xp / 10
     }
+    pub fn farming_level(&self) -> u32 {
+        self.farming_xp / 10
+    }
     pub fn capacity(&self) -> u32 {
         4
+    }
+    /// Morale scales all work rates: a miserable delver works at
+    /// 0.6x, a thriving one at 1.2x.
+    pub fn work_mult(&self) -> f32 {
+        0.6 + 0.6 * (self.morale / 100.0)
     }
 }
 
@@ -194,6 +310,96 @@ pub struct Stores {
 }
 
 // ---------------------------------------------------------------------------
+// Seeded RNG (xorshift64*) — the only randomness in the sim, and its
+// state lives in the save, per the determinism rule.
+// ---------------------------------------------------------------------------
+
+pub struct Rng {
+    pub state: u64,
+}
+
+impl Rng {
+    pub fn next_u64(&mut self) -> u64 {
+        let mut x = self.state;
+        x ^= x >> 12;
+        x ^= x << 25;
+        x ^= x >> 27;
+        self.state = x;
+        x.wrapping_mul(0x2545_F491_4F6C_DD1D)
+    }
+    pub fn below(&mut self, n: u64) -> u64 {
+        self.next_u64() % n
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Critters — what lives in the dark (S3)
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum CritterKind {
+    GloamRat,
+    DeepLurker,
+}
+
+impl CritterKind {
+    pub fn max_hp(&self) -> f32 {
+        match self {
+            CritterKind::GloamRat => 20.0,
+            CritterKind::DeepLurker => 45.0,
+        }
+    }
+    pub fn damage(&self) -> f32 {
+        match self {
+            CritterKind::GloamRat => 4.0,
+            CritterKind::DeepLurker => 8.0,
+        }
+    }
+    /// Food the colony renders from the carcass.
+    pub fn food_value(&self) -> u32 {
+        match self {
+            CritterKind::GloamRat => 1,
+            CritterKind::DeepLurker => 2,
+        }
+    }
+    pub fn label(&self) -> &'static str {
+        match self {
+            CritterKind::GloamRat => "gloam rat",
+            CritterKind::DeepLurker => "deep lurker",
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct Critter {
+    pub id: u32,
+    pub kind: CritterKind,
+    pub pos: Pos,
+    pub hp: f32,
+    pub move_cd: u32,
+    pub attack_cd: u32,
+    pub spotted: bool,
+}
+
+pub const CRITTER_SPAWN_INTERVAL: u64 = 700;
+pub const CRITTER_CAP: usize = 4;
+pub const CRITTER_MIN_DEPTH: i32 = 5;
+pub const ATTACK_PERIOD: u32 = 6;
+pub const LIGHT_DAMAGE: f32 = 1.5;
+/// Ticks a downed delver's emergency light lasts — the rescue clock.
+pub const DOWNED_CLOCK: u32 = 900;
+/// Ticks a delver cut off in total darkness can last.
+pub const DARK_CLOCK: u32 = 600;
+
+pub const RECRUIT_NAMES: &[&str] = &[
+    "Wren", "Tomas", "Ines", "Pell", "Odile", "Sanna", "Yuri", "Bea", "Alba", "Fenn", "Maren",
+    "Silas",
+];
+pub const MAX_DELVER_POPULATION: usize = 6;
+pub const RECRUIT_INTERVAL: u64 = 2400;
+pub const RECRUIT_MIN_FOOD: u32 = 4;
+
+// ---------------------------------------------------------------------------
 // Sim
 // ---------------------------------------------------------------------------
 
@@ -202,52 +408,79 @@ pub struct Sim {
     pub world: World,
     /// Kept sorted by position so serialization is canonical.
     pub lanterns: Vec<LanternEntry>,
-    pub delver: Delver,
+    /// Kept in id order (arrivals append).
+    pub delvers: Vec<Delver>,
     pub stockpile: Pos,
-    pub bed: Pos,
-    /// The ore cell being worked, and the carved cell the delver
-    /// stands on to work it.
-    pub face: Pos,
-    pub face_stand: Pos,
-    pub face_ore: u32,
+    pub beds: Vec<Pos>,
+    /// Kept sorted by rock position.
+    pub faces: Vec<Face>,
+    /// Kept sorted by position.
+    pub plots: Vec<Plot>,
+    /// Where surface arrivals appear.
+    pub gate: Pos,
     pub stores: Stores,
     pub ledger: Vec<LedgerEntry>,
     pub lit_depths: BTreeSet<i32>,
     pub tick_count: u64,
+    pub rng_state: u64,
+    pub next_arrival: u64,
+    pub next_delver_id: u32,
+    /// Kept in id order (spawns append).
+    pub critters: Vec<Critter>,
+    pub next_critter_id: u32,
+    /// Scenarios from before the dark bit (S1/S2) keep critters off;
+    /// S3 turns them on.
+    pub critters_enabled: bool,
     #[serde(skip)]
     pub lit: Vec<bool>,
 }
 
 impl Sim {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         world: World,
-        delver: Delver,
+        delvers: Vec<Delver>,
         stockpile: Pos,
-        bed: Pos,
-        face: Pos,
-        face_stand: Pos,
-        face_ore: u32,
+        beds: Vec<Pos>,
+        faces: Vec<Face>,
+        gate: Pos,
         stores: Stores,
+        rng_seed: u64,
+        next_arrival: u64,
+        critters_enabled: bool,
     ) -> Self {
+        let mut faces = faces;
+        faces.sort_by_key(|f| f.rock);
+        let next_delver_id = delvers.iter().map(|d| d.id).max().map_or(0, |m| m + 1);
+        let founder = delvers
+            .first()
+            .map(|d| d.name.clone())
+            .unwrap_or_else(|| "No one".to_string());
         let mut sim = Self {
             world,
             lanterns: Vec::new(),
-            delver,
+            delvers,
             stockpile,
-            bed,
-            face,
-            face_stand,
-            face_ore,
+            beds,
+            faces,
+            plots: Vec::new(),
+            gate,
             stores,
             ledger: Vec::new(),
             lit_depths: BTreeSet::new(),
             tick_count: 0,
+            rng_state: if rng_seed == 0 { 0x9E37_79B9_7F4A_7C15 } else { rng_seed },
+            next_arrival,
+            next_delver_id,
+            critters: Vec::new(),
+            next_critter_id: 0,
+            critters_enabled,
             lit: Vec::new(),
         };
         sim.refresh_light();
         sim.log(
             LedgerKind::ColonyFounded,
-            format!("{} takes the lantern down", sim.delver.name),
+            format!("{founder} takes the lantern down"),
         );
         sim
     }
@@ -320,6 +553,29 @@ impl Sim {
         self.note_new_lit_depths();
     }
 
+    /// Assign a delver's job. Takes effect at their next decision.
+    pub fn set_job(&mut self, delver_id: u32, job: Job) {
+        if let Some(d) = self.delvers.iter_mut().find(|d| d.id == delver_id) {
+            d.job = job;
+            d.state = DelverState::Idle;
+            d.path.clear();
+            d.target_face = None;
+            d.target_plot = None;
+        }
+    }
+
+    /// Designate a carved camp cell as a mushroom plot.
+    pub fn plant_plot(&mut self, pos: Pos) {
+        if self.world.get(pos) != Some(Cell::Carved) {
+            return;
+        }
+        if self.plots.iter().any(|p| p.pos == pos) {
+            return;
+        }
+        self.plots.push(Plot { pos, growth: 0.0 });
+        self.plots.sort_by_key(|p| p.pos);
+    }
+
     // -- Save / load ------------------------------------------------------------
 
     pub fn save_json(&self) -> String {
@@ -336,6 +592,53 @@ impl Sim {
         let mut h = Sha256::new();
         h.update(self.save_json().as_bytes());
         format!("{:x}", h.finalize())
+    }
+
+    // -- Recruitment --------------------------------------------------------------
+
+    fn maybe_recruit(&mut self) {
+        if self.tick_count < self.next_arrival {
+            return;
+        }
+        self.next_arrival += RECRUIT_INTERVAL;
+        if self.delvers.len() >= MAX_DELVER_POPULATION {
+            return;
+        }
+        if self.stores.food < RECRUIT_MIN_FOOD {
+            return;
+        }
+        let mut rng = Rng {
+            state: self.rng_state,
+        };
+        let taken: Vec<&str> = self.delvers.iter().map(|d| d.name.as_str()).collect();
+        let free: Vec<&&str> = RECRUIT_NAMES.iter().filter(|n| !taken.contains(n)).collect();
+        if free.is_empty() {
+            self.rng_state = rng.state;
+            return;
+        }
+        let name = free[rng.below(free.len() as u64) as usize].to_string();
+        self.rng_state = rng.state;
+        // Fill the colony's gaps first: miner, then farmer, then hauler.
+        let has = |j: Job| self.delvers.iter().any(|d| d.job == j);
+        let job = if !has(Job::Miner) {
+            Job::Miner
+        } else if !has(Job::Farmer) {
+            Job::Farmer
+        } else if !has(Job::Hauler) {
+            Job::Hauler
+        } else {
+            Job::Miner
+        };
+        let id = self.next_delver_id;
+        self.next_delver_id += 1;
+        let mut d = Delver::new(id, &name, self.gate, job);
+        d.energy = 90.0;
+        d.hunger = 80.0;
+        self.delvers.push(d);
+        self.log(
+            LedgerKind::RecruitArrived,
+            format!("{name} arrived from the surface and takes up work as a {:?}", job),
+        );
     }
 
     // -- Tick -------------------------------------------------------------------
@@ -361,14 +664,395 @@ impl Sim {
             }
             self.refresh_light();
         }
-        self.tick_delver();
+        // Mushroom plots grow a little on their own.
+        for p in self.plots.iter_mut() {
+            p.growth = (p.growth + PLOT_PASSIVE_GROWTH).min(PLOT_READY);
+        }
+        self.maybe_recruit();
+        self.maybe_spawn_critter();
+        self.assign_rescues();
+        self.tick_critters();
+        for idx in 0..self.delvers.len() {
+            self.tick_delver(idx);
+        }
+        self.sweep_danger();
         self.tick_count += 1;
     }
 
-    fn start_path(&mut self, to: Pos) -> bool {
-        match find_path(&self.world, &self.lit, self.delver.pos, to) {
+    fn lit_at(&self, p: Pos) -> bool {
+        match self.world.idx(p) {
+            Some(i) => self.lit.get(i).copied().unwrap_or(false),
+            None => false,
+        }
+    }
+
+    // -- Critters ---------------------------------------------------------------
+
+    /// Spawn a critter at a carved cell (world events and scenario
+    /// scripting both use this; auto-spawn picks the cell itself).
+    pub fn spawn_critter(&mut self, kind: CritterKind, pos: Pos) -> u32 {
+        let id = self.next_critter_id;
+        self.next_critter_id += 1;
+        self.critters.push(Critter {
+            id,
+            kind,
+            pos,
+            hp: kind.max_hp(),
+            move_cd: 0,
+            attack_cd: 0,
+            spotted: false,
+        });
+        id
+    }
+
+    fn maybe_spawn_critter(&mut self) {
+        if !self.critters_enabled
+            || self.tick_count == 0
+            || !self.tick_count.is_multiple_of(CRITTER_SPAWN_INTERVAL)
+            || self.critters.len() >= CRITTER_CAP
+        {
+            return;
+        }
+        // Candidate cells: carved, unlit, deep enough, touching light.
+        let mut cells: Vec<Pos> = Vec::new();
+        for y in CRITTER_MIN_DEPTH..self.world.sy as i32 {
+            for x in 0..self.world.sx as i32 {
+                for z in 0..self.world.sz as i32 {
+                    let p = Pos::new(x, y, z);
+                    if self.world.get(p) != Some(Cell::Carved) || self.lit_at(p) {
+                        continue;
+                    }
+                    if p.neighbors6().iter().any(|n| self.lit_at(*n)) {
+                        cells.push(p);
+                    }
+                }
+            }
+        }
+        if cells.is_empty() {
+            return;
+        }
+        let mut rng = Rng {
+            state: self.rng_state,
+        };
+        if rng.below(100) >= 65 {
+            self.rng_state = rng.state;
+            return;
+        }
+        let pos = cells[rng.below(cells.len() as u64) as usize];
+        let kind = if pos.y >= 7 && rng.below(2) == 0 {
+            CritterKind::DeepLurker
+        } else {
+            CritterKind::GloamRat
+        };
+        self.rng_state = rng.state;
+        self.spawn_critter(kind, pos);
+    }
+
+    fn kill_critter(&mut self, cid: u32, credit: Option<&str>) {
+        let Some(ci) = self.critters.iter().position(|c| c.id == cid) else {
+            return;
+        };
+        let critter = self.critters.remove(ci);
+        self.stores.food += critter.kind.food_value();
+        let detail = match credit {
+            Some(name) => format!(
+                "{} slew a {}",
+                name,
+                critter.kind.label()
+            ),
+            None => format!("a {} burned away in the light", critter.kind.label()),
+        };
+        self.log(LedgerKind::CreatureSlain, detail);
+    }
+
+    /// BFS over carved cells regardless of light — how critters move.
+    fn critter_path(&self, from: Pos, to: Pos) -> Option<Vec<Pos>> {
+        if from == to {
+            return Some(Vec::new());
+        }
+        let traversable = |p: Pos| self.world.get(p) == Some(Cell::Carved);
+        if !traversable(to) {
+            return None;
+        }
+        let mut prev: HashMap<Pos, Pos> = HashMap::new();
+        let mut seen: HashSet<Pos> = HashSet::new();
+        let mut queue: VecDeque<Pos> = VecDeque::new();
+        seen.insert(from);
+        queue.push_back(from);
+        while let Some(cur) = queue.pop_front() {
+            for n in cur.neighbors6() {
+                if seen.contains(&n) || !traversable(n) {
+                    continue;
+                }
+                seen.insert(n);
+                prev.insert(n, cur);
+                if n == to {
+                    let mut path = vec![n];
+                    let mut c = n;
+                    while c != from {
+                        c = prev[&c];
+                        if c != from {
+                            path.push(c);
+                        }
+                    }
+                    path.reverse();
+                    return Some(path);
+                }
+                queue.push_back(n);
+            }
+        }
+        None
+    }
+
+    fn down_delver(&mut self, idx: usize) {
+        if self.delvers[idx].state == DelverState::Downed {
+            return;
+        }
+        self.delvers[idx].hp = 0.0;
+        self.delvers[idx].state = DelverState::Downed;
+        self.delvers[idx].path.clear();
+        self.delvers[idx].carrying = 0;
+        self.delvers[idx].rescue_target = None;
+        self.delvers[idx].dark_clock = Some(DOWNED_CLOCK);
+        let name = self.delvers[idx].name.clone();
+        let pos = self.delvers[idx].pos;
+        self.log(
+            LedgerKind::DelverDowned,
+            format!(
+                "{} is down at ({}, {}, {}) — the rescue clock is running",
+                name, pos.x, pos.y, pos.z
+            ),
+        );
+    }
+
+    fn tick_critters(&mut self) {
+        let ids: Vec<u32> = self.critters.iter().map(|c| c.id).collect();
+        for cid in ids {
+            let Some(ci) = self.critters.iter().position(|c| c.id == cid) else {
+                continue;
+            };
+            // Light burns.
+            if self.lit_at(self.critters[ci].pos) {
+                if !self.critters[ci].spotted {
+                    self.critters[ci].spotted = true;
+                    let label = self.critters[ci].kind.label();
+                    self.log(
+                        LedgerKind::CreatureSpotted,
+                        format!("a {label} — in the light!"),
+                    );
+                }
+                self.critters[ci].hp -= LIGHT_DAMAGE;
+                if self.critters[ci].hp <= 0.0 {
+                    self.kill_critter(cid, None);
+                    continue;
+                }
+            }
+            if self.critters[ci].attack_cd > 0 {
+                self.critters[ci].attack_cd -= 1;
+            }
+            // Nearest living, non-downed delver.
+            let cpos = self.critters[ci].pos;
+            let target = self
+                .delvers
+                .iter()
+                .filter(|d| d.state != DelverState::Downed)
+                .min_by_key(|d| {
+                    (d.pos.x - cpos.x).abs() + (d.pos.y - cpos.y).abs() + (d.pos.z - cpos.z).abs()
+                })
+                .map(|d| (d.id, d.pos));
+            let Some((tid, tpos)) = target else {
+                continue;
+            };
+            let dist = (tpos.x - cpos.x).abs() + (tpos.y - cpos.y).abs() + (tpos.z - cpos.z).abs();
+            if dist <= 1 {
+                if self.critters[ci].attack_cd == 0 {
+                    self.critters[ci].attack_cd = ATTACK_PERIOD;
+                    let dmg = self.critters[ci].kind.damage();
+                    if let Some(di) = self.delvers.iter().position(|d| d.id == tid) {
+                        self.delvers[di].hp -= dmg;
+                        if self.delvers[di].hp <= 0.0 {
+                            self.down_delver(di);
+                        }
+                    }
+                }
+                continue;
+            }
+            if self.critters[ci].move_cd > 0 {
+                self.critters[ci].move_cd -= 1;
+                continue;
+            }
+            self.critters[ci].move_cd = 1; // critters move every other tick
+            if let Some(path) = self.critter_path(cpos, tpos) {
+                if let Some(next) = path.first().copied() {
+                    // Never step onto the delver's own cell.
+                    if next != tpos {
+                        self.critters[ci].pos = next;
+                    }
+                }
+            }
+        }
+    }
+
+    // -- Rescue -------------------------------------------------------------------
+
+    /// Path where every intermediate cell must be lit and carved, but
+    /// the final cell may be dark — a rescuer's dash to a delver who
+    /// is down just past the light's edge.
+    fn find_path_dash(&self, from: Pos, to: Pos) -> Option<Vec<Pos>> {
+        if self.world.get(to) != Some(Cell::Carved) {
+            return None;
+        }
+        if from == to {
+            return Some(Vec::new());
+        }
+        let intermediate_ok = |p: Pos| -> bool {
+            match self.world.idx(p) {
+                Some(i) => self.world.get(p) == Some(Cell::Carved) && self.lit[i],
+                None => false,
+            }
+        };
+        let mut prev: HashMap<Pos, Pos> = HashMap::new();
+        let mut seen: HashSet<Pos> = HashSet::new();
+        let mut queue: VecDeque<Pos> = VecDeque::new();
+        seen.insert(from);
+        queue.push_back(from);
+        while let Some(cur) = queue.pop_front() {
+            for n in cur.neighbors6() {
+                if seen.contains(&n) {
+                    continue;
+                }
+                if n != to && !intermediate_ok(n) {
+                    continue;
+                }
+                seen.insert(n);
+                prev.insert(n, cur);
+                if n == to {
+                    let mut path = vec![n];
+                    let mut c = n;
+                    while c != from {
+                        c = prev[&c];
+                        if c != from {
+                            path.push(c);
+                        }
+                    }
+                    path.reverse();
+                    return Some(path);
+                }
+                queue.push_back(n);
+            }
+        }
+        None
+    }
+
+    fn assign_rescues(&mut self) {
+        let downed: Vec<u32> = self
+            .delvers
+            .iter()
+            .filter(|d| d.state == DelverState::Downed)
+            .map(|d| d.id)
+            .collect();
+        for did in downed {
+            if self.delvers.iter().any(|d| d.rescue_target == Some(did)) {
+                continue;
+            }
+            let dpos = match self.delvers.iter().find(|d| d.id == did) {
+                Some(d) => d.pos,
+                None => continue,
+            };
+            // Nearest able delver: upright, healthy enough, not
+            // already on a rescue.
+            let candidate = self
+                .delvers
+                .iter()
+                .filter(|d| {
+                    d.state != DelverState::Downed
+                        && d.hp >= 30.0
+                        && d.rescue_target.is_none()
+                })
+                .min_by_key(|d| {
+                    (d.pos.x - dpos.x).abs() + (d.pos.y - dpos.y).abs() + (d.pos.z - dpos.z).abs()
+                })
+                .map(|d| d.id);
+            let Some(rid) = candidate else {
+                continue;
+            };
+            let ridx = self.delvers.iter().position(|d| d.id == rid).unwrap();
+            let from = self.delvers[ridx].pos;
+            let path = if self.lit_at(dpos) {
+                find_path(&self.world, &self.lit, from, dpos)
+            } else {
+                self.find_path_dash(from, dpos)
+            };
+            if let Some(path) = path {
+                self.delvers[ridx].state = DelverState::ToRescue;
+                self.delvers[ridx].rescue_target = Some(did);
+                self.delvers[ridx].path = path;
+                self.delvers[ridx].target_face = None;
+                self.delvers[ridx].target_plot = None;
+            }
+        }
+    }
+
+    /// The danger sweep: clocks run for the downed and for anyone cut
+    /// off in total darkness. A clock that reaches zero is a loss,
+    /// and the Ledger keeps the name.
+    fn sweep_danger(&mut self) {
+        let mut lost: Vec<u32> = Vec::new();
+        for idx in 0..self.delvers.len() {
+            let (id, pos, state, prev_clock) = {
+                let d = &self.delvers[idx];
+                (d.id, d.pos, d.state, d.dark_clock)
+            };
+            let in_dark = !self.lit_at(pos);
+            let cut_off = in_dark
+                && pos != self.stockpile
+                && find_path(&self.world, &self.lit, pos, self.stockpile).is_none();
+            let downed = state == DelverState::Downed;
+            if downed || cut_off {
+                let clock = match prev_clock {
+                    Some(c) => c.saturating_sub(1),
+                    None => {
+                        if downed {
+                            DOWNED_CLOCK
+                        } else {
+                            DARK_CLOCK
+                        }
+                    }
+                };
+                self.delvers[idx].dark_clock = Some(clock);
+                if clock == 0 {
+                    lost.push(id);
+                }
+            } else if !downed {
+                self.delvers[idx].dark_clock = None;
+            }
+        }
+        for id in lost {
+            if let Some(pos) = self.delvers.iter().position(|d| d.id == id) {
+                let name = self.delvers[pos].name.clone();
+                self.delvers.remove(pos);
+                self.log(
+                    LedgerKind::DelverLost,
+                    format!("{name} was lost to the dark"),
+                );
+            }
+            for d in self.delvers.iter_mut() {
+                if d.rescue_target == Some(id) {
+                    d.rescue_target = None;
+                    if d.state == DelverState::ToRescue || d.state == DelverState::Rescuing {
+                        d.state = DelverState::Idle;
+                        d.path.clear();
+                    }
+                }
+            }
+        }
+    }
+
+    fn start_path(&mut self, idx: usize, to: Pos) -> bool {
+        let from = self.delvers[idx].pos;
+        match find_path(&self.world, &self.lit, from, to) {
             Some(path) => {
-                self.delver.path = path;
+                self.delvers[idx].path = path;
                 true
             }
             None => false,
@@ -376,154 +1060,547 @@ impl Sim {
     }
 
     /// One movement step along the current path. Returns true on arrival.
-    fn follow_path(&mut self) -> bool {
-        if let Some(next) = self.delver.path.first().copied() {
-            self.delver.pos = next;
-            self.delver.path.remove(0);
+    fn follow_path(&mut self, idx: usize) -> bool {
+        if let Some(next) = self.delvers[idx].path.first().copied() {
+            self.delvers[idx].pos = next;
+            self.delvers[idx].path.remove(0);
         }
-        self.delver.path.is_empty()
+        self.delvers[idx].path.is_empty()
     }
 
-    /// The camp decision, made whenever the delver is at camp with no
-    /// active job: eat if hungry, rest if spent, otherwise go to work —
-    /// or discover the dark says no.
-    fn decide_from_camp(&mut self) {
-        if self.delver.hunger < 40.0 && self.stores.food > 0 {
-            self.delver.state = DelverState::Eating;
+    fn delver_bed(&self, idx: usize) -> Pos {
+        if self.beds.is_empty() {
+            return self.stockpile;
+        }
+        self.beds[(self.delvers[idx].id as usize) % self.beds.len()]
+    }
+
+    fn has_hauler(&self) -> bool {
+        self.delvers.iter().any(|d| d.job == Job::Hauler)
+    }
+
+    /// Deposit whatever the delver is carrying into the stores, with
+    /// the S1 conversion rule: ore converts to goods in pairs.
+    fn deposit(&mut self, idx: usize) {
+        let amount = self.delvers[idx].carrying;
+        if amount > 0 {
+            self.delvers[idx].carrying = 0;
+            self.delvers[idx].hauling_xp += amount;
+            self.stores.ore += amount;
+            let name = self.delvers[idx].name.clone();
+            self.log(
+                LedgerKind::HaulDelivered,
+                format!("{name} hauled {amount} ore to the stockpile"),
+            );
+            self.convert_stores();
+        }
+        let food = self.delvers[idx].carrying_food;
+        if food > 0 {
+            self.delvers[idx].carrying_food = 0;
+            self.stores.food += food;
+        }
+    }
+
+    fn convert_stores(&mut self) {
+        let pairs = self.stores.ore / 2;
+        if pairs > 0 {
+            self.stores.ore -= pairs * 2;
+            self.stores.goods += pairs;
+            self.log(
+                LedgerKind::Converted,
+                format!("converted {} ore into {pairs} goods", pairs * 2),
+            );
+        }
+    }
+
+    fn go_blocked(&mut self, idx: usize, what: &str) {
+        self.delvers[idx].state = DelverState::Blocked;
+        if !self.delvers[idx].blocked_logged {
+            self.delvers[idx].blocked_logged = true;
+            let name = self.delvers[idx].name.clone();
+            self.log(
+                LedgerKind::RouteBlocked,
+                format!("{name} cannot reach {what} — the way is dark"),
+            );
+        }
+    }
+
+    /// The camp decision, made whenever a delver stands at camp with
+    /// empty hands and no active job step: eat, rest, or work by job.
+    fn decide(&mut self, idx: usize) {
+        // Nobody works in the dark. A delver caught out by a light
+        // failure cowers and waits for rescue or a relight; the
+        // danger sweep runs their clock meanwhile.
+        if !self.lit_at(self.delvers[idx].pos) && self.delvers[idx].pos != self.stockpile {
+            self.delvers[idx].state = DelverState::Idle;
             return;
         }
-        if self.delver.energy < 30.0 {
-            if self.start_path(self.bed) {
-                self.delver.state = DelverState::ToBed;
+        if self.delvers[idx].hunger < 40.0 && self.stores.food > 0 {
+            self.delvers[idx].state = DelverState::Eating;
+            return;
+        }
+        if self.delvers[idx].energy < 30.0 {
+            let bed = self.delver_bed(idx);
+            if self.delvers[idx].pos == bed || self.start_path(idx, bed) {
+                self.delvers[idx].state = DelverState::ToBed;
             } else {
-                self.delver.state = DelverState::Resting;
+                self.delvers[idx].state = DelverState::Resting;
             }
             return;
         }
-        if self.face_ore == 0 {
-            self.delver.state = DelverState::Idle;
-            return;
-        }
-        if self.start_path(self.face_stand) {
-            self.delver.state = DelverState::ToFace;
-            self.delver.blocked_logged = false;
-        } else {
-            self.delver.state = DelverState::Blocked;
-            if !self.delver.blocked_logged {
-                self.delver.blocked_logged = true;
-                self.log(
-                    LedgerKind::RouteBlocked,
-                    format!(
-                        "{} cannot reach the face — the way is dark",
-                        self.delver.name
-                    ),
-                );
-            }
+        match self.delvers[idx].job {
+            Job::Miner => self.decide_miner(idx),
+            Job::Farmer => self.decide_farmer(idx),
+            // Haulers and the unassigned run the camp↔face route and
+            // work the camp converter in between.
+            Job::Hauler | Job::Unassigned => self.decide_hauler(idx),
         }
     }
 
-    fn tick_delver(&mut self) {
-        // Needs decay by exertion.
-        let exertion = match self.delver.state {
+    fn decide_miner(&mut self, idx: usize) {
+        // Nearest workable face (deterministic: faces are sorted).
+        let face_idx = self
+            .faces
+            .iter()
+            .position(|f| f.ore > 0 || f.cache > 0);
+        let Some(fi) = face_idx else {
+            self.delvers[idx].state = DelverState::Idle;
+            return;
+        };
+        let stand = self.faces[fi].stand;
+        self.delvers[idx].target_face = Some(fi);
+        if self.delvers[idx].pos == stand || self.start_path(idx, stand) {
+            self.delvers[idx].state = DelverState::ToFace;
+            self.delvers[idx].blocked_logged = false;
+        } else {
+            self.go_blocked(idx, "the face");
+        }
+    }
+
+    fn decide_hauler(&mut self, idx: usize) {
+        let face_idx = self.faces.iter().position(|f| f.cache > 0);
+        if let Some(fi) = face_idx {
+            let stand = self.faces[fi].stand;
+            self.delvers[idx].target_face = Some(fi);
+            if self.delvers[idx].pos == stand || self.start_path(idx, stand) {
+                self.delvers[idx].state = DelverState::ToFace;
+                self.delvers[idx].blocked_logged = false;
+            } else {
+                self.go_blocked(idx, "the face");
+            }
+            return;
+        }
+        if self.stores.ore >= 2 {
+            self.delvers[idx].state = DelverState::Converting;
+            return;
+        }
+        self.delvers[idx].state = DelverState::Idle;
+    }
+
+    fn decide_farmer(&mut self, idx: usize) {
+        if self.plots.is_empty() {
+            self.delvers[idx].state = DelverState::Idle;
+            return;
+        }
+        // Prefer a ready plot, else the most-grown one.
+        let pos = self.delvers[idx].pos;
+        let mut best: Option<usize> = None;
+        let mut best_key: (bool, i32) = (false, i32::MAX);
+        for (pi, p) in self.plots.iter().enumerate() {
+            let dist = (p.pos.x - pos.x).abs() + (p.pos.y - pos.y).abs() + (p.pos.z - pos.z).abs();
+            let key = (p.growth >= PLOT_READY, dist);
+            if best.is_none() || (key.0 && !best_key.0) || (key.0 == best_key.0 && key.1 < best_key.1)
+            {
+                best = Some(pi);
+                best_key = key;
+            }
+        }
+        let pi = best.unwrap();
+        let target = self.plots[pi].pos;
+        self.delvers[idx].target_plot = Some(pi);
+        if pos == target || self.start_path(idx, target) {
+            self.delvers[idx].state = DelverState::ToPlot;
+            self.delvers[idx].blocked_logged = false;
+        } else {
+            self.go_blocked(idx, "the plots");
+        }
+    }
+
+    fn tick_delver(&mut self, idx: usize) {
+        // Needs decay by exertion; morale drifts toward how well the
+        // delver's needs are met.
+        let state = self.delvers[idx].state;
+        let exertion = match state {
             DelverState::ToFace
             | DelverState::Mining
             | DelverState::ToCamp
-            | DelverState::ToBed => 0.08,
+            | DelverState::ToBed
+            | DelverState::ToPlot
+            | DelverState::Tending => 0.08,
             DelverState::Resting => 0.0,
             _ => 0.02,
         };
-        if self.delver.state != DelverState::Resting {
-            self.delver.energy = (self.delver.energy - exertion).clamp(0.0, 100.0);
+        if state != DelverState::Resting {
+            self.delvers[idx].energy = (self.delvers[idx].energy - exertion).clamp(0.0, 100.0);
         }
-        if self.delver.state != DelverState::Eating {
-            self.delver.hunger = (self.delver.hunger - 0.02).clamp(0.0, 100.0);
+        if state != DelverState::Eating {
+            self.delvers[idx].hunger = (self.delvers[idx].hunger - 0.045).clamp(0.0, 100.0);
+        }
+        // A starving delver tires at everything.
+        if self.delvers[idx].hunger <= 0.0 && state != DelverState::Resting {
+            self.delvers[idx].energy = (self.delvers[idx].energy - 0.04).clamp(0.0, 100.0);
+        }
+        {
+            let d = &mut self.delvers[idx];
+            // Colony prosperity lifts spirits only for the fed —
+            // goods in the store mean little on an empty stomach.
+            let goods_term = (self.stores.goods.min(10)) as f32 * (d.hunger / 100.0);
+            let target = (10.0 + d.hunger * 0.5 + d.energy * 0.3 + goods_term).clamp(0.0, 100.0);
+            d.morale += (target - d.morale) * 0.02;
+            d.morale = d.morale.clamp(0.0, 100.0);
+        }
+        if self.delvers[idx].morale < 25.0 && !self.delvers[idx].low_morale_logged {
+            self.delvers[idx].low_morale_logged = true;
+            let name = self.delvers[idx].name.clone();
+            self.log(
+                LedgerKind::SpiritsFallen,
+                format!("{name}'s spirits have fallen"),
+            );
+        }
+        if self.delvers[idx].morale > 40.0 {
+            self.delvers[idx].low_morale_logged = false;
         }
 
-        match self.delver.state {
-            DelverState::Idle => self.decide_from_camp(),
-            DelverState::Blocked => {
-                // Retry: home if carrying, the face otherwise.
-                let (target, next) = if self.delver.carrying > 0 {
-                    (self.stockpile, DelverState::ToCamp)
+        // The downed cannot act; their clock runs in the sweep.
+        if self.delvers[idx].state == DelverState::Downed {
+            return;
+        }
+        if self.delvers[idx].fight_cd > 0 {
+            self.delvers[idx].fight_cd -= 1;
+        }
+
+        let on_rescue = matches!(
+            self.delvers[idx].state,
+            DelverState::ToRescue | DelverState::Rescuing
+        );
+
+        // In the dark with a way home: take it. (No way home is the
+        // sweep's problem — the clock is running.)
+        if !on_rescue
+            && !self.lit_at(self.delvers[idx].pos)
+            && self.delvers[idx].state != DelverState::ToCamp
+        {
+            if self.start_path(idx, self.stockpile) {
+                self.delvers[idx].state = DelverState::ToCamp;
+            }
+        }
+
+        // Combat: something is at claw's reach. The healthy stand
+        // and fight; the hurt run for camp.
+        if !on_rescue {
+            let pos = self.delvers[idx].pos;
+            let adjacent = self
+                .critters
+                .iter()
+                .filter(|c| {
+                    (c.pos.x - pos.x).abs() + (c.pos.y - pos.y).abs() + (c.pos.z - pos.z).abs()
+                        <= 1
+                })
+                .map(|c| c.id)
+                .next();
+            if let Some(cid) = adjacent {
+                if self.delvers[idx].hp < 35.0 {
+                    if self.delvers[idx].state != DelverState::ToCamp
+                        && self.start_path(idx, self.stockpile)
+                    {
+                        self.delvers[idx].state = DelverState::ToCamp;
+                    }
                 } else {
-                    (self.face_stand, DelverState::ToFace)
-                };
-                if self.start_path(target) {
-                    self.delver.state = next;
-                    self.delver.blocked_logged = false;
+                    if self.delvers[idx].fight_cd == 0 {
+                        self.delvers[idx].fight_cd = ATTACK_PERIOD;
+                        let dmg = 3.0 + (self.delvers[idx].combat_xp / 8) as f32;
+                        let name = self.delvers[idx].name.clone();
+                        let mut slain = false;
+                        if let Some(c) = self.critters.iter_mut().find(|c| c.id == cid) {
+                            c.hp -= dmg;
+                            slain = c.hp <= 0.0;
+                        }
+                        if slain {
+                            self.delvers[idx].combat_xp += 2;
+                            self.kill_critter(cid, Some(&name));
+                        }
+                    }
+                    return; // busy fighting this tick
                 }
             }
+        }
+
+        match self.delvers[idx].state {
+            DelverState::Idle => self.decide(idx),
+            DelverState::Blocked => {
+                // Retry the job decision; light may have arrived.
+                self.delvers[idx].state = DelverState::Idle;
+                self.decide(idx);
+            }
             DelverState::ToFace => {
-                if self.follow_path() {
-                    self.delver.state = DelverState::Mining;
+                if self.follow_path(idx) {
+                    match self.delvers[idx].job {
+                        Job::Miner => {
+                            self.delvers[idx].state = DelverState::Mining;
+                        }
+                        _ => {
+                            // Hauler arrival: load from the face cache.
+                            let fi = self.delvers[idx].target_face.unwrap_or(0);
+                            let space = self.delvers[idx].capacity()
+                                - self.delvers[idx].carrying;
+                            let take = self
+                                .faces
+                                .get(fi)
+                                .map_or(0, |f| f.cache.min(space));
+                            if take > 0 {
+                                if let Some(f) = self.faces.get_mut(fi) {
+                                    f.cache -= take;
+                                }
+                                self.delvers[idx].carrying += take;
+                            }
+                            if self.delvers[idx].carrying > 0 {
+                                if self.start_path(idx, self.stockpile) {
+                                    self.delvers[idx].state = DelverState::ToCamp;
+                                } else {
+                                    self.go_blocked(idx, "the stockpile");
+                                }
+                            } else {
+                                self.delvers[idx].state = DelverState::Idle;
+                            }
+                        }
+                    }
                 }
             }
             DelverState::Mining => {
-                let rate = 0.2 + 0.04 * self.delver.mining_level() as f32;
-                self.delver.mine_progress += rate;
-                while self.delver.mine_progress >= 1.0
-                    && self.face_ore > 0
-                    && self.delver.carrying < self.delver.capacity()
-                {
-                    self.delver.mine_progress -= 1.0;
-                    self.face_ore -= 1;
-                    self.delver.carrying += 1;
-                    self.delver.mining_xp += 1;
+                let fi = match self.delvers[idx].target_face {
+                    Some(fi) if fi < self.faces.len() => fi,
+                    _ => {
+                        self.delvers[idx].state = DelverState::Idle;
+                        return;
+                    }
+                };
+                let mult = self.delvers[idx].work_mult();
+                let rate = (0.2 + 0.04 * self.delvers[idx].mining_level() as f32) * mult;
+                self.delvers[idx].mine_progress += rate;
+                while self.delvers[idx].mine_progress >= 1.0 && self.faces[fi].ore > 0 {
+                    self.delvers[idx].mine_progress -= 1.0;
+                    self.faces[fi].ore -= 1;
+                    self.faces[fi].cache += 1;
+                    self.delvers[idx].mining_xp += 1;
                 }
-                if self.delver.carrying >= self.delver.capacity() || self.face_ore == 0 {
-                    if self.start_path(self.stockpile) {
-                        self.delver.state = DelverState::ToCamp;
+                let face_done = self.faces[fi].ore == 0;
+                let cache_full = self.faces[fi].cache >= 8;
+                let self_haul = self.faces[fi].cache >= self.delvers[idx].capacity()
+                    && !self.has_hauler();
+                if face_done || cache_full || self_haul {
+                    // Load up and run it home personally.
+                    let space =
+                        self.delvers[idx].capacity() - self.delvers[idx].carrying;
+                    let take = self.faces[fi].cache.min(space);
+                    self.faces[fi].cache -= take;
+                    self.delvers[idx].carrying += take;
+                    if self.delvers[idx].carrying > 0 {
+                        if self.start_path(idx, self.stockpile) {
+                            self.delvers[idx].state = DelverState::ToCamp;
+                        } else {
+                            self.go_blocked(idx, "the stockpile");
+                        }
+                    } else if face_done {
+                        // Nothing left and nothing to carry: head home.
+                        if self.start_path(idx, self.stockpile) {
+                            self.delvers[idx].state = DelverState::ToCamp;
+                        } else {
+                            self.delvers[idx].state = DelverState::Idle;
+                        }
                     } else {
-                        self.delver.state = DelverState::Blocked;
+                        self.delvers[idx].state = DelverState::Idle;
                     }
                 }
             }
             DelverState::ToCamp => {
-                if self.follow_path() {
-                    self.delver.state = DelverState::Converting;
+                if self.follow_path(idx) {
+                    self.deposit(idx);
+                    // Wounds close slowly at camp.
+                    if self.delvers[idx].hp < 100.0 {
+                        self.delvers[idx].state = DelverState::Resting;
+                    } else {
+                        self.decide(idx);
+                    }
                 }
             }
-            DelverState::Converting => {
-                let amount = self.delver.carrying;
-                if amount > 0 {
-                    self.delver.carrying = 0;
-                    self.delver.hauling_xp += amount;
-                    self.stores.ore += amount;
-                    self.log(
-                        LedgerKind::HaulDelivered,
-                        format!("{} hauled {amount} ore to the stockpile", self.delver.name),
-                    );
-                    let pairs = self.stores.ore / 2;
-                    if pairs > 0 {
-                        self.stores.ore -= pairs * 2;
-                        self.stores.goods += pairs;
+            DelverState::Downed => unreachable!("downed delvers return early"),
+            DelverState::ToRescue => {
+                let Some(tid) = self.delvers[idx].rescue_target else {
+                    self.delvers[idx].state = DelverState::Idle;
+                    return;
+                };
+                let tpos = self
+                    .delvers
+                    .iter()
+                    .find(|d| d.id == tid && d.state == DelverState::Downed)
+                    .map(|d| d.pos);
+                let Some(tpos) = tpos else {
+                    self.delvers[idx].rescue_target = None;
+                    self.delvers[idx].state = DelverState::Idle;
+                    return;
+                };
+                let arrived = self.follow_path(idx);
+                let pos = self.delvers[idx].pos;
+                let near = (pos.x - tpos.x).abs()
+                    + (pos.y - tpos.y).abs()
+                    + (pos.z - tpos.z).abs()
+                    <= 1;
+                if arrived || (self.delvers[idx].path.is_empty() && near) {
+                    if self.start_path(idx, self.stockpile) {
+                        self.delvers[idx].state = DelverState::Rescuing;
+                    }
+                    // No lit way home yet: wait with them; the sweep
+                    // keeps their clock running, not the rescuer's.
+                }
+            }
+            DelverState::Rescuing => {
+                let Some(tid) = self.delvers[idx].rescue_target else {
+                    self.delvers[idx].state = DelverState::Idle;
+                    return;
+                };
+                let ti = self
+                    .delvers
+                    .iter()
+                    .position(|d| d.id == tid && d.state == DelverState::Downed);
+                let Some(ti) = ti else {
+                    self.delvers[idx].rescue_target = None;
+                    self.delvers[idx].state = DelverState::Idle;
+                    return;
+                };
+                // Carrying is slow work: move every other tick, and
+                // the carried delver moves with the carrier.
+                if self.tick_count % 2 == 0 {
+                    let arrived = self.follow_path(idx);
+                    let my_pos = self.delvers[idx].pos;
+                    self.delvers[ti].pos = my_pos;
+                    if arrived || my_pos == self.stockpile {
+                        let rname = self.delvers[idx].name.clone();
+                        let dname = self.delvers[ti].name.clone();
+                        self.delvers[ti].hp = 30.0;
+                        self.delvers[ti].state = DelverState::Resting;
+                        self.delvers[ti].dark_clock = None;
+                        self.delvers[idx].rescue_target = None;
+                        self.delvers[idx].state = DelverState::Idle;
                         self.log(
-                            LedgerKind::Converted,
-                            format!("converted {} ore into {pairs} goods", pairs * 2),
+                            LedgerKind::DelverRescued,
+                            format!("{rname} carried {dname} home"),
                         );
                     }
                 }
-                self.decide_from_camp();
+            }
+            DelverState::Converting => {
+                // Camp conversion work (haulers): pairs of ore become
+                // goods at a working pace rather than instantly.
+                let mult = self.delvers[idx].work_mult();
+                self.delvers[idx].convert_progress += 0.1 * mult;
+                if self.delvers[idx].convert_progress >= 1.0 {
+                    self.delvers[idx].convert_progress = 0.0;
+                    if self.stores.ore >= 2 {
+                        self.stores.ore -= 2;
+                        self.stores.goods += 1;
+                        self.delvers[idx].hauling_xp += 1;
+                        self.log(
+                            LedgerKind::Converted,
+                            format!(
+                                "{} converted 2 ore into 1 goods",
+                                self.delvers[idx].name
+                            ),
+                        );
+                    }
+                }
+                if self.stores.ore < 2 {
+                    self.delvers[idx].state = DelverState::Idle;
+                }
+                // New cache at a face outranks converting.
+                if self.faces.iter().any(|f| f.cache > 0)
+                    && matches!(self.delvers[idx].job, Job::Hauler | Job::Unassigned)
+                {
+                    self.decide(idx);
+                }
             }
             DelverState::ToBed => {
-                if self.follow_path() {
-                    self.delver.state = DelverState::Resting;
+                if self.follow_path(idx) {
+                    self.delvers[idx].state = DelverState::Resting;
                 }
             }
             DelverState::Resting => {
-                self.delver.energy = (self.delver.energy + 2.5).clamp(0.0, 100.0);
-                if self.delver.energy >= 100.0 {
-                    self.decide_from_camp();
+                // A starving delver cannot rest properly.
+                let cap = if self.delvers[idx].hunger <= 1.0 {
+                    50.0
+                } else {
+                    100.0
+                };
+                self.delvers[idx].energy = (self.delvers[idx].energy + 2.5).min(cap);
+                // Wounds close at camp, slower than energy returns.
+                if self.delvers[idx].hp < 100.0 {
+                    self.delvers[idx].hp = (self.delvers[idx].hp + 0.8).min(100.0);
+                }
+                if self.delvers[idx].energy >= cap && self.delvers[idx].hp >= 60.0 {
+                    self.decide(idx);
                 }
             }
             DelverState::Eating => {
                 if self.stores.food > 0 {
                     self.stores.food -= 1;
-                    self.delver.hunger = 100.0;
+                    self.delvers[idx].hunger = 100.0;
                 }
-                self.decide_from_camp();
+                self.decide(idx);
+            }
+            DelverState::ToPlot => {
+                if self.follow_path(idx) {
+                    self.delvers[idx].state = DelverState::Tending;
+                }
+            }
+            DelverState::Tending => {
+                let pi = match self.delvers[idx].target_plot {
+                    Some(pi) if pi < self.plots.len() => pi,
+                    _ => {
+                        self.delvers[idx].state = DelverState::Idle;
+                        return;
+                    }
+                };
+                if self.plots[pi].growth >= PLOT_READY {
+                    self.plots[pi].growth = 0.0;
+                    self.delvers[idx].carrying_food += PLOT_YIELD;
+                    self.delvers[idx].farming_xp += PLOT_YIELD;
+                    let name = self.delvers[idx].name.clone();
+                    self.log(
+                        LedgerKind::Harvested,
+                        format!("{name} harvested {PLOT_YIELD} food from the plots"),
+                    );
+                    if self.delvers[idx].carrying_food >= PLOT_YIELD * 2 {
+                        if self.start_path(idx, self.stockpile) {
+                            self.delvers[idx].state = DelverState::ToCamp;
+                        } else {
+                            self.decide(idx);
+                        }
+                    } else {
+                        self.decide_farmer_next(idx);
+                    }
+                } else {
+                    let mult = self.delvers[idx].work_mult();
+                    let rate = (0.055 + 0.005 * self.delvers[idx].farming_level() as f32) * mult;
+                    self.plots[pi].growth = (self.plots[pi].growth + rate).min(PLOT_READY);
+                }
             }
         }
+    }
+
+    /// After a harvest with room to carry more, move to the next plot
+    /// worth tending instead of walking home.
+    fn decide_farmer_next(&mut self, idx: usize) {
+        self.delvers[idx].state = DelverState::Idle;
+        self.decide_farmer(idx);
     }
 }
 

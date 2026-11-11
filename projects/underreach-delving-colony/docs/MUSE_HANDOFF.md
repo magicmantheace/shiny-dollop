@@ -114,12 +114,13 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   network as lit nav graph; one named delver (needs, skills) running
   delve → haul → convert; frontier extension with first-light Ledger
   entries; lantern fuel burn-down; canonical save/load + determinism.
-- **S2 — colony breadth.** Multiple delvers, job assignment, morale,
-  food production at camp, surface recruitment arrivals. *(Needs owner
-  go-ahead at the S1 report.)*
-- **S3 — the dark bites.** First creatures + combat-led threat model,
-  lantern-clock strandings and rescue runs, failed-rescue permadeath
-  and Ledger losses.
+- **S2 — colony breadth (BUILT 2026-11-10).** Multiple delvers, job
+  assignment (miner/hauler/farmer), morale, food production at camp,
+  surface recruitment arrivals. *(Owner lifted the per-slice gate
+  2026-11-10 and authorized every slice to a working prototype.)*
+- **S3 — the dark bites (BUILT 2026-11-10).** First creatures +
+  combat-led threat model, lantern-clock strandings and rescue runs,
+  failed-rescue permadeath and Ledger losses.
 - **S4 — Godot frontend.** Presentation over the core: voxel meshing
   (bevelled/smoothed), lantern light, delver sprites/models, camp view.
 - **S5 — second band.** Fungal Reaches gate set (masks, fungal oil,
@@ -129,9 +130,10 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
 
 ## Status — 2026-11-10
 
-- **Implemented and verified (VM, headless):** the S1 sim core —
-  `cargo test` (unit + scenario) and the `scenario` binary's two-phase
-  run. Details and numbers in `docs/TEST_PLAN.md`.
+- **Implemented and verified (VM, headless):** the S1 sim core, the
+  S2 colony layer, and the S3 threat/rescue layer — `cargo test`
+  18/18 and the `scenario` binary's three-slice run. Details and
+  numbers in `docs/TEST_PLAN.md`.
 - **Implemented but unverified:** nothing yet.
 - **Planned:** S2+ per the slice plan; each needs the owner's go-ahead.
 - **Blocked:** nothing.
