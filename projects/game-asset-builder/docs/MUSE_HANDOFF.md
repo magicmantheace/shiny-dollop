@@ -871,3 +871,75 @@ catalog-verify MATCH; suite 135 passed. Note for future
 templates: any bone-local yaw on a canted bone has the same
 trap — prefer `world_z` for head turns. The wallpaper copy was
 re-synced the same day (wallpaper project records).
+
+## Underreach asset queue (2026-11-10 night, branch game-asset-builder/underreach-assets)
+
+Four assets for the Underreach delving colony, run in queue order
+after the owner lifted the PC GPU stop. New standing rule from the
+owner this session, now a HARD GATE for every asset (not an advisory
+warn): **arms/limbs must not be fused to the body along their
+length** — he saw connected meshes stretching in the live wallpaper.
+A concept that fails preflight on separation is replaced BEFORE any
+GPU stage, and the finished rig gets a posed-render check.
+
+- **Delver — CATALOGUED.** The shipped concept failed the gate
+  (preflight warn, arm daylight 0.227 < 0.4), so a new A-pose
+  concept was generated (arms 30–40° down-out, daylight along both
+  arms) and PASSED (0.5955). Full pipeline: mesh 669,560 faces;
+  texture exit 0 (947.74 s stage total; the pipeline client died at
+  the bridge tracking limit during the fetch — the stage was
+  verified alive on the PC and its result + GLB fetched intact,
+  records restored into the manifest). 11-bone biped; skinning fell
+  back to distance weights (bone heat rejected by the skin policy:
+  torso arm share 0.4165 > 0.25 — same disclosure class as Crow
+  Postman / Owl-Cat); weight coverage 1.0, hands-tip dominance 1.0.
+  Clips: bounce 1.25 s, idle 4.79 s, walk 1.5 s, run 1.0 s.
+  Catalog sha256 `7ab7262b7eeb5716c23bd0494f133a7674a0f858cd4a839bd80c8ca7e8b7edc4`;
+  catalog-verify MATCH. Cycles render verdict: reads unmistakably
+  as the delver (lantern helmet, pickaxe, red coat, pouches,
+  beard); arms sit clear of the torso in the rest render and the
+  posed bounce render shows no coat tearing — the gate's
+  posed-render half passes. Disclosed: dark/muddy texture on the
+  face under the helmet brim; backpack/pickaxe reads as a shoulder
+  hump from some angles.
+- **Gloam Lurker — NOT CATALOGUED (texture stage failed twice).**
+  The shipped concept also failed the gate (quadruped preflight:
+  legs read as one fused mass, 0 components after erosion), a
+  separated-legs concept PASSED (3 components, gap 0.0322), and
+  the mesh built clean (317,866 faces). Attempt 1 texture: loaded,
+  then no output for ~7,400 s with the stall signature (GPU 100%
+  at ~62 W, one CPU core, private memory byte-stable 14,383 MB) —
+  killed at the tree root; log preserved at
+  `outputs/gloam-lurker/texture-attempt1.log`. Attempt 2 (fresh
+  dispatch on the same mesh): the stage process died natively
+  after 103 s, exit code 0xC0000005 (access violation) during the
+  paint pipeline's second model-load phase; log at
+  `texture-attempt2.log`. Two different failures on one mesh while
+  the Delver completed the identical stage the same night →
+  asset-local, root cause UNPROVEN. No py-spy on the PC, so no
+  thread dump exists for either failure. Mesh + cutout intact on
+  disk; a future retry needs no re-mesh. Disposition note:
+  `outputs/gloam-lurker/attempt1-texture-note.txt`.
+- **Lantern (tier-1 oil lantern prop) — CATALOGUED, procedural
+  paint.** Mesh exit 0 (343,848 faces). Hunyuan texture spun with
+  the stall signature and was killed at the 2,400 s top of the
+  documented success curve; finished with procedural vertex-colour
+  paint (Blender queue painter: iron cage, amber glass band, wood
+  post) and `--resume`, provenance restored truthfully — the
+  catalog does NOT claim Hunyuan paint for this asset. Final 4,505
+  verts; sha256 `5dffb6360730c30d9a0a3c928afd89f5f9148c4a1ecf732b8ffbc71f426cf900`;
+  catalog-verify MATCH. Render: post lantern reads correctly.
+- **Cot (camp cot prop) — CATALOGUED, procedural paint.** Mesh
+  exit 0 (500,698 faces); the texture stage was stood down during
+  its load phase by design after the night's two spins + one crash,
+  and the prop was painted procedurally (olive canvas, wood frame,
+  bedroll + cream pillow by position). Final 4,983 verts; sha256
+  `67e070f2012f416f96b202fe0cb419255b5f57a72b83053f916ba22ca1659ef7`;
+  catalog-verify MATCH. Render: reads as a camp cot; the
+  pillow/bedroll boundary is approximate.
+
+Suite after the queue: 135 passed (the UI catalog-set test now
+expects delver/lantern/cot; gloam-lurker correctly absent).
+NOT verified: Godot playback of any of the three new GLBs (a
+later, separate phase); the Underreach frontend still uses its
+stand-in assets until the parent project swaps them.

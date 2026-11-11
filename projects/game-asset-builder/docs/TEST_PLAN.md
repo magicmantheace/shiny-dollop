@@ -789,3 +789,25 @@ cost of the new creatures in the wallpaper scene.
   beak height Δ +0.001 / −0.005. Apex render: near-profile,
   level head. Catalog-verify MATCH (`98bc4f3f5c25…`); suite
   135 passed.
+
+## Underreach asset queue (2026-11-10 night)
+- Arm-separation hard gate (owner requirement, this session):
+  delver concept replaced pre-GPU (warn 0.227 → A-pose pass
+  0.5955); gloam concept replaced pre-GPU (0 leg components →
+  pass, 3 components, gap 0.0322). Delver posed (bounce) render
+  inspected: arms clear, no tearing.
+- Delver: catalog-verify MATCH (`7ab7262b7eeb…`); 11 bones;
+  clips bounce/idle/walk/run; distance-fallback weights disclosed
+  (bone heat rejected, torso arm share 0.4165); coverage 1.0.
+- Gloam Lurker: NOT catalogued. Texture attempt 1 spun ~7,400 s
+  (stall signature; private memory stable 14,383 MB — not a
+  runaway), killed with log preserved. Attempt 2 crashed natively
+  (0xC0000005) at 103 s in the second model-load phase. Root
+  cause unproven; mesh intact for a future retry.
+- Lantern: catalog-verify MATCH (`5dffb6360730…`), 4,505 verts,
+  procedural vertex-colour paint (Hunyuan texture killed at the
+  2,400 s success-curve top). Cot: MATCH (`67e070f2012f…`),
+  4,983 verts, procedural paint (texture stage stood down by
+  design). Both renders inspected on Cycles CPU.
+- Suite: 135 passed. Not verified: Godot playback of the new
+  GLBs; no claim made.
