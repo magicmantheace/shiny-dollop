@@ -18,7 +18,7 @@ terrain is dressing and kit pieces per band.
 
 | Asset | Spec | Status |
 |---|---|---|
-| Delver (base colonist) | Rigged biped; idle/walk/run + mine swing, carry walk, tend, eat, sleep (lying), downed (lying), rescue-carry | 🛑 stopped at mesh (prep done) — 🔄 snow-goblin stands in |
+| Delver (base colonist) | Rigged biped; idle/walk/run + mine swing, carry walk, tend, eat, sleep (lying), downed (lying), rescue-carry | ✅ catalogued 2026-11-11 (arm-separation-gated A-pose rebuild; clips idle/walk/run/bounce) and in frontend use — snow-goblin stand-in retired |
 | The Frontier Bearer (player) | Rigged biped with the great lantern; idle/walk/run + plant-light, carve swing | ⬜ (co-op: up to 4 tint variants) |
 | Miner kit — pickaxe + helmet lamp | Hand/back props, attachable | ⬜ |
 | Hauler kit — carry sack / ore basket | Back prop | ⬜ |
@@ -34,7 +34,7 @@ terrain is dressing and kit pieces per band.
 | Asset | Spec | Status |
 |---|---|---|
 | Gloam rat | Rigged quadruped, small; idle/walk/run + bite lunge | ⬜ (sim kind exists) |
-| Deep lurker | Rigged quadruped, large; idle/walk/run + lunge | 🛑 was in the stopped queue — 🔄 ember-dragon stands in |
+| Deep lurker | Rigged quadruped, large; idle/walk/run + lunge | ⬜ not built yet — 🔄 ember-dragon stands in |
 | Shallows starter creature | Small cave beast, quadruped | ⬜ design TBD |
 | Fungal ambusher | Spore-hulk quadruped; burst-from-ground signature | ⬜ design TBD |
 | Drowned swimmer | Eel-like swimmer rig | ⬜ design TBD |
@@ -49,7 +49,7 @@ steadiness / tags all read off these):
 | Asset | Tier / role | Status |
 |---|---|---|
 | Torch on a stand | Tier 0 — torches/charcoal | ⬜ |
-| Oil lantern on a post | Tier 1 — the colony standard | 🛑 was in the stopped queue (frontend uses an emissive sphere meanwhile) |
+| Oil lantern on a post | Tier 1 — the colony standard | ✅ catalogued and in frontend use 2026-11-11 (OmniLight + emissive flame marker kept) |
 | Fungal-oil lantern | Tier 2 — spore-repellent glow | ⬜ |
 | Sealed pressure lantern | Tier 3 — waterproof (Drowned) | ⬜ |
 | Crystal-heart lantern | Tier 4 — focused beam (Crystal Dark) | ⬜ |
@@ -63,7 +63,7 @@ steadiness / tags all read off these):
 | Asset | Role | Status |
 |---|---|---|
 | Stockpile chest | Ore/goods store marker | ✅ treasure-chest |
-| Cot / bedroll | Delver beds | 🛑 was in the stopped queue (frontend uses a plain box) |
+| Cot / bedroll | Delver beds | ✅ catalogued and in frontend use 2026-11-11 |
 | Mushroom plot cluster | Farm plots | ✅ mushroom-cluster |
 | Converter forge | Ore → goods station | ⬜ |
 | Chandlery / rendering bench | Tallow & oil station | ⬜ |
@@ -116,6 +116,7 @@ drawn or generated 2D, not the 3D pipeline.
 ## Totals
 
 ~55 pipeline assets: 10 character-side, 7 creatures, 9 light,
-14 camp, 4 faces/loads, ~11 band kit/dressing — of which **4 are
-catalogued and in use today**, 3 more were in the stopped queue,
-and the rest are designed and waiting.
+14 camp, 4 faces/loads, ~11 band kit/dressing — of which **7 are
+catalogued and in use today** (delver, oil lantern, cot, stockpile
+chest, mushroom cluster, fallen-log, stump), the deep lurker
+remains unbuilt, and the rest are designed and waiting.

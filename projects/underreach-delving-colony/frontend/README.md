@@ -49,23 +49,42 @@ the pipeline is the art source, per the owner's direction:
 
 | File | Role here | Catalog sha256 |
 |---|---|---|
-| `assets/snow-goblin.glb` | delver stand-in | `c4ba135bcb26a85d…` |
+| `assets/delver.glb` | the delvers (dedicated asset) | `7ab7262b7eeb5716c23bd0494f133a7674a0f858cd4a839bd80c8ca7e8b7edc4` |
+| `assets/lantern.glb` | lantern prop (Tier 1) | `5dffb6360730c30d9a0a3c928afd89f5f9148c4a1ecf732b8ffbc71f426cf900` |
+| `assets/cot.glb` | delver beds | `67e070f2012f416f96b202fe0cb419255b5f57a72b83053f916ba22ca1659ef7` |
 | `assets/ember-dragon.glb` | critter stand-in | `2837c6b2969f0bf6…` |
 | `assets/treasure-chest.glb` | the stockpile | `2b6e51cc0d8273e3…` |
 | `assets/mushroom-cluster.glb` | farm plots | `6e607ffdaeed58c7…` |
+| `assets/snow-goblin.glb` | former delver stand-in (unused) | `c4ba135bcb26a85d…` |
 
-The dedicated **delver** and **gloam-lurker** assets were in the
-pipeline (delver through prep) when the owner ordered all PC GPU
-work stopped on 2026-11-10. Until that lane reopens, the two
-catalogued creatures above stand in; swapping them in later is a
-two-line change (`DELVER_SCENE` / `CRITTER_SCENE` in `main.gd`).
-Lanterns are emissive spheres on posts (a builder lantern prop is
-in the same stopped queue).
+Source for the three 2026-11-11 additions: Game Asset Builder
+catalog on branch `game-asset-builder/underreach-assets` @
+`5642dce` (`outputs/<slug>/<slug>.glb` in that worktree), copied
+byte-for-byte — the frontend copies hash to the catalog values
+above.
+
+The dedicated **delver** replaced the snow-goblin stand-in on
+2026-11-11 (`DELVER_SCENE` in `main.gd`). It is the
+arm-separation-gated rebuild: a new A-pose concept passed the
+builder's preflight (arm daylight 0.5955), and the finished rigged
+biped carries idle / walk / run / bounce clips. The **gloam-lurker**
+asset is not built yet, so the ember-dragon still stands in for
+critters (`CRITTER_SCENE` is the one-line swap when it lands).
+Lanterns now render the builder's Tier-1 lantern prop; the actual
+light still comes from an `OmniLight3D` per lantern, with a small
+emissive marker at the flame point (the prop is untextured
+vertex-colour geometry). Beds render the builder cot prop, scaled
+by height target so its footprint matches the plain box it
+replaced.
 
 ## Honest limits
 
 - Nothing here has run on owner hardware; no frame-rate claims.
-  The catalog GLBs are unoptimized source meshes (the snow-goblin
-  alone is ~22 MB) — fine for a prototype, not for shipping.
+  The catalog GLBs are unoptimized source meshes (the delver alone
+  is ~20 MB) — fine for a prototype, not for shipping.
+- The 2026-11-11 asset swap is verified for loading and logic
+  only (headless verify below); how the delver, lantern, and cot
+  actually look in the scene is **unverified** until the on-PC
+  visual pass.
 - The depth-slice view is a prototype answer to presenting a 3D
   voxel dig, not the final camera design.

@@ -9,15 +9,17 @@ extends Node3D
 ##
 ## Delver/critter/prop models are byte-for-byte Game Asset Builder
 ## catalog files (see README.md in this folder for provenance).
-## The dedicated delver + gloam-lurker assets were mid-pipeline when
-## the owner stopped PC GPU work on 2026-11-10; the catalogued
-## snow-goblin and ember-dragon stand in until that lane reopens,
-## and swapping them is a one-line change below.
+## The dedicated delver asset (arm-separation-gated A-pose build)
+## replaced the snow-goblin stand-in on 2026-11-11; the gloam-lurker
+## asset is not built yet, so the ember-dragon still stands in for
+## critters — swapping it is a one-line change below (CRITTER_SCENE).
 
-const DELVER_SCENE := "res://assets/snow-goblin.glb"
+const DELVER_SCENE := "res://assets/delver.glb"
 const CRITTER_SCENE := "res://assets/ember-dragon.glb"
 const CHEST_SCENE := "res://assets/treasure-chest.glb"
 const SHROOM_SCENE := "res://assets/mushroom-cluster.glb"
+const LANTERN_SCENE := "res://assets/lantern.glb"
+const COT_SCENE := "res://assets/cot.glb"
 
 const JOBS := ["Miner", "Hauler", "Farmer", "Herbalist", "Unassigned"]
 const MOVING_STATES := ["ToFace", "ToCamp", "ToBed", "ToPlot", "ToPatient", "ToRescue", "Rescuing"]
@@ -270,28 +272,27 @@ func fill_multimesh(mmi: MultiMeshInstance3D, items: Array) -> void:
 
 func make_lantern_node(tier: int) -> Node3D:
 	var root := Node3D.new()
-	var mesh := MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = 0.13
-	sphere.height = 0.26
+	# Visible prop: the builder's Tier-1 lantern GLB (untextured
+	# vertex-colour prop), scaled to ~0.6 units tall. The OmniLight
+	# below is what actually lights the network; the prop is unlit
+	# geometry, so a small emissive marker stays at the flame point
+	# to keep placed lanterns readable in the dark.
+	var prop := instantiate_scaled(LANTERN_SCENE, 0.6)
+	root.add_child(prop)
+	call_deferred("measure_and_scale", prop)
+	var glow := MeshInstance3D.new()
+	var glow_sphere := SphereMesh.new()
+	glow_sphere.radius = 0.05
+	glow_sphere.height = 0.1
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(1.0, 0.72, 0.3)
 	mat.emission_enabled = true
 	mat.emission = Color(1.0, 0.62, 0.2)
 	mat.emission_energy_multiplier = 2.4
-	sphere.material = mat
-	mesh.mesh = sphere
-	mesh.position = Vector3(0, 0.42, 0)
-	root.add_child(mesh)
-	var post := MeshInstance3D.new()
-	var post_mesh := BoxMesh.new()
-	post_mesh.size = Vector3(0.07, 0.42, 0.07)
-	var post_mat := StandardMaterial3D.new()
-	post_mat.albedo_color = Color(0.23, 0.18, 0.13)
-	post_mesh.material = post_mat
-	post.mesh = post_mesh
-	post.position = Vector3(0, 0.21, 0)
-	root.add_child(post)
+	glow_sphere.material = mat
+	glow.mesh = glow_sphere
+	glow.position = Vector3(0, 0.42, 0)
+	root.add_child(glow)
 	var light := OmniLight3D.new()
 	light.light_color = Color(1.0, 0.7, 0.35)
 	light.light_energy = 1.1
@@ -353,15 +354,13 @@ func rebuild_props() -> void:
 	for b in view.get("beds", []):
 		if int(b[1]) != layer:
 			continue
-		var bed := MeshInstance3D.new()
-		var bm := BoxMesh.new()
-		bm.size = Vector3(0.9, 0.22, 0.7)
-		var bmat := StandardMaterial3D.new()
-		bmat.albedo_color = Color(0.3, 0.24, 0.3)
-		bm.material = bmat
-		bed.mesh = bm
-		bed.position = cell_to_world(b) + Vector3(0, 0.11, 0)
+		# Builder cot prop. Its natural proportions are ~6.1 long ×
+		# 2.0 high, so a height target of 0.31 scales it to ~0.95
+		# long — the footprint of the plain box it replaces.
+		var bed := instantiate_scaled(COT_SCENE, 0.31)
+		bed.position = cell_to_world(b) + Vector3(0, 0.02, 0)
 		props_root.add_child(bed)
+		call_deferred("measure_and_scale", bed)
 
 # ---------------------------------------------------------------------------
 # Entities

@@ -43,16 +43,20 @@ S1 proves the spine of the game in simulation:
 Verified: `cargo test` in `sim/` (unit + scenario tests), and the
 `scenario` binary's two-phase run (blocked in the dark → lit → producing).
 
-**Not yet built:** rendering/frontend (Godot 4, a later slice), combat,
-the deeper bands' mechanics (Drowned flooding, Magma heat — their
-hazard flags are modelled in S5's recombination table but not yet
-simulated), co-op, and children/generations. S2 added the colony
-(multiple delvers, jobs, morale, camp farming, recruitment); S3
-added creatures, combat, lantern-clock strandings, rescue runs, and
-permadeath; S5 added the Fungal Reaches: spore sickness, crafted
-masks, a herbalist, fungal oil, and oil-burning tier-2 lanterns. No
-frame or performance claims exist — nothing has run on owner
-hardware.
+**Not yet built:** the deeper bands' mechanics (Drowned flooding,
+Magma heat — their hazard flags are modelled in S5's recombination
+table but not yet simulated), co-op, and children/generations. S2
+added the colony (multiple delvers, jobs, morale, camp farming,
+recruitment); S3 added creatures, combat, lantern-clock strandings,
+rescue runs, and permadeath; S5 added the Fungal Reaches: spore
+sickness, crafted masks, a herbalist, fungal oil, and oil-burning
+tier-2 lanterns; S4 added the Godot 4 frontend over the sim core.
+On 2026-11-11 the frontend's delver visual became the builder's
+dedicated delver asset (arm-separation-gated build), with the
+builder's lantern and cot props swapped in as well — verified
+headless for load and logic; the rendered appearance is still
+unverified, pending an on-PC visual pass. No frame or performance
+claims exist — nothing has run on owner hardware.
 
 ## Layout
 

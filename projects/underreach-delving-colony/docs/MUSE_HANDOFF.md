@@ -142,11 +142,26 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   25/25, the `scenario` binary's four-slice run, and the frontend's
   `UNDERREACH_VERIFY_PASS` headless run. Details and numbers in
   `docs/TEST_PLAN.md`.
+- **Asset swap (2026-11-11, VM-verified load/logic):** the owner
+  lifted the PC stop on 2026-11-10 (~22:13) and the builder lane
+  finished the dedicated delver — an arm-separation-gated rebuild
+  (new A-pose concept, preflight PASS; the owner's hard requirement
+  is that arms/limbs are never fused to the body along their
+  length). The frontend now renders the dedicated delver (catalog
+  sha `7ab7262b7eeb…`) instead of the snow-goblin stand-in, plus
+  the builder's Tier-1 lantern prop (OmniLight kept) and cot prop
+  for beds. Headless verify passes identically; provenance in
+  `frontend/README.md`, numbers in `docs/TEST_PLAN.md`. The
+  gloam-lurker asset is not built yet — the ember-dragon still
+  stands in for critters.
 - **Implemented but unverified (visual):** the frontend's rendered
   appearance — no screenshot exists; see TEST_PLAN's S4 section.
+  This now includes how the swapped-in delver, lantern, and cot
+  look in the scene.
 - **Planned:** the "Later" list above (Drowned/Crystal/Magma
   mechanics, co-op, succession, generations) — future programs, not
   part of the 2026-11-10 all-slices build.
-- **Blocked:** PC-side work (GPU asset stages, on-PC visual pass) by
-  the owner's 2026-11-10 stop order, until he lifts it.
+- **Outstanding on owner hardware:** the on-PC visual pass of the
+  frontend (the 2026-11-10 stop was lifted 2026-11-10 ~22:13, so
+  this is unscheduled rather than blocked).
 - No performance claims: nothing has run on owner hardware.

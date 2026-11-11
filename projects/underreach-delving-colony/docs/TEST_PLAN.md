@@ -133,10 +133,32 @@ A scripted Shallows colony: camp chamber, shaft, tunnel, ore face.
   the owner's PC is under a stop order for agent work. A visual pass
   on owner hardware remains outstanding, as do all frame claims.
 
+## Asset swap — dedicated delver, lantern, cot (verified 2026-11-11, VM headless)
+
+- The builder's dedicated delver GLB (catalog sha256
+  `7ab7262b7eeb…`, arm-separation-gated A-pose build) replaced the
+  snow-goblin stand-in as `DELVER_SCENE`; the Tier-1 lantern prop
+  (`5dffb6360730…`) replaced the emissive-sphere lantern visual
+  (OmniLight + emissive flame marker kept); the cot prop
+  (`67e070f2012…`) replaced the plain bed box. Frontend copies are
+  byte-for-byte — sha256 of the copies matches the catalog values.
+- `godot --headless -- --underreach-verify` after the swap prints
+  the identical pass line as S4: `UNDERREACH_VERIFY_PASS goods=20
+  delvers=5 floor_instances=15 tick=4000`, with no errors or
+  warnings in the full output.
+- A one-off load check (temporary script, run then deleted)
+  instantiated all three GLBs in Godot: delver 1 mesh / 4 animation
+  clips (idle, walk, run, bounce), lantern 1 mesh, cot 1 mesh.
+- Sim untouched: `cargo test` 25/25 and the `scenario` binary run
+  repeated after the swap, same results.
+- **Not verified:** the visual appearance of the delver, lantern,
+  and cot in the rendered scene — headless verify proves load and
+  logic, not looks. The on-PC visual pass remains the outstanding
+  check, as do all frame claims.
+
 ## Planned (later slices)
 
 - Owner-PC visual pass of the frontend; performance measurement
   before any frame budget claim.
-- The dedicated delver / gloam-lurker / lantern-prop assets once the
-  pipeline lane reopens (delver is through prep; its mesh stage was
-  the process stopped on 2026-11-10).
+- The dedicated gloam-lurker asset once it is built (not yet in the
+  builder catalog); the ember-dragon stands in until then.
