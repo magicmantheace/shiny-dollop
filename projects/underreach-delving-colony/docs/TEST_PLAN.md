@@ -113,8 +113,30 @@ A scripted Shallows colony: camp chamber, shaft, tunnel, ore face.
   test — caught by that test), and a herbalist's patient stays a
   patient until well (<30 spore), not until merely not-critical.
 
+## S4 — Godot frontend (verified 2026-11-10, VM headless)
+
+- Bridge: `cargo test` 25/25 (adds a bridge acceptance test that
+  drives an S3 colony to production through the file protocol
+  alone: init → light_the_way → 4,000 ticks → goods ≥ 1).
+- Frontend: `godot --headless -- --underreach-verify` prints
+  `UNDERREACH_VERIFY_PASS goods=20 delvers=5 floor_instances=15
+  tick=4000` — the scene initialises the colony through the bridge,
+  issues the network command, drives 4,000 ticks, and the rendered
+  entity set matches the sim view exactly.
+- The view is a depth slice (one sim layer at a time); entities use
+  Game Asset Builder catalog GLBs (snow-goblin delver stand-in,
+  ember-dragon critter stand-in, treasure-chest stockpile,
+  mushroom-cluster plots — provenance + shas in `frontend/README.md`).
+- **Not verified:** anything visual. Godot's headless driver on this
+  VM produces no viewport image (a capture attempt failed cleanly
+  and the code path was removed rather than shipped unproven), and
+  the owner's PC is under a stop order for agent work. A visual pass
+  on owner hardware remains outstanding, as do all frame claims.
+
 ## Planned (later slices)
 
-- Godot frontend: headless `--verify` load of core state; owner-PC
-  visual pass before any frame claims.
-- Owner-hardware performance measurement before any frame budget claim.
+- Owner-PC visual pass of the frontend; performance measurement
+  before any frame budget claim.
+- The dedicated delver / gloam-lurker / lantern-prop assets once the
+  pipeline lane reopens (delver is through prep; its mesh stage was
+  the process stopped on 2026-11-10).

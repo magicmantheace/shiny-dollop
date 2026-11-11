@@ -121,8 +121,12 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
 - **S3 — the dark bites (BUILT 2026-11-10).** First creatures +
   combat-led threat model, lantern-clock strandings and rescue runs,
   failed-rescue permadeath and Ledger losses.
-- **S4 — Godot frontend.** Presentation over the core: voxel meshing
-  (bevelled/smoothed), lantern light, delver sprites/models, camp view.
+- **S4 — Godot frontend (BUILT 2026-11-10).** Presentation over the
+  core via a file bridge (`sim/src/bin/bridge.rs`): depth-slice voxel
+  view, lantern light, delver/critter models from the Game Asset
+  Builder catalog, camp view, job assignment, carve/lantern/plant
+  tools, live Deep Ledger feed. Verified headless (logic + state
+  sync); a visual pass awaits owner hardware.
 - **S5 — second band (BUILT 2026-11-10, sim side).** Fungal Reaches
   gate set (masks, fungal oil, herbalist), band recombination
   groundwork (`hazards_at` table; flooded/hot flags modelled, only
@@ -133,11 +137,16 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
 ## Status — 2026-11-10
 
 - **Implemented and verified (VM, headless):** the S1 sim core, the
-  S2 colony layer, the S3 threat/rescue layer, and the S5 Fungal
-  Reaches (sim side) — `cargo test` 24/24 and the `scenario`
-  binary's four-slice run. Details and numbers in
+  S2 colony layer, the S3 threat/rescue layer, the S5 Fungal
+  Reaches (sim side), and the S4 Godot frontend — `cargo test`
+  25/25, the `scenario` binary's four-slice run, and the frontend's
+  `UNDERREACH_VERIFY_PASS` headless run. Details and numbers in
   `docs/TEST_PLAN.md`.
-- **Implemented but unverified:** nothing yet.
-- **Planned:** S2+ per the slice plan; each needs the owner's go-ahead.
-- **Blocked:** nothing.
+- **Implemented but unverified (visual):** the frontend's rendered
+  appearance — no screenshot exists; see TEST_PLAN's S4 section.
+- **Planned:** the "Later" list above (Drowned/Crystal/Magma
+  mechanics, co-op, succession, generations) — future programs, not
+  part of the 2026-11-10 all-slices build.
+- **Blocked:** PC-side work (GPU asset stages, on-PC visual pass) by
+  the owner's 2026-11-10 stop order, until he lifts it.
 - No performance claims: nothing has run on owner hardware.

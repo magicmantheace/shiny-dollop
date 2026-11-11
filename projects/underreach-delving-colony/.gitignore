@@ -7,9 +7,9 @@ Cargo.lock.orig
 *.save.json
 saves/
 
-# Godot (future frontend)
+# Godot frontend: the import cache is local, but .import sidecars
+# and .uid files are project files and belong in git.
 .godot/
-*.import
 
 # OS / editor
 .DS_Store

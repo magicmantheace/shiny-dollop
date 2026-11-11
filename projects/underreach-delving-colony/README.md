@@ -56,7 +56,12 @@ hardware.
 
 ## Layout
 
-- `sim/` — the Rust simulation core and its tests.
+- `sim/` — the Rust simulation core, its tests, the `scenario`
+  demo binary, and the `bridge` binary the frontend speaks to.
+- `frontend/` — the Godot 4 frontend (S4): a depth-slice view over
+  the core, driven entirely through the bridge. See
+  `frontend/README.md` for controls, verification, and asset
+  provenance.
 - `docs/MUSE_HANDOFF.md` — design record, slice plan, status.
 - `docs/TEST_PLAN.md` — verification plan and results.
 - `REQUIREMENTS.md` — project requirements.
