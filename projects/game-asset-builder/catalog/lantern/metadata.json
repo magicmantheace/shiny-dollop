@@ -1,0 +1,46 @@
+{
+ "entry_version": 1,
+ "name": "Lantern",
+ "slug": "lantern",
+ "source_concept": "media-generation-underreach-lantern-reference-0-040a779f-fbf3-4e69-9ecc-b94d9aa85c28.webp",
+ "asset_file": "lantern.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "5dffb6360730c30d9a0a3c928afd89f5f9148c4a1ecf732b8ffbc71f426cf900",
+ "bytes": 215672,
+ "counts": {
+  "verts": 4505,
+  "faces": 8946,
+  "raw_mesh_verts": 45004,
+  "raw_mesh_faces": 89996
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "procedural vertex-color (Blender) \u2014 Hunyuan3D paint not used for this asset (see texture_stage)",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "stage": "mesh",
+   "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+   "verts": 171926,
+   "faces": 343848,
+   "load_s": 119.3,
+   "inference_s": 354.87,
+   "total_s": 474.21,
+   "torch_peak_mib": 5707.8,
+   "output": "D:\\asset-forge-lab\\out\\gab\\lantern\\shape.glb"
+  },
+  "texture_stage": {
+   "method": "procedural-vertex-color",
+   "tool": "Blender paint_prop.py (queue painter written for the Underreach resume, run by Nyx 2026-11-10)",
+   "input_mesh": "outputs/lantern/shape.glb (Hunyuan shape, 171,926 verts) decimated to ~45k in Blender",
+   "reason": "Hunyuan3D paint spun with the documented stall signature (GPU 100% at ~64 W, no output) and was killed at the 2,400 s top of the documented success curve (docs/PAINT_STALL.md); see outputs/lantern/attempt1-texture-note.txt + texture-attempt1.log. Per the owner's environment-pack route, this prop is painted procedurally; this is NOT Hunyuan paint output."
+  }
+ }
+}
