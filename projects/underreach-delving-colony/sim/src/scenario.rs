@@ -49,6 +49,7 @@ fn the_face() -> Face {
         stand: Pos::new(14, 8, 4),
         ore: 12,
         cache: 0,
+        yield_kind: crate::sim::YieldKind::Ore,
     }
 }
 
@@ -65,6 +66,8 @@ pub fn build_scenario() -> Sim {
             ore: 0,
             goods: 0,
             food: 10,
+            fungal_oil: 0,
+            masks: 0,
         },
         0x5EED_0001,
         u64::MAX, // the S1 scenario takes no recruits
@@ -92,6 +95,8 @@ pub fn build_scenario_s2() -> Sim {
             ore: 0,
             goods: 0,
             food: 12,
+            fungal_oil: 0,
+            masks: 0,
         },
         0x5EED_0002,
         1500, // first recruit is due at tick 1500 if the colony is fed
@@ -134,6 +139,8 @@ pub fn build_scenario_s3() -> Sim {
             ore: 0,
             goods: 0,
             food: 12,
+            fungal_oil: 0,
+            masks: 0,
         },
         0x5EED_0003,
         1500,
@@ -151,4 +158,95 @@ pub fn light_the_way(sim: &mut Sim) {
     sim.place_lantern(SHAFT_LANTERN, 1, 5_000.0);
     sim.place_lantern(TUNNEL_LANTERN_A, 1, 5_000.0);
     sim.place_lantern(TUNNEL_LANTERN_B, 1, 5_000.0);
+}
+
+pub const DEEP_SHAFT_LANTERN: Pos = Pos { x: 4, y: 11, z: 4 };
+pub const FUNGAL_LANTERN: Pos = Pos { x: 6, y: 14, z: 4 };
+
+/// S5: the colony digs past the Shallows. A deep shaft drops from
+/// the tunnel level to a fungal chamber at depth 14 — spore-bearing
+/// air, fungal nodes to mine for oil, and the full gate set to test:
+/// masks, a herbalist, and tier-2 lanterns that burn the oil.
+pub fn build_scenario_s5() -> Sim {
+    let mut world = World::new(24, 20, 8, Cell::Stone);
+    for x in 0..24 {
+        for z in 0..8 {
+            world.set(Pos::new(x, 0, z), Cell::Earth);
+            world.set(Pos::new(x, 1, z), Cell::Earth);
+        }
+    }
+    for x in 2..=6 {
+        for z in 3..=5 {
+            world.carve(Pos::new(x, 3, z));
+        }
+    }
+    for y in 4..=8 {
+        world.carve(Pos::new(4, y, 4));
+    }
+    for x in 4..=14 {
+        world.carve(Pos::new(x, 8, 4));
+    }
+    world.set(Pos::new(15, 8, 4), Cell::Ore);
+    world.set(Pos::new(16, 8, 4), Cell::Ore);
+    // The deep shaft: from the tunnel down to the fungal chamber.
+    for y in 9..=14 {
+        world.carve(Pos::new(4, y, 4));
+    }
+    // Fungal chamber at depth 14.
+    for x in 2..=8 {
+        for z in 3..=5 {
+            world.carve(Pos::new(x, 14, z));
+        }
+    }
+    world.set(Pos::new(8, 14, 4), Cell::FungalNode);
+    world.set(Pos::new(8, 14, 3), Cell::FungalNode);
+
+    let delvers = vec![
+        Delver::new(0, "Bram", Pos::new(3, 3, 4), Job::Miner),
+        Delver::new(1, "Sella", Pos::new(4, 3, 5), Job::Farmer),
+        Delver::new(2, "Hale", Pos::new(4, 3, 3), Job::Hauler),
+        Delver::new(3, "Wren", Pos::new(5, 3, 5), Job::Herbalist),
+    ];
+    let fungal_face = Face {
+        rock: Pos::new(8, 14, 4),
+        stand: Pos::new(7, 14, 4),
+        ore: 20,
+        cache: 0,
+        yield_kind: crate::sim::YieldKind::FungalOil,
+    };
+    let mut sim = Sim::new(
+        world,
+        delvers,
+        Pos::new(3, 3, 4),
+        vec![
+            Pos::new(2, 3, 3),
+            Pos::new(2, 3, 5),
+            Pos::new(6, 3, 5),
+            Pos::new(6, 3, 3),
+        ],
+        vec![the_face(), fungal_face],
+        Pos::new(6, 3, 4),
+        Stores {
+            ore: 0,
+            goods: 4,
+            food: 12,
+            fungal_oil: 0,
+            masks: 0,
+        },
+        0x5EED_0005,
+        1500,
+        true,
+    );
+    sim.place_lantern(CAMP_LANTERN, 1, 1_000_000.0);
+    sim.plant_plot(Pos::new(5, 3, 3));
+    sim.plant_plot(Pos::new(6, 3, 3));
+    sim
+}
+
+/// Light the deep shaft and the fungal chamber (tier-1 lanterns;
+/// tier-2 comes once the oil flows).
+pub fn light_the_deep(sim: &mut Sim) {
+    light_the_way(sim);
+    sim.place_lantern(DEEP_SHAFT_LANTERN, 1, 5_000.0);
+    sim.place_lantern(FUNGAL_LANTERN, 1, 5_000.0);
 }

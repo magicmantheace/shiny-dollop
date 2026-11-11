@@ -35,6 +35,9 @@ pub enum Cell {
     Earth,
     Stone,
     Ore,
+    /// A fungal growth node in the Fungal Reaches — mined like ore,
+    /// rendered into fungal oil instead.
+    FungalNode,
     Carved,
 }
 

@@ -28,14 +28,19 @@ fn corridor_sim(lit: bool, delvers: Vec<Delver>) -> Sim {
             ore: 0,
             goods: 0,
             food: 10,
+            fungal_oil: 0,
+            masks: 0,
         },
         0x5EED_0010,
         u64::MAX,
         true,
     );
     if lit {
-        sim.place_lantern(Pos::new(1, 1, 1), 3, 1_000_000.0);
-        sim.place_lantern(Pos::new(8, 1, 1), 3, 1_000_000.0);
+        // Tier-1 lanterns (radius 3): two of them cover the corridor.
+        // (Tier-2+ would draw fungal oil under the S5 rules — a test
+        // fixture has no business in that economy.)
+        sim.place_lantern(Pos::new(1, 1, 1), 1, 1_000_000.0);
+        sim.place_lantern(Pos::new(8, 1, 1), 1, 1_000_000.0);
     }
     sim
 }

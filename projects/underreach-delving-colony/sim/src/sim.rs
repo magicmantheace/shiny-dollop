@@ -148,6 +148,8 @@ pub enum LedgerKind {
     DelverDowned,
     DelverRescued,
     DelverLost,
+    DelverSick,
+    Crafted,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -167,17 +169,27 @@ pub enum Job {
     Miner,
     Hauler,
     Farmer,
+    /// Tends the sick (spore care in S5); farms when nobody is ill.
+    Herbalist,
 }
 
-/// An ore face: the rock cell being worked, the carved cell the
-/// delver stands on, the ore still in the rock, and the mined cache
-/// waiting at the face for a hauler.
+/// What a face yields when mined.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum YieldKind {
+    Ore,
+    FungalOil,
+}
+
+/// A work face: the rock cell being worked, the carved cell the
+/// delver stands on, the units still in the rock, and the mined
+/// cache waiting at the face for a hauler.
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Face {
     pub rock: Pos,
     pub stand: Pos,
     pub ore: u32,
     pub cache: u32,
+    pub yield_kind: YieldKind,
 }
 
 /// A camp mushroom plot. Growth runs 0..10; at 10 it is ready to
@@ -191,6 +203,74 @@ pub struct Plot {
 pub const PLOT_READY: f32 = 10.0;
 pub const PLOT_PASSIVE_GROWTH: f32 = 0.002;
 pub const PLOT_YIELD: u32 = 2;
+
+// ---------------------------------------------------------------------------
+// Depth bands & hazards (S5)
+// ---------------------------------------------------------------------------
+
+/// The hazard flags a depth can carry. S5 wires `spores` to real
+/// mechanics; `flooded` and `hot` are the Drowned / Magma hazards,
+/// present in the data model now so deeper bands compose from the
+/// same table instead of new code.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
+pub struct Hazards {
+    pub spores: bool,
+    pub flooded: bool,
+    pub hot: bool,
+}
+
+/// The Fungal Reaches begin at this depth.
+pub const FUNGAL_FROM: i32 = 10;
+/// Thickness of one recombined band below the Fungal Reaches.
+pub const DEEP_BAND_SPAN: i32 = 8;
+
+/// Hazards by depth. The Shallows are clean; the Fungal Reaches are
+/// spore-bearing; deeper still, the bands **recombine** — the hazard
+/// sets cycle through unions of the parent bands' flags, which is
+/// what makes depth endless without new mechanics per band.
+pub fn hazards_at(y: i32) -> Hazards {
+    if y < FUNGAL_FROM {
+        return Hazards::default();
+    }
+    let idx = (y - FUNGAL_FROM) / DEEP_BAND_SPAN;
+    match idx % 4 {
+        0 => Hazards {
+            spores: true,
+            flooded: false,
+            hot: false,
+        },
+        1 => Hazards {
+            spores: true,
+            flooded: true,
+            hot: false,
+        },
+        2 => Hazards {
+            spores: true,
+            flooded: false,
+            hot: true,
+        },
+        _ => Hazards {
+            spores: false,
+            flooded: true,
+            hot: true,
+        },
+    }
+}
+
+/// Spore exposure per tick in a spore band, unmasked vs masked.
+pub const SPORE_RATE_UNMASKED: f32 = 0.6;
+pub const SPORE_RATE_MASKED: f32 = 0.05;
+/// Spore load at which a delver is sick (the spore-cough).
+pub const SICK_AT: f32 = 60.0;
+/// Spore load clears this fast in clean air, plus herbalist care.
+pub const SPORE_CLEAR_RATE: f32 = 0.15;
+pub const HERBALIST_CARE_RATE: f32 = 0.85;
+/// Goods cost of one crafted spore mask.
+pub const MASK_GOODS_COST: u32 = 2;
+/// Fungal oil a tier-2+ lantern placement (or refuel) draws: one
+/// charge of oil per lantern, flat — oil is the fuel, the lantern
+/// is the lantern, however long the scenario says it burns.
+pub const LANTERN_OIL_COST: u32 = 1;
 
 // ---------------------------------------------------------------------------
 // Delver
@@ -215,6 +295,10 @@ pub enum DelverState {
     ToRescue,
     /// Carrying a downed delver back to camp (half speed).
     Rescuing,
+    /// Herbalist heading to a sick delver.
+    ToPatient,
+    /// Herbalist tending a patient within reach.
+    Care,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -233,7 +317,14 @@ pub struct Delver {
     pub hauling_xp: u32,
     pub farming_xp: u32,
     pub carrying: u32,
+    /// What the carried units are (a load is homogeneous).
+    pub carrying_kind: YieldKind,
     pub carrying_food: u32,
+    /// Spore load 0..100 (S5). Sick at `SICK_AT`; at 100 it eats hp.
+    pub spore: f32,
+    /// Wearing a crafted spore mask (permanent kit once equipped).
+    pub masked: bool,
+    pub sick_logged: bool,
     /// 0..100 — spent in combat and accidents; a delver at 0 is
     /// Downed, not dead: the rescue clock decides which.
     pub hp: f32,
@@ -268,7 +359,11 @@ impl Delver {
             hauling_xp: 0,
             farming_xp: 0,
             carrying: 0,
+            carrying_kind: YieldKind::Ore,
             carrying_food: 0,
+            spore: 0.0,
+            masked: false,
+            sick_logged: false,
             hp: 100.0,
             combat_xp: 0,
             fight_cd: 0,
@@ -295,10 +390,18 @@ impl Delver {
     pub fn capacity(&self) -> u32 {
         4
     }
+    pub fn sick(&self) -> bool {
+        self.spore >= SICK_AT
+    }
     /// Morale scales all work rates: a miserable delver works at
-    /// 0.6x, a thriving one at 1.2x.
+    /// 0.6x, a thriving one at 1.2x. Sickness halves it again.
     pub fn work_mult(&self) -> f32 {
-        0.6 + 0.6 * (self.morale / 100.0)
+        let base = 0.6 + 0.6 * (self.morale / 100.0);
+        if self.sick() {
+            base * 0.5
+        } else {
+            base
+        }
     }
 }
 
@@ -307,6 +410,10 @@ pub struct Stores {
     pub ore: u32,
     pub goods: u32,
     pub food: u32,
+    /// Rendered from fungal nodes; fuels tier-2+ lanterns (S5).
+    pub fungal_oil: u32,
+    /// Crafted spore masks waiting to be equipped (S5).
+    pub masks: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -537,7 +644,17 @@ impl Sim {
     }
 
     /// Place (or refuel/replace) a lantern and extend the network.
-    pub fn place_lantern(&mut self, pos: Pos, tier: u8, fuel: f32) {
+    /// Tier-2+ lanterns burn fungal oil: placement draws
+    /// `LANTERN_OIL_COST` oil from the stores and fails (returns
+    /// false, nothing placed) when the colony has none — the Fungal
+    /// Reaches' own product is what lights them.
+    pub fn place_lantern(&mut self, pos: Pos, tier: u8, fuel: f32) -> bool {
+        if tier >= 2 {
+            if self.stores.fungal_oil < LANTERN_OIL_COST {
+                return false;
+            }
+            self.stores.fungal_oil -= LANTERN_OIL_COST;
+        }
         if let Some(e) = self.lanterns.iter_mut().find(|e| e.pos == pos) {
             e.tier = tier;
             e.fuel = fuel;
@@ -551,6 +668,22 @@ impl Sim {
         );
         self.refresh_light();
         self.note_new_lit_depths();
+        true
+    }
+
+    /// Craft a spore mask from colony goods (the Fungal gate set's
+    /// first item). Delvers equip masks automatically at camp.
+    pub fn craft_mask(&mut self) -> bool {
+        if self.stores.goods < MASK_GOODS_COST {
+            return false;
+        }
+        self.stores.goods -= MASK_GOODS_COST;
+        self.stores.masks += 1;
+        self.log(
+            LedgerKind::Crafted,
+            format!("a spore mask was crafted from {MASK_GOODS_COST} goods"),
+        );
+        true
     }
 
     /// Assign a delver's job. Takes effect at their next decision.
@@ -1079,20 +1212,32 @@ impl Sim {
         self.delvers.iter().any(|d| d.job == Job::Hauler)
     }
 
-    /// Deposit whatever the delver is carrying into the stores, with
-    /// the S1 conversion rule: ore converts to goods in pairs.
+    /// Deposit whatever the delver is carrying into the stores. Ore
+    /// converts to goods in pairs (the S1 rule); fungal oil goes to
+    /// the oil store as-is.
     fn deposit(&mut self, idx: usize) {
         let amount = self.delvers[idx].carrying;
         if amount > 0 {
             self.delvers[idx].carrying = 0;
             self.delvers[idx].hauling_xp += amount;
-            self.stores.ore += amount;
             let name = self.delvers[idx].name.clone();
-            self.log(
-                LedgerKind::HaulDelivered,
-                format!("{name} hauled {amount} ore to the stockpile"),
-            );
-            self.convert_stores();
+            match self.delvers[idx].carrying_kind {
+                YieldKind::Ore => {
+                    self.stores.ore += amount;
+                    self.log(
+                        LedgerKind::HaulDelivered,
+                        format!("{name} hauled {amount} ore to the stockpile"),
+                    );
+                    self.convert_stores();
+                }
+                YieldKind::FungalOil => {
+                    self.stores.fungal_oil += amount;
+                    self.log(
+                        LedgerKind::HaulDelivered,
+                        format!("{name} hauled {amount} fungal oil to the stockpile"),
+                    );
+                }
+            }
         }
         let food = self.delvers[idx].carrying_food;
         if food > 0 {
@@ -1135,8 +1280,23 @@ impl Sim {
             self.delvers[idx].state = DelverState::Idle;
             return;
         }
+        // Pick up a mask if the colony has one spare.
+        if !self.delvers[idx].masked && self.stores.masks > 0 {
+            self.stores.masks -= 1;
+            self.delvers[idx].masked = true;
+        }
         if self.delvers[idx].hunger < 40.0 && self.stores.food > 0 {
             self.delvers[idx].state = DelverState::Eating;
+            return;
+        }
+        // The spore-sick go to bed and stay there until it clears.
+        if self.delvers[idx].sick() {
+            let bed = self.delver_bed(idx);
+            if self.delvers[idx].pos == bed || self.start_path(idx, bed) {
+                self.delvers[idx].state = DelverState::ToBed;
+            } else {
+                self.delvers[idx].state = DelverState::Resting;
+            }
             return;
         }
         if self.delvers[idx].energy < 30.0 {
@@ -1151,6 +1311,7 @@ impl Sim {
         match self.delvers[idx].job {
             Job::Miner => self.decide_miner(idx),
             Job::Farmer => self.decide_farmer(idx),
+            Job::Herbalist => self.decide_herbalist(idx),
             // Haulers and the unassigned run the camp↔face route and
             // work the camp converter in between.
             Job::Hauler | Job::Unassigned => self.decide_hauler(idx),
@@ -1250,12 +1411,59 @@ impl Sim {
         if self.delvers[idx].hunger <= 0.0 && state != DelverState::Resting {
             self.delvers[idx].energy = (self.delvers[idx].energy - 0.04).clamp(0.0, 100.0);
         }
+        // Spores (S5): exposure in a spore band, clearing in clean
+        // air — faster with a herbalist close by.
+        {
+            let pos = self.delvers[idx].pos;
+            if hazards_at(pos.y).spores {
+                let rate = if self.delvers[idx].masked {
+                    SPORE_RATE_MASKED
+                } else {
+                    SPORE_RATE_UNMASKED
+                };
+                self.delvers[idx].spore = (self.delvers[idx].spore + rate).min(100.0);
+                if self.delvers[idx].spore >= 100.0 {
+                    self.delvers[idx].hp -= 0.2;
+                    if self.delvers[idx].hp <= 0.0 {
+                        self.down_delver(idx);
+                        return;
+                    }
+                }
+            } else if self.delvers[idx].spore > 0.0 {
+                let near_herbalist = self.delvers.iter().any(|d| {
+                    d.job == Job::Herbalist
+                        && d.id != self.delvers[idx].id
+                        && (d.pos.x - pos.x).abs() + (d.pos.y - pos.y).abs() + (d.pos.z - pos.z).abs()
+                            <= 2
+                });
+                let clear = SPORE_CLEAR_RATE
+                    + if near_herbalist {
+                        HERBALIST_CARE_RATE
+                    } else {
+                        0.0
+                    };
+                self.delvers[idx].spore = (self.delvers[idx].spore - clear).max(0.0);
+            }
+            if self.delvers[idx].sick() && !self.delvers[idx].sick_logged {
+                self.delvers[idx].sick_logged = true;
+                let name = self.delvers[idx].name.clone();
+                self.log(
+                    LedgerKind::DelverSick,
+                    format!("{name} has the spore-cough"),
+                );
+            }
+            if self.delvers[idx].spore < 30.0 {
+                self.delvers[idx].sick_logged = false;
+            }
+        }
         {
             let d = &mut self.delvers[idx];
             // Colony prosperity lifts spirits only for the fed —
             // goods in the store mean little on an empty stomach.
             let goods_term = (self.stores.goods.min(10)) as f32 * (d.hunger / 100.0);
-            let target = (10.0 + d.hunger * 0.5 + d.energy * 0.3 + goods_term).clamp(0.0, 100.0);
+            let sick_term = if d.sick() { -20.0 } else { 0.0 };
+            let target =
+                (10.0 + d.hunger * 0.5 + d.energy * 0.3 + goods_term + sick_term).clamp(0.0, 100.0);
             d.morale += (target - d.morale) * 0.02;
             d.morale = d.morale.clamp(0.0, 100.0);
         }
@@ -1360,6 +1568,7 @@ impl Sim {
                             if take > 0 {
                                 if let Some(f) = self.faces.get_mut(fi) {
                                     f.cache -= take;
+                                    self.delvers[idx].carrying_kind = f.yield_kind;
                                 }
                                 self.delvers[idx].carrying += take;
                             }
@@ -1403,6 +1612,7 @@ impl Sim {
                         self.delvers[idx].capacity() - self.delvers[idx].carrying;
                     let take = self.faces[fi].cache.min(space);
                     self.faces[fi].cache -= take;
+                    self.delvers[idx].carrying_kind = self.faces[fi].yield_kind;
                     self.delvers[idx].carrying += take;
                     if self.delvers[idx].carrying > 0 {
                         if self.start_path(idx, self.stockpile) {
@@ -1545,7 +1755,10 @@ impl Sim {
                 if self.delvers[idx].hp < 100.0 {
                     self.delvers[idx].hp = (self.delvers[idx].hp + 0.8).min(100.0);
                 }
-                if self.delvers[idx].energy >= cap && self.delvers[idx].hp >= 60.0 {
+                if self.delvers[idx].energy >= cap
+                    && self.delvers[idx].hp >= 60.0
+                    && self.delvers[idx].spore < 30.0
+                {
                     self.decide(idx);
                 }
             }
@@ -1555,6 +1768,26 @@ impl Sim {
                     self.delvers[idx].hunger = 100.0;
                 }
                 self.decide(idx);
+            }
+            DelverState::ToPatient => {
+                if self.follow_path(idx) {
+                    self.delvers[idx].state = DelverState::Care;
+                }
+            }
+            DelverState::Care => {
+                // Stand with the patient; the care itself lands in
+                // the patient's own spore clearing. When nobody near
+                // is sick any more, re-decide.
+                let pos = self.delvers[idx].pos;
+                let any_sick_near = self.delvers.iter().any(|d| {
+                    d.id != self.delvers[idx].id
+                        && d.spore >= 30.0
+                        && (d.pos.x - pos.x).abs() + (d.pos.y - pos.y).abs() + (d.pos.z - pos.z).abs()
+                            <= 2
+                });
+                if !any_sick_near {
+                    self.decide(idx);
+                }
             }
             DelverState::ToPlot => {
                 if self.follow_path(idx) {
@@ -1593,6 +1826,33 @@ impl Sim {
                     self.plots[pi].growth = (self.plots[pi].growth + rate).min(PLOT_READY);
                 }
             }
+        }
+    }
+
+    fn decide_herbalist(&mut self, idx: usize) {
+        // The sickest delver is the patient; go to them, or farm.
+        // A patient stays a patient until they are well (spore under
+        // 30), not merely until they stop being critical.
+        let my_pos = self.delvers[idx].pos;
+        let patient = self
+            .delvers
+            .iter()
+            .filter(|d| d.id != self.delvers[idx].id && d.spore >= 30.0)
+            .max_by(|a, b| a.spore.partial_cmp(&b.spore).unwrap());
+        let Some(patient) = patient.map(|d| (d.id, d.pos)) else {
+            self.decide_farmer(idx);
+            return;
+        };
+        let (_, ppos) = patient;
+        let dist = (ppos.x - my_pos.x).abs() + (ppos.y - my_pos.y).abs() + (ppos.z - my_pos.z).abs();
+        if dist <= 2 {
+            self.delvers[idx].state = DelverState::Care;
+        } else if self.start_path(idx, ppos) {
+            self.delvers[idx].state = DelverState::ToPatient;
+            self.delvers[idx].blocked_logged = false;
+        } else {
+            // Patient is somewhere light doesn't reach; farm instead.
+            self.decide_farmer(idx);
         }
     }
 

@@ -89,6 +89,30 @@ A scripted Shallows colony: camp chamber, shaft, tunnel, ore face.
   dark — a delver cut off by a light failure stops work and waits
   (for rescue, a relight, or the clock).
 
+## S5 — the Fungal Reaches (verified 2026-11-10, VM headless)
+
+- `cargo test`: 24/24 green (adds 6 S5 scenario tests).
+- The gate set, proven piece by piece: an unmasked miner working the
+  fungal face gets the spore-cough (`DelverSick`) and still hauls oil
+  home; a crafted mask (2 goods) protects its wearer entirely;
+  tier-2 lantern placement is refused with no oil in stores and
+  succeeds for exactly 1 oil once it flows; a herbalist clears a
+  spore load of 90 to well in ~60 ticks vs ~400 for clean air alone
+  (control run in the same test).
+- Recombination groundwork: `hazards_at(y)` — Shallows clean, Fungal
+  spore, then cycling unions (spore+flood, spore+heat, flood+heat)
+  every 8 depths, asserted as data. Only `spores` has mechanics in
+  this slice; `flooded`/`hot` are modelled, not yet simulated.
+- S5 scenario run (6,000 ticks, two masks crafted): 6 delvers alive,
+  19 fungal oil stockpiled, tier-2 placement succeeds, **0 sick
+  events** — with the miner masked, the hauler's short trips clear
+  between runs; sustained unmasked mining is what sickens (test 1).
+- Two design rules fell out of implementation failures, both kept:
+  tier-2 oil cost is a flat 1 per lantern (a per-fuel charge made
+  scenario lanterns silently unaffordable and broke the S3 rescue
+  test — caught by that test), and a herbalist's patient stays a
+  patient until well (<30 spore), not until merely not-critical.
+
 ## Planned (later slices)
 
 - Godot frontend: headless `--verify` load of core state; owner-PC

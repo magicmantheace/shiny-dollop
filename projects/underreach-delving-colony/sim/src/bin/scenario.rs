@@ -2,7 +2,10 @@
 //! opens production) and S2 (a working colony of three, plus a
 //! recruit, dividing the labour).
 
-use underreach_sim::scenario::{build_scenario, build_scenario_s2, build_scenario_s3, light_the_way};
+use underreach_sim::scenario::{
+    build_scenario, build_scenario_s2, build_scenario_s3, build_scenario_s5, light_the_deep,
+    light_the_way,
+};
 use underreach_sim::sim::LedgerKind;
 
 fn count(sim: &underreach_sim::sim::Sim, kind: LedgerKind) -> usize {
@@ -88,6 +91,36 @@ fn main() {
         );
     }
     println!("S3 state hash: {}", sim.state_hash());
+
+    // ---- S5 ------------------------------------------------------------
+    let mut sim = build_scenario_s5();
+    // The player crafts two masks from the colony's goods, then
+    // lights the deep. Bram and Sella win the masks (camp order);
+    // whoever else works the fungal face goes unprotected.
+    sim.craft_mask();
+    sim.craft_mask();
+    light_the_deep(&mut sim);
+    for _ in 0..6000 {
+        sim.tick();
+    }
+    let tier2_placed = sim.place_lantern(underreach_sim::world::Pos::new(5, 14, 4), 2, 500.0);
+    println!(
+        "S5 fungal reaches ({} ticks): delvers alive={}, goods={}, fungal oil={}, masks in stores={}, sick events={}, tier-2 lantern placed={}",
+        sim.tick_count,
+        sim.delvers.len(),
+        sim.stores.goods,
+        sim.stores.fungal_oil,
+        sim.stores.masks,
+        count(&sim, LedgerKind::DelverSick),
+        tier2_placed,
+    );
+    for d in &sim.delvers {
+        println!(
+            "  {} ({:?}): hp={:.0} spore={:.0} masked={} morale={:.0}",
+            d.name, d.job, d.hp, d.spore, d.masked, d.morale,
+        );
+    }
+    println!("S5 state hash: {}", sim.state_hash());
 
     println!("deep ledger (S2):");
     for e in &sim.ledger {

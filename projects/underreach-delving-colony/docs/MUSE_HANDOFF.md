@@ -123,17 +123,20 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   failed-rescue permadeath and Ledger losses.
 - **S4 — Godot frontend.** Presentation over the core: voxel meshing
   (bevelled/smoothed), lantern light, delver sprites/models, camp view.
-- **S5 — second band.** Fungal Reaches gate set (masks, fungal oil,
-  herbalist), band recombination groundwork.
+- **S5 — second band (BUILT 2026-11-10, sim side).** Fungal Reaches
+  gate set (masks, fungal oil, herbalist), band recombination
+  groundwork (`hazards_at` table; flooded/hot flags modelled, only
+  spores simulated so far).
 - Later: Drowned/Crystal/Magma gates, co-op, colony failure &
   succession, children/generations.
 
 ## Status — 2026-11-10
 
 - **Implemented and verified (VM, headless):** the S1 sim core, the
-  S2 colony layer, and the S3 threat/rescue layer — `cargo test`
-  18/18 and the `scenario` binary's three-slice run. Details and
-  numbers in `docs/TEST_PLAN.md`.
+  S2 colony layer, the S3 threat/rescue layer, and the S5 Fungal
+  Reaches (sim side) — `cargo test` 24/24 and the `scenario`
+  binary's four-slice run. Details and numbers in
+  `docs/TEST_PLAN.md`.
 - **Implemented but unverified:** nothing yet.
 - **Planned:** S2+ per the slice plan; each needs the owner's go-ahead.
 - **Blocked:** nothing.

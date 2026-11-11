@@ -44,11 +44,15 @@ Verified: `cargo test` in `sim/` (unit + scenario tests), and the
 `scenario` binary's two-phase run (blocked in the dark → lit → producing).
 
 **Not yet built:** rendering/frontend (Godot 4, a later slice), combat,
-the other depth bands (the Fungal Reaches arrive in S5), co-op, and
-children/generations. S2 added the colony (multiple delvers, jobs,
-morale, camp farming, recruitment); S3 added creatures, combat,
-lantern-clock strandings, rescue runs, and permadeath. No frame or
-performance claims exist — nothing has run on owner hardware.
+the deeper bands' mechanics (Drowned flooding, Magma heat — their
+hazard flags are modelled in S5's recombination table but not yet
+simulated), co-op, and children/generations. S2 added the colony
+(multiple delvers, jobs, morale, camp farming, recruitment); S3
+added creatures, combat, lantern-clock strandings, rescue runs, and
+permadeath; S5 added the Fungal Reaches: spore sickness, crafted
+masks, a herbalist, fungal oil, and oil-burning tier-2 lanterns. No
+frame or performance claims exist — nothing has run on owner
+hardware.
 
 ## Layout
 
