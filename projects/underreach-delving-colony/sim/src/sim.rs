@@ -21,6 +21,7 @@ use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::gen::FloorInfo;
 use crate::world::{Cell, Pos, World};
 
 // ---------------------------------------------------------------------------
@@ -529,6 +530,17 @@ pub struct Sim {
     pub ledger: Vec<LedgerEntry>,
     pub lit_depths: BTreeSet<i32>,
     pub tick_count: u64,
+    /// The colony's unified world seed (S6): every floor's
+    /// layout is a pure function of this seed and the floor
+    /// index (see `crate::gen`). Recorded at founding from the
+    /// construction seed; generation never draws on the runtime
+    /// RNG below. Saves from before S6 load with 0 (unset).
+    #[serde(default)]
+    pub world_seed: u64,
+    /// The generated floor this colony is playing on, if it was
+    /// founded on one (S6). Hand-built scenarios leave it `None`.
+    #[serde(default)]
+    pub floor: Option<FloorInfo>,
     pub rng_state: u64,
     pub next_arrival: u64,
     pub next_delver_id: u32,
@@ -576,6 +588,8 @@ impl Sim {
             ledger: Vec::new(),
             lit_depths: BTreeSet::new(),
             tick_count: 0,
+            world_seed: rng_seed,
+            floor: None,
             rng_state: if rng_seed == 0 { 0x9E37_79B9_7F4A_7C15 } else { rng_seed },
             next_arrival,
             next_delver_id,

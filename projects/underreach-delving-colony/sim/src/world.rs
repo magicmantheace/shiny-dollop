@@ -38,6 +38,16 @@ pub enum Cell {
     /// A fungal growth node in the Fungal Reaches — mined like ore,
     /// rendered into fungal oil instead.
     FungalNode,
+    /// Cave-in-prone rock (S6 floor generation). Embedded in the
+    /// rock by the floor generator as a hazard pocket. Generation
+    /// and rendering only for now: the cave-in mechanics — and the
+    /// timber-support answer — are a later slice, the same way S5
+    /// modelled `flooded`/`hot` before simulating them.
+    Loose,
+    /// A bad-air pocket (S6 floor generation). Solid until carved;
+    /// the bad-air mechanics and the ventilation answer are a
+    /// later slice, like `Loose`.
+    BadAir,
     Carved,
 }
 
