@@ -1122,6 +1122,57 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 11 — Newest window joint breadth recovery: leg N, a newest-window joint-breadth leg replacing leg W on the regular recovery branch (FAILED / REGRESSION at checkpoint 32)
+
+Optional `NewestWindowJointBreadthRecoveryMemory` is identical to
+the graded acting candidate in every element — acting model,
+extended signal, retained archive, archive concordance, joint
+recovery test, recovery model, the full three-leg authority
+condition, the minority branch in full INCLUDING the inverted
+minority model and leg W on the minority branch, leg T on both
+recovery branches, leg P ≥ 0.70, leg R and leg C on partial
+abstention triggers, and the full / retained-partial abstention
+classes with the widened class removed, support threshold null;
+the SINGLE changed element is leg N: the regular branch fires
+only if its joint count over the newest four events events[-4:]
+reaches newest_joint_threshold 2, leg W carried records-only on
+that branch (leg P / leg R / leg T / leg C explicitly NOT
+re-tuned) — under a protocol frozen before implementation (new
+cohorts 512003-family / 513001-family, now INSPECTED). **Graded
+Failed / Regression at checkpoint 32 under the protocol's own
+definitions (PRIMARY criterion 17 FAILs on BOTH cohorts —
+development on the ceiling sub-condition alone, 52 vs 48.0,
+additional on both, 76 vs guard 67 and ceiling 49.8; the Failed
+clause triggers on the additional cohort several times over —
+criteria 17, 4, and 2 FAIL there, criterion 7 PASSes both; the
+Regression clause triggers on development's checkpoint-32
+successes, 71 below the recent8 − 4 line of 75, the deficit
+exactly leg N's single released routing).** Stated as prominently
+as the failure: leg N restored the regular branch at return-A
+onset on BOTH cohorts — **the grading cap is MET** (3 graded
+restorations development, 1 additional), and development's were
+productive (+24 successes / −24 harm vs the decisive baseline;
+return-A recovery 5/6 vs decisive 2/6, pooled onset harm below
+the decisive baseline, 127 vs 151, for the first time in the
+breadth line) — but the frozen harm form still fails on both,
+and leg N's stand-down side, exercised exactly once, released a
+productive checkpoint-32 routing (decisive 10/6) to a taken
+partial abstention (0/0) at seed 512003 return-A k=32, failing
+criterion 5(d) and carrying the Regression. Criterion 5 passes
+additional in full; criteria 9 and 3 pass both; criterion 6
+fails development on a carried draw (four control abstentions,
+branch-identical to the decisive baseline) with additional at
+exact parity; criterion 1 fails development on its carried
+minority count alone. Leg T disarmed zero states for the fourth
+consecutive cycle. Next limitation selected: P1 checkpoint-32
+release through leg N — the sole newest-disarmed state across
+both cohorts, a correct-rule retained routing at newest count
+1 / acting count 3 released to an abstention, on NEW cohorts
+under a NEW protocol. Learner acquisition actions zero;
+external TRAIN actor harm published in full in the report.
+[Complete preregistration, results and limitations](docs/NEWEST_WINDOW_JOINT_BREADTH_RECOVERY.md).
+
+
 ### November 11 — Acting window joint breadth recovery: leg W, an acting-window joint-breadth leg on both recovery branches (FAILED, not a Regression)
 
 Optional `ActingWindowJointBreadthRecoveryMemory` is identical to

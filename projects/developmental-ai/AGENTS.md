@@ -1,3 +1,142 @@
+# Newest window joint breadth recovery: leg N, a newest-window joint-breadth leg replacing leg W on the regular recovery branch — 2026-11-11 (FAILED / REGRESSION at checkpoint 32)
+
+Optional `developmental_ai/newest_window_joint_breadth_recovery.py`
+(identical to the graded acting candidate in every element —
+acting model recent8 exactly, extended signal, retained archive,
+archive concordance, joint test joint_count >= 1, recovery model,
+the full three-leg authority condition, the minority branch in
+full INCLUDING the inverted minority model and leg W on the
+minority branch, leg T on both recovery branches, leg P >= 0.70,
+leg R and leg C on partial abstention triggers, and the full /
+retained-partial abstention classes with the widened class
+removed records-only, support threshold null; the SINGLE changed
+element is leg N: the regular branch fires only if its joint
+count over events[-4:] reaches newest_joint_threshold 2, leg W
+records-only on the regular branch; leg P / leg R / leg T /
+leg C explicitly NOT re-tuned) was evaluated under the protocol
+frozen BEFORE implementation at
+`benchmarks/newest_window_joint_breadth_recovery_protocol.json`
+on NEW cohorts 512003/512021/512039 and 513001/513017/513041,
+both now INSPECTED — never re-tune against them. **Graded
+Failed / Regression at checkpoint 32 under the protocol's own
+definitions (PRIMARY criterion 17 FAILs on BOTH cohorts —
+development on the ceiling sub-condition (b) alone, harm 52 vs
+guard 65 PASS and ceiling 0.60 x recent8 80 = 48.0 FAIL, and
+additional on both sub-conditions, harm 76 vs guard 67 and
+ceiling 49.8; the Failed clause triggers on the additional
+cohort several times over — criteria 17, 4, and 2 FAIL there,
+criterion 7 PASSes both — and the Regression clause triggers on
+development's checkpoint-32 successes, 71 below the recent8 - 4
+line of 75, the deficit exactly leg N's single released routing
+at seed 512003 return-A k=32; the other Regression clauses do
+not trigger — pooled onset harm 127/128 below recent8 253/228,
+the control clause requires both cohorts and additional is at
+exact parity against development's -27, suite + transfer pass).**
+Per-criterion, development / additional, PRIMARY criterion 17
+first, then co-graded guards 5, 9, 6, 1, 11, 4, 2, 3, 7:
+C17 FAIL/FAIL, C5 FAIL/PASS (development on (d) alone —
+abstained branch 1/9 against the frozen 0/9; abstentions 16/144
+PASS, successes 71 at exactly the recent8 - 8 line PASS,
+non-recent8 1/9 at the allowance PASS; the one state is leg N's
+stand-down side exercised exactly once across both cohorts,
+seed 512003 return-A k=32, newest 1 / acting 3, stale 0, purity
+0.714, decisive retained routing 10/6 released to a taken
+partial abstention 0/0; additional in full — 81 = recent8 81,
+0/9, 0/9, abstentions 0/144, no routing drawn at all), C9
+PASS/PASS (development TAKEN 3/6 at the floor — 1 full + 2
+retained partial, both through leg C only — harm 47 vs guard
+74 / recent8 79, successes 1 vs recent8 17 / guard 6; additional
+TAKEN 4/6 — 3 full + 1 partial through R+C — harm 32 vs guard
+42 / recent8 64, successes 0 vs 32/22; candidate identical to
+the decisive baseline at every B1 state on both cohorts), C6
+FAIL/PASS (development on (a) AND (b) — abstentions 64/240
+against the <= 32 budget and successes 88 vs recent8 115,
+required >= 109, harm 88 vs 125 PASS; four carried control
+abstention firings, candidate branch-identical to the decisive
+baseline at 15/15 graded control states; additional at exact
+recent8 parity, 127/113, abstentions 0/240), C1 FAIL/PASS
+(development on (a) alone — minority TAKEN 2/6, selectivity
+0/6 / 0/6, harm 28 vs guard 46 / ceiling 56.4, successes 20 vs
+guard+16 = 18; candidate identical to the decisive baseline at
+every B2 state, minority branch bit-for-bit the baseline's;
+additional in full — minority 3/6 at the floor, harm 20 vs
+guard 61 / ceiling 48.6, successes 28 vs 19), C11 FAIL/PASS
+(development on its stationary side only, additional both
+sides), C4 FAIL/FAIL (the same computation as PRIMARY C17),
+C2 PASS/FAIL (development 44 vs frozen_A 62 floor 24.8 and
+guard+16 = 31; additional 20 vs floor 28.0 and guard+16 = 29 —
+frozen_A beats the candidate on BOTH axes at return-A on BOTH
+cohorts again, 62/34 and 70/26, and cumulative does the same,
+54/42 and 56/40), C3 PASS/PASS (127 vs guard 185, cells 6/6
+development; 128 vs guard 170, cells 6/6 additional; pooled
+onset harm BELOW decisive on development, 127 vs 151, and
+ABOVE it on additional, 128 vs 119, through the one
+restoration's +9 harm against its abstention fall-through),
+C7 PASS/PASS (replay 72/72 per cohort, newest lists of 4 with
+the newest count recomputable everywhere and newest records ==
+acting records' last four everywhere, newest_joint_threshold 2
+everywhere, newest-breadth-rule == candidate branch and
+acting-breadth-rule == decisive baseline branch everywhere,
+both acting breadth flags and the newest breadth flag recomputed
+everywhere with 0 mismatches, companion fields recomputable at
+every partial state, kind never widened, stale lists of 18
+recomputable, thresholds 2/3/1/null as registered,
+minority_model_archive_count == archive_events_count and
+minority_model_inverted true everywhere, cross-check PASS at
+every minority-fired state 5/5 development and 6/6 additional,
+acquisition 0). **The grading cap is MET on both cohorts —
+leg N restored the regular branch at return-A onset at four
+graded states (development: 512021 k=4 newest 2 / acting 2,
+purity 0.833, candidate 10/6 vs decisive / recent8 3/13; 512039
+k=2 newest 2 / acting 2, purity 0.927, 9/7 vs 1/15; 512039 k=4
+newest 2 / acting 2, purity 0.900, 9/7 vs 0/16 — all three
+productive against their recent8 fall-throughs; additional:
+513041 k=4 newest 2 / acting 2, purity 0.971, candidate 7/9
+where the decisive baseline's fall-through was a taken full
+abstention 0/0), so a harm PASS would not have been a
+newest-breadth null — but the harm lines still fail as above,
+and each restoration is charged in full: development's
+restorations were worth +24 successes / -24 harm against the
+decisive baseline on the pooled return-A line, additional's
+converted an abstention's 0 harm into a 7/9 firing. Leg T
+disarmed ZERO states on either cohort for the fourth
+consecutive cycle.** Full unit suite (1740) and historical
+transfer benchmark passed in the implementation, evaluation,
+and grading stages; no CI claimed for the evaluation or
+grading commits (UNVERIFIED). See
+`docs/NEWEST_WINDOW_JOINT_BREADTH_RECOVERY.md`. Keep the
+learner optional and unpromoted, default controller unchanged,
+no merge, no AthenZ/Synveil integration, D1–D10/V2A/V2B
+unchanged. Next limitation selected: P1 checkpoint-32 release
+through leg N — criterion 5 fails development on
+sub-condition (d) alone and carries this cycle's Regression,
+and its mechanism is entirely leg N's stand-down side (the
+sole newest-disarmed state across both cohorts, a productive
+retained routing at newest 1 / acting 3 released to a partial
+abstention); whether an evidence-derived condition on the
+regular recovery branch's late routings, a condition that
+distinguishes leg N's checkpoint-32 release population from
+its onset restoration population without re-tuning leg N's
+onset form, can hold criterion 5's frozen form on BOTH
+cohorts while holding return-A onset harm (criteria 17/4,
+with leg N's restoration side carried), B1 engagement
+(criterion 9), stationary selectivity (criterion 6), and B2
+protection (criterion 1) as co-graded guards, on NEW cohorts
+under a NEW protocol. Recorded but not selected:
+development's return-A restorations were productive and
+additional's criterion 17 failure is dominated by carried
+recent8 fall-through harm at non-engaged return-A states
+(candidate identical to recent8 at 5/6 additional return-A
+onset states) plus the one abstention-converting restoration
+— a further return-A retry needs a condition on the
+non-engaged fall-through population; development's stationary
+failure is a carried draw identical to the decisive baseline
+with additional at exact parity; development's B2 failure is
+carried identical with additional passing in full at the
+floor; additional's criterion 2 failure is driven by the same
+non-engaged return-A population; frozen_A / cumulative
+both-axes return-A dominance holds on both cohorts again.
+
 # Acting window joint breadth recovery: leg W, an acting-window joint-breadth leg on both recovery branches — 2026-11-11 (FAILED, not a Regression)
 
 Optional `developmental_ai/acting_window_joint_breadth_recovery.py`
