@@ -17,8 +17,10 @@
 //! foreign claims it covets.
 
 use crate::catalog::Galaxy;
+use crate::race::Personality;
 use crate::state::{
-    Campaign, Purpose, ShipKind, ShipState, Specialization, CLAIM_COST_CREDITS,
+    Campaign, DealOutcome, PeaceTerms, Purpose, ShipKind, ShipState, Specialization, TreatyKind,
+    CLAIM_COST_CREDITS, PLAYER_CIV,
 };
 
 /// Minimum habitability an AI will claim or colonize (design §6.2's
@@ -46,6 +48,9 @@ pub fn plan_month(campaign: &mut Campaign, galaxy: &Galaxy, civ_id: u32) {
     assign_specializations(campaign, civ_id);
     build_ships(campaign, civ_id, expansion);
     claim_systems(campaign, civ_id, expansion);
+    // S4 diplomacy runs before contesting: a pact signed this
+    // month already binds this month's claims.
+    diplomacy_step(campaign, galaxy, civ_id, personality);
     contest_claims(campaign, civ_id, personality.aggression);
     // One shared return-cost field for this month's dispatching,
     // keyed to the surveyor design's legs and tank.
@@ -462,6 +467,177 @@ fn dispatch_idle_ships(
                             Purpose::Relocate,
                         );
                     }
+                }
+            }
+        }
+    }
+}
+
+/// S4 diplomacy (design §6.3): one month of treaty business for
+/// this civilization, conducted entirely through the core's public
+/// deal commands — the same stated-reasons evaluation the player
+/// faces, with no AI back door. Personality drives the agenda:
+/// honour decides whether treaties hold and whether embargoes are
+/// beneath it, aggression whether embargoes and hard lines appeal,
+/// trade affinity (inside the evaluation) what gets offered first.
+///
+/// Per contacted civilization, in order: embargo management
+/// (lift when relations recover; declare against the hated when
+/// aggressive and unbound), settlement of old disputes, treaty
+/// breaking when a relation has rotted past saving, new treaty
+/// proposals (one instrument per pair per month; at most one fresh
+/// offer to the player per month), and trade-route opening under
+/// an active trade agreement.
+fn diplomacy_step(
+    campaign: &mut Campaign,
+    galaxy: &Galaxy,
+    civ_id: u32,
+    personality: Personality,
+) {
+    let contacted: Vec<u32> = campaign
+        .civs()
+        .iter()
+        .map(|c| c.id)
+        .filter(|&id| id != civ_id && campaign.has_contact(civ_id, id))
+        .collect();
+    let mut proposed_to_player = false;
+
+    for other in contacted {
+        if !campaign.diplomacy_open(civ_id, other) {
+            continue;
+        }
+        let opinion = campaign.relation(galaxy, civ_id, other).opinion.total;
+
+        // Embargoes: lift mine when the relation has recovered;
+        // while either direction stands, no deals are weighed.
+        if campaign.embargo_of(civ_id, other).is_some() {
+            if opinion >= 0.0 {
+                let _ = campaign.lift_embargo_for(civ_id, other);
+            }
+            continue;
+        }
+        if campaign.embargo_of(other, civ_id).is_some() {
+            continue;
+        }
+        // Declare: only against a civ we genuinely dislike, only
+        // when aggressive, and not while bound by treaties an
+        // embargo would tangle (a trade agreement is the exception
+        // — an embargo *is* its termination, breach and all).
+        let bound = TreatyKind::ALL
+            .iter()
+            .any(|&k| k != TreatyKind::TradeAgreement && campaign.treaty_active(civ_id, other, k));
+        if opinion <= -35.0 && personality.aggression >= 0.55 && personality.honour < 0.6 && !bound
+        {
+            let _ = campaign.declare_embargo_for(civ_id, other);
+            continue;
+        }
+
+        // Settle disputes that have had half a year to cool: a
+        // recognition settlement (no cessions, no credits) when
+        // both sides' evaluations accept it.
+        let disputes = campaign.disputes_between(civ_id, other);
+        let oldest_days = disputes
+            .iter()
+            .map(|d| campaign.day().saturating_sub(d.opened_day))
+            .max()
+            .unwrap_or(0);
+        if !disputes.is_empty() && oldest_days >= 180 {
+            let terms = PeaceTerms::recognition_only();
+            if campaign.evaluate_peace(galaxy, civ_id, other, &terms).accept {
+                if other == PLAYER_CIV {
+                    if !proposed_to_player
+                        && matches!(
+                            campaign.propose_peace_for(civ_id, galaxy, other, terms),
+                            Ok(DealOutcome::Pending { .. })
+                        )
+                    {
+                        proposed_to_player = true;
+                    }
+                } else {
+                    let _ = campaign.propose_peace_for(civ_id, galaxy, other, terms);
+                }
+            }
+        }
+
+        // Break a treaty when the relation has rotted: faithless
+        // civs walk away freely; honourable ones walk only from a
+        // partner who broke faith first. The least-valued
+        // instrument goes first; an alliance holds to −60.
+        if opinion <= -45.0 {
+            let they_breached_us = campaign
+                .breaches()
+                .iter()
+                .any(|b| b.breaker == other && b.other == civ_id);
+            if personality.honour < 0.5 || they_breached_us {
+                for kind in [
+                    TreatyKind::ResearchPact,
+                    TreatyKind::GateAccess,
+                    TreatyKind::NonAggressionPact,
+                    TreatyKind::TradeAgreement,
+                    TreatyKind::Alliance,
+                ] {
+                    if kind == TreatyKind::Alliance && opinion > -60.0 {
+                        continue;
+                    }
+                    if campaign.treaty_active(civ_id, other, kind) {
+                        let _ = campaign.break_treaty_for(civ_id, other, kind);
+                        break;
+                    }
+                }
+                continue;
+            }
+        }
+
+        // New instruments, in a fixed order; the evaluation decides
+        // what this civ actually wants, kind by kind.
+        for kind in TreatyKind::ALL {
+            if campaign.treaty_active(civ_id, other, kind) {
+                continue;
+            }
+            if !campaign.evaluate_treaty(galaxy, civ_id, other, kind).accept {
+                continue;
+            }
+            if other == PLAYER_CIV {
+                if proposed_to_player {
+                    continue;
+                }
+                if matches!(
+                    campaign.propose_treaty_for(civ_id, galaxy, other, kind),
+                    Ok(DealOutcome::Pending { .. })
+                ) {
+                    proposed_to_player = true;
+                }
+            } else {
+                let _ = campaign.propose_treaty_for(civ_id, galaxy, other, kind);
+            }
+            break;
+        }
+
+        // Trade routes under an active agreement: keep up to two
+        // running, best endpoints first (the core's one suggestion
+        // rule serves AI and player alike).
+        if campaign.treaty_active(civ_id, other, TreatyKind::TradeAgreement) {
+            while campaign.routes_between(civ_id, other).len() < 2 {
+                let Some((mine, theirs, _, _)) =
+                    campaign.suggest_trade_route(galaxy, civ_id, other)
+                else {
+                    break;
+                };
+                let already = campaign
+                    .routes_between(civ_id, other)
+                    .iter()
+                    .any(|r| {
+                        (r.system_a == mine && r.system_b == theirs)
+                            || (r.system_a == theirs && r.system_b == mine)
+                    });
+                if already {
+                    break;
+                }
+                if campaign
+                    .establish_trade_route_for(civ_id, galaxy, other, mine, theirs)
+                    .is_err()
+                {
+                    break;
                 }
             }
         }
