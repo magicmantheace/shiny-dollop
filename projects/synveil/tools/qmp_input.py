@@ -317,6 +317,16 @@ AB_COMMANDS = {
     # open and the session could never end (the same trap the
     # observer history fixture documents above).
     "wine-stop": "export WINEPREFIX=$(cat /var/tmp/wineprefix.path); /usr/lib/wine/wineserver64 -k; sleep 3; kill %1; sync",
+    # Graphics proof (ADR 0027): run the image's graphics probe
+    # against the sealed Mesa + Vulkan payload and leave its
+    # GFX_* report on the state partition for host-side
+    # assertions. LD_LIBRARY_PATH mirrors the Wine launcher:
+    # the payload keeps its distribution multiarch layout and
+    # runs the baseline rootfs's own glibc. EGL_PLATFORM pins
+    # Mesa's surfaceless platform (the session has no display
+    # for the probe; surfaceless is the honest headless init
+    # path for llvmpipe).
+    "gfx-probe": "echo synveil-gfx-run; EGL_PLATFORM=surfaceless LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu /usr/libexec/synveil/gfx-probe > /var/tmp/gfx-probe.txt 2>&1; sync",
 }
 
 _AB_CHAR_KEYS = {c: c for c in "abcdefghijklmnopqrstuvwxyz0123456789"}

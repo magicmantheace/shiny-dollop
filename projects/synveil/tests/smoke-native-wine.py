@@ -22,12 +22,16 @@ The host then requires, from live frames of the S4 desktop:
     Notepad window while it is open.
 
 Afterwards the fixed `wine-stop` command stops the Wine
-session (wineserver -k on the recorded prefix), the terminal
-is closed, and the graphical login must relock — the same
-session discipline as every other gate. The launcher's log
-and the recorded prefix path are read back from the state
-partition as supporting evidence (the prefix itself lives
-on tmpfs and is gone, by design).
+session (wineserver -k on the recorded prefix), the fixed
+`gfx-probe` command runs the image's graphics probe
+(ADR 0027: the sealed Mesa + Vulkan payload — Vulkan must
+enumerate the lavapipe device and EGL/GL must initialize on
+llvmpipe, reported as GFX_* lines read back from the state
+partition), the terminal is closed, and the graphical login
+must relock — the same session discipline as every other
+gate. The launcher's log and the recorded prefix path are
+read back from the state partition as supporting evidence
+(the prefix itself lives on tmpfs and is gone, by design).
 
 Boot/enroll flakes under TCG retry the whole boot on a fresh
 image copy (3 attempts); assertions never retry. QEMU
@@ -550,6 +554,20 @@ def boot_and_wine(work: Path, secret: str, out: Path) -> bool:
                         return False
                     note("wine stop typed; letting wineserver die")
                     time.sleep(8)
+                    # Graphics probe (ADR 0027): the terminal is
+                    # still focused; run the image's probe against
+                    # the sealed Mesa + Vulkan payload. Its report
+                    # lands on the state partition for readback.
+                    phase = "gfx-probe"
+                    try:
+                        type_ab_command(qmp, "gfx-probe",
+                                        timeout=90)
+                    except Exception as exc:  # noqa: BLE001
+                        note(f"gfx probe failed: {exc}")
+                        return False
+                    WINE_FACTS["gfx_probe_typed"] = True
+                    note("gfx probe typed; letting it run")
+                    time.sleep(20)
                     phase = "closing"
                     for _ in range(10):
                         try:
@@ -649,6 +667,50 @@ def check_wine(facts: dict, prefix_path: str | None,
     return failures
 
 
+def parse_graphics(gfx_text: str | None) -> dict:
+    """Extract the probe's headline facts from its GFX_* report."""
+    facts: dict = {"probe_ok": False, "vulkan_device": None,
+                   "gl_renderer": None, "egl_vendor": None}
+    if gfx_text is None:
+        return facts
+    for line in gfx_text.splitlines():
+        if line == "GFX_PROBE_OK":
+            facts["probe_ok"] = True
+        elif line.startswith("GFX_VULKAN_DEVICE name="):
+            facts["vulkan_device"] = line.split("name=", 1)[1]
+        elif line.startswith("GFX_GL_OK"):
+            facts["gl_renderer"] = line
+        elif line.startswith("GFX_EGL_OK"):
+            facts["egl_vendor"] = line
+    return facts
+
+
+def check_graphics(gfx_text: str | None) -> list[str]:
+    """Assert the ADR 0027 graphics proof from the probe report
+    read back off the state partition: Vulkan enumerated the
+    lavapipe software device and EGL/GL initialized on
+    llvmpipe. This proves the staged payload initializes in
+    the guest (QEMU/TCG software rendering) — not Direct3D,
+    not a real GPU, not performance."""
+    failures: list[str] = []
+    if gfx_text is None:
+        return ["gfx-probe.txt not found in state partition"]
+    facts = parse_graphics(gfx_text)
+    if not facts["probe_ok"]:
+        failures.append("graphics probe did not report GFX_PROBE_OK")
+    device = facts["vulkan_device"] or ""
+    if "llvmpipe" not in device:
+        failures.append(
+            f"lavapipe device not enumerated: {device!r}")
+    if "GFX_VULKAN_OK" not in gfx_text:
+        failures.append("probe reported no GFX_VULKAN_OK")
+    renderer = facts["gl_renderer"] or ""
+    if "llvmpipe" not in renderer:
+        failures.append(
+            f"GL did not initialize on llvmpipe: {renderer!r}")
+    return failures
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=OUT)
@@ -671,6 +733,7 @@ def main() -> int:
     facts: dict = {}
     prefix_path = None
     log_bytes = None
+    gfx_text = None
     booted = False
     for attempt in range(1, 4):
         attempts = attempt
@@ -698,7 +761,13 @@ def main() -> int:
                     state, ["tmp/wine.log"], log_raw) is not None:
                 log_bytes = log_raw.read_bytes()
                 (out / "wine.log").write_bytes(log_bytes)
+            gfx_raw = work / "gfx-probe.txt"
+            if dump_state_file(
+                    state, ["tmp/gfx-probe.txt"], gfx_raw) is not None:
+                gfx_text = gfx_raw.read_text(errors="replace")
+                (out / "gfx-probe.txt").write_text(gfx_text)
             failures = check_wine(facts, prefix_path, log_bytes)
+            failures += check_graphics(gfx_text)
             break
     if not booted:
         failures = ["no boot attempt produced a wine session"]
@@ -716,6 +785,14 @@ def main() -> int:
             facts.get("task_buttons_with_notepad"),
         "typed_pixel_diff": facts.get("typed_pixel_diff"),
         "prefix_path": prefix_path,
+        "graphics": {
+            **parse_graphics(gfx_text),
+            "mesa_version": (proof.get("graphics") or {}).get(
+                "mesa_version"),
+            "scope": "payload staged + Vulkan/GL initialize in "
+                     "guest (software rendering); Direct3D and "
+                     "real-GPU behaviour not proven",
+        },
         "failures": failures,
     }
     (out / "result.json").write_text(

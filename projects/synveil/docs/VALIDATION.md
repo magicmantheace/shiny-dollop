@@ -1452,3 +1452,45 @@ custom shell. Not claimed: Direct3D/3D, 32-bit execution,
 prefix persistence, Start-menu presence, third-party
 applications, performance, or physical hardware
 validation.
+
+## Mesa/Vulkan graphics payload — native validation (2026-11-08)
+
+Under ADR 0027 (owner decision 2026-11-07, distro-staging
+route), `tools/distro_graphics.py` sealed the Mesa +
+Vulkan software stack from the pinned snapshot
+(`20261024T000000Z`): 54 packages, 97 payload files,
+220,473,743 bytes — Vulkan loader 1.4.309 with **lavapipe
+as the only ICD**, Mesa 25.0.7-2+deb13u1 with **swrast /
+kms_swrast as the only GL entry points** (Mesa 25's
+gallium is a single unified library, sealed whole;
+hardware Vulkan ICDs pruned with their JSONs). Stage
+marker: `SYNVEIL_DISTRO_GRAPHICS_STAGED_NOT_BOOTED`; the
+stage build fails if lavapipe or the Mesa GL vendor stack
+is absent from the seal.
+
+Woven into the Wine proof image (sha256
+`6c74bec9f6917019db05a530f1565a8b2ec48fd38f07e9cd29121a7006314c92`,
+source `3015ef6`; 61 files copied, 36 byte-identical to
+baseline, 29 graphics ELFs link-checked), the extended
+Wine gate passed on attempt 1
+(`SYNVEIL_WINE_QEMU_PASS`): Notepad unregressed, and the
+in-guest probe (`/usr/libexec/synveil/gfx-probe`) report
+was read back off the state partition — a real Vulkan
+instance enumerated the lavapipe device
+("llvmpipe (LLVM 19.1.7, 128 bits)", type CPU,
+API 1.4.305) and a real EGL context (Mesa Project 1.5,
+surfaceless platform) produced an OpenGL 4.5
+Compatibility renderer string on llvmpipe. The joined
+baseline rebuilt from the same source passed
+`SYNVEIL_NATIVE_JOINED_QEMU_ENROLL_LOGIN_WESTON_PASS`
+and `SYNVEIL_SHELL_QEMU_PASS`. Evidence:
+`docs/validation/graphics-3015ef6/`. Proven: the payload
+is present, byte-verified, and Vulkan/GL initialize in
+the guest (software rendering). Not claimed: Direct3D
+(DXVK/vkd3d not staged — this is their prerequisite),
+any game or 3D workload, 32-bit graphics, real-GPU
+behaviour or performance, or physical hardware
+validation. The A/B update gate was not re-run: no
+joined-image source changed (frozen boot/update
+mechanisms untouched); the change is a payload weave
+into the proof image only.

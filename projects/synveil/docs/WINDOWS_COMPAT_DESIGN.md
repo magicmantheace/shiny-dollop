@@ -95,6 +95,13 @@ checkable rather than assumed).
   performance is owner-hardware territory and stays
   labelled unverified, the same line the browser proof
   draws.
+  **Decision made 2026-11-07 (ADR 0027): option (a).** The
+  owner directed the graphics stack be staged via the
+  distro route — `tools/distro_graphics.py` seals Mesa
+  25.0.7 (lavapipe + llvmpipe) from the same pinned
+  snapshot as Wine, woven into the Wine proof image with a
+  guest initialization probe. See "Graphics staging
+  outcome" below.
 
 ### Install / launch model
 
@@ -191,3 +198,29 @@ answers left it: Direct3D awaits its own Mesa/Vulkan
 decision, prefix persistence stays tied to the storage
 roadmap, Start-menu presence is a later marker-gated
 slice, and 32-bit support is not claimed.
+
+## Graphics staging outcome (2026-11-08, ADR 0027)
+
+The graphics decision was made the same evening
+(2026-11-07, ADR 0027) and executed on branch
+`synveil/mesa-vulkan-staging`: `tools/distro_graphics.py`
+seals Mesa 25.0.7 + the Vulkan loader from the same
+pinned snapshot as Wine (54 packages; 97 payload files,
+~210 MiB; **lavapipe the only Vulkan ICD**, swrast /
+kms_swrast the only GL entry points — Mesa 25's gallium
+is one unified library and is sealed whole), woven into
+the Wine proof image (sha256 `6c74bec9…4c92`, source
+`3015ef6`) with an in-guest initialization probe. The
+Wine gate (`SYNVEIL_WINE_QEMU_PASS`, attempt 1) now
+also proves the probe report read back off the state
+partition: Vulkan device "llvmpipe (LLVM 19.1.7,
+128 bits)", API 1.4.305; EGL 1.5 (Mesa Project);
+OpenGL 4.5 Compatibility on llvmpipe, Mesa 25.0.7.
+The joined and shell gates stayed green on the same
+source. Evidence: `docs/validation/graphics-3015ef6/`.
+
+Proven: the payload is present and **Vulkan/GL
+initialize in the guest** (software rendering). Still
+not proven: Direct3D (DXVK/vkd3d not staged — this is
+their prerequisite), any game, real-GPU behaviour or
+performance, physical hardware.
