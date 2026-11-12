@@ -89,6 +89,25 @@ environment for the token. No dependencies, no build step, binds
 127.0.0.1 by default. Suite 92/92; details in
 `docs/MUSE_HANDOFF.md`.**
 
+**P3 update (2026-11-07): engine hand-offs built and playback
+PROVEN in both engines** (branch `game-asset-builder/p3-handoff`,
+stacked on the P2 UI branch). `asset_builder.py export-godot /
+export-threejs / export-studio` turn any catalogued asset into a
+ready package — every export sha-verifies the GLB against the
+catalog record before and after copying, and refuses a mismatch.
+Playback, the project's standing unverified gap, is now closed:
+**Godot 4.7.2** (owner's PC, headless) instanced all four exported
+assets through their wrapper scenes — bone sets equal the catalog,
+every baked clip moves the skeleton (hop Δ0.085, goblin wave
+Δ1.69, bounce Δ0.096; the chest verified static) — and **three.js
+0.180** (Chrome headless, SwiftShader) loaded and played the same
+GLBs through GLTFLoader + AnimationMixer with matching bone counts
+and identical clip durations. The studio export emits the
+animation studio's intake format (validated against its real
+schema; records stay `candidate` — promotion is the studio's
+process). Harnesses + procedure: `handoff/README.md`. Suite
+101/101; full numbers in `docs/TEST_PLAN.md`.**
+
 A fully local, no-API pipeline that builds game assets — creatures included —
 on the owner's own hardware:
 
@@ -140,3 +159,5 @@ cloud-generated reference Pip the owner already has.
   **Done 2026-11-07** (see the P2 UI status note above;
   branch `game-asset-builder/p2-ui`).
 - **P3** — hand-off integrations (animation studio library, Godot projects).
+  **Done 2026-11-07** (see the P3 status note above;
+  branch `game-asset-builder/p3-handoff`).

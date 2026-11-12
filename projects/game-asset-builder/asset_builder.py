@@ -88,6 +88,22 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_export(args: argparse.Namespace) -> int:
+    import json
+
+    from handoff import export as handoff_export
+    entry, glb_path = handoff_export.load_verified_entry(args.slug)
+    if args.target == "godot":
+        result = handoff_export.export_godot(entry, glb_path, args.dest)
+    elif args.target == "threejs":
+        result = handoff_export.export_threejs(entry, glb_path, args.dest)
+    else:
+        result = handoff_export.export_studio(entry, glb_path,
+                                              args.asset_root)
+    print(json.dumps(result, indent=1, default=str))
+    return 0
+
+
 def cmd_ui(args: argparse.Namespace) -> int:
     from ui.server import serve
     serve(host=args.host, port=args.port)
@@ -146,6 +162,16 @@ def main(argv: list[str] | None = None) -> int:
                       help="bind address (default localhost only)")
     p_ui.add_argument("--port", type=int, default=8770)
     p_ui.set_defaults(fn=cmd_ui)
+    for target, dest_arg in (("godot", "--dest"), ("threejs", "--dest"),
+                             ("studio", "--asset-root")):
+        p_exp = sub.add_parser(
+            f"export-{target}",
+            help=f"export a catalogued asset as a {target} hand-off (P3)")
+        p_exp.add_argument("--slug", required=True)
+        p_exp.add_argument(dest_arg, required=True,
+                           dest="dest" if target != "studio"
+                           else "asset_root")
+        p_exp.set_defaults(fn=cmd_export, target=target)
     args = parser.parse_args(argv)
     return args.fn(args)
 

@@ -360,11 +360,62 @@ pipeline." Built stdlib-only, matching the CLI's discipline:
   launched from the browser (the spawn path is the proven CLI
   verbatim; only its validation/tracking is new-tested).
 
+## P3 engine hand-offs — BUILT AND PLAYBACK-PROVEN (2026-11-07, branch game-asset-builder/p3-handoff, stacked on p2-ui)
+
+Owner approved P3 alongside P2 on 2026-11-07. Scope per the README
+slice list ("hand-off integrations — animation studio library,
+Godot projects") plus the TEST_PLAN's standing gap (Godot/three.js
+playback of the baked clips).
+
+- **Exporters** (`handoff/export.py`, CLI `export-godot /
+  export-threejs / export-studio`): load the catalog entry and
+  REFUSE the export unless the local GLB verifies against it
+  (sha256 + size), then re-verify the copy. Godot package: GLB +
+  wrapper .tscn (instances the GLB at `res://assets/<slug>/`) +
+  catalog record + README + manifest. three.js package: GLB +
+  asset.json + GLTFLoader/AnimationMixer snippet + README +
+  manifest. Studio package: GLB under the asset root's
+  `assets/characters|props/` + a record merged into
+  `game-asset-builder-catalog.json` in the studio's schema-1.0.0
+  intake format — always `status: "candidate"`, `rig_id` = the GAB
+  template (never `studio_humanoid_v1`; these are not that rig),
+  license `proprietary` (owner-generated).
+- **Playback verification (owner's PC, via the bridge)** — the
+  long-standing gap is CLOSED for all four catalogued assets:
+  Godot 4.7.2 headless (scratch project from `handoff/godot/`,
+  import exit 0; `GODOT_VERIFY_DONE ok=true`): bone sets equal
+  the catalog's, every clip found with length > 0 and real
+  skeleton motion (global-pose deltas: dragon hop 0.085 / idle
+  0.0062, goblin wave 1.69 / idle 0.035, trike bounce 0.096 /
+  idle 0.156; chest static-verified). three.js 0.180 in Chrome
+  headless under SwiftShader (`THREE_VERIFY_DONE ok=true`):
+  same bone counts, same clips, durations identical to Godot's,
+  world-space bone deltas dragon hop 0.074, goblin wave 0.70,
+  trike bounce 0.030, chest static. PC scratch persists at
+  `D:\asset-forge-lab\handoff-verify\`; no stray processes left.
+- Harness lessons (in `handoff/README.md`): Godot `find_child`
+  matches names, not types — walk by `is_class`; three ≥ 0.170
+  needs `three.core.js` beside `three.module.js`; Chrome
+  `--dump-dom` snapshots mid-load — the three.js driver polls
+  the result element over the DevTools protocol instead.
+- Studio scope honesty: the export was produced and
+  schema-validated (real `asset.schema.json`, jsonschema, all
+  four VALID) against a SCRATCH asset root. Writing into the
+  studio's live store (`~/workspace/ai-animation-studio-assets`)
+  and running its register/promote flow were deliberately NOT
+  done from this project — that's the studio side's gated step,
+  and the export command makes it a one-liner when wanted.
+- Not verified: rendered pixels in either engine (both checks
+  sample poses, not frames), the Godot editor GUI path, any
+  shipped-game integration.
+
 Next:
-1. P3 (same owner approval): engine hand-offs — Godot + three.js
-   export/playback verification; the studio library export.
-2. Owner decisions unchanged: merges of PR #38, the p2-cleanup
-   PR, and this slice's PR are the owner's call.
+1. Owner decisions: merges of PR #38, the p2-cleanup PR, the P2
+   UI PR, and this slice's PR are the owner's call.
+2. Possible follow-ups if wanted: a rendered-frame engine check
+   (Godot viewport capture / three.js screenshot) to cover the
+   seam-under-rendering question; running the studio hand-off
+   into the live store.
 
 Boundaries: no cloud fallback exists or may be added; weights and outputs
 never enter git; GPU claims only from PC runs; merges are the owner's call.
