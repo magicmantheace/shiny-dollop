@@ -1,6 +1,6 @@
 # OPTIONAL: register a logon task that starts the muse-pc-bridge agent
 # in a VISIBLE console window at logon (same indicator + kill-switch
-# model as scripts\start-bridge.cmd — closing the window stops it).
+# model as scripts\start-bridge.cmd -- closing the window stops it).
 #
 # This is NOT required for v0. Only run it if you want the agent to
 # come up automatically when you log on to Windows.

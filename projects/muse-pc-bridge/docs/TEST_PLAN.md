@@ -44,8 +44,23 @@ PC during install verification.
 
 | File | Covers |
 | --- | --- |
-| `tests/test_display_state.py` (14) | the pure signal→display mapping: idle / working (job or tracked process) / session outranks working / staged update → connecting / fresh `applied_ok` → celebrate, stale → falls through / apply + rollback failures and a fresh rollback → alert / supervisor failure states → alert / agent unreachable: briefly → connecting, during restart states → connecting, too long → alert / alert outranks activity |
+| `tests/test_display_state.py` (18) | the pure signal→display mapping: idle / working (job or tracked process) / session outranks working / staged update → connecting / fresh `applied_ok` → celebrate, stale → falls through / apply + rollback failures and a fresh rollback → alert / supervisor failure states → alert / agent unreachable: briefly → connecting, during restart states → connecting, too long → alert / alert outranks activity / **v1.1: an active UAC prompt → alert art with label "Approval needed at PC", outranking working/session but not update failures; inactive or absent `uac_prompt` falls through** |
 | `tests/test_supervisor_gui.py` (4) | import-level smoke only (module imports with no window created); every art key the mapping can emit has a committed animation asset; the mapping only ever emits known art keys; every asset declares a transparent colour (byte-level Graphic Control Extension check — the floating window is colour-key transparent). A real Tk window needs a display and is verified on the owner's PC, never claimed from a headless run |
+
+### v1.1 suites (added 2026-11-08)
+
+| File | Covers |
+| --- | --- |
+| `tests/test_v1_gui_spawn.py` (9) | detached GUI launch: `{"gui": true, "executable", "args"}` spawns the executable directly and the registry tracks its real, live pid (the pid's own cmdline is the spawned program, not a wrapper); client-library round trip; missing/nonexistent `executable` → 400; bad `args` (string, non-string list, object) → 400; bad `cwd` → 400; the `gui` flag persists in `state/processes.json` and survives a record restore; a restored record (no Popen handle) reports liveness by OS pid; shell spawn still works and reports `gui: false` |
+| `tests/test_v1_wol.py` (12, 2 environment-skipped) | magic-packet layout (102 bytes: 6×0xFF + MAC×16); MAC normalization (colon/dash/bare/lowercase) and rejection of garbage; payload validation incl. defaults (255.255.255.255:9) and bad port/broadcast rejection; the route with the sender stubbed (validation → sender called with canonical values → result returned → audit line written with the MAC, status 200); auth required (401 both ways); `wol` in status capabilities; the standalone `scripts/wol-send.py` produces byte-identical packets. **Live delivery tests** (agent → UDP listener on loopback receives the exact packet; client-library live send) run only where the environment permits outbound UDP — the build VM's sandbox refuses ALL UDP sends (EPERM, verified for plain loopback with no broadcast flag), so they skip there with the reason stated |
+| `tests/test_v1_uac.py` (7) | monitor transitions with a stubbed probe: appear (snapshot `active` + ISO `since`), steady state (no duplicate transition, stable `since`), clear; exactly one `uac_prompt_shown` and one `uac_prompt_cleared` audit event, the cleared event carrying the waited seconds, and no credential strings anywhere in the events; a raising probe reads as no prompt; poll-interval config hardening (junk → 2.0 default, floor 0.5 s); the real probe returns False off Windows; `/v1/status` carries `uac_prompt: {active: false, since: null}` by default and flips when the core monitor transitions |
+| `tests/test_v1_boot_core.py` (18) | the supervisor core publishes `display-state.json` itself: working / idle / agent-down-too-long → alert states resolved from stubbed signals; write-on-change only (identical bytes incl. `since` on a repeat publish); **a label-only change (alert reason: agent down → UAC waiting) republishes with the original `since`**; the real run loop with a fake agent publishes and settles to idle; `choose_gui_mode` — attach when our agent answers, foreign when another agent answers, own immediately when nothing answers and no live core is evidenced (no status file / "stopped" / stale timestamp with a dead pid), **wait while a core may be alive (fresh status — including steady "running", which the supervisor writes before the agent binds — or a live agent_pid), then attach when the agent starts answering**, own after the bounded wait when it never answers; **stop-request file: a running supervisor consumes it and stops gracefully (status "stopped", no restart, file consumed), and a stale file is cleared at startup**; `--headless` stdio guard redirects pythonw-style None streams to `supervisor-core.log`; a real `supervisor.py --headless` subprocess starts its fake agent and reports `running` |
+| `tests/test_v1_session_broker.py` (11) | the session broker: desktop-route whitelist matrix (exec/status/files/sessions/WoL/update all excluded); the helper server 404s non-desktop routes, 501s desktop routes honestly off Windows, still enforces auth; registration lifecycle (fresh registry with port/pid/session, removed on stop); **a real main server proxies a GUI spawn → inspect → kill to a real helper, the record living with the helper, and both sides audit with `via` markers (`session-broker` / `session-helper`)**; a stale registration or `session_broker: false` means local service; **a session-0 agent (session probe patched to 0) refuses desktop routes 501 without a helper and proxies them with one**; the helper starts no second UAC watch (watch starts counted via the entry point; the monitor loop itself is a no-op off Windows); **the listing merge (Codex PR #47 re-review): a brokered spawn appears in the main agent's `GET /v1/processes` (tagged `via: session-helper`) and in `/v1/status` process counts, kill through the main agent is reflected in both, and the listing/counts degrade to local-only when the helper stops** |
+| `tests/test_v1_audit_coordination.py` (2) | audit coordination across two cores sharing ONE log (Codex PR #47 re-review): two `BridgeCore` instances append in strict alternation with entries in order; **the rotation race — the log + archives are primed with sentinel entries, the cap is derived from measured on-disk sizes so exactly one of two concurrent appends may rotate, and the first writer is parked between its rotation size check and the renames until the second writer has fully rotated and appended; every entry a serialized run retains (all but the oldest archive) must survive**. The cap deliberately comes from measured sizes: a line occupies one more byte on disk on Windows than POSIX (text-mode CRLF) while the core accounts `len(line)+1`, and an arithmetic cap made the second append rotate legitimately on Windows |
+| `tests/test_script_encoding.py` (2) | every shipped `.ps1`/`.cmd` file is **pure ASCII bytes** -- Windows PowerShell 5.1 reads a BOM-less `.ps1` as ANSI, so a UTF-8 em dash decodes to bytes including a stray `"` and the whole file fails to parse (the `bridge-core.ps1` install failure on the owner's PC, 2026-11-08). The scan must find the scripts (incl. `bridge-core.ps1`) and every byte must be < 128 |
+| `tests/test_v1_status_helper_timeout.py` (2) | **status-probe deadlines vs a hung helper (Codex PR #47 re-review)**: a raw TCP listener accepts connections and never answers while a heartbeat thread keeps its registration fresh (the real failure shape — heartbeat and request handling are separate threads); `/v1/status` must answer **well inside the supervisor health check's 3 s** (asserted < 2 s), twice in a row, with local process counts intact; `GET /v1/processes` still returns the local listing. Pre-fix, status took **5.01 s** (the listing's fetch budget, synchronous in `_status_obj`) |
+| `tests/test_v1_helper_ownership.py` (5) | **single-helper ownership of the state dir (Codex PR #47 re-review)**: a second `SessionHelper` against the same state dir is refused (`HelperOwnershipError`) and the first helper's registration is untouched; `supervisor_gui.start_attach_helper` reuses a live registration (returns None, registration unchanged) and a process spawned through the surviving helper stays visible via the main agent by id and in the listing; a stale registration does not block attach; a stopped owner frees the state dir for the next helper |
+| `tests/test_v1_shell_resolution.py` (13) | **Windows shell-executable resolution (defect found at the boot-core activation)**: the pure seam `_resolve_windows_shell_exe` with injected env/which/exists — a PATH hit pointing at the per-user **WindowsApps execution alias** loses to the System32 powershell path and is never returned even when nothing "exists" (the fallback is the canonical System32 path, never the alias, never a bare name); a real pwsh install (Program Files) keeps its historical preference; hits under a user profile or per-user AppData are rejected; cmd resolves to System32; `pwsh` returns None when only an alias exists; bare/relative PATH results are rejected. Plus `build_command`/`shell_argv` integration under a simulated SYSTEM environment (patched `IS_WINDOWS`/`which`/`exists`): argv[0] is the System32 path, where pre-fix it was the alias verbatim; POSIX behaviour pinned unchanged. The SYSTEM/session-0 context itself cannot be reproduced in the suite |
 
 ### Verified so far
 
@@ -209,6 +224,206 @@ PC during install verification.
   test. **Not verified:** the Windows graceful-stop path
   (CTRL_BREAK_EVENT) and everything else Windows-side; nothing was
   deployed to the owner's PC — the production bridge is untouched.
+- 2026-11-08 (v1.1 features, Muse's Linux VM, Python 3.12):
+  baseline re-run before the work: **88 tests, OK (1 skip)**.
+  After: **full suite 132 tests, OK (3 skips)** — the pre-existing
+  Windows-only real-capture skip plus the two WoL live-delivery
+  tests, which skip in this sandbox because it refuses all outbound
+  UDP (EPERM on a plain loopback send, no broadcast involved);
+  the WoL route is still proven end-to-end there with the sender
+  stubbed, and the packet bytes are proven exactly. The 44 new
+  tests cover GUI-mode detached spawn, Wake-on-LAN, the UAC
+  monitor + status field + display mapping, and the boot-core
+  topology (display publishing, GUI mode choice, headless entry).
+  **Not verified (owner-PC only, activation not performed):** the
+  Toolhelp32 consent.exe probe against a real UAC prompt; a real
+  GUI application launched via gui mode (window appears, pid
+  tracked, breakaway flags); a magic packet actually waking a
+  sleeping machine; the SYSTEM boot task starting the core before
+  logon and the avatar attaching on the real desktop. Nothing was
+  deployed to the owner's PC.
+- 2026-11-08 (Codex PR #47 fixes, Muse's Linux VM, Python 3.12):
+  Codex reviewed `12efcdb` and left four findings (3 P1, 1 P2); all
+  four were verified real against the code and fixed. (1) The
+  SYSTEM boot core lives in session 0, so desktop routes served
+  locally would act on the wrong desktop — the agent now brokers
+  them to an interactive **session helper** hosted by the avatar
+  (new `agent/session_helper.py`, desktop-routes-only, loopback,
+  same token, shared audit log) and answers an honest 501 for them
+  from session 0 when no helper is registered. (2) `choose_gui_mode`
+  treated a fresh "running" supervisor status as "core gone" and
+  could race a second supervisor onto the port — it now waits while
+  a core may be alive (fresh status or live agent_pid) and answers
+  "own" immediately only for stopped/stale/absent evidence. (3) The
+  management scripts' stop killed processes outright, bypassing the
+  audited agent shutdown — they now drop a **stop-request file**
+  the supervisor consumes for a graceful stop, with the process
+  sweep kept only as a 20 s fallback. (4) Display-state publishing
+  compared only the state, leaving a stale label when the alert
+  reason changed — it now compares state+art+label and republishes,
+  preserving `since`. **Full suite on the VM: 147 tests, OK
+  (3 skips)** — the same three skips as the 132 run.
+- 2026-11-08 (script encoding fix, Muse's Linux VM, Python 3.12):
+  the owner's first run of `scripts/bridge-core.ps1 -Action install`
+  on the PC failed to parse under Windows PowerShell 5.1 with
+  cascading errors (the error text itself showed mojibake): every
+  shipped `.ps1`/`.cmd` file contained UTF-8 em dashes saved
+  without a BOM, and 5.1 reads BOM-less files as ANSI, so the em
+  dash decoded to bytes including a stray `"` that broke string
+  quoting. All 21 em dashes across 8 files replaced with `--`;
+  files are byte-pure ASCII. New regression suite
+  `tests/test_script_encoding.py` (2 tests) asserts ASCII-only
+  bytes for every shipped script -- verified to FAIL against the
+  pre-fix `bridge-core.ps1` and pass after. **Full suite on the
+  VM: 149 tests, OK (3 skips).** Owner-PC proof the same day:
+  PowerShell's own parser (`Parser::ParseFile`) run over the
+  pulled scripts on the PC reported 0 errors for each -- see the
+  run note in `docs/MUSE_HANDOFF.md`.
+- 2026-11-08 (Codex PR #47 re-review fixes, VM + owner's PC):
+  Codex's re-review of the broker fix round left two findings;
+  both verified real and fixed. (P1) The agent and the session
+  helper append to ONE audit log through separate `BridgeCore`
+  instances whose per-instance threading locks cannot coordinate
+  rotation: both could rotate from the same stale size and shift
+  the archives twice, discarding retained entries. `audit()` now
+  wraps rotate+append in two layers — a threading lock shared per
+  resolved log path within the process, and an OS file lock on a
+  sidecar (`audit.jsonl.lock`) across processes; acquisition
+  failure degrades to the previous unlocked behaviour with a
+  stderr warning (never a crash, never a dropped entry; no entry
+  content or rotation policy change). (P2) Brokered GUI spawns
+  lived only in the helper's registry while `GET /v1/processes`
+  and the `/v1/status` counts read only the local one; both now
+  merge the helper's records (tagged `via: session-helper`), and
+  a missing/unanswering helper degrades the merge to local-only.
+  **Full suite on the VM: 153 tests, OK (3 skips).** Owner-PC
+  runs (checkout pulled through the production bridge as jobs;
+  production 1.1.0 in the avatar form stayed up throughout;
+  Windows, Python 3.14.2): at `7664444` (the two fixes) the suite
+  ran 153 with **one failure** — the new audit race test lost a
+  retained archive (R2); at `73f53ab` (shared per-path lock added)
+  the same single failure recurred. Root cause then traced to the
+  TEST, not the lock: Windows text mode writes CRLF, so a line
+  occupies `len+2` bytes on disk while the core accounts an
+  incoming line as `len(line)+1`; the test's arithmetic cap sat
+  low enough on Windows that the second append rotated
+  legitimately and discarded R2 by the book. (The `73f53ab`
+  commit message attributed the first PC failure to msvcrt
+  same-process lock semantics; that claim is not established —
+  the accounting bug fully explains both PC runs — and commit
+  `f4d0306` corrects the record in the code/test comments. The
+  shared lock stays as deliberate hardening.) The test now
+  derives its cap from measured on-disk sizes and forces the
+  interleave structurally (first writer parked between its size
+  check and the renames until the second writer has fully
+  rotated and appended): against the pre-fix agent on the VM it
+  fails 3/3 with exactly the predicted R2 loss, and at
+  `f4d0306` the **owner-PC suite is fully green: 153 tests, OK
+  (8 skips)** — the 8 skips are the platform-mirror tests. Still
+  unproven: the file-lock layer under the real two-PROCESS split
+  (both suites run the two cores in one process, exercising the
+  in-process layer; the cross-process layer is exercised by the
+  activation verification below, not by the suite), and the boot
+  topology activation itself — see "What the tests cannot prove".
+
+- 2026-11-08 (Codex PR #47 second re-review fixes, VM + owner's
+  PC): Codex's review of the re-review fix round left two more
+  findings; both verified real against the code and fixed, each
+  with regression tests written first and demonstrated failing on
+  the pre-fix code. (P2) `/v1/status` merged helper processes
+  through the listing's 5 s fetch synchronously, so a helper that
+  stays registered and heartbeating but stops answering HTTP
+  stalled status for 5 s — past the avatar readers' 1.5 s and the
+  supervisor health check's 3 s, whose failure after an update
+  triggers rollback of a healthy update. The status path now has
+  its own bounded merge: a fresh-enough last-known merge (2 s) is
+  served without touching the network, a failed fetch backs off
+  for 1 s instead of stalling every poll, and a cold fetch is
+  bounded at 0.75 s; the plain listing keeps its 5 s budget and
+  refreshes the cache, and the merge behaviour when the helper
+  answers is unchanged. The new deadline test measured status at
+  **5.01 s pre-fix** against a hung-helper stub (accepts, never
+  answers, heartbeat keeps the registration fresh) and inside
+  2 s post-fix. (P2) Opening the avatar launcher twice started
+  two session helpers whose heartbeats overwrote the one
+  registration while their process registries diverged, so
+  brokered processes 404'd or vanished; `SessionHelper.start()`
+  now claims an OS exclusive lock on
+  `state/session-helper-owner.lock` before loading anything,
+  held until `stop()` and released by process death (no
+  stale-lock janitor), and a second start is refused with
+  `HelperOwnershipError`. The GUI attach path applies the agent's
+  own liveness test first — a live registration is reused, a
+  stale one never blocks. **Full suite on the VM: 160 tests, OK
+  (3 skips). Owner-PC run (checkout fast-forwarded to `6fbdd3d`
+  through the production bridge as a job; production 1.1.0 in
+  the avatar form was NOT restarted — its uptime ran
+  continuously through the pull and the run; Windows,
+  Python 3.14.2): 160 tests, OK (8 skips)** — the 8 skips are
+  the platform-mirror tests. Still unproven: the ownership lock
+  under the real two-PROCESS split on Windows (both suites
+  exercise it between two helpers in one process; the
+  cross-process case is the owner opening the launcher twice,
+  which the staged core-switch verification covers), and the
+  boot topology activation itself.
+
+- 2026-11-08 (shell resolution fix — defect found live at the
+  boot-core activation, VM + owner's PC): during the activation
+  verification, with production running as the session-0 core
+  (SYSTEM), every `powershell` job (the agent's default shell)
+  failed at spawn — `[WinError 1920] The file cannot be accessed
+  by the system` — while `cmd` jobs under the same core worked,
+  and the full System32 path to powershell.exe invoked through
+  cmd worked. Root cause, verified in `agent/bridge_agent.py`:
+  `build_command`/`shell_argv` resolved the executable with a
+  bare-name `shutil.which()` over the process PATH, which in the
+  boot-task environment returns the per-user WindowsApps
+  execution alias for powershell.exe — a reparse stub inside the
+  interactive user's profile that SYSTEM cannot execute. cmd
+  survived only because it was passed bare and Windows'
+  CreateProcess search order found System32\cmd.exe. Fix
+  (commit `6855539`): a new `resolve_shell_exe()` with a pure,
+  injectable Windows seam — PATH hits are vetted (absolute, and
+  never under WindowsApps, a user profile, or per-user AppData)
+  and the fixed System32 locations are preferred and fallen
+  back to; a real pwsh install keeps its preference, so
+  user-session behaviour is unchanged in effect; `run_uia`'s
+  lookup routes through the same resolver. The new
+  `tests/test_v1_shell_resolution.py` (13 tests) pins the seam
+  contract with injected env/which/exists (the SYSTEM context
+  cannot be reproduced in the suite), and its `build_command`
+  cases fail behaviourally pre-fix (argv[0] was the WindowsApps
+  alias verbatim). **Full suite on the VM: 173 tests, OK
+  (3 skips). Owner-PC runs (checkout fast-forwarded to
+  `6855539` through the production core as cmd jobs — git
+  needed a per-invocation `-c safe.directory` because the core
+  runs as SYSTEM against the owner's checkout; production was
+  NOT restarted, its /v1/status uptime ran 547 s → 952 s
+  continuously across the pull and all runs; Windows,
+  Python 3.14.2): the new shell-resolution file passes
+  standalone — 13 tests, OK (1 skip: the POSIX-only case). The
+  full suite in this topology ran 173 tests, FAILED
+  (19 failures, 1 error, 8 skips) in aggregate; the per-file
+  breakdown attributes the failures to the suite now executing
+  IN session 0 (the test agents it boots inherit session 0, so
+  desktop routes answer the honest 501): `test_v1_gui_spawn.py`
+  (7 failures, 2 errors), `test_v1_session_broker.py` (6),
+  `test_v1_platform.py` screenshot/input (3),
+  `test_v1_status_helper_timeout.py` (2, local process spawn
+  answered 501), `test_v1_helper_ownership.py` (1, brokered
+  spawn) — plus `test_v1_uac.py`'s status-transition test
+  (1 failure, deterministic 2/2 in this topology; no shell or
+  desktop route is involved, and its mechanism was not pinned
+  down in this pass — recorded, not absorbed). The identical
+  suite was green in the interactive-session PC runs earlier
+  the same day (160/160 under the avatar form); none of these
+  failures touches shell resolution and none is claimed as a
+  pass. Still unproven: PowerShell jobs actually spawning
+  under the core with the fix in place — that requires the
+  core to restart onto the new code, which is the owner's
+  step; until then the running core still fails powershell
+  jobs with WinError 1920, and cmd / full-path jobs are the
+  working route.**
 
 ## What the tests cannot prove
 
@@ -233,6 +448,42 @@ These require the owner's PC and are **not** claimed by any VM test:
 - **v1 exit criteria from the plan**: surviving a reboot and a week
   of unattended running, and the four 2026-11-04 workflows running
   with zero workarounds — these are owner-PC, elapsed-time checks.
+- **v1.1 UAC probe on real Windows**: that consent.exe presence
+  tracks a real elevation prompt's lifetime, that the agent (in
+  whichever session the core runs) can enumerate it, and that the
+  avatar flips to "Approval needed at PC" while a prompt is up and
+  back when it clears. The VM proves the monitor logic and every
+  surface with the probe stubbed — never the probe itself.
+- **v1.1 shell resolution under SYSTEM/session 0**: the
+  resolver's contract is suite-proven with injected inputs and
+  the defect it fixes was observed live at the boot-core
+  activation, but the fixed code has not yet executed under the
+  core — the running core holds its pre-fix loaded code until
+  the owner restarts it, so PowerShell jobs spawning under the
+  core with the fix in place remain unproven until then.
+- **v1.1 GUI launch on real Windows**: spawning an actual GUI
+  executable (e.g. Godot) with `gui: true` — window opens, the
+  tracked pid is the app, the app survives the request and agent
+  restarts of the supervisor, and the breakaway-from-job flags
+  behave. The VM proves the direct-spawn mechanics with a console
+  child only.
+- **v1.1 Wake-on-LAN end-to-end**: a packet from the agent (or from
+  `scripts/wol-send.py` on another LAN device) actually waking a
+  configured, sleeping machine — a property of that machine's
+  BIOS/NIC/OS settings. The VM build sandbox cannot even send UDP,
+  so live delivery is unproven there by environment, not by code.
+- **v1.1 boot topology activation**: the "Muse PC Bridge (core)"
+  task firing at boot as SYSTEM, the agent answering before logon,
+  the avatar attaching at logon (and its close leaving the core
+  running), and rollback to the logon form. Script/code + VM tests
+  only; activation is a separate owner-approved step.
+- **v1.1 session broker on real Windows**: the SYSTEM core
+  brokering desktop routes to the avatar's session helper —
+  screenshot/content, input, clipboard and GUI launch acting on the
+  owner's real desktop through the core's port — plus the honest
+  501 for desktop routes before logon (no helper yet). The VM
+  proves the proxy, whitelist, registry and audit mechanics with
+  both servers on loopback; it cannot prove session behaviour.
 
 ## Owner-PC verification checklist (part of install)
 

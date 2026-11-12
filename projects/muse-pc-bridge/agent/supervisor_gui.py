@@ -14,10 +14,32 @@ small status line) is visible against the desktop, and clicks pass
 through the transparent parts. Platforms without colour-key support
 fall back to the plain dark window.
 
-Kill-switch semantics are preserved exactly: the floating window IS
-the visible indicator, and stopping it (the x control or the
-right-click menu) stops the supervisor AND the agent. There is no
-hidden background mode.
+Kill-switch semantics for the form this process owns: the floating
+window IS the visible indicator, and stopping it (the x control or
+the right-click menu) stops the supervisor AND the agent.
+
+Attach mode (v1.1): if a bridge core is already running — the
+headless boot form (supervisor.py --headless under the boot task) or
+any other healthy agent — this window ATTACHES display-only: it
+shows the same resolved state but owns no supervisor, and closing it
+leaves the bridge running (the menu says so: "Close avatar (bridge
+keeps running)"). The core's kill switches are its own (task
+controls / scripts/bridge-core.ps1 -Action stop). If something that
+is NOT a muse-pc-bridge agent answers on the configured port, the
+window refuses to start rather than fight over it.
+
+In attach mode this process also hosts the interactive SESSION
+HELPER (session_helper.py): the core may be running in session 0
+(the SYSTEM boot form), where screenshot/input/clipboard/GUI-launch
+would act on the wrong desktop — the agent brokers those routes to
+the helper, which lives here in the owner's session. The helper
+stops when the window closes; the core keeps running and its
+desktop routes answer 501 until an avatar (and helper) runs again.
+One helper owns a state directory: a second window attaching to
+the same core reuses the live helper instead of starting another
+(start_attach_helper; the helper itself enforces it with an
+ownership lock) — two helpers would overwrite each other's
+registration while their process registries diverged.
 
 Usage:
   pythonw supervisor_gui.py [--config C:\\path\\config.json]
@@ -38,8 +60,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import bridge_agent  # noqa: E402
 import bridge_update  # noqa: E402
 import display_state  # noqa: E402
+import session_helper  # noqa: E402
 from supervisor import Supervisor  # noqa: E402
 
 POLL_MS = 600
@@ -55,6 +79,167 @@ KEY = "#ff00ff"
 
 def _agent_dir() -> Path:
     return Path(__file__).resolve().parent
+
+
+# How long a supervisor status file stays credible evidence that a
+# core is alive: the supervisor writes it at every transition, and
+# the longest silent stretch in a live run is the restart backoff
+# (30 s max) plus a health-check window (20 s) — 90 s covers both
+# with margin. Older than that, the file is a leftover from a dead
+# run and proves nothing.
+_CORE_STATUS_FRESH_S = 90.0
+
+
+def _pid_alive(pid) -> bool:
+    """Cross-platform liveness for the status file's agent_pid."""
+    if not isinstance(pid, int) or pid <= 0:
+        return False
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(0x1000, False, pid)
+            if not handle:
+                return False
+            try:
+                code = ctypes.c_ulong(0)
+                ok = kernel32.GetExitCodeProcess(
+                    handle, ctypes.byref(code))
+                return bool(ok) and code.value == 259  # STILL_ACTIVE
+            finally:
+                kernel32.CloseHandle(handle)
+        except Exception:
+            return False
+    try:
+        import os
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def _core_may_be_alive(state_dir: Path, *, now: float,
+                       pid_alive=_pid_alive) -> bool:
+    """Evidence that a supervisor still owns the agent and may yet
+    bring it to answering: any status but a terminal "stopped",
+    backed by a LIVE agent_pid or a FRESH status timestamp.
+
+    "running" counts: the supervisor writes it the moment it spawns
+    the agent, before the agent has bound its socket — treating it
+    as "core gone" raced a second supervisor onto the same port at
+    exactly the logon/boot overlap this topology creates."""
+    sup = bridge_update._read_json(
+        state_dir / "supervisor-status.json") or {}
+    if not sup or sup.get("state") == "stopped":
+        return False
+    if pid_alive(sup.get("agent_pid")):
+        return True
+    updated = sup.get("updated_at")
+    return isinstance(updated, (int, float)) \
+        and now - float(updated) <= _CORE_STATUS_FRESH_S
+
+
+def fetch_agent_status(config_path: Path) -> dict | None:
+    """The agent's /v1/status body, or None when unreachable."""
+    try:
+        cfg = json.loads(config_path.read_text(encoding="utf-8"))
+        host = str(cfg.get("host", "127.0.0.1"))
+        port = int(cfg.get("port", 8765))
+        token = str(cfg.get("token", ""))
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return None
+    req = urllib.request.Request(
+        f"http://{host}:{port}/v1/status",
+        headers={"Authorization": f"Bearer {token}"})
+    try:
+        with urllib.request.urlopen(req, timeout=1.5) as resp:
+            if resp.status == 200:
+                return json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, OSError, json.JSONDecodeError):
+        return None
+    return None
+
+
+def is_bridge_agent(status: dict | None) -> bool:
+    return bool(status) and status.get("agent") == "muse-pc-bridge"
+
+
+def choose_gui_mode(config_path: Path, state_dir: Path, *,
+                    fetch=fetch_agent_status, attempts: int = 90,
+                    interval_s: float = 0.5,
+                    sleep=time.sleep, now=time.time,
+                    pid_alive=_pid_alive) -> tuple[str, dict | None]:
+    """Decide how this window should run.
+
+    Returns ("attach", status) when a muse-pc-bridge agent already
+    answers, ("foreign", status) when something else answers on the
+    port, or ("own", None) when nothing answers and no live core
+    owns the agent — the historical behaviour of running our own
+    supervisor. While a core may still be alive (fresh supervisor
+    status or a live agent_pid — see _core_may_be_alive), the probe
+    retries: at logon the boot core may still be starting or
+    restarting its agent, and starting a second supervisor against
+    the same port and state files is the failure this wait exists
+    to prevent. With no live-core evidence (no status file, a
+    "stopped" one, or a stale leftover) the answer is "own"
+    immediately — no pointless logon delay.
+    """
+    status = fetch(config_path)
+    if status is not None:
+        return ("attach", status) if is_bridge_agent(status) \
+            else ("foreign", status)
+    for _ in range(attempts):
+        if not _core_may_be_alive(state_dir, now=now(),
+                                  pid_alive=pid_alive):
+            break
+        sleep(interval_s)
+        status = fetch(config_path)
+        if status is not None:
+            return ("attach", status) if is_bridge_agent(status) \
+                else ("foreign", status)
+    return ("own", None)
+
+
+def start_attach_helper(config_path: Path,
+                        state_dir: Path) -> session_helper.SessionHelper | None:
+    """Start the session helper for an attach-mode window — unless
+    a live helper already owns this state directory.
+
+    Opening the launcher twice must not start two helpers: their
+    heartbeats would overwrite the same session-helper.json while
+    their process registries diverged, and brokered processes
+    would vanish depending on whose heartbeat landed last (Codex
+    PR #47 finding). So: when a LIVE registration already exists
+    (fresh heartbeat, live pid — the same test the agent applies),
+    reuse it and start nothing; a race the registration check
+    cannot see is settled by the helper's ownership lock, and the
+    loser of that race also starts nothing. Returns the helper this
+    window started (and must stop), or None when this window hosts
+    no helper of its own — the window is display-only either way,
+    and desktop brokering continues through the existing helper.
+    A STALE registration never blocks: it fails the liveness test
+    here just as it does agent-side, and the fresh helper takes
+    over the file.
+    """
+    reg = bridge_agent.read_session_helper(state_dir)
+    if reg is not None:
+        print(f"[supervisor-gui] A session helper is already "
+              f"registered on 127.0.0.1:{reg['port']} for this "
+              f"state directory; reusing it — this window starts "
+              f"no second helper.", flush=True)
+        return None
+    try:
+        helper = session_helper.SessionHelper(
+            config_path, state_dir).start()
+    except session_helper.HelperOwnershipError:
+        print("[supervisor-gui] Another window already hosts the "
+              "session helper for this state directory; this "
+              "window is display-only.", flush=True)
+        return None
+    print(f"[supervisor-gui] Session helper registered on "
+          f"127.0.0.1:{helper.port} for desktop brokering.",
+          flush=True)
+    return helper
 
 
 def _enable_dpi_awareness() -> None:
@@ -154,11 +339,14 @@ class GifPlayer:
 
 
 class AvatarWindow:
-    def __init__(self, supervisor: Supervisor, config_path: Path,
+    def __init__(self, supervisor: Supervisor | None, config_path: Path,
                  state_dir: Path):
         import tkinter as tk
         self.tk = tk
+        # supervisor is None in attach mode: a core elsewhere owns
+        # the agent and this window is display-only.
         self.supervisor = supervisor
+        self._attached = supervisor is None
         self.config_path = config_path
         self.state_dir = state_dir
         self._down_since: float | None = None
@@ -199,7 +387,12 @@ class AvatarWindow:
         self.close_label.bind("<Button-1>", lambda _e: self.stop())
 
         self.menu = tk.Menu(root, tearoff=0)
-        self.menu.add_command(label="Stop bridge", command=self.stop)
+        if self._attached:
+            self.menu.add_command(
+                label="Close avatar (bridge keeps running)",
+                command=self.stop)
+        else:
+            self.menu.add_command(label="Stop bridge", command=self.stop)
 
         for widget in (root, self.avatar_label, self.text_label):
             widget.bind("<ButtonPress-1>", self._drag_start)
@@ -230,35 +423,22 @@ class AvatarWindow:
             self.menu.grab_release()
 
     def stop(self) -> None:
-        """The kill switch: stop supervisor + agent, close the window."""
+        """Own form: the kill switch — stop supervisor + agent, close
+        the window. Attach mode: close the window only; the core
+        keeps running (the menu label says exactly that)."""
         if self._stopped:
             return
         self._stopped = True
         try:
-            self.supervisor.stop()
+            if self.supervisor is not None:
+                self.supervisor.stop()
         finally:
             self.root.destroy()
 
     # -- state polling ---------------------------------------------------------
 
     def _agent_status(self) -> dict | None:
-        try:
-            cfg = json.loads(self.config_path.read_text(encoding="utf-8"))
-            host = str(cfg.get("host", "127.0.0.1"))
-            port = int(cfg.get("port", 8765))
-            token = str(cfg.get("token", ""))
-        except (OSError, json.JSONDecodeError):
-            return None
-        req = urllib.request.Request(
-            f"http://{host}:{port}/v1/status",
-            headers={"Authorization": f"Bearer {token}"})
-        try:
-            with urllib.request.urlopen(req, timeout=1.5) as resp:
-                if resp.status == 200:
-                    return json.loads(resp.read().decode("utf-8"))
-        except (urllib.error.URLError, OSError, json.JSONDecodeError):
-            return None
-        return None
+        return fetch_agent_status(self.config_path)
 
     def _poll(self) -> None:
         if self._stopped:
@@ -291,18 +471,11 @@ class AvatarWindow:
         if view["state"] != self._current_state:
             self._current_state = view["state"]
             self._state_since = time.time()
-            # Publish the display state for other local apps (e.g. a
-            # desktop pet) to observe. Read-only, no token material,
-            # written beside the supervisor's own status file.
-            try:
-                bridge_update._write_json(
-                    self.state_dir / "display-state.json",
-                    {"state": view["state"], "art": art,
-                     "label": view["label"],
-                     "since": self._state_since,
-                     "updated_at": time.time()})
-            except OSError:
-                pass
+            # display-state.json (read by local apps such as a
+            # desktop pet) is published by the supervisor core since
+            # v1.1, in every form — this window only displays. That
+            # keeps the file fresh when no window is open (boot core)
+            # and identical when one is (either GUI form).
         if art != self._current_art:
             if self._current_art in self._players:
                 self._players[self._current_art].stop()
@@ -375,6 +548,39 @@ def main(argv: list[str] | None = None) -> int:
         state_dir = (args.config.resolve().parent / state_dir).resolve()
 
     _quiet_stdio(state_dir)
+    mode, found = choose_gui_mode(args.config, state_dir)
+    if mode == "foreign":
+        print(f"[supervisor-gui] Something that is not a muse-pc-bridge "
+              f"agent is answering on the configured address "
+              f"({found.get('agent')!r}); refusing to start. Free the "
+              f"port or fix the config.", file=sys.stderr)
+        return 2
+    if mode == "attach":
+        # A core (boot form or another supervisor) already owns the
+        # agent: display-only. Closing the window leaves it running.
+        print("[supervisor-gui] Attaching to the running bridge core; "
+              "this window is display-only.", flush=True)
+        # Host the interactive session helper from this (user
+        # session) process, so the core can broker desktop routes
+        # here — unless a live helper already owns this state dir
+        # (a second launcher window reuses it; see
+        # start_attach_helper). Failure to start one must not block
+        # the avatar — the core then answers 501 for desktop
+        # routes, honestly.
+        helper = None
+        try:
+            helper = start_attach_helper(args.config, state_dir)
+        except Exception as exc:  # never block the window on it
+            print(f"[supervisor-gui] WARNING: session helper failed "
+                  f"to start ({exc}); desktop routes will answer "
+                  f"501 via the core.", flush=True)
+        window = AvatarWindow(None, args.config, state_dir)
+        try:
+            window.run()
+        finally:
+            if helper is not None:
+                helper.stop()
+        return 0
     supervisor = Supervisor(args.install_root, args.config, state_dir)
     thread = threading.Thread(target=supervisor.run, daemon=True,
                               name="bridge-supervisor")

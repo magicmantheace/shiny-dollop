@@ -3,7 +3,7 @@
 # Fixed, agent-shipped script. The bridge agent writes a JSON request
 # to a temp file and invokes this script with -In <path>; the script
 # prints exactly one JSON object to stdout. The client never supplies
-# script text — only the JSON parameters below.
+# script text -- only the JSON parameters below.
 #
 # Actions:
 #   windows    list top-level windows

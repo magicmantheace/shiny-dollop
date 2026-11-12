@@ -28,6 +28,20 @@ Owner's Windows PC                          Muse's Linux VM
   Long-running HTTP server. Started manually via
   `scripts/start-bridge.cmd` (visible console) or, optionally, by a
   logon task.
+- **Supervisor forms (v1.1 topology)**: one `Supervisor` core
+  (`agent/supervisor.py`) — crash restart, staged-update apply with
+  health check and rollback, `supervisor-status.json`, and (since
+  v1.1) publishing of `display-state.json` — runs in three forms:
+  a visible **console** (the original kill-switch form), a
+  **headless core** (`--headless`, pythonw, started at machine boot
+  by the "Muse PC Bridge (core)" Scheduled Task as SYSTEM, before
+  any logon), and embedded in the **avatar GUI**
+  (`agent/supervisor_gui.py`). When a core already answers, the GUI
+  **attaches display-only** instead of starting a second supervisor:
+  closing the avatar then leaves the bridge running, and the window
+  says so. The headless core never does GUI work; display-state
+  publishing is the supervisor's, so the file local apps read stays
+  fresh with no window open.
 - **Client** (`client/bridge_client.py`): thin CLI used by Muse.
   Reads `MUSE_PC_BRIDGE_URL` / `MUSE_PC_BRIDGE_TOKEN` from the
   environment.
@@ -69,6 +83,16 @@ Response (agent `1.0.0`; v0 fields retained):
 `capabilities` lists what this agent on this platform can do;
 Windows-only services appear in `platform_limited` (and return 501)
 on other platforms.
+
+Since v1.1 the status body also carries **`uac_prompt`**:
+`{"active": bool, "since": <ISO timestamp or null>}` — whether a
+UAC elevation/consent prompt is currently awaiting the owner on
+the PC (detected by the presence of `consent.exe`, polled every
+`uac_poll_interval_s`, default 2 s; always inactive off Windows).
+Presence only: the agent never reads the prompt's contents.
+Transitions are audited as `uac_prompt_shown` /
+`uac_prompt_cleared` events, and the avatar maps an active prompt
+to its alert art with the label "Approval needed at PC".
 
 ### POST /v1/exec — jobs (v1)
 Exec is a **job**. Submitting returns `202` with a `job_id`
@@ -122,6 +146,80 @@ state dir. `GET /v1/processes`, `GET /v1/processes/{id}?tail_bytes=N`,
 `POST /v1/processes/{id}/kill`. The registry persists to
 `state/processes.json`; after an agent restart, tracked processes
 are reported by OS pid liveness.
+
+**GUI mode (v1.1):** with `"gui": true`, the request names an
+`executable` (plus optional `args` list) instead of a shell
+`command`, and the agent spawns the executable **directly**. A
+shell-wrapped spawn cannot track a GUI application — the wrapper
+exits as soon as it hands off to the GUI exe, so the app reported
+dead instantly (hit with the Godot launches, 2026-11-06). In GUI
+mode the tracked pid IS the application; on Windows the spawn also
+requests breakaway from any job object that dies with the agent,
+retrying without that flag when the job refuses. Records and
+responses carry `"gui": true/false`. A command string is not
+accepted in GUI mode — it cannot be split into argv safely.
+
+### Session broker (v1.1, Codex-fix)
+Desktop routes — `GET /v1/screenshot`, `POST /v1/input`,
+`POST /v1/uia`, `GET|POST /v1/clipboard`, GUI-mode process spawns
+and the process records they own — act on the **interactive**
+desktop. An agent in Windows session 0 (the SYSTEM boot core) must
+not serve them locally: it would capture and inject into the
+services desktop. Instead it **brokers** them to the session
+helper (`agent/session_helper.py`), a loopback-only HTTP server
+hosted by the avatar process in the owner's logon session:
+
+- the helper serves ONLY the desktop routes (everything else
+  404s), with the same token, and registers itself in
+  `state/session-helper.json` (port, pid, session id, 5 s
+  heartbeat); the agent trusts only a fresh registration with a
+  live pid outside session 0;
+- the agent forwards the request verbatim and returns the
+  helper's response; **both sides audit** — the agent's entry is
+  marked `"via": "session-broker"`, the helper's (same audit log)
+  `"via": "session-helper"`;
+- GUI process records live with the helper (its own registry under
+  `state/session-helper/`); inspect/kill for an id the agent does
+  not own are brokered too;
+- `GET /v1/processes` and the `/v1/status` process counts merge
+  the helper's records (tagged `via: session-helper`), so a
+  brokered process stays discoverable after its spawn response is
+  gone; a registered helper that does not answer degrades the
+  merge to local-only rather than failing the request. The two
+  merges are budgeted differently: the listing fetches generously
+  (5 s), while `/v1/status` — whose readers time out at 1.5 s
+  (avatar) and 3 s (the supervisor's update health check, whose
+  failure can roll back a healthy update) — serves a fresh-enough
+  last-known merge (2 s), backs off briefly after a failed fetch,
+  and otherwise makes one sub-second (0.75 s) fetch attempt, so a
+  live-but-hung helper can never make a healthy agent look dead;
+- exactly one helper owns a state directory: `SessionHelper`
+  holds an OS exclusive lock on `state/session-helper-owner.lock`
+  for its lifetime (released on stop or process death), a second
+  start against the same directory is refused, and an attaching
+  avatar window reuses a live registration instead of starting a
+  rival helper — two helpers would overwrite the one registration
+  while their process registries diverged, losing brokered
+  processes;
+- with no helper registered, a session-0 agent answers these
+  routes **501** with the reason, rather than touching the wrong
+  desktop; an agent already in the interactive session (console /
+  avatar own-form) serves them directly, as before. Config
+  `"session_broker": false` disables brokering. `/v1/status`
+  reports `session_helper: {registered, session_id}`.
+
+### Wake-on-LAN (v1.1)
+`POST /v1/wol` with `{"mac": "AA:BB:CC:DD:EE:FF", "broadcast":
+"192.168.1.255", "port": 9}` (broadcast/port optional; defaults
+255.255.255.255 and 9) sends the 102-byte magic packet by UDP
+broadcast **from the agent machine**, for waking *other* machines
+on its LAN. Token-authed and audited like every route; advertised
+as the `wol` capability. The honest limit: a sleeping PC runs no
+agent, so **the bridge cannot wake its own host** — waking the
+bridge PC itself requires a sender on some other always-on LAN
+device (or an awake Tailscale peer on that LAN); `scripts/wol-send.py`
+is that sender, and its docstring lists the target-side
+prerequisites (BIOS WoL, NIC wake permission, wired Ethernet).
 
 ### Interactive sessions (v1)
 `POST /v1/sessions` opens a shell session; `GET /v1/sessions/{id}`
@@ -236,6 +334,15 @@ line:
   `audit_max_bytes` (default 10 MiB), it is rotated to
   `audit.jsonl.1`, older files shift up, and at most `audit_keep`
   (default 5) rotated files are kept. Set either to 0 to disable.
+- **Two writers, one log (v1.1):** the session helper appends to
+  the same log through its own core. Rotation + append are
+  serialized across both writers by a threading lock shared per
+  log path within a process, plus an OS file lock on a sidecar
+  (`audit.jsonl.lock`) across processes — so the size check and
+  the archive renames cannot interleave into a double rotation
+  that discards retained entries. If the file lock cannot be
+  taken, the append proceeds unlocked with a console warning
+  rather than dropping the entry.
 - **Job completion entries:** every job completion writes a
   `job_finish` entry with the `job_id`, exit code, timed-out flag,
   per-stream byte totals, and the **SHA-256 of the captured stdout

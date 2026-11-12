@@ -1,8 +1,8 @@
-# muse-pc-bridge — service-form management (v1 S3).
+# muse-pc-bridge -- service-form management (v1 S3).
 #
 # The "service" is a per-user logon Scheduled Task that opens the
 # supervisor in a VISIBLE console (never a hidden background process):
-# closing that console stops the agent — the kill switch is preserved.
+# closing that console stops the agent -- the kill switch is preserved.
 #
 #   .\bridge-service.ps1 -Action install     register the logon task
 #   .\bridge-service.ps1 -Action start       start it now
@@ -10,7 +10,7 @@
 #   .\bridge-service.ps1 -Action status      task + supervisor state
 #   .\bridge-service.ps1 -Action uninstall   remove the task
 #
-# install/uninstall touch Scheduled Tasks and may prompt for UAC —
+# install/uninstall touch Scheduled Tasks and may prompt for UAC --
 # run them yourself, interactively.
 
 param(
@@ -50,9 +50,34 @@ switch ($Action) {
     }
     'stop' {
         Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-        # Stopping the task does not always reap the console's children;
-        # stop the supervisor (its status file names the agent pid, and
-        # stopping the supervisor stops the agent by design).
+        # Graceful first: ask the supervisor for an audited shutdown
+        # by dropping a stop-request file into the state dir. The
+        # supervisor consumes it and stops the agent through its
+        # normal path, so the audit log gains its server_stop entry.
+        # Killing processes outright would bypass that entry -- the
+        # sweep below is only the fallback for a supervisor that
+        # does not answer within 20 s.
+        $requestFile = Join-Path $StateDir "stop-request.json"
+        @{ requested_at = (Get-Date).ToUniversalTime().ToString("o")
+           requested_by = "bridge-service.ps1 -Action stop" } |
+            ConvertTo-Json | Set-Content -Encoding UTF8 $requestFile
+        $graceful = $false
+        $deadline = (Get-Date).AddSeconds(20)
+        while ((Get-Date) -lt $deadline) {
+            if (Test-Path $StatusFile) {
+                try {
+                    $supState = (Get-Content -Raw $StatusFile |
+                        ConvertFrom-Json).state
+                    if ($supState -eq 'stopped') { $graceful = $true; break }
+                } catch { }
+            }
+            Start-Sleep -Milliseconds 500
+        }
+        if ($graceful) {
+            Write-Output "Bridge stopped gracefully (audited shutdown -- see agent\logs\audit.jsonl for server_stop)."
+            break
+        }
+        Write-Warning "Graceful stop did not complete within 20 s; terminating processes directly. The audit log may miss its server_stop entry for this stop."
         $stopped = @()
         Get-CimInstance Win32_Process -Filter "Name='python.exe' OR Name='py.exe'" |
             Where-Object { $_.CommandLine -match 'supervisor\.py|bridge_agent\.py' } |

@@ -15,7 +15,9 @@ States (art key -> meaning):
             applying, or the agent briefly unreachable
   celebrate an update applied cleanly, shown briefly
   alert     something needs the owner's eye: apply/rollback failure,
-            a completed rollback, or the agent down too long
+            a completed rollback, the agent down too long, or a UAC
+            consent prompt waiting for the owner at the PC (label
+            "Approval needed at PC" — distinct text, same alert art)
 """
 
 from __future__ import annotations
@@ -77,6 +79,16 @@ def resolve_display(supervisor: dict | None,
                     "label": "Agent not responding"}
         return {"state": "connecting", "art": "connecting",
                 "label": "Connecting…"}
+
+    # -- a UAC consent prompt is waiting for the owner at the PC ------------
+    # The agent reports presence only (status field "uac_prompt");
+    # the avatar cannot see or answer the prompt — it can only say
+    # that the PC needs the owner's hands. Reuses the alert art with
+    # its own label, per the v1.1 design note.
+    uac = agent.get("uac_prompt") or {}
+    if uac.get("active"):
+        return {"state": "alert", "art": "alert",
+                "label": "Approval needed at PC"}
 
     # -- celebrate a clean apply, briefly ------------------------------------
     if outcome == "applied_ok" and age is not None and age <= CELEBRATE_WINDOW_S:

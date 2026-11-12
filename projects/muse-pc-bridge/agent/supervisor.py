@@ -1,32 +1,51 @@
 #!/usr/bin/env python3
 """muse-pc-bridge supervisor — service form of the agent (v1 §4).
 
-Runs `bridge_agent.py` as a child process in a **visible console** and:
+Runs `bridge_agent.py` as a child process and:
 
 - restarts it automatically if it crashes (exponential backoff),
 - applies a staged self-update at the restart boundary, health-checks
   the new agent, and **rolls back automatically** if the health check
   fails,
 - writes its state to `<state_dir>/supervisor-status.json` so start /
-  stop / status tooling (and humans) can see what is running.
+  stop / status tooling (and humans) can see what is running,
+- publishes `<state_dir>/display-state.json` (the resolved avatar
+  display state) from the same signals — since v1.1 this is the
+  supervisor's job in every form, so the file stays fresh even when
+  no avatar window is open (local apps such as a desktop pet read
+  it; it carries no token material).
 
-Kill-switch semantics are preserved from v0: the supervisor console
-is the visible indicator — closing it (or Ctrl+C) stops the supervisor
-AND the agent. There is no hidden background mode.
+Forms (v1.1 topology — see docs/INSTALL_WINDOWS.md):
+
+- **Console** (`python supervisor.py`): the original form. The
+  console is the visible indicator; closing it (or Ctrl+C) stops the
+  supervisor AND the agent — the kill switch.
+- **Headless core** (`pythonw supervisor.py --headless`): the boot
+  form, started by the "Muse PC Bridge (core)" boot task as SYSTEM
+  before any logon (scripts/bridge-core.ps1). No console exists, so
+  prints go to `<state_dir>/supervisor-core.log`. The kill switches
+  for this form are the task controls and scripts/bridge-core.ps1
+  -Action stop. It never opens a window or touches GUI state.
+- **GUI/avatar**: supervisor_gui.py embeds this same Supervisor in
+  its own process — or, when a core is already running, attaches to
+  it display-only (see that module).
 
 Usage:
-  python supervisor.py [--config C:\\path\\config.json]
+  python supervisor.py [--headless]
+                       [--config C:\\path\\config.json]
                        [--install-root C:\\path\\projects\\muse-pc-bridge]
 """
 
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -35,6 +54,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import bridge_update  # noqa: E402
+import display_state  # noqa: E402
+
+# A management script (scripts/bridge-core.ps1 / bridge-service.ps1
+# -Action stop) drops this file into the state dir to ask the
+# supervisor for a GRACEFUL stop: the supervisor stops the agent
+# through its normal audited path (server_stop is written) instead
+# of the script killing processes outright. The supervisor deletes
+# any stale file at startup, so a request only counts when it is
+# written while this supervisor is running.
+STOP_REQUEST_NAME = "stop-request.json"
 
 
 def _agent_dir() -> Path:
@@ -61,6 +90,11 @@ class Supervisor:
         self._child: subprocess.Popen | None = None
         self.restarts = 0
         self._fast_crashes = 0
+        self._last_status: dict | None = None
+        # display-state publishing (see _publish_display_state)
+        self._display_key: tuple | None = None
+        self._display_since: float = 0.0
+        self._agent_down_since: float | None = None
 
     # -- state file ----------------------------------------------------------
     def _write_status(self, state: str, **extra) -> None:
@@ -71,6 +105,7 @@ class Supervisor:
             "updated_at": time.time(),
         }
         obj.update(extra)
+        self._last_status = obj
         try:
             bridge_update._write_json(
                 self.state_dir / "supervisor-status.json", obj)
@@ -142,6 +177,94 @@ class Supervisor:
             time.sleep(self.health_interval_s)
         return False
 
+    # -- display-state publishing -------------------------------------------
+    def _fetch_agent_status(self) -> dict | None:
+        """The agent's /v1/status body, or None when unreachable."""
+        try:
+            cfg = json.loads(self.config_path.read_text(encoding="utf-8"))
+            host = str(cfg.get("host", "127.0.0.1"))
+            port = int(cfg.get("port", 8765))
+            token = str(cfg.get("token", ""))
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            return None
+        req = urllib.request.Request(
+            f"http://{host}:{port}/v1/status",
+            headers={"Authorization": f"Bearer {token}"})
+        try:
+            with urllib.request.urlopen(req, timeout=1.5) as resp:
+                if resp.status == 200:
+                    return json.loads(resp.read().decode("utf-8"))
+        except (urllib.error.URLError, OSError, json.JSONDecodeError):
+            return None
+        return None
+
+    def _publish_display_state(self) -> None:
+        """Resolve the display state and write display-state.json on
+        change. Same inputs and mapping the avatar window uses; the
+        supervisor owns the file so it stays fresh with no window
+        open (headless core) exactly as with one (either GUI form).
+
+        "Change" means the whole view — state, art AND label. Two
+        alert reasons share the alert state (a down agent vs a UAC
+        prompt waiting); comparing only the state would leave the
+        stale label in the file after the reason changed. ``since``
+        still tracks when the STATE began, so a label-only change
+        republishes with the original ``since``.
+        """
+        agent = self._fetch_agent_status()
+        if agent is None:
+            if self._agent_down_since is None:
+                self._agent_down_since = time.time()
+        else:
+            self._agent_down_since = None
+        sup = self._last_status or {"state": "starting"}
+        update = bridge_update.update_status(self.state_dir)
+        view = display_state.resolve_display(
+            sup, agent, update, down_since=self._agent_down_since)
+        key = (view["state"], view["art"], view["label"])
+        if key != self._display_key:
+            if self._display_key is None \
+                    or view["state"] != self._display_key[0]:
+                self._display_since = time.time()
+            self._display_key = key
+            try:
+                bridge_update._write_json(
+                    self.state_dir / "display-state.json",
+                    {"state": view["state"], "art": view["art"],
+                     "label": view["label"],
+                     "since": self._display_since,
+                     "updated_at": time.time()})
+            except OSError:
+                pass
+
+    def _display_loop(self) -> None:
+        while not self._stop:
+            try:
+                self._publish_display_state()
+            except Exception:  # publishing must never kill the core
+                pass
+            self._sleep(1.0)
+
+    # -- stop requests ------------------------------------------------------
+    def _check_stop_request(self) -> bool:
+        """Consume a management stop request, if one was dropped
+        into the state dir while this supervisor is running. The
+        request routes through the same graceful path as stop():
+        the agent gets its graceful signal, so its shutdown is
+        audited (server_stop) instead of bypassed by a kill."""
+        path = self.state_dir / STOP_REQUEST_NAME
+        if not path.exists():
+            return False
+        try:
+            path.unlink()
+        except OSError:
+            pass
+        print("[supervisor] stop requested via "
+              f"{STOP_REQUEST_NAME}; stopping gracefully.",
+              flush=True)
+        self._stop = True
+        return True
+
     # -- main loop ------------------------------------------------------------
     def stop(self) -> None:
         self._stop = True
@@ -149,8 +272,19 @@ class Supervisor:
 
     def run(self) -> int:
         self.state_dir.mkdir(parents=True, exist_ok=True)
+        # A stop request only counts when written while THIS
+        # supervisor runs; clear any stale file from a previous run
+        # so an old request can't stop a fresh start.
+        try:
+            (self.state_dir / STOP_REQUEST_NAME).unlink()
+        except OSError:
+            pass
         self._write_status("starting")
+        threading.Thread(target=self._display_loop, daemon=True,
+                         name="display-state").start()
         while not self._stop:
+            if self._check_stop_request():
+                break
             applied = None
             pending = bridge_update._read_json(
                 self.state_dir / "update-pending.json")
@@ -211,13 +345,38 @@ class Supervisor:
             code = child.poll()
             if code is not None:
                 return code
+            if self._check_stop_request():
+                break
             time.sleep(0.1)
         return child.poll()
 
     def _sleep(self, seconds: float) -> None:
         deadline = time.monotonic() + seconds
         while not self._stop and time.monotonic() < deadline:
+            if self._check_stop_request():
+                break
             time.sleep(0.1)
+
+
+def _headless_stdio(state_dir: Path) -> None:
+    """Under pythonw (the boot-task form) there is no console; give
+    the supervisor's prints a home — a log beside the state files —
+    instead of a None stream that would crash print()."""
+    if sys.stdout is not None and sys.stderr is not None:
+        return
+    try:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        log = open(state_dir / "supervisor-core.log", "a",
+                   encoding="utf-8", buffering=1)
+        if sys.stdout is None:
+            sys.stdout = log
+        if sys.stderr is None:
+            sys.stderr = log
+    except OSError:
+        if sys.stdout is None:
+            sys.stdout = io.StringIO()
+        if sys.stderr is None:
+            sys.stderr = io.StringIO()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -228,6 +387,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--install-root", type=Path,
                         default=_agent_dir().parent,
                         help="project folder (default: parent of agent/)")
+    parser.add_argument("--headless", action="store_true",
+                        help="boot-task form: no console, output to "
+                             "<state_dir>/supervisor-core.log; started "
+                             "by the 'Muse PC Bridge (core)' boot task "
+                             "(scripts/bridge-core.ps1)")
     args = parser.parse_args(argv)
 
     if not args.config.exists():
@@ -245,6 +409,9 @@ def main(argv: list[str] | None = None) -> int:
     if not state_dir.is_absolute():
         state_dir = (args.config.resolve().parent / state_dir).resolve()
 
+    if args.headless:
+        _headless_stdio(state_dir)
+
     supervisor = Supervisor(args.install_root, args.config, state_dir)
 
     def _handle_signal(_signum, _frame):
@@ -253,9 +420,14 @@ def main(argv: list[str] | None = None) -> int:
     signal.signal(signal.SIGINT, _handle_signal)
     if hasattr(signal, "SIGTERM"):
         signal.signal(signal.SIGTERM, _handle_signal)
-    print("[supervisor] muse-pc-bridge supervisor running. "
-          "Closing this window (or Ctrl+C) stops the agent — "
-          "that is the kill switch.")
+    if args.headless:
+        print("[supervisor] muse-pc-bridge core running headless "
+              "(boot form). Stop it with scripts/bridge-core.ps1 "
+              "-Action stop or by disabling the boot task.")
+    else:
+        print("[supervisor] muse-pc-bridge supervisor running. "
+              "Closing this window (or Ctrl+C) stops the agent — "
+              "that is the kill switch.")
     try:
         return supervisor.run()
     except KeyboardInterrupt:

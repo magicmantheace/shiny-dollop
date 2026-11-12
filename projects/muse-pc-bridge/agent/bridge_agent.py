@@ -10,7 +10,11 @@ Tailscale IP, and exposes a JSON API:
   GET  /v1/jobs                       list recent jobs
   GET  /v1/jobs/{id}                  job state + incremental output
   POST /v1/jobs/{id}/cancel           terminate a running job
-  POST /v1/processes                  spawn a detached process
+  POST /v1/wol                        send a Wake-on-LAN magic packet
+                                      from this machine
+  POST /v1/processes                  spawn a detached process (with
+                                      "gui": true + "executable"/"args":
+                                      launch a GUI app directly, no shell)
   GET  /v1/processes                  list tracked detached processes
   GET  /v1/processes/{id}             inspect one (+ log tails)
   POST /v1/processes/{id}/kill       terminate a detached process
@@ -63,6 +67,7 @@ import binascii
 import hashlib
 import hmac
 import json
+import ntpath
 import os
 import platform
 import re
@@ -75,15 +80,18 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.error
+import urllib.request
 import uuid
 import zlib
 from collections import deque
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 AGENT_NAME = "muse-pc-bridge"
 MAX_GET_BYTES = 16 * 1024 * 1024          # whole-file /v1/file/get limit
 MAX_RANGE_BYTES = 64 * 1024 * 1024        # per-call range-read limit
@@ -108,6 +116,9 @@ DEFAULT_CONFIG = {
     "job_history_limit": 100,              # finished jobs retained in memory
     "job_output_cap_bytes": 8 * 1024 * 1024,  # per-stream capture cap per job
     "session_idle_timeout_s": 1800,
+    "session_broker": True,              # proxy desktop routes to the
+                                         # interactive session helper
+    "uac_poll_interval_s": 2.0,          # UAC consent prompt polling
     "auth_fail_limit": 5,                  # failures inside the window ...
     "auth_fail_window_s": 60,              # ... trigger a temporary block
     "auth_block_s": 30,
@@ -185,12 +196,112 @@ def init_config(config_path: Path) -> str:
 # Process helpers (shared by jobs, processes, sessions)
 # --------------------------------------------------------------------------
 
+# -- Shell executable resolution -------------------------------------------
+#
+# Why this exists (defect found live at the v1.1 boot-core activation,
+# 2026-11-08): under the session-0 core running as SYSTEM, every
+# PowerShell job failed at spawn with WinError 1920 ("The file cannot
+# be accessed by the system") while cmd jobs under the same core
+# worked. build_command resolved the PowerShell executable with a
+# bare-name shutil.which() over the process PATH, and in the
+# boot-task environment that search returns the per-user WindowsApps
+# execution alias for powershell.exe -- a reparse stub inside the
+# interactive user's profile that no other account (SYSTEM included)
+# can execute. cmd survived only because it was passed bare and
+# Windows' own CreateProcess search order found System32\cmd.exe.
+# Resolution therefore never trusts a PATH hit that lives under
+# WindowsApps or any user profile, and prefers the fixed System32
+# locations outright.
+
+def _shell_path_is_blocked(path: str, env) -> bool:
+    """True if a resolved shell path must never be spawned: a
+    WindowsApps execution alias, or anything under a user profile /
+    per-user AppData. Such paths are per-user reparse stubs or
+    profile content that a service account cannot (or must not)
+    execute."""
+    norm = str(path).replace("/", "\\").lower()
+    if "\\windowsapps\\" in norm or norm.endswith("\\windowsapps"):
+        return True
+    if re.search(r"\\users\\[^\\]+\\appdata\\", norm):
+        return True
+    for var in ("USERPROFILE", "LOCALAPPDATA", "APPDATA"):
+        base = str(env.get(var) or "").replace("/", "\\").rstrip("\\").lower()
+        if base and norm.startswith(base + "\\"):
+            return True
+    return False
+
+
+def _resolve_windows_shell_exe(shell: str, env, which, exists) -> str | None:
+    """Resolve a Windows shell name to an absolute executable path.
+
+    Pure seam: env/which/exists are injected so the contract is
+    testable off-Windows (the SYSTEM context itself cannot be
+    reproduced in the suite). Preference order for "powershell": a
+    vetted pwsh on PATH (unchanged from the historical behaviour),
+    then the fixed System32 WindowsPowerShell path, then a vetted
+    PATH hit for powershell; if nothing exists, the System32 path is
+    returned anyway -- it is present on every Windows install, and a
+    genuinely missing shell must fail against its real path, never
+    against an alias stub. "cmd": System32 first, then a vetted PATH
+    hit, then System32 regardless. "pwsh": a vetted, existing PATH
+    hit or None.
+    """
+    system_root = str(env.get("SystemRoot") or env.get("windir")
+                      or r"C:\Windows")
+    system32 = system_root.rstrip("\\") + r"\System32"
+    ps_system32 = system32 + r"\WindowsPowerShell\v1.0\powershell.exe"
+    cmd_system32 = system32 + r"\cmd.exe"
+
+    def vetted(candidate):
+        if not candidate or not ntpath.isabs(candidate):
+            return None
+        if _shell_path_is_blocked(candidate, env):
+            return None
+        return candidate
+
+    if shell == "powershell":
+        for candidate in (vetted(which("pwsh")), ps_system32,
+                          vetted(which("powershell"))):
+            if candidate and exists(candidate):
+                return candidate
+        return ps_system32
+    if shell == "pwsh":
+        candidate = vetted(which("pwsh"))
+        return candidate if candidate and exists(candidate) else None
+    if shell == "cmd":
+        for candidate in (cmd_system32, vetted(which("cmd"))):
+            if candidate and exists(candidate):
+                return candidate
+        return cmd_system32
+    return None
+
+
+def resolve_shell_exe(shell: str) -> str | None:
+    """Absolute executable for a shell name, or None if unavailable.
+
+    On Windows this is the vetted, System32-first resolution above.
+    Off Windows (dev machines), "posix" keeps its fixed location and
+    powershell/cmd keep the historical PATH behaviour.
+    """
+    if IS_WINDOWS:
+        return _resolve_windows_shell_exe(
+            shell, os.environ, shutil.which, os.path.exists)
+    if shell == "posix":
+        return "/bin/sh"
+    if shell in ("powershell", "pwsh"):
+        return shutil.which("pwsh") or shutil.which("powershell")
+    if shell == "cmd":
+        return shutil.which("cmd")
+    return None
+
+
 def build_command(shell: str, command: str) -> list[str]:
     if shell == "powershell":
-        exe = shutil.which("pwsh") or shutil.which("powershell") or "powershell"
+        exe = resolve_shell_exe("powershell") or "powershell"
         return [exe, "-NoProfile", "-NonInteractive", "-Command", command]
     if shell == "cmd":
-        return ["cmd", "/d", "/s", "/c", command]
+        exe = resolve_shell_exe("cmd") or "cmd"
+        return [exe, "/d", "/s", "/c", command]
     if shell == "posix":
         return ["/bin/sh", "-c", command]
     raise ValueError(f"unknown shell: {shell!r}")
@@ -199,10 +310,11 @@ def build_command(shell: str, command: str) -> list[str]:
 def shell_argv(shell: str) -> list[str]:
     """Argv for an interactive shell of the given kind."""
     if shell == "powershell":
-        exe = shutil.which("pwsh") or shutil.which("powershell") or "powershell"
+        exe = resolve_shell_exe("powershell") or "powershell"
         return [exe, "-NoProfile", "-NoExit", "-Command", "-"]
     if shell == "cmd":
-        return ["cmd"]
+        exe = resolve_shell_exe("cmd") or "cmd"
+        return [exe]
     if shell == "posix":
         return ["/bin/sh", "-i"]
     raise ValueError(f"unknown shell: {shell!r}")
@@ -240,21 +352,25 @@ def pid_alive(pid: int) -> bool:
     if pid <= 0:
         return False
     if IS_WINDOWS:
-        import ctypes
-        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
-        _declare_process_signatures(kernel32)
-        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-        STILL_ACTIVE = 259
-        handle = kernel32.OpenProcess(
-            PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
-        if not handle:
-            return False
         try:
-            code = ctypes.c_ulong(0)
-            ok = kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
-            return bool(ok) and code.value == STILL_ACTIVE
-        finally:
-            kernel32.CloseHandle(handle)
+            import ctypes
+            kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+            _declare_process_signatures(kernel32)
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            STILL_ACTIVE = 259
+            handle = kernel32.OpenProcess(
+                PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+            if not handle:
+                return False
+            try:
+                code = ctypes.c_ulong(0)
+                ok = kernel32.GetExitCodeProcess(handle,
+                                                 ctypes.byref(code))
+                return bool(ok) and code.value == STILL_ACTIVE
+            finally:
+                kernel32.CloseHandle(handle)
+        except Exception:
+            return False
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -264,6 +380,313 @@ def pid_alive(pid: int) -> bool:
     except OSError:
         return False
     return True
+
+
+# ---------------------------------------------------------------------------
+# Interactive-session broker (v1.1 topology fix)
+#
+# Desktop-class operations — screen capture, input injection, UI
+# automation, the clipboard, launching a GUI window — act on the
+# INTERACTIVE user's desktop. An agent running as SYSTEM under the
+# boot task lives in session 0, whose desktop is not the owner's:
+# serving those routes locally there would silently capture/inject
+# into the wrong desktop. So in the boot topology the agent PROXIES
+# desktop routes to a small helper server that the avatar process
+# hosts inside the interactive session (agent/session_helper.py),
+# and — when no helper is registered — answers an honest 501 for
+# them instead of touching session 0's desktop. The helper registers
+# itself in <state_dir>/session-helper.json with a heartbeat; only a
+# fresh registration with a live pid is trusted.
+# ---------------------------------------------------------------------------
+
+HELPER_REGISTRY_NAME = "session-helper.json"
+HELPER_FRESH_S = 20.0        # heartbeat is 5 s; 20 s of silence = gone
+# The /v1/status merge of helper-owned processes is bounded by its
+# READERS' deadlines, not the listing's: avatar status readers time
+# out at 1.5 s and the supervisor's update health check at 3 s, so
+# a live-but-hung helper must never stall status past them (Codex
+# PR #47 finding). The status path therefore fetches with a
+# sub-second timeout, serves a fresh-enough last-known merge
+# without touching the network, and backs off briefly after a
+# failed fetch — see BridgeHandler._helper_processes_for_status.
+HELPER_STATUS_TIMEOUT_S = 0.75   # one status-path fetch attempt
+HELPER_MERGE_CACHE_S = 2.0       # a merge this fresh is served as-is
+HELPER_MERGE_RETRY_S = 1.0       # min gap between failed status fetches
+
+
+def current_session_id() -> int | None:
+    """This process's Windows session id, or None off Windows /
+    when it cannot be determined. Session 0 is the non-interactive
+    services session."""
+    if not IS_WINDOWS:
+        return None
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        session_id = ctypes.c_ulong(0)
+        ok = kernel32.ProcessIdToSessionId(
+            os.getpid(), ctypes.byref(session_id))
+        return int(session_id.value) if ok else None
+    except Exception:
+        return None
+
+
+def read_session_helper(state_dir: Path, *,
+                        now: float | None = None) -> dict | None:
+    """The session helper's live registration, or None.
+
+    A registration counts only when it is fresh (heartbeat within
+    HELPER_FRESH_S), names a live pid, and does not claim session 0
+    (a helper in the services session is no better than the agent
+    itself). Anything else — missing file, stale heartbeat, dead
+    pid — means there is no helper to broker through.
+    """
+    now = time.time() if now is None else now
+    try:
+        reg = json.loads(
+            (Path(state_dir) / HELPER_REGISTRY_NAME).read_text(
+                encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(reg, dict):
+        return None
+    port = reg.get("port")
+    pid = reg.get("pid")
+    updated = reg.get("updated_at")
+    if not isinstance(port, int) or not 0 < port < 65536:
+        return None
+    if not isinstance(pid, int) or not pid_alive(pid):
+        return None
+    if not isinstance(updated, (int, float)) \
+            or now - float(updated) > HELPER_FRESH_S:
+        return None
+    if reg.get("session_id") == 0:
+        return None
+    return reg
+
+
+# ---------------------------------------------------------------------------
+# Wake-on-LAN
+# ---------------------------------------------------------------------------
+
+_MAC_RE = re.compile(r"^[0-9A-Fa-f]{2}([:-]?[0-9A-Fa-f]{2}){5}$")
+_WOL_DEFAULT_BROADCAST = "255.255.255.255"
+_WOL_DEFAULT_PORT = 9
+
+
+def normalize_mac(value) -> str:
+    """Canonical 'AA:BB:CC:DD:EE:FF' form of a MAC address.
+
+    Accepts colon, dash, or bare hex forms in any case; anything
+    else is a ValueError (the route turns it into a 400).
+    """
+    if not isinstance(value, str) or not _MAC_RE.match(value.strip()):
+        raise ValueError(f"invalid MAC address: {value!r}")
+    digits = re.sub(r"[^0-9A-Fa-f]", "", value).upper()
+    return ":".join(digits[i:i + 2] for i in range(0, 12, 2))
+
+
+def build_magic_packet(mac: str) -> bytes:
+    """The 102-byte magic packet: 6 x 0xFF, then the MAC 16 times."""
+    raw = bytes.fromhex(normalize_mac(mac).replace(":", ""))
+    return b"\xff" * 6 + raw * 16
+
+
+def validate_wol_payload(payload: dict) -> tuple[str, str, int]:
+    """Return (mac, broadcast, port) for a /v1/wol request body."""
+    mac = normalize_mac(payload.get("mac"))
+    broadcast = payload.get("broadcast") or _WOL_DEFAULT_BROADCAST
+    if not isinstance(broadcast, str):
+        raise ValueError("broadcast must be an IP address string")
+    try:
+        socket.inet_aton(broadcast)
+    except OSError:
+        raise ValueError(
+            f"invalid broadcast address: {broadcast!r}") from None
+    port = payload.get("port", _WOL_DEFAULT_PORT)
+    if isinstance(port, bool) or not isinstance(port, int) \
+            or not 0 < port < 65536:
+        raise ValueError("port must be an integer in 1..65535")
+    return mac, broadcast, port
+
+
+def send_magic_packet(mac: str, broadcast: str, port: int) -> dict:
+    """Send one magic packet by UDP broadcast from this machine."""
+    packet = build_magic_packet(mac)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.sendto(packet, (broadcast, port))
+    finally:
+        sock.close()
+    return {"mac": mac, "broadcast": broadcast, "port": port,
+            "bytes": len(packet)}
+
+
+# ---------------------------------------------------------------------------
+# UAC consent detection (Windows)
+# ---------------------------------------------------------------------------
+
+def _declare_snapshot_signatures(kernel32) -> None:
+    """Declare argtypes/restype for the Toolhelp32 snapshot calls.
+
+    Same handle discipline as _declare_process_signatures: the
+    snapshot handle is pointer-sized, so every handle slot is
+    c_void_p — an undeclared restype would truncate it to a C int.
+    Kept separate from _declare_process_signatures because the two
+    declaration sets cover different calls.
+    """
+    import ctypes
+    P = ctypes.c_void_p
+    I = ctypes.c_int
+    UL = ctypes.c_ulong
+    kernel32.CreateToolhelp32Snapshot.argtypes = [UL, UL]
+    kernel32.CreateToolhelp32Snapshot.restype = P
+    kernel32.Process32FirstW.argtypes = [P, P]
+    kernel32.Process32FirstW.restype = I          # BOOL
+    kernel32.Process32NextW.argtypes = [P, P]
+    kernel32.Process32NextW.restype = I           # BOOL
+    kernel32.CloseHandle.argtypes = [P]
+    kernel32.CloseHandle.restype = I              # BOOL
+
+
+def consent_prompt_active() -> bool:
+    """True while Windows is showing a UAC consent prompt.
+
+    consent.exe runs (in the SYSTEM session) for exactly the
+    lifetime of an elevation prompt on the secure desktop, so its
+    presence in the process list is the classic signal. Windows
+    only: everywhere else this is False, and any probe failure is
+    also False — a phantom "needs you" would be worse than none.
+    Presence only: nothing about the prompt's contents is read, and
+    nothing about any credential is ever observed or logged.
+
+    PC-VERIFICATION PENDING: the Toolhelp32 path is written against
+    the documented Win32 ABI but has never run on Windows (see
+    docs/TEST_PLAN.md); the monitor's transition logic is what the
+    VM suite exercises, with this probe stubbed.
+    """
+    if not IS_WINDOWS:
+        return False
+    import ctypes
+
+    class _PROCESSENTRY32W(ctypes.Structure):
+        _fields_ = [
+            ("dwSize", ctypes.c_ulong),
+            ("cntUsage", ctypes.c_ulong),
+            ("th32ProcessID", ctypes.c_ulong),
+            ("th32DefaultHeapID", ctypes.c_void_p),   # ULONG_PTR
+            ("th32ModuleID", ctypes.c_ulong),
+            ("cntThreads", ctypes.c_ulong),
+            ("th32ParentProcessID", ctypes.c_ulong),
+            ("pcPriClassBase", ctypes.c_long),
+            ("dwFlags", ctypes.c_ulong),
+            ("szExeFile", ctypes.c_wchar * 260),
+        ]
+
+    TH32CS_SNAPPROCESS = 0x00000002
+    try:
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        _declare_snapshot_signatures(kernel32)
+        handle = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        if not handle or handle == ctypes.c_void_p(-1).value:
+            return False
+        try:
+            entry = _PROCESSENTRY32W()
+            entry.dwSize = ctypes.sizeof(entry)
+            ok = kernel32.Process32FirstW(handle, ctypes.byref(entry))
+            while ok:
+                if entry.szExeFile.lower() == "consent.exe":
+                    return True
+                ok = kernel32.Process32NextW(handle, ctypes.byref(entry))
+            return False
+        finally:
+            kernel32.CloseHandle(handle)
+    except Exception:  # a broken probe must never claim a prompt
+        return False
+
+
+class UacMonitor:
+    """Polls the consent probe and tracks prompt state transitions.
+
+    Surfaces: snapshot() feeds /v1/status ("uac_prompt") and the
+    avatar's display-state mapping; transitions are written to the
+    audit log as uac_prompt_shown / uac_prompt_cleared events. The
+    probe is injectable so the transition logic is unit-testable on
+    any platform.
+    """
+
+    def __init__(self, core: "BridgeCore", probe=None):
+        self._core = core
+        self._probe = probe if probe is not None else consent_prompt_active
+        try:
+            self._poll_s = float(core.cfg.get("uac_poll_interval_s") or 2.0)
+        except (TypeError, ValueError):
+            self._poll_s = 2.0
+        self._poll_s = max(0.5, self._poll_s)
+        self._lock = threading.Lock()
+        self._active = False
+        self._since: float | None = None
+
+    def check_once(self, now: float | None = None) -> bool:
+        """Run one probe; audit and record any transition."""
+        now = time.time() if now is None else now
+        try:
+            active = bool(self._probe())
+        except Exception:  # a failing probe reads as "no prompt"
+            active = False
+        with self._lock:
+            was = self._active
+            if active and not was:
+                self._active = True
+                self._since = now
+            elif was and not active:
+                self._active = False
+                waited = now - (self._since or now)
+                self._since = None
+            else:
+                waited = None
+        if active and not was:
+            self._core.audit({
+                "event": "uac_prompt_shown", "ip": None, "method": None,
+                "path": None,
+                "summary": "UAC consent prompt is awaiting the owner",
+                "status": None, "duration_ms": None,
+            })
+        elif was and not active:
+            self._core.audit({
+                "event": "uac_prompt_cleared", "ip": None, "method": None,
+                "path": None,
+                "summary": f"UAC consent prompt cleared after "
+                           f"{waited:.0f}s",
+                "status": None, "duration_ms": None,
+            })
+        return active
+
+    def snapshot(self) -> dict:
+        with self._lock:
+            since = None
+            if self._active and self._since is not None:
+                since = datetime.fromtimestamp(
+                    self._since, timezone.utc).isoformat(
+                    timespec="milliseconds").replace("+00:00", "Z")
+            return {"active": self._active, "since": since}
+
+    def run(self) -> None:
+        """Poll loop for the lifetime of the agent (daemon thread).
+
+        A no-op off Windows: there is no consent prompt to detect,
+        and the status field simply reports inactive.
+        """
+        if not IS_WINDOWS:
+            return
+        while True:
+            self.check_once()
+            time.sleep(self._poll_s)
+
+
+def _uac_watch(core: "BridgeCore") -> None:
+    core.uac.run()
 
 
 def kill_tree(proc: subprocess.Popen) -> None:
@@ -346,6 +769,143 @@ class OutputBuffer:
 # Core: audit log, rate limiting, file roots, runtime registries
 # --------------------------------------------------------------------------
 
+def _lock_file_exclusive(fh) -> bool:
+    """Take an OS-level exclusive lock on an open file. The lock is
+    released by closing the file or via _unlock_file. Separate opens
+    conflict even within one process (flock is per open-file
+    description; Windows byte-range locks are per handle), which is
+    what makes this usable as a cross-writer mutex."""
+    if IS_WINDOWS:
+        import msvcrt
+        fh.seek(0, os.SEEK_END)
+        if fh.tell() == 0:
+            fh.write(b"\0")
+            fh.flush()
+        fh.seek(0)
+        msvcrt.locking(fh.fileno(), msvcrt.LK_LOCK, 1)
+        return True
+    try:
+        import fcntl
+    except ImportError:
+        return False
+    fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+    return True
+
+
+def _try_lock_file_exclusive(fh) -> bool:
+    """Non-blocking variant of _lock_file_exclusive: True when the
+    lock was taken, False when another holder (process or open file
+    description) already has it. Used for ownership claims that
+    must fail fast rather than queue (the session helper's
+    state-dir ownership). On a platform with no lock primitive at
+    all, returns True — the caller proceeds unguarded rather than
+    never starting (the session-helper registration freshness
+    check remains as the sequential guard there)."""
+    if IS_WINDOWS:
+        import msvcrt
+        fh.seek(0, os.SEEK_END)
+        if fh.tell() == 0:
+            fh.write(b"\0")
+            fh.flush()
+        fh.seek(0)
+        try:
+            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+        except OSError:
+            return False
+        return True
+    try:
+        import fcntl
+    except ImportError:
+        return True
+    try:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return False
+    return True
+
+
+def _unlock_file(fh) -> None:
+    try:
+        if IS_WINDOWS:
+            import msvcrt
+            fh.seek(0)
+            msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+    except (OSError, ImportError):
+        pass
+
+
+_AUDIT_PATH_LOCKS: dict[str, threading.Lock] = {}
+_AUDIT_PATH_LOCKS_GUARD = threading.Lock()
+
+
+def _audit_lock_for(audit_path: Path) -> threading.Lock:
+    """The process-local audit lock for a log path, SHARED by every
+    core writing to that path. Two cores in one process (the test
+    fixtures run the agent and the helper as two servers in one
+    process) must not rely on the file lock alone: Windows
+    byte-range locks have per-handle semantics quite unlike flock
+    — including dropping a process's locks on a file when ANY of
+    its handles to that file closes — so co-hosted serialization
+    is made independent of those subtleties by sharing this plain
+    threading lock. Keyed by the resolved path so differently
+    spelled references to one log still share the lock."""
+    key = str(Path(audit_path).resolve())
+    with _AUDIT_PATH_LOCKS_GUARD:
+        lock = _AUDIT_PATH_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _AUDIT_PATH_LOCKS[key] = lock
+        return lock
+
+
+@contextmanager
+def _audit_file_lock(audit_path: Path):
+    """Serialize one audit append (+ its rotation) across processes.
+
+    The main agent and the session helper append to the SAME audit
+    log from two processes; each core's threading lock serializes
+    only its own writers, so two cores could both decide to rotate
+    from the same stale file state and shift the archives twice,
+    discarding entries that should have been retained (Codex PR #47
+    finding). Within one process the writers share a threading lock
+    (see _audit_lock_for); this is the cross-process layer. It lives
+    in a sidecar file (audit log name + ".lock") because rotation
+    renames the log itself; the sidecar name never changes.
+    Acquisition failure never takes auditing down with it: on
+    OSError the caller proceeds unlocked, with a stderr warning —
+    the uncoordinated behaviour is the fallback, never a crash and
+    never a silently dropped entry.
+    """
+    lock_path = audit_path.with_name(audit_path.name + ".lock")
+    fh = None
+    locked = False
+    try:
+        try:
+            audit_path.parent.mkdir(parents=True, exist_ok=True)
+            fh = open(lock_path, "a+b")
+            locked = _lock_file_exclusive(fh)
+            if not locked:
+                print("[bridge] WARNING: no file-lock primitive on "
+                      "this platform; audit append proceeding "
+                      "without cross-process coordination",
+                      file=sys.stderr)
+        except OSError as exc:
+            print(f"[bridge] WARNING: audit lock unavailable: {exc}; "
+                  f"append proceeding unlocked", file=sys.stderr)
+        yield
+    finally:
+        if fh is not None:
+            if locked:
+                _unlock_file(fh)
+            try:
+                fh.close()
+            except OSError:
+                pass
+
+
 class BridgeCore:
     def __init__(self, cfg: dict):
         self.cfg = cfg
@@ -375,7 +935,10 @@ class BridgeCore:
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.audit_path = Path(cfg["audit_log"])
         self.started_at = time.time()
-        self._audit_lock = threading.Lock()
+        # Shared with every other core writing to the same log in
+        # this process (see _audit_lock_for) — a private lock per
+        # core left the rotation race open between co-hosted cores.
+        self._audit_lock = _audit_lock_for(self.audit_path)
         # auth rate limiting (per source IP)
         self._auth_lock = threading.Lock()
         self._auth_failures: dict[str, deque] = {}
@@ -389,8 +952,55 @@ class BridgeCore:
         self._sessions_lock = threading.Lock()
         self.uploads: dict[str, "Upload"] = {}
         self._uploads_lock = threading.Lock()
+        # Last-known merge of session-helper-owned process records,
+        # for the deadline-bound /v1/status path: (monotonic
+        # fetched-at, registration port, records) plus the last
+        # failed fetch (monotonic, port). See
+        # BridgeHandler._helper_processes_for_status.
+        self._helper_merge_lock = threading.Lock()
+        self._helper_merge_cache: tuple[float, int, list] | None = None
+        self._helper_merge_failed: tuple[float, int] | None = None
+        # UAC consent-prompt monitor (polled by a thread started in
+        # create_server; inert off Windows).
+        self.uac = UacMonitor(self)
+        # True when this core belongs to the interactive session
+        # helper (agent/session_helper.py) rather than the main
+        # agent: helpers serve desktop routes directly and never
+        # broker onward.
+        self.is_helper = bool(cfg.get("session_helper"))
         self._load_processes()
         self._load_uploads()
+
+    # -- interactive-session broker --------------------------------------
+    def session_helper_registration(self) -> dict | None:
+        """The live session-helper registration to broker desktop
+        routes through, or None. Helpers never broker, and the
+        broker can be switched off in config."""
+        if self.is_helper or not self.cfg.get("session_broker", True):
+            return None
+        return read_session_helper(self.state_dir)
+
+    def desktop_unavailable_reason(self) -> str | None:
+        """Why desktop routes cannot be served right now, or None
+        when they can (directly, or via the session helper).
+
+        Only one case blocks: this agent is in Windows session 0
+        (the SYSTEM boot core) and no interactive session helper is
+        registered. Serving capture/input/clipboard/GUI-launch from
+        session 0 would act on the wrong desktop, so the routes
+        answer 501 with this reason instead. (Off Windows the
+        session id is None, which never equals 0 — no block.)
+        """
+        if self.is_helper:
+            return None
+        if self.session_helper_registration() is not None:
+            return None
+        if current_session_id() != 0:
+            return None
+        return ("desktop features need the interactive session: this "
+                "agent is running in session 0 (boot core) and no "
+                "session helper is registered — log on so the avatar "
+                "starts the helper, or use a logon form of the bridge")
 
     # -- audit -------------------------------------------------------------
     def audit(self, entry: dict) -> None:
@@ -399,15 +1009,28 @@ class BridgeCore:
         line = json.dumps(record, ensure_ascii=False)
         try:
             with self._audit_lock:
-                self.audit_path.parent.mkdir(parents=True, exist_ok=True)
-                self._rotate_audit_if_needed(len(line) + 1)
-                with open(self.audit_path, "a", encoding="utf-8") as fh:
-                    fh.write(line + "\n")
+                # The session helper appends to this same log (in
+                # production from another process). _audit_lock is
+                # shared per log path within this process, and the
+                # file lock below coordinates across processes;
+                # together they make rotation + append atomic
+                # across BOTH writers (see _audit_lock_for and
+                # _audit_file_lock).
+                with _audit_file_lock(self.audit_path):
+                    self.audit_path.parent.mkdir(
+                        parents=True, exist_ok=True)
+                    self._rotate_audit_if_needed(len(line) + 1)
+                    with open(self.audit_path, "a",
+                              encoding="utf-8") as fh:
+                        fh.write(line + "\n")
         except OSError as exc:  # never crash the server on audit failure
             print(f"[bridge] WARNING: audit write failed: {exc}", file=sys.stderr)
 
     def _rotate_audit_if_needed(self, incoming: int) -> None:
-        """Size-based rotation (v1 §5). Caller holds the audit lock."""
+        """Size-based rotation (v1 §5). Caller holds both audit
+        locks (the per-core threading lock and the cross-process
+        audit file lock), so the size check and the archive renames
+        cannot interleave with another writer's rotation."""
         max_bytes = int(self.cfg.get("audit_max_bytes") or 0)
         keep = int(self.cfg.get("audit_keep") or 0)
         if max_bytes <= 0 or keep <= 0:
@@ -800,6 +1423,11 @@ def validate_exec_payload(core: BridgeCore, payload: dict):
     else:
         cwd = str(agent_dir())
 
+    return argv, cwd, _merged_env(payload), timeout
+
+
+def _merged_env(payload: dict) -> dict:
+    """The process environment for a spawn: ours plus payload extras."""
     env = dict(os.environ)
     extra_env = payload.get("env")
     if extra_env is not None:
@@ -807,7 +1435,7 @@ def validate_exec_payload(core: BridgeCore, payload: dict):
             raise ValueError("env must be an object of string values")
         for k, v in extra_env.items():
             env[str(k)] = str(v)
-    return argv, cwd, env, timeout
+    return env
 
 
 def submit_job(core: BridgeCore, payload: dict) -> Job:
@@ -843,7 +1471,8 @@ class DetachedProcess:
                  command_summary: str, shell: str,
                  proc: subprocess.Popen | None = None,
                  started_wall: float | None = None,
-                 proc_id: str | None = None):
+                 proc_id: str | None = None,
+                 gui: bool = False):
         self.core = core
         self.id = proc_id or uuid.uuid4().hex[:12]
         self.pid = pid
@@ -851,6 +1480,7 @@ class DetachedProcess:
         self.command_summary = command_summary
         self.shell = shell
         self.proc = proc
+        self.gui = gui
         self.started_wall = started_wall or time.time()
 
     @property
@@ -875,6 +1505,7 @@ class DetachedProcess:
         return {
             "id": self.id, "pid": self.pid, "name": self.name,
             "command": self.command_summary, "shell": self.shell,
+            "gui": self.gui,
             "started_at": self.started_wall,
         }
 
@@ -884,7 +1515,8 @@ class DetachedProcess:
                    command_summary=str(item.get("command", "")),
                    shell=str(item.get("shell", "")),
                    started_wall=float(item.get("started_at") or time.time()),
-                   proc_id=str(item["id"]))
+                   proc_id=str(item["id"]),
+                   gui=bool(item.get("gui", False)))
 
     def describe(self, tail_bytes: int = 0) -> dict:
         obj = {
@@ -893,6 +1525,7 @@ class DetachedProcess:
             "name": self.name,
             "command": self.command_summary,
             "shell": self.shell,
+            "gui": self.gui,
             "alive": self.alive(),
             "exit_code": self.exit_code(),
             "started_at": datetime.fromtimestamp(
@@ -912,8 +1545,49 @@ class DetachedProcess:
         return obj
 
 
+def _gui_launch_argv(payload: dict) -> tuple[list[str], str, str]:
+    """Validate a GUI-mode spawn payload; return (argv, cwd, summary).
+
+    GUI mode exists because the shell-wrapped spawn cannot track a
+    GUI application: the wrapper shell (powershell -Command "app")
+    returns as soon as it has handed off to the GUI exe, so the
+    registry marked the *wrapper* dead while the app kept running —
+    the defect the Milky Way Godot launches hit (2026-11-06), worked
+    around at the time with exec + Start-Process. GUI mode spawns
+    the executable directly, so the tracked pid IS the application.
+    A command string is deliberately not accepted here: it cannot
+    be split into argv safely.
+    """
+    exe = payload.get("executable")
+    if not isinstance(exe, str) or not exe.strip():
+        raise ValueError(
+            "gui spawn requires field 'executable' (path to the .exe)")
+    if not Path(exe).is_file():
+        raise ValueError(f"executable does not exist: {exe!r}")
+    args = payload.get("args") or []
+    if not isinstance(args, list) \
+            or not all(isinstance(a, str) for a in args):
+        raise ValueError("field 'args' must be a list of strings")
+    cwd = payload.get("cwd")
+    if cwd is not None:
+        if not isinstance(cwd, str) or not Path(cwd).is_dir():
+            raise ValueError(f"cwd does not exist: {cwd!r}")
+    else:
+        cwd = str(agent_dir())
+    argv = [exe, *args]
+    return argv, cwd, " ".join(argv)[:500]
+
+
 def spawn_detached(core: BridgeCore, payload: dict) -> DetachedProcess:
-    argv, cwd, env, _timeout = validate_exec_payload(core, payload)
+    gui = payload.get("gui") is True
+    if gui:
+        argv, cwd, summary = _gui_launch_argv(payload)
+        env = _merged_env(payload)
+        shell_name = ""
+    else:
+        argv, cwd, env, _timeout = validate_exec_payload(core, payload)
+        summary = str(payload.get("command", ""))[:500]
+        shell_name = str(payload.get("shell") or default_shell())
     name = str(payload.get("name") or "")
     proc_id = uuid.uuid4().hex[:12]
     log_dir = core.state_dir / "processes"
@@ -921,22 +1595,41 @@ def spawn_detached(core: BridgeCore, payload: dict) -> DetachedProcess:
     out_fh = open(log_dir / f"{proc_id}.out.log", "ab")
     err_fh = open(log_dir / f"{proc_id}.err.log", "ab")
     kwargs: dict = {}
+    breakaway = False
     if IS_WINDOWS:
-        kwargs["creationflags"] = (
-            subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
+        flags = (subprocess.CREATE_NEW_PROCESS_GROUP
+                 | subprocess.DETACHED_PROCESS)
+        if gui:
+            # Best effort: keep the app out of any job object that
+            # dies with the agent (a Task Scheduler / supervisor
+            # chain can be one). Not every job permits breakaway —
+            # Popen then raises and we retry without the flag.
+            flags |= subprocess.CREATE_BREAKAWAY_FROM_JOB
+            breakaway = True
+        kwargs["creationflags"] = flags
     else:
         kwargs["start_new_session"] = True
     try:
-        proc = subprocess.Popen(argv, stdout=out_fh, stderr=err_fh,
-                                stdin=subprocess.DEVNULL, cwd=cwd, env=env,
-                                **kwargs)
+        try:
+            proc = subprocess.Popen(argv, stdout=out_fh, stderr=err_fh,
+                                    stdin=subprocess.DEVNULL, cwd=cwd,
+                                    env=env, **kwargs)
+        except OSError:
+            if not breakaway:
+                raise
+            kwargs["creationflags"] = (
+                subprocess.CREATE_NEW_PROCESS_GROUP
+                | subprocess.DETACHED_PROCESS)
+            proc = subprocess.Popen(argv, stdout=out_fh, stderr=err_fh,
+                                    stdin=subprocess.DEVNULL, cwd=cwd,
+                                    env=env, **kwargs)
     finally:
         out_fh.close()
         err_fh.close()
     record = DetachedProcess(core, pid=proc.pid, name=name,
-                             command_summary=str(payload.get("command", ""))[:500],
-                             shell=str(payload.get("shell") or default_shell()),
-                             proc=proc, proc_id=proc_id)
+                             command_summary=summary,
+                             shell=shell_name,
+                             proc=proc, proc_id=proc_id, gui=gui)
     with core._processes_lock:
         core.processes[record.id] = record
         core._save_processes()
@@ -1695,7 +2388,7 @@ def run_uia(core: "BridgeCore", payload: dict) -> dict:
     helper = agent_dir() / "helpers" / "uia.ps1"
     if not helper.exists():
         raise PlatformUnavailable(f"UIA helper not installed: {helper}")
-    exe = shutil.which("pwsh") or shutil.which("powershell")
+    exe = resolve_shell_exe("powershell")
     if not exe:
         raise PlatformUnavailable("PowerShell not found")
     action = str(payload.get("action", ""))
@@ -1730,7 +2423,7 @@ def capability_lists() -> tuple[list[str], list[str]]:
         "exec", "jobs", "processes", "sessions",
         "files.list", "files.get", "files.put", "files.range",
         "files.chunked", "files.tree", "files.ops", "files.hash",
-        "audit.tail", "update.stage",
+        "audit.tail", "update.stage", "wol",
     ]
     limited: list[str] = []
     if IS_WINDOWS:
@@ -1765,20 +2458,31 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _body_bytes(self, limit: int) -> bytes:
+        """The request body, read at most once: the session broker
+        peeks at the body to decide routing (GUI spawns), and the
+        route handler then reads the same bytes from this cache."""
+        cached = getattr(self, "_cached_body", None)
+        if cached is None:
+            length = int(self.headers.get("Content-Length") or 0)
+            if length > limit:
+                raise ValueError(
+                    f"request body too large ({length} > {limit})")
+            cached = self.rfile.read(length) if length else b""
+            self._cached_body = cached
+        if len(cached) > limit:
+            raise ValueError(
+                f"request body too large ({len(cached)} > {limit})")
+        return cached
+
     def _read_json_body(self) -> dict:
-        length = int(self.headers.get("Content-Length") or 0)
-        if length > MAX_BODY_BYTES:
-            raise ValueError("request body too large")
-        raw = self.rfile.read(length) if length else b""
+        raw = self._body_bytes(MAX_BODY_BYTES)
         if not raw:
             return {}
         return json.loads(raw.decode("utf-8"))
 
     def _read_raw_body(self, limit: int) -> bytes:
-        length = int(self.headers.get("Content-Length") or 0)
-        if length > limit:
-            raise ValueError(f"request body too large ({length} > {limit})")
-        return self.rfile.read(length) if length else b""
+        return self._body_bytes(limit)
 
     def _authorized(self) -> bool:
         header = self.headers.get("Authorization") or ""
@@ -1810,6 +2514,11 @@ class BridgeHandler(BaseHTTPRequestHandler):
             entry["output_sha256"] = output_sha256
         if extra:
             entry.update(extra)
+        if getattr(self.server, "is_helper", False):
+            # This request was served by the interactive session
+            # helper (brokered here by the main agent, which writes
+            # its own entry marked via=session-broker).
+            entry.setdefault("via", "session-helper")
         self.core.audit(entry)
 
     # -- routing ---------------------------------------------------------------
@@ -1827,6 +2536,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def _dispatch(self, method: str) -> None:
         started = time.monotonic()
+        self._cached_body = None
         parsed = urlparse(self.path)
         route = parsed.path
         if not route.startswith("/v1/"):
@@ -1876,6 +2586,47 @@ class BridgeHandler(BaseHTTPRequestHandler):
             r"/v1/file/upload/([0-9a-f]+)(?:/(complete))?", route)
         chunk_match = re.fullmatch(r"/v1/file/upload/([0-9a-f]+)/(\d+)", route)
 
+        # -- interactive-session broker (desktop routes) ----------------
+        # Screenshot / input / UIA / clipboard act on the interactive
+        # desktop: broker them to the session helper when one is
+        # registered, and refuse them (501) from session 0 without
+        # one. GUI spawns and helper-owned process records follow
+        # the same rule. Everything else is served locally as usual.
+        desktop_direct = (
+            (method == "GET" and route == "/v1/screenshot")
+            or (method == "POST" and route == "/v1/input")
+            or (method == "POST" and route == "/v1/uia")
+            or (route == "/v1/clipboard" and method in ("GET", "POST")))
+        if desktop_direct:
+            body = self._body_bytes(MAX_BODY_BYTES) \
+                if method in ("POST", "PUT") else None
+            proxied = self._broker_or_block(method, route, parsed, body)
+            if proxied is not None:
+                return proxied
+        if method == "POST" and route == "/v1/processes":
+            raw = self._body_bytes(MAX_BODY_BYTES)
+            try:
+                peek = json.loads(raw.decode("utf-8")) if raw else {}
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                peek = {}
+            if isinstance(peek, dict) and peek.get("gui") is True:
+                proxied = self._broker_or_block(
+                    method, route, parsed, raw)
+                if proxied is not None:
+                    return proxied
+        if proc_match and ((method == "GET" and not proc_match.group(2))
+                           or (method == "POST"
+                               and proc_match.group(2) == "kill")):
+            with core._processes_lock:
+                known_locally = proc_match.group(1) in core.processes
+            if not known_locally:
+                reg = core.session_helper_registration()
+                if reg is not None:
+                    body = self._body_bytes(MAX_BODY_BYTES) \
+                        if method in ("POST", "PUT") else None
+                    return self._proxy_request(
+                        method, route, parsed, body, reg)
+
         if method == "GET" and route == "/v1/status":
             obj = self._status_obj()
             return 200, obj, "status", {}
@@ -1891,12 +2642,18 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return self._handle_job_get(job_match.group(1), parsed)
         if method == "POST" and job_match and job_match.group(2) == "cancel":
             return self._handle_job_cancel(job_match.group(1))
+        if method == "POST" and route == "/v1/wol":
+            return self._handle_wol()
         if method == "POST" and route == "/v1/processes":
             return self._handle_process_spawn()
         if method == "GET" and route == "/v1/processes":
             with core._processes_lock:
                 procs = list(core.processes.values())
             listing = [p.describe() for p in procs]
+            # Brokered GUI spawns live in the helper's registry;
+            # merge them in so the listing covers every process
+            # this agent can inspect or kill.
+            listing += self._helper_processes()
             return 200, {"processes": listing}, \
                 f"processes list ({len(listing)})", {}
         if method == "GET" and proc_match and not proc_match.group(2):
@@ -1970,6 +2727,172 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return self._handle_update_stage()
         return 404, {"error": "not found"}, "no route", {}
 
+    # -- session broker ---------------------------------------------------
+    def _broker_or_block(self, method: str, route: str, parsed,
+                         body: bytes | None):
+        """Route a desktop request: proxy it to the session helper
+        when one is registered, raise PlatformUnavailable when this
+        agent is in session 0 without one, or return None to serve
+        it locally (this agent IS in the interactive session)."""
+        core = self.core
+        reg = core.session_helper_registration()
+        if reg is not None:
+            return self._proxy_request(method, route, parsed, body, reg)
+        reason = core.desktop_unavailable_reason()
+        if reason is not None:
+            raise PlatformUnavailable(reason)
+        return None
+
+    def _proxy_request(self, method: str, route: str, parsed,
+                       body: bytes | None, reg: dict):
+        """Forward a desktop route to the interactive session helper
+        and return its response verbatim. The helper re-checks the
+        same token itself; both sides audit the request (this side
+        marks its entry via=session-broker)."""
+        url = f"http://127.0.0.1:{reg['port']}{route}"
+        if parsed.query:
+            url += f"?{parsed.query}"
+        headers = {"Authorization": f"Bearer {self.core.token}"}
+        data = None
+        if method in ("POST", "PUT"):
+            data = body if body is not None else b""
+            headers["Content-Type"] = \
+                self.headers.get("Content-Type") or "application/json"
+        req = urllib.request.Request(url, data=data, headers=headers,
+                                     method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=70) as resp:
+                status, raw = resp.status, resp.read()
+        except urllib.error.HTTPError as exc:
+            status, raw = exc.code, exc.read()
+        except (urllib.error.URLError, OSError) as exc:
+            raise PlatformUnavailable(
+                f"session helper registered but not answering: {exc}")
+        try:
+            obj = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            obj = {"error": "session helper returned a non-JSON response"}
+            status = 502
+        return status, obj, \
+            f"{route} via session helper (port {reg['port']})", \
+            {"extra": {"via": "session-broker"}}
+
+    def _fetch_helper_processes(self, reg: dict,
+                                timeout_s: float) -> list[dict] | None:
+        """One bounded fetch of the helper's process listing.
+
+        Returns the merged records (tagged via=session-helper), or
+        None when the helper did not answer within timeout_s —
+        unreachable, hung, or a bad payload. Callers decide what a
+        failure means; the distinction from an empty list matters
+        (a live helper with no processes is a success)."""
+        url = f"http://127.0.0.1:{reg['port']}/v1/processes"
+        req = urllib.request.Request(
+            url, headers={"Authorization": f"Bearer {self.core.token}"},
+            method="GET")
+        try:
+            with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+                obj = json.loads(resp.read().decode("utf-8"))
+        except (urllib.error.URLError, OSError, UnicodeDecodeError,
+                json.JSONDecodeError):
+            return None
+        procs = obj.get("processes") if isinstance(obj, dict) \
+            else None
+        if not isinstance(procs, list):
+            return None
+        merged = []
+        for item in procs:
+            if isinstance(item, dict):
+                item = dict(item)
+                item.setdefault("via", "session-helper")
+                merged.append(item)
+        return merged
+
+    def _note_helper_merge(self, reg: dict,
+                           records: list[dict] | None) -> None:
+        """Record a helper-merge outcome for the status path."""
+        core = self.core
+        with core._helper_merge_lock:
+            if records is None:
+                core._helper_merge_failed = (time.monotonic(),
+                                             reg["port"])
+            else:
+                core._helper_merge_cache = (time.monotonic(),
+                                            reg["port"], records)
+                core._helper_merge_failed = None
+
+    def _cached_helper_merge(self, reg: dict) -> list[dict] | None:
+        """The last-known merge for THIS registration, if any."""
+        with self.core._helper_merge_lock:
+            cache = self.core._helper_merge_cache
+        if cache is not None and cache[1] == reg["port"]:
+            return cache[2]
+        return None
+
+    def _helper_processes(self) -> list[dict]:
+        """Process records owned by the registered session helper.
+
+        GUI spawns brokered to the helper live ONLY in the helper's
+        registry (inspect/kill by id already forward there); without
+        this merge the public listing and the status counts showed
+        only local records, so clients could not rediscover a
+        brokered process after losing the spawn response (Codex
+        PR #47 finding). Records are tagged via=session-helper.
+        Returns [] when no helper is registered or it does not
+        answer — a listing must never fail because the helper is
+        gone; the local records are still the truth locally. The
+        listing keeps the generous fetch budget; /v1/status uses
+        _helper_processes_for_status instead (see there why).
+        """
+        core = self.core
+        reg = core.session_helper_registration()
+        if reg is None:
+            return []
+        records = self._fetch_helper_processes(reg, timeout_s=5)
+        self._note_helper_merge(reg, records)
+        if records is not None:
+            return records
+        cached = self._cached_helper_merge(reg)
+        return cached if cached is not None else []
+
+    def _helper_processes_for_status(self) -> list[dict]:
+        """The helper merge for /v1/status, bounded by its readers.
+
+        Avatar status readers time out at 1.5 s and the
+        supervisor's update health check at 3 s — a helper that is
+        alive but hung must not make a healthy agent look dead to
+        them (it once could: status shared the listing's 5 s fetch
+        synchronously — Codex PR #47 finding). So this path serves
+        a fresh-enough cached merge without touching the network,
+        backs off briefly after a failed fetch instead of stalling
+        every poll, and otherwise makes ONE fetch attempt with a
+        sub-second timeout. Worst case the status counts lag the
+        helper's registry by a few seconds; the degradation stays
+        local to the counts — status itself always answers.
+        """
+        core = self.core
+        reg = core.session_helper_registration()
+        if reg is None:
+            return []
+        now = time.monotonic()
+        with core._helper_merge_lock:
+            cache = core._helper_merge_cache
+            failed = core._helper_merge_failed
+        if cache is not None and cache[1] == reg["port"] \
+                and now - cache[0] < HELPER_MERGE_CACHE_S:
+            return cache[2]
+        if failed is not None and failed[1] == reg["port"] \
+                and now - failed[0] < HELPER_MERGE_RETRY_S:
+            cached = self._cached_helper_merge(reg)
+            return cached if cached is not None else []
+        records = self._fetch_helper_processes(
+            reg, timeout_s=HELPER_STATUS_TIMEOUT_S)
+        self._note_helper_merge(reg, records)
+        if records is not None:
+            return records
+        cached = self._cached_helper_merge(reg)
+        return cached if cached is not None else []
+
     # -- status ------------------------------------------------------------------
     def _status_obj(self) -> dict:
         core = self.core
@@ -1981,6 +2904,13 @@ class BridgeHandler(BaseHTTPRequestHandler):
         with core._processes_lock:
             procs_alive = sum(1 for p in core.processes.values() if p.alive())
             procs_total = len(core.processes)
+        # Helper-owned (brokered) processes count too: without them
+        # the avatar reported idle while a GUI app it brokered was
+        # still running. The merge goes through the deadline-bound
+        # status path, never the listing's 5 s fetch.
+        helper_procs = self._helper_processes_for_status()
+        procs_total += len(helper_procs)
+        procs_alive += sum(1 for p in helper_procs if p.get("alive"))
         with core._sessions_lock:
             sessions_open = sum(1 for s in core.sessions.values()
                                 if s.state == "running")
@@ -2010,6 +2940,12 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "processes_alive": procs_alive,
             "processes_tracked": procs_total,
             "sessions_open": sessions_open,
+            "uac_prompt": core.uac.snapshot(),
+            "session_helper": {
+                "registered":
+                    core.session_helper_registration() is not None,
+                "session_id": current_session_id(),
+            },
             "disk": disk,
             "audit_log": str(core.audit_path),
             "audit_bytes": audit_bytes,
@@ -2072,6 +3008,18 @@ class BridgeHandler(BaseHTTPRequestHandler):
             f"job {job_id} cancel", {"job_id": job_id}
 
     # -- detached processes -----------------------------------------------------------
+    def _handle_wol(self):
+        payload = self._read_json_body()
+        # ValueError from validation becomes a 400 in the router.
+        mac, broadcast, port = validate_wol_payload(payload)
+        try:
+            result = send_magic_packet(mac, broadcast, port)
+        except OSError as exc:
+            return 500, {"error": f"wake-on-LAN send failed: {exc}"}, \
+                f"wol send failed -> {mac}", {}
+        return 200, result, \
+            f"wol magic packet -> {mac} via {broadcast}:{port}", {}
+
     def _handle_process_spawn(self):
         payload = self._read_json_body()
         record = spawn_detached(self.core, payload)
@@ -2587,6 +3535,11 @@ def create_server(cfg: dict) -> ThreadingHTTPServer:
     core.log_start()
     threading.Thread(target=_session_reaper, args=(core,), daemon=True,
                      name="session-reaper").start()
+    if not cfg.get("session_helper"):
+        # The session helper shares the audit log but must not run a
+        # second UAC watch: one prompt would be audited twice.
+        threading.Thread(target=_uac_watch, args=(core,), daemon=True,
+                         name="uac-watch").start()
     return server
 
 
