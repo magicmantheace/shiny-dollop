@@ -88,6 +88,12 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_ui(args: argparse.Namespace) -> int:
+    from ui.server import serve
+    serve(host=args.host, port=args.port)
+    return 0
+
+
 def cmd_catalog_verify(args: argparse.Namespace) -> int:
     import pipeline
     entry = pipeline.catalog_mod.read_entry(pipeline.CATALOG_DIR, args.slug)
@@ -134,6 +140,12 @@ def main(argv: list[str] | None = None) -> int:
                            help="verify a catalogued asset's sha256")
     p_cat.add_argument("--slug", required=True)
     p_cat.set_defaults(fn=cmd_catalog_verify)
+    p_ui = sub.add_parser("ui", help="serve the local UI (P2) over the "
+                                     "catalog and pipeline")
+    p_ui.add_argument("--host", default="127.0.0.1",
+                      help="bind address (default localhost only)")
+    p_ui.add_argument("--port", type=int, default=8770)
+    p_ui.set_defaults(fn=cmd_ui)
     args = parser.parse_args(argv)
     return args.fn(args)
 
