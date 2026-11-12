@@ -129,9 +129,12 @@ A scripted Shallows colony: camp chamber, shaft, tunnel, ore face.
   mushroom-cluster plots — provenance + shas in `frontend/README.md`).
 - **Not verified:** anything visual. Godot's headless driver on this
   VM produces no viewport image (a capture attempt failed cleanly
-  and the code path was removed rather than shipped unproven), and
-  the owner's PC is under a stop order for agent work. A visual pass
-  on owner hardware remains outstanding, as do all frame claims.
+  and the code path was removed rather than shipped unproven). A
+  first on-PC pass ran 2026-11-12 after the owner lifted the PC
+  testing stop — engine-verified live (see the on-PC section
+  below) — but the workstation was locked, so screenshots captured
+  only the Windows lock screen. Rendered appearance remains
+  unverified, as do all frame claims.
 
 ## Asset swap — dedicated delver, lantern, cot (verified 2026-11-11, VM headless)
 
@@ -155,6 +158,56 @@ A scripted Shallows colony: camp chamber, shaft, tunnel, ore face.
   and cot in the rendered scene — headless verify proves load and
   logic, not looks. The on-PC visual pass remains the outstanding
   check, as do all frame claims.
+
+## On-PC pass — engine-verified live (2026-11-12)
+
+- The owner lifted the full PC testing stop on 2026-11-12. The sim
+  bridge was cross-compiled on the VM for Windows
+  (`x86_64-pc-windows-gnu`; `bridge.exe` sha256 `5f374368…`) — the
+  PC has no Rust toolchain — so the pass ran against a genuinely
+  live sim stepping on the PC, not a state snapshot.
+- Frontend + bridge staged at `D:\bridge-work\underreach-visual\`
+  and hash-verified on the PC: `delver.glb`, `lantern.glb`, and
+  `cot.glb` copies match the builder catalog shas.
+- A first windowed launch threw repeated script errors (prop
+  scenes loading as null) — traced to the missing Godot import
+  cache in the staging, not project code. After a headless editor
+  import pass on the PC, the project's own check printed
+  `UNDERREACH_VERIFY_PASS goods=20 delvers=5 floor_instances=15
+  tick=4000` on Windows — identical numbers to the VM.
+- Windowed relaunch on the RTX 3060 (OpenGL/NVIDIA per the engine
+  log): zero script errors (stderr 0 bytes); the state file
+  changed on every sample — the sim was live and stepping. Godot
+  was closed afterwards and verified gone.
+- **Not verified:** rendered appearance. The workstation was
+  locked (LogonUI) throughout, so all screenshots captured only
+  the Windows lock screen; the captures were deleted rather than
+  kept as misleading "game" images. The staging and import cache
+  persist on the PC, so the capture redo is minutes of work once
+  the PC is unlocked. Animation motion was not observed; clip
+  playback rests on the headless verifies.
+
+## Asset swap — gloam-lurker critter (verified 2026-11-12, VM headless)
+
+- The builder's gloam-lurker GLB (catalog sha256 `f0c881cb9bd3…`,
+  builder branch `game-asset-builder/underreach-assets` @
+  `328bca3`) replaced the ember-dragon stand-in as `CRITTER_SCENE`;
+  the dragon file is kept, now unused. The frontend copy is
+  byte-for-byte — sha256 of the copy matches the catalog value.
+  The asset passed the builder's leg-separation gates before
+  cataloguing (concept preflight; posed renders of rest and the
+  idle/walk/run/shiver apexes plus a beyond-spec stress pose —
+  legs separate with belly daylight in every shipped pose; the
+  stress pose only shows a neck/head weight artifact, recorded in
+  the builder docs).
+- `godot --headless -- --underreach-verify` after the swap prints
+  the identical pass line: `UNDERREACH_VERIFY_PASS goods=20
+  delvers=5 floor_instances=15 tick=4000`.
+- Sim untouched: `cargo test` 25/25 and the `scenario` binary run
+  repeated after the swap, clean to tick 6000.
+- **Not verified:** the lurker's in-engine appearance and clip
+  playback — load is proven by the verify run; looks await the
+  unlocked-PC capture redo above.
 
 ## Planned (later slices)
 

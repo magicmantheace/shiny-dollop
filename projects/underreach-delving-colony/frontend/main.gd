@@ -10,12 +10,12 @@ extends Node3D
 ## Delver/critter/prop models are byte-for-byte Game Asset Builder
 ## catalog files (see README.md in this folder for provenance).
 ## The dedicated delver asset (arm-separation-gated A-pose build)
-## replaced the snow-goblin stand-in on 2026-11-11; the gloam-lurker
-## asset is not built yet, so the ember-dragon still stands in for
-## critters — swapping it is a one-line change below (CRITTER_SCENE).
+## replaced the snow-goblin stand-in on 2026-11-11; the dedicated
+## gloam-lurker critter asset replaced the ember-dragon stand-in on
+## 2026-11-12 (CRITTER_SCENE below; the dragon file is kept, unused).
 
 const DELVER_SCENE := "res://assets/delver.glb"
-const CRITTER_SCENE := "res://assets/ember-dragon.glb"
+const CRITTER_SCENE := "res://assets/gloam-lurker.glb"
 const CHEST_SCENE := "res://assets/treasure-chest.glb"
 const SHROOM_SCENE := "res://assets/mushroom-cluster.glb"
 const LANTERN_SCENE := "res://assets/lantern.glb"

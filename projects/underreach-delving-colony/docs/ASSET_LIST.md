@@ -34,7 +34,7 @@ terrain is dressing and kit pieces per band.
 | Asset | Spec | Status |
 |---|---|---|
 | Gloam rat | Rigged quadruped, small; idle/walk/run + bite lunge | ⬜ (sim kind exists) |
-| Deep lurker | Rigged quadruped, large; idle/walk/run + lunge | ⬜ not built yet — 🔄 ember-dragon stands in |
+| Deep lurker | Rigged quadruped, large; idle/walk/run + lunge | ✅ catalogued 2026-11-12 as gloam-lurker (clips idle/walk/run/shiver; leg-separation gates passed) and in frontend use — ember-dragon stand-in retired |
 | Shallows starter creature | Small cave beast, quadruped | ⬜ design TBD |
 | Fungal ambusher | Spore-hulk quadruped; burst-from-ground signature | ⬜ design TBD |
 | Drowned swimmer | Eel-like swimmer rig | ⬜ design TBD |
@@ -116,7 +116,7 @@ drawn or generated 2D, not the 3D pipeline.
 ## Totals
 
 ~55 pipeline assets: 10 character-side, 7 creatures, 9 light,
-14 camp, 4 faces/loads, ~11 band kit/dressing — of which **7 are
+14 camp, 4 faces/loads, ~11 band kit/dressing — of which **8 are
 catalogued and in use today** (delver, oil lantern, cot, stockpile
-chest, mushroom cluster, fallen-log, stump), the deep lurker
-remains unbuilt, and the rest are designed and waiting.
+chest, mushroom cluster, fallen-log, stump, gloam-lurker), and
+the rest are designed and waiting.

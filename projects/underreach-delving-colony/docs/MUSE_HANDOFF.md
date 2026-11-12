@@ -151,13 +151,23 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   sha `7ab7262b7eeb…`) instead of the snow-goblin stand-in, plus
   the builder's Tier-1 lantern prop (OmniLight kept) and cot prop
   for beds. Headless verify passes identically; provenance in
-  `frontend/README.md`, numbers in `docs/TEST_PLAN.md`. The
-  gloam-lurker asset is not built yet — the ember-dragon still
-  stands in for critters.
+  `frontend/README.md`, numbers in `docs/TEST_PLAN.md`.
+- **Gloam-lurker + on-PC pass (2026-11-12):** the owner lifted the
+  full PC testing stop; the builder lane finished the gloam-lurker
+  (catalog sha `f0c881cb9bd3…`; texture succeeded on the first
+  post-reboot paint dispatch; quadruped leg-separation gates
+  passed — concept preflight and posed renders). The frontend now
+  renders it as `CRITTER_SCENE`; the ember-dragon stand-in is
+  retired (file kept, unused). The same day, the frontend ran
+  windowed on the owner's PC against a live cross-compiled sim
+  bridge: `UNDERREACH_VERIFY_PASS` on Windows with identical
+  numbers and zero script errors. Details in `docs/TEST_PLAN.md`.
 - **Implemented but unverified (visual):** the frontend's rendered
-  appearance — no screenshot exists; see TEST_PLAN's S4 section.
-  This now includes how the swapped-in delver, lantern, and cot
-  look in the scene.
+  appearance — the on-PC pass was engine-verified live, but the
+  workstation was locked, so every screenshot captured only the
+  Windows lock screen and no game screenshot exists yet; see
+  TEST_PLAN's S4 section. This covers how the delver, lantern,
+  cot, and gloam-lurker look in the scene.
 - **Planned:** the "Later" list above (Drowned/Crystal/Magma
   mechanics, co-op, succession, generations) — future programs, not
   part of the 2026-11-10 all-slices build.
