@@ -1,10 +1,12 @@
 //! Slice demonstrations: S1 (the dark refuses, then first light
-//! opens production) and S2 (a working colony of three, plus a
-//! recruit, dividing the labour).
+//! opens production), S2 (a working colony of three, plus a
+//! recruit, dividing the labour), S3/S5, and S6 — the same
+//! colony loop founded on a procedurally generated Floor 1.
 
+use underreach_sim::gen::generate_floor;
 use underreach_sim::scenario::{
-    build_scenario, build_scenario_s2, build_scenario_s3, build_scenario_s5, light_the_deep,
-    light_the_way,
+    build_scenario, build_scenario_gen, build_scenario_s2, build_scenario_s3, build_scenario_s5,
+    light_the_deep, light_the_way, open_floor1, GEN_WORLD_SEED,
 };
 use underreach_sim::sim::LedgerKind;
 
@@ -121,6 +123,43 @@ fn main() {
         );
     }
     println!("S5 state hash: {}", sim.state_hash());
+
+    // ---- GEN (S6): the colony loop on a generated Floor 1 ---------------
+    let mut gen = build_scenario_gen(GEN_WORLD_SEED);
+    for _ in 0..200 {
+        gen.tick();
+    }
+    println!(
+        "GEN phase 1 — passages dark ({} ticks): goods={}, deliveries={}, route-blocked entries={}",
+        gen.tick_count,
+        gen.stores.goods,
+        count(&gen, LedgerKind::HaulDelivered),
+        count(&gen, LedgerKind::RouteBlocked),
+    );
+    open_floor1(&mut gen);
+    for _ in 0..6000 {
+        gen.tick();
+    }
+    // Regenerating the floor here is free and proves the point:
+    // the layout the sim stands on is a pure function of the seed.
+    let layout = generate_floor(GEN_WORLD_SEED, 1).layout;
+    println!(
+        "GEN colony on generated floor 1 ({} ticks): goods={}, deliveries={}, conversions={}, delvers alive={}, lost={}, descent at ({},{},{}) network distance={}, network cells={}, dens={}, faces={}",
+        gen.tick_count,
+        gen.stores.goods,
+        count(&gen, LedgerKind::HaulDelivered),
+        count(&gen, LedgerKind::Converted),
+        gen.delvers.len(),
+        count(&gen, LedgerKind::DelverLost),
+        layout.descent.x,
+        layout.descent.y,
+        layout.descent.z,
+        layout.descent_network_distance,
+        layout.network_cells.len(),
+        layout.cavities.iter().filter(|c| c.den).count(),
+        layout.faces.len(),
+    );
+    println!("GEN state hash: {}", gen.state_hash());
 
     println!("deep ledger (S2):");
     for e in &sim.ledger {

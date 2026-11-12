@@ -5,8 +5,11 @@
 //! renders the view JSON that comes back.
 //!
 //! Usage:
-//!   bridge init <s1|s2|s3|s5> <out.json>
+//!   bridge init <s1|s2|s3|s5|gen> <out.json>
 //!   bridge step <state.json> <commands.json> <ticks> <out.json>
+//!
+//! `gen` founds the S3 colony on a generated Floor 1 (S6,
+//! `docs/FLOOR_GENERATION.md`), seeded by the demo world seed.
 //!
 //! state.json / out.json: {"save": "<canonical sim json>", "view": {...}}
 //! commands.json: a JSON array of command objects:
@@ -16,14 +19,15 @@
 //!   {"cmd":"plant","pos":[x,y,z]}
 //!   {"cmd":"craft_mask"}
 //!   {"cmd":"light_the_way"} / {"cmd":"light_the_deep"}
+//!   {"cmd":"open_floor1"} (gen scenario: lantern the route to the first face)
 
 use std::process::exit;
 
 use serde_json::{json, Value};
 
 use underreach_sim::scenario::{
-    build_scenario, build_scenario_s2, build_scenario_s3, build_scenario_s5, light_the_deep,
-    light_the_way,
+    build_scenario, build_scenario_gen, build_scenario_s2, build_scenario_s3, build_scenario_s5,
+    light_the_deep, light_the_way, open_floor1, GEN_WORLD_SEED,
 };
 use underreach_sim::sim::{Job, Sim};
 use underreach_sim::world::{Cell, Pos};
@@ -82,6 +86,7 @@ fn apply(sim: &mut Sim, cmd: &Value) {
         }
         Some("light_the_way") => light_the_way(sim),
         Some("light_the_deep") => light_the_deep(sim),
+        Some("open_floor1") => open_floor1(sim),
         _ => {}
     }
 }
@@ -162,8 +167,34 @@ fn view(sim: &Sim) -> Value {
         .take(25)
         .map(|e| json!({"tick": e.tick, "kind": format!("{:?}", e.kind), "detail": e.detail}))
         .collect();
+    // Floor-generation record (S6): present when the sim stands
+    // on a generated floor, null for the hand-built scenarios.
+    let (floor_index, descent, dens, dressing, hazards) = match &sim.floor {
+        Some(f) => (
+            json!(f.index),
+            json!([f.descent.x, f.descent.y, f.descent.z]),
+            f.dens.iter().map(|p| json!([p.x, p.y, p.z])).collect::<Vec<_>>().into(),
+            f.dressing
+                .iter()
+                .map(|a| json!({"pos": [a.pos.x, a.pos.y, a.pos.z], "kind": format!("{:?}", a.kind)}))
+                .collect::<Vec<_>>()
+                .into(),
+            f.hazards
+                .iter()
+                .map(|h| json!({"pos": [h.pos.x, h.pos.y, h.pos.z], "kind": format!("{:?}", h.kind)}))
+                .collect::<Vec<_>>()
+                .into(),
+        ),
+        None => (Value::Null, json!([]), json!([]), json!([]), json!([])),
+    };
     json!({
         "tick": sim.tick_count,
+        "world_seed": sim.world_seed,
+        "floor_index": floor_index,
+        "descent": descent,
+        "dens": dens,
+        "dressing": dressing,
+        "hazards": hazards,
         "dims": [sim.world.sx, sim.world.sy, sim.world.sz],
         "carved": carved,
         "lit": lit,
@@ -197,8 +228,9 @@ fn main() {
                 Some("s2") => build_scenario_s2(),
                 Some("s3") => build_scenario_s3(),
                 Some("s5") => build_scenario_s5(),
+                Some("gen") => build_scenario_gen(GEN_WORLD_SEED),
                 _ => {
-                    eprintln!("unknown scenario (want s1|s2|s3|s5)");
+                    eprintln!("unknown scenario (want s1|s2|s3|s5|gen)");
                     exit(2);
                 }
             };
@@ -223,7 +255,7 @@ fn main() {
             write_out(&sim, &args[5]);
         }
         _ => {
-            eprintln!("usage: bridge init <s1|s2|s3|s5> <out.json> | bridge step <state.json> <commands.json> <ticks> <out.json>");
+            eprintln!("usage: bridge init <s1|s2|s3|s5|gen> <out.json> | bridge step <state.json> <commands.json> <ticks> <out.json>");
             exit(2);
         }
     }

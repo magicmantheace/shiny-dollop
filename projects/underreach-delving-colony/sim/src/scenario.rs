@@ -8,7 +8,8 @@
 //! farmer, hauler), mushroom plots at camp, and a recruitment
 //! arrival scheduled while the colony looks viable.
 
-use crate::sim::{Delver, Face, Job, Sim, Stores};
+use crate::gen::{carved_path, generate_floor, ENTRY, GATE};
+use crate::sim::{CritterKind, Delver, Face, Job, Sim, Stores};
 use crate::world::{Cell, Pos, World};
 
 pub const CAMP_LANTERN: Pos = Pos { x: 4, y: 3, z: 4 };
@@ -249,4 +250,83 @@ pub fn light_the_deep(sim: &mut Sim) {
     light_the_way(sim);
     sim.place_lantern(DEEP_SHAFT_LANTERN, 1, 5_000.0);
     sim.place_lantern(FUNGAL_LANTERN, 1, 5_000.0);
+}
+
+// ---------------------------------------------------------------------------
+// S6 — the generated Floor 1
+// ---------------------------------------------------------------------------
+
+/// The demo world seed for the generated-floor scenario (the
+/// bridge's `gen`, the scenario binary's GEN section, the
+/// frontend verify).
+pub const GEN_WORLD_SEED: u64 = 0x5EED_0007;
+
+/// S6: the S3 colony founded on a **generated** Floor 1 — the
+/// Shallows produced by `crate::gen` from the colony's world
+/// seed instead of by hand. The camp chamber is the generator's
+/// entry room (same shape as the hand-built scenarios); the
+/// passages, cavities, dens, veins, and descent are the seed's.
+/// The dens' residents are home: one critter per den, placed by
+/// the scenario script, as choreographed tests place theirs.
+pub fn build_scenario_gen(world_seed: u64) -> Sim {
+    let floor = generate_floor(world_seed, 1);
+    let info = floor.info();
+    let faces = floor.layout.faces.clone();
+    let dens: Vec<(Pos, CritterKind)> = floor
+        .layout
+        .cavities
+        .iter()
+        .filter(|c| c.den)
+        .map(|c| (c.centre, c.critter.unwrap_or(CritterKind::GloamRat)))
+        .collect();
+    let delvers = vec![
+        Delver::new(0, "Bram", Pos::new(3, 3, 4), Job::Miner),
+        Delver::new(1, "Sella", Pos::new(4, 3, 5), Job::Farmer),
+        Delver::new(2, "Hale", Pos::new(4, 3, 3), Job::Hauler),
+    ];
+    let mut sim = Sim::new(
+        floor.world,
+        delvers,
+        ENTRY,
+        vec![Pos::new(2, 3, 3), Pos::new(2, 3, 5), Pos::new(6, 3, 5)],
+        faces,
+        GATE,
+        Stores {
+            ore: 0,
+            goods: 0,
+            food: 12,
+            fungal_oil: 0,
+            masks: 0,
+        },
+        world_seed,
+        1500,
+        true, // the dark bites — and this floor's dens are occupied
+    );
+    sim.floor = Some(info);
+    sim.place_lantern(CAMP_LANTERN, 1, 1_000_000.0);
+    sim.plant_plot(Pos::new(5, 3, 3));
+    sim.plant_plot(Pos::new(6, 3, 3));
+    for (pos, kind) in dens {
+        sim.spawn_critter(kind, pos);
+    }
+    sim
+}
+
+/// The player's frontier work on a generated floor — the
+/// analogue of `light_the_way`: carry light from the camp along
+/// the natural passages to the first workable face (the faces
+/// are sorted, so it is the same one the miner will pick),
+/// lanterns spaced inside each other's radius.
+pub fn open_floor1(sim: &mut Sim) {
+    let Some(face) = sim.faces.first().cloned() else {
+        return;
+    };
+    let Some(path) = carved_path(&sim.world, sim.stockpile, face.stand) else {
+        return;
+    };
+    for (i, p) in path.iter().enumerate() {
+        if i % 4 == 3 || i == path.len() - 1 {
+            sim.place_lantern(*p, 1, 5_000.0);
+        }
+    }
 }
