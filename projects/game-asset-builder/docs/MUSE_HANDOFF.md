@@ -1041,3 +1041,27 @@ Catalogue on this branch only — no wallpaper deployment in this run.
   outputs/snow-goblin/before-fringe/; working files +
   overlays in outputs/snow-goblin/fringe-work/; gate record
   in the builder goal's hidden_files/goblin-fringe/.
+
+- **Mandrake Toddler arm-gate fix COMPLETE 2026-11-12**
+  (catalog sha 72fea9f407…, catalog-verify MATCH, suite
+  144/144). Root causes were all in the rig layer, not the
+  mesh: at the default 45k target the shoulder decimation
+  collapsed into pleated fans and bone heat failed or
+  bled (torso arm share 0.60+). Re-rigging the same
+  textured mesh at --target-verts 150000 with P3-SAM
+  labels + trunk:arm zone bans made heat pass (share
+  0.0659). Repairs after that, in order: strip arm weights
+  outside the arm components (mislabelled patches streak
+  at big poses even when a zone-share metric passes);
+  snap arm-component weights to arm/arm2 segment distance
+  (heat mis-binds thin fingertips to the upper-arm bone);
+  fan-fill the body-side shoulder sockets that Layer-3
+  separation leaves open (invisible at rest, a black hole
+  at the signature apex — check the SIDE view at apex).
+  Lessons for thin-limbed assets: rig hi-res, verify
+  components after separation, and never trust the zone
+  metrics alone — view the apex close-ups. GLB is 50.6 MB
+  at this resolution. Failed 45k build preserved in
+  outputs/mandrake-toddler/before-hires-fix/; working
+  record in the builder goal's hidden_files/mandrake-zoneban/
+  (folders 15-hires, 16-snap, 17-armsnap, 18-fill).

@@ -991,3 +991,38 @@ in 615 s on the first post-reboot dispatch):
     builder goal's hidden_files/goblin-fringe/. Deployed to
     the live wallpaper the same day (both PC copies
     hash-verified, Lively re-applied).
+  - **Mandrake Toddler arm-gate rebuild (2026-11-12)**: the
+    Nov 11 build (concept preflight pass 0.4437) failed the
+    posed gate at 45k verts — heat rejected or torso arm
+    share 0.60-0.72, and the scream tore the flank into a
+    pleated sail (decimation fans at the shoulder). Fourteen
+    post-hoc repair iterations on that rig (weld/snap/fill/
+    graft) never passed. Winning route, all on the SAME
+    textured mesh (no GPU stages re-run): re-rig at
+    --target-verts 150000 with labels + --zone-ban
+    trunk:arm.L/R — bone heat ACCEPTED for the first time on
+    this asset, label veto active (97,533 entries), torso
+    arm share 0.0659. Three post-rig repairs, each verified
+    by the full 16-render gate: (1) strip arm-bone weights
+    outside the two arm components (8,695 verts — mislabelled
+    body/leg patches streaking ~2 units at the scream apex);
+    (2) inside the arm components, replace heat weights with
+    arm/arm2 segment-distance weights (13,940 verts — heat
+    had bound fingertips to the upper-arm bone, stretching
+    finger triangles into needles at the elbow bend);
+    (3) fan-fill the body-side shoulder socket loops left
+    open by Layer-3 separation (98 + 110 faces; centroid
+    weights = rim averages) — at rest the arm root plugs the
+    socket, at the scream apex it opened as a black hole.
+    Final gate PASS at the owner's bar: rest/idle/walk/run
+    and the scream (front/side/back + shoulder close-up)
+    viewed — arms separated with daylight, raised arm a
+    clean branched twig, body whole, no sails, needles,
+    holes or tears in any shipped pose; at the beyond-spec
+    2.2 rad stress the torso still holds (artifacts confined
+    to joint extremes). **Catalogued sha 72fea9f407…,
+    catalog-verify MATCH; suite 144/144.** Rig is 135,638
+    verts (GLB 50.6 MB — the price of the hi-res rig).
+    Failed build preserved in outputs/mandrake-toddler/
+    before-hires-fix/; iteration record (15-hires → 18-fill)
+    in the builder goal's hidden_files/mandrake-zoneban/.

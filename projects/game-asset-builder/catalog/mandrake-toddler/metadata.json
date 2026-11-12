@@ -2,16 +2,16 @@
  "entry_version": 1,
  "name": "Mandrake Toddler",
  "slug": "mandrake-toddler",
- "source_concept": "media-generation-media-generation-mandrake-todd-0-92537b0a-a935-4625-8c75-df3aba105ca8.webp",
+ "source_concept": "media-generation-armfix-mandrake-twobulb-0-9ad41a1a-bb49-4022-86cd-ef15cae91f2b.webp",
  "asset_file": "mandrake-toddler.glb",
  "asset_location": "outputs/<slug>/ (local; not in git)",
- "sha256": "c9010c3a7ccd1625f661c134417dcf769567bc808e2eb08a089ff7c919b738b0",
- "bytes": 20635552,
+ "sha256": "72fea9f4078223fa97b710b8f0eb3e6b58ef6a5b1b707cfaeaa8a3d98b6109b6",
+ "bytes": 50635060,
  "counts": {
-  "verts": 45013,
-  "faces": 87389,
-  "raw_mesh_verts": 558050,
-  "raw_mesh_faces": 710862
+  "verts": 135638,
+  "faces": 268000,
+  "raw_mesh_verts": 422904,
+  "raw_mesh_faces": 537568
  },
  "bones": [
   "root",
@@ -38,28 +38,29 @@
   "rigged": true,
   "rig_template": "biped",
   "signature_clip": "scream",
-  "weight_method": "bone-heat (automatic weights); geodesic distance veto (factor 0.85, floor 0.19); label-aware veto (P3-SAM parts, 335 entries vetoed by label); distance rescue on 1595 verts",
+  "weight_method": "bone-heat (automatic weights); geodesic distance veto (factor 0.85, floor 0.19); label-aware veto (P3-SAM parts, 97533 entries vetoed by label); cross-zone ban (trunk:arm.L, trunk:arm.R); distance rescue on 4962 verts; post-rig repairs 2026-11-12 (arm-gate fix): stray arm-weight strip outside the arm components (8,695 verts), arm-chain segment-distance weight snap inside the arm components (13,940 verts), body-side shoulder-socket fan fill (208 faces; centroid weights = rim average)",
   "segmentation": {
    "model": "P3-SAM (Tencent Hunyuan3D-Part)",
-   "parts": 9,
-   "proxy_faces": 49997,
-   "islands_relabelled": 35,
-   "separated_verts_added": 1375,
-   "labelled_verts": 45013
+   "parts": 12,
+   "proxy_faces": 50000,
+   "islands_relabelled": 13,
+   "separated_verts_added": 1771,
+   "labelled_verts": 135636
   },
   "label_map": {
    "0": {
     "dominant": "head",
     "allowed": [
-     "arm.L",
-     "arm.R",
-     "arm2.L",
-     "arm2.R",
      "head",
      "root",
      "spine"
     ],
     "forbidden": [
+     "arm.L",
+     "arm.R",
+     "arm2.L",
+     "arm2.R",
+     "leg2.L",
      "leg2.R"
     ]
    },
@@ -71,6 +72,11 @@
      "spine"
     ],
     "forbidden": [
+     "arm.L",
+     "arm.R",
+     "arm2.L",
+     "arm2.R",
+     "leg2.L",
      "leg2.R"
     ]
    },
@@ -82,39 +88,56 @@
      "spine"
     ],
     "forbidden": [
+     "arm.L",
+     "arm.R",
+     "arm2.L",
+     "arm2.R",
+     "leg2.L",
      "leg2.R"
     ]
    },
    "3": {
-    "dominant": "head",
+    "dominant": "leg2.R",
     "allowed": [
      "head",
+     "leg.R",
+     "leg2.R",
      "root",
      "spine"
     ],
     "forbidden": [
-     "leg2.R"
+     "arm.R",
+     "arm2.L",
+     "leg2.L"
     ]
    },
    "4": {
-    "dominant": "head",
+    "dominant": "arm.R",
     "allowed": [
-     "head",
-     "root",
-     "spine"
+     "arm.R",
+     "arm2.R"
     ],
     "forbidden": [
-     "leg2.R"
+     "arm2.L",
+     "head",
+     "leg2.L",
+     "leg2.R",
+     "root",
+     "spine"
     ]
    },
    "5": {
-    "dominant": "head",
+    "dominant": "leg2.L",
     "allowed": [
      "head",
+     "leg.L",
+     "leg2.L",
      "root",
      "spine"
     ],
     "forbidden": [
+     "arm.R",
+     "arm2.L",
      "leg2.R"
     ]
    },
@@ -126,21 +149,28 @@
      "spine"
     ],
     "forbidden": [
+     "arm.L",
+     "arm.R",
+     "arm2.L",
+     "arm2.R",
+     "leg2.L",
      "leg2.R"
     ]
    },
    "7": {
-    "dominant": "leg2.R",
+    "dominant": "arm2.L",
     "allowed": [
-     "arm2.R",
+     "arm.L",
+     "arm2.L"
+    ],
+    "forbidden": [
+     "arm.R",
      "head",
-     "leg.R",
      "leg2.L",
      "leg2.R",
      "root",
      "spine"
-    ],
-    "forbidden": []
+    ]
    },
    "8": {
     "dominant": "head",
@@ -150,6 +180,59 @@
      "spine"
     ],
     "forbidden": [
+     "arm.L",
+     "arm.R",
+     "arm2.L",
+     "arm2.R",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "9": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R",
+     "arm2.L",
+     "arm2.R",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "10": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R",
+     "arm2.L",
+     "arm2.R",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "11": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R",
+     "arm2.L",
+     "arm2.R",
+     "leg2.L",
      "leg2.R"
     ]
    }
@@ -158,12 +241,8 @@
    "hostname": "AthenZ971",
    "agent": "1.1.0"
   },
-  "mesh_stage": {
-   "resumed": true
-  },
-  "texture_stage": {
-   "resumed": true
-  }
+  "rig_target_verts": 150000,
+  "repairs_folder": "hidden_files/mandrake-zoneban (15-hires rig, 16-snap strip, 17-armsnap, 18-fill)"
  },
  "clips": {
   "idle": {
