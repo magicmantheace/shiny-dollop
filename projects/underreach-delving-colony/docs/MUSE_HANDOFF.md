@@ -162,12 +162,27 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   windowed on the owner's PC against a live cross-compiled sim
   bridge: `UNDERREACH_VERIFY_PASS` on Windows with identical
   numbers and zero script errors. Details in `docs/TEST_PLAN.md`.
-- **Implemented but unverified (visual):** the frontend's rendered
-  appearance — the on-PC pass was engine-verified live, but the
-  workstation was locked, so every screenshot captured only the
-  Windows lock screen and no game screenshot exists yet; see
-  TEST_PLAN's S4 section. This covers how the delver, lantern,
-  cot, and gloam-lurker look in the scene.
+- **CONFLICT RECORDED 2026-11-12 (rule 3 — implementation reality
+  vs the spec's working-prototype expectation):** the capture redo
+  ran on the owner's PC with the workstation unlocked. The sim is
+  genuinely live (live `state.json`: 15 carved/lit cells at the
+  viewed layer, 4 delvers and a lantern beside the camera target;
+  HUD tick/Food/Delvers advancing; zero script errors) — **but the
+  3D viewport renders pitch black in every frame**: no terrain, no
+  delver, no lantern prop or light pool, no labels. The headless
+  verify counts instances and nodes and never checks pixels, which
+  is how this survived every earlier pass. Root cause is NOT
+  proven; candidates from the code read are MultiMesh
+  instance-colour handling with `vertex_color_use_as_albedo` under
+  the Compatibility renderer, or world-node setup. Recorded here
+  rather than silently worked around; diagnosis/fix is the next
+  step, on the owner's go. Until then the frontend's rendered
+  appearance (delver, lantern, cot, gloam-lurker in scene) is
+  unverified and the 3D view must be treated as not working.
+- **On-PC run note:** the PC verify/launch needs the
+  `UNDERREACH_BRIDGE` environment variable set to the release
+  `bridge.exe` path; without it the frontend falls back to a
+  non-existent debug path and fails.
 - **Planned:** the "Later" list above (Drowned/Crystal/Magma
   mechanics, co-op, succession, generations) — future programs, not
   part of the 2026-11-10 all-slices build.

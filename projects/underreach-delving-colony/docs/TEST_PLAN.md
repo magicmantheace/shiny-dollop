@@ -182,10 +182,23 @@ A scripted Shallows colony: camp chamber, shaft, tunnel, ore face.
 - **Not verified:** rendered appearance. The workstation was
   locked (LogonUI) throughout, so all screenshots captured only
   the Windows lock screen; the captures were deleted rather than
-  kept as misleading "game" images. The staging and import cache
-  persist on the PC, so the capture redo is minutes of work once
-  the PC is unlocked. Animation motion was not observed; clip
-  playback rests on the headless verifies.
+  kept as misleading "game" images. Animation motion was not
+  observed; clip playback rests on the headless verifies.
+- **Capture redo (2026-11-12, workstation unlocked):** staging
+  restaged from branch tip `3cca4f2` (lurker swap included; all
+  GLB shas re-verified on the PC), import pass redone, project
+  check again `UNDERREACH_VERIFY_PASS` with identical numbers.
+  (Wrinkle: the verify needs `UNDERREACH_BRIDGE` set to the
+  release `bridge.exe`; without it the frontend falls back to a
+  non-existent debug path.) The live run climbed past tick 3,783
+  with the HUD advancing and zero script errors — **but the 3D
+  viewport is pitch black in every capture** while the live
+  `state.json` held 15 carved/lit cells, 4 delvers, and a lantern
+  at the viewed layer beside the camera target. Nothing 3D is
+  drawn: no terrain, models, light pools, or name labels.
+  Appearance is therefore still unverified — now blocked on this
+  rendering defect, not on access. Root cause unproven; the
+  conflict is recorded in `docs/MUSE_HANDOFF.md` (rule 3).
 
 ## Asset swap — gloam-lurker critter (verified 2026-11-12, VM headless)
 
