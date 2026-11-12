@@ -101,6 +101,33 @@ needs to go deeper.
 10. **Known cost driver (flagged at filing): villager AI.** Mitigated
     by decision 3 (pathing on the lit network, not free-solving).
 
+## Owner decisions (2026-11-12) — procedural floor generation
+
+11. **Themed floors from a unified world seed.** Each floor is
+    randomly generated from its band **theme** and the colony's
+    **unified world seed**, starting with a designed Floor 1;
+    placeholder assets are acceptable for now. (Implementation:
+    a floor's layout is a pure function of `(world_seed,
+    floor_index)` — hash-mixed per-floor seed, never sequential
+    draws; generation does not consume the runtime RNG. Full
+    record: `docs/FLOOR_GENERATION.md`.)
+12. **Pre-connected passages (amendment, same day).** Each floor
+    also starts with a natural passage network: pre-carved
+    tunnels connecting the entry camp to several natural
+    cavities and partway through the floor — with branches, dead
+    ends, and at least one loop. The richest veins and some
+    cavities stay off-network, reachable only by carving.
+    Passages start dark and follow the ordinary lit-nav-graph
+    rules; no sim rule treats them specially.
+13. **Dens and stairs on the network (amendment #2, same day —
+    this settles the descent question).** The passage network
+    connects to some monster dens (Floor 1: at least 2 gloam-rat
+    dens on-network, none within 10 network steps of the entry;
+    off-network dens are a minority). **The stairs down live in
+    a natural cavern on the network**, far from the entry in
+    network distance (Floor 1 guarantee: ≥ 24 steps), so finding
+    the way down is exploration, never a strip-mining search.
+
 ## Architecture
 
 Core/frontend split, the Milky Way pattern: a deterministic Rust sim
@@ -131,8 +158,18 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   gate set (masks, fungal oil, herbalist), band recombination
   groundwork (`hazards_at` table; flooded/hot flags modelled, only
   spores simulated so far).
-- Later: Drowned/Crystal/Magma gates, co-op, colony failure &
-  succession, children/generations.
+- **S6 — procedural floor generation (BUILT 2026-11-12, branch
+  `underreach-delving-colony/floor-generation`).** Owner decisions
+  11–13 above: a seeded generator (`sim/src/gen.rs`) producing a
+  floor as a pure function of `(world_seed, floor_index)` — theme
+  table for all five bands (Floor 1 designed, the rest explicit
+  stubs), natural passage network with dens and the descent
+  cavern on it, embedded veins/hazard pockets/dressing. The S3
+  colony loop runs end-to-end on a generated Floor 1 (bridge
+  scenario `gen`). Design record: `docs/FLOOR_GENERATION.md`.
+- Later: Drowned/Crystal/Magma gates, floor-to-floor traversal,
+  cave-in/bad-air mechanics, co-op, colony failure & succession,
+  children/generations.
 
 ## Status — 2026-11-10
 
@@ -203,3 +240,17 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   and plays live on the owner's PC.
 - No performance claims: the frontend has run on owner hardware,
   but no frame-time measurement has been taken there.
+- **S6 — procedural floors (2026-11-12, VM-verified; branch
+  `underreach-delving-colony/floor-generation`, not yet merged):**
+  owner decisions 11–13 built and verified headless — `cargo
+  test` 37/37 (25 pre-existing + 10 new generation tests + 2
+  generator unit tests), the `scenario` binary's GEN section runs
+  the colony loop clean on the demo-seed Floor 1 (goods 24 after
+  opening, nobody lost), and the Godot headless verify prints
+  both PASS lines (s3 unchanged; `scenario=gen` with 61 floor
+  instances on the descent layer). The network guarantees hold
+  across seeds 1–16 + the demo seed. NOT built: floors 2–5
+  scenarios/balance (stub themes generate only), floor-to-floor
+  traversal, cave-in/bad-air mechanics, face registration for
+  embedded pockets. Full record: `docs/FLOOR_GENERATION.md`,
+  numbers in `docs/TEST_PLAN.md`.

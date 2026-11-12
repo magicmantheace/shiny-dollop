@@ -58,6 +58,17 @@ headless for load and logic; the rendered appearance is still
 unverified, pending an on-PC visual pass. No frame or performance
 claims exist — nothing has run on owner hardware.
 
+**S6 — procedural floor generation (2026-11-12, branch
+`underreach-delving-colony/floor-generation`):** each floor is
+generated as a pure function of the colony's unified world seed
+and the floor index, driven by a per-band theme table — a natural
+passage network with monster dens and the stairs down on it,
+embedded ore veins, hazard pockets, and dressing anchors. Floor 1
+(the Shallows) is designed and verified end-to-end (the colony
+loop runs on it through the bridge's `gen` scenario); the other
+four bands are explicit NOT-BUILT stubs that generate through the
+same code. Design record: `docs/FLOOR_GENERATION.md`.
+
 ## Layout
 
 - `sim/` — the Rust simulation core, its tests, the `scenario`
@@ -68,5 +79,8 @@ claims exist — nothing has run on owner hardware.
   provenance.
 - `docs/MUSE_HANDOFF.md` — design record, slice plan, status.
 - `docs/TEST_PLAN.md` — verification plan and results.
+- `docs/FLOOR_GENERATION.md` — the S6 floor-generation design
+  record (seed scheme, theme table, Floor 1 numbers, placeholder
+  mapping).
 - `REQUIREMENTS.md` — project requirements.
 - `AGENTS.md` — project rules.

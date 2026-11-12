@@ -277,9 +277,91 @@ A scripted Shallows colony: camp chamber, shaft, tunnel, ore face.
   playback — load is proven by the verify run; looks await the
   unlocked-PC capture redo above.
 
+## S6 — procedural floor generation (verified 2026-11-12, VM headless)
+
+Branch `underreach-delving-colony/floor-generation`. Design
+record: `docs/FLOOR_GENERATION.md`. Save hashes for S1–S5 shift
+in this slice (the save gains `world_seed` and `floor` fields);
+behaviour numbers are unchanged, and determinism is proven by
+the twin-run tests as before.
+
+### Generator tests (`sim/tests/gen_floor.rs`, 10 tests)
+
+- **Purity:** same seed + floor → identical world hash and
+  layout across runs; floors 1–4 generated standalone equal
+  floors generated sequentially and interleaved; seeds 1/2/3 →
+  pairwise different floor 1s; floor 1 ≠ floor 2 for one seed.
+- **Network guarantees across seeds 1–16 + demo seed
+  `0x5EED0007`:** entry → descent reachable via passages alone
+  every time; measured descent network distance **25–45**
+  (guarantee ≥ 24, and the layout's recorded distance equals
+  the measured one); every connected cavity reached, every
+  sealed cavity unreached; on-network dens exactly **2** at
+  distances **18–36** (guarantee ≥ 2 at ≥ 10); sealed dens 0–1
+  (minority); node graph 8 nodes / 8 links (one loop); camp room
+  intact; 3 faces with carved stands and ore rock; 6 veins with
+  at least one embedded pocket.
+- **Hazards:** the world's Loose/BadAir cells are exactly the
+  layout's pockets; every bad-air cell at y ≥ 6; loose 7–12
+  cells, bad air 5–8 cells per floor across the spread.
+- **RNG separation:** the gen scenario starts with
+  `rng_state == world_seed`, and `open_floor1` draws nothing.
+- **Save/load:** generated-floor sim saved at tick 500 reloads
+  to the identical hash, floor record included; twin
+  continuation for 300 ticks stays identical.
+- **Colony loop on the generated floor:** 200 dark ticks →
+  goods 0, deliveries 0, RouteBlocked ≥ 1; after `open_floor1`,
+  6 000 ticks → deliveries ≥ 3, goods ≥ 2 (actual 24), nobody
+  lost.
+- **Rescue on generated geometry:** a deep lurker staged beside
+  the first face downs Bram; a rescuer carries him home within
+  the 1 500-tick window; nobody lost.
+- **Stub bands:** floor 2 generates as Fungal Reaches with
+  fungal-node cells present and `built == false`; floor 5 is
+  Magma Roots; floor 6 recombines to Fungal Reaches.
+
+### Defects found by these tests during development (both fixed)
+
+- **HashSet-order impurity:** one sampling step iterated a
+  `HashSet` unsorted, so floor 2 could differ between
+  generation orders. Fixed by sorting every sampled set; the
+  independence test now covers stub bands for this reason.
+- **Bad-air depth leak:** hazard pockets were *seeded* at
+  y ≥ 6 but *grew* upward. The growth predicate now enforces
+  the floor's minimum y for the whole pocket.
+
+### Full-suite + harness results
+
+- `cargo test`: **37/37** (25 pre-existing + 10 gen_floor + 2
+  generator unit tests), 0 failed.
+- `scenario` binary (release): S1/S2/S3/S5 sections unchanged
+  in behaviour (S1 goods 6, S3 goods 20, S5 oil 19). New GEN
+  section: phase 1 goods=0, RouteBlocked=1; after opening,
+  **goods=24, deliveries=13, conversions=13, delvers alive=5,
+  lost=0** at tick 6 200; descent (20, 9, 3) at network
+  distance 28; 52 network cells; 2 dens; 3 faces. GEN state
+  hash `ba202ca7f045f5443d08…`.
+- Godot headless verify prints **both** lines:
+  `UNDERREACH_VERIFY_PASS goods=20 delvers=5 floor_instances=15
+  tick=4000` (s3, unchanged) and `UNDERREACH_VERIFY_PASS
+  scenario=gen goods=24 delvers=5 floor_instances=61 tick=4000`
+  — for gen, the view layer is set to the descent's depth (9),
+  so 61 is the generated floor's carved-cell count on that
+  layer.
+- **Not verified:** generated-floor appearance on the owner's
+  PC (placeholder markers have never been rendered outside the
+  headless load check); floors 2–5 balance (stub themes);
+  cave-in/bad-air mechanics (cells exist, no mechanics);
+  floor-to-floor traversal (descent is a marker, not a
+  transition).
+
 ## Planned (later slices)
 
 - Owner-PC visual pass of the frontend; performance measurement
   before any frame budget claim.
 - The dedicated gloam-lurker asset once it is built (not yet in the
   builder catalog); the ember-dragon stands in until then.
+- S6 follow-ons: floor-to-floor traversal, cave-in/bad-air
+  mechanics with their timber/ventilation answers, face
+  registration when a pocket is carved open, floors 2–5
+  scenarios.
