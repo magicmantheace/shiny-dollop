@@ -1,3 +1,144 @@
+# Newest singleton release recovery: leg D, a newest-singleton acting-corroboration release path on the regular recovery branch — 2026-11-12 (FAILED / REGRESSION, stationary clause)
+
+Optional `developmental_ai/newest_singleton_release_recovery.py`
+(identical to the graded newest candidate in every element —
+acting model recent8 exactly, extended signal, retained archive,
+archive concordance, joint test joint_count >= 1, recovery model,
+the full three-leg authority condition, the minority branch in
+full INCLUDING the inverted minority model and leg W on the
+minority branch, leg T on both recovery branches, leg P >= 0.70,
+leg R and leg C on partial abstention triggers, and the full /
+retained-partial abstention classes with the widened class
+removed records-only, support threshold null; the SINGLE changed
+element is leg D: the regular branch ALSO fires when
+newest_joint_count == 1 AND acting_joint_count >= 3, NO new
+numeric threshold — the singleton is the exact complement of
+leg N's threshold 2 and the corroboration threshold is leg W's
+graded acting_joint_threshold 3; new decision-record field
+singleton_release_fired; recovery_disarmed_by_newest_breadth
+keeps its graded formula; leg N / leg W (minority) / leg T /
+leg P / leg R / leg C explicitly NOT re-tuned) was evaluated
+under the protocol frozen BEFORE implementation at
+`benchmarks/newest_singleton_release_recovery_protocol.json`
+on NEW cohorts 522003/522021/522039 and 523001/523017/523041,
+both now INSPECTED — never re-tune against them. **Graded
+Failed / Regression (stationary clause) under the protocol's
+own definitions (PRIMARY criterion 18 PASSes on BOTH cohorts —
+and the Failed clause triggers on the additional cohort several
+times over: criteria 6, 1, and 11 FAIL there, criterion 7
+PASSes both — and a Regression clause triggers on the
+stationary arm: control successes 86 vs recent8 94 (−8)
+development and 89 vs 101 (−12) additional, both past the
+more-than-6 both-cohorts line, on carried abstention firings
+identical to the decisive baseline's; the other Regression
+clauses do not trigger — pooled onset harm 142/79 below
+recent8 256/268, k=32 successes 58/71 at exact recent8 parity
+above the recent8 − 4 lines of 54/67, suite + transfer pass).**
+Per-criterion, development / additional, PRIMARY criterion 18
+first, then co-graded guards 5, 9, 6, 1, 11, 17, 4, 2, 3, 7:
+C18 PASS/PASS (the same computation as C5: abstentions 0/144,
+successes at EXACT recent8 parity 58/71, non-recent8 0/9,
+abstained 0/9 on both — as a CARRIED PROFILE with a
+singleton-release null result: neither cohort drew ANY
+checkpoint-32 routing, all 9 k=32 states per cohort are
+recent8 under candidate, decisive, and recent8 alike with
+pooled k=32 successes/harm 58/86 and 71/73 identical under
+all three, every firing path "neither", leg D fired ZERO
+times at checkpoint 32 on either cohort, so the grading cap
+is NOT MET on either cohort and the pass must never be stated
+as a release demonstration), C5 PASS/PASS (same computation),
+C9 PASS/PASS (TAKEN 4/6 on both — dev 2 full + 2 partial
+through R+C / R, harm 20 vs guard 49 and < recent8 81, B1
+successes 12 vs 15/15; add 2 full + 2 partial through C /
+R+C, harm 29 vs guard 72 and < recent8 87, successes 3 vs
+9/8; candidate identical to decisive at every B1 state both
+cohorts), C6 FAIL/FAIL (dev on (b) alone — abstentions 32/240
+AT the budget PASS, successes 86 vs 94 required >= 88 FAIL
+by 2, harm 122 vs 146 PASS; two carried firings, 522003 k=2
+partial through leg C purity 0.868 and 522003 k=8 full 0.889;
+add on (a) AND (b) — abstentions 48/240 FAIL, successes 89
+vs 101 required >= 95 FAIL by 6, harm 103 vs 139 PASS; three
+carried firings, 523001 k=2 partial through leg C 0.846,
+523001 k=4 partial 0.846, 523041 k=32 partial 0.886; branch
+diffs vs decisive 0/15 graded control states on both), C1
+FAIL/FAIL (dev on (a) AND (d) — minority 1/6, selectivity
+0/6 / 0/6, harm 52 vs guard 91 / ceiling 54.6 PASS both,
+successes 12 vs guard+16 = 21 FAIL; add on (a) alone —
+minority 2/6, selectivity 0/6 / 0/6, harm 13 vs guard 48 /
+ceiling 55.8, successes 19 vs 16; minority branch bit-for-bit
+the baseline's on both), C11 FAIL/FAIL (both on their
+stationary side only), C17 FAIL/PASS (dev on ceiling (b)
+alone — harm 70 vs guard 84 PASS, ceiling 0.60 x recent8 84
+= 50.4 FAIL, regular TAKEN 2/6 = decisive; add in full —
+37 vs guard 60 / ceiling 52.8, regular 5/6), C4 FAIL/PASS
+(the same computation as C17), C2 FAIL/PASS (dev 26 vs
+frozen_A floor 22.4 PASS but guard+16 = 28 FAIL by 2; add
+59 vs floor 24.8 and guard+16 = 20 PASS — frozen_A 56/40
+and cumulative 68/28 beat the candidate 26/70 on BOTH axes
+on development, and frozen_A 62/34 / cumulative 72/24 sit
+above the candidate's 59 successes with lower harm than its
+37 on additional), C3 PASS/PASS (142 vs guard 224, cells
+6/6 dev; 79 vs guard 180, cells 6/6 add; pooled onset
+IDENTICAL to decisive on both at graded checkpoints), C7
+PASS/PASS (replay 72/72 per cohort, singleton_release_fired
+and the recovery_fired leg-N-or-leg-D composition recomputed
+everywhere with 0 mismatches, singleton-rule == candidate
+branch and newest-breadth-rule == decisive branch
+everywhere, companion fields recomputable at every partial
+state (30 dev / 26 add) and at fallback elsewhere, kind
+never widened, stale lists of 18, acting lists of 8 and
+newest lists of 4 with all counts recomputable everywhere
+and newest records == acting tail, thresholds 2/3/2/3/1/null
+as registered, minority_model_archive_count ==
+archive_events_count and minority_model_inverted true
+everywhere, cross-check PASS at every minority-fired state
+2/2 dev and 3/3 add, acquisition 0). **The grading cap is
+NOT MET on either cohort — leg D's designed checkpoint-32
+release population did not occur on these draws (zero k=32
+routings of any kind were drawn); leg D's ONLY firing
+anywhere was one ungraded state, additional 523001 return-A
+k=16 (newest 1 / acting 3, stale 1, purity 0.707), candidate
+retained 10/6 vs decisive abstained 0/0 and recent8 4/12 — a
+productive release at k=16 that is NOT a checkpoint-32
+release and must not be counted toward the cap; on
+development leg D never fired at any checkpoint (candidate
+identical to decisive at 0/72; additional 1/72). Leg T
+disarmed ZERO states on either cohort for the fifth
+consecutive cycle.** Full unit suite (1848) and historical
+transfer benchmark passed in the implementation, evaluation,
+and grading stages; no CI claimed for the evaluation or
+grading commits (UNVERIFIED). See
+`docs/NEWEST_SINGLETON_RELEASE_RECOVERY.md`. Keep the
+learner optional and unpromoted, default controller unchanged,
+no merge, no AthenZ/Synveil integration, D1–D10/V2A/V2B
+unchanged. Next limitation selected: P1 stationary selectivity
+of the carried abstention classes — criterion 6 FAILs on BOTH
+cohorts (development on successes alone at volume AT the
+budget; additional on volume 48/240 AND successes) and carries
+this cycle's Regression (control successes −8 / −12), on five
+carried abstention firings identical to the decisive
+baseline's on an arm where every breadth/release leg is inert
+in expectation; whether an evidence-derived condition on the
+abstention classes themselves can hold criterion 6's frozen
+form on BOTH cohorts while holding B1 engagement (criterion 9,
+PASSing both — the same classes at onset), checkpoint-32
+release (criteria 18/5, PASSing both as a carried profile),
+B2 protection (criterion 1), and return-A profiles (criteria
+17/4/2) as co-graded guards, on NEW cohorts under a NEW
+protocol. Recorded but not selected: criterion 1 FAILs on
+both cohorts as well (minority 1/6 dev with successes also
+failing; 2/6 add on the count alone) — a carried engagement
+draw identical to the decisive baseline's with harm passing
+both comparisons on both, carried as a co-graded guard;
+development's criteria 17/4 failure is the return-A ceiling
+alone at fully carried states with additional passing in
+full, and its criterion 2 failure is the guard comparison
+alone by 2; checkpoint-32 release passes both with zero
+routings drawn, so there is no release population to retry
+and leg D's single productive k=16 firing is recorded, not a
+graded population; frozen_A / cumulative both-axes return-A
+dominance holds on both cohorts again.
+
 # Newest window joint breadth recovery: leg N, a newest-window joint-breadth leg replacing leg W on the regular recovery branch — 2026-11-11 (FAILED / REGRESSION at checkpoint 32)
 
 Optional `developmental_ai/newest_window_joint_breadth_recovery.py`

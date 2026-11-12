@@ -1122,6 +1122,58 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 12 — Newest singleton release recovery: leg D, a newest-singleton acting-corroboration release path on the regular recovery branch (FAILED / REGRESSION, stationary clause)
+
+Optional `NewestSingletonReleaseRecoveryMemory` is identical to
+the graded newest candidate in every element — acting model,
+extended signal, retained archive, archive concordance, joint
+recovery test, recovery model, the full three-leg authority
+condition, the minority branch in full INCLUDING the inverted
+minority model and leg W on the minority branch, leg T on both
+recovery branches, leg P ≥ 0.70, leg R and leg C on partial
+abstention triggers, and the full / retained-partial abstention
+classes with the widened class removed, support threshold null;
+the SINGLE changed element is leg D: the regular branch ALSO
+fires when newest_joint_count == 1 AND acting_joint_count >= 3,
+with NO new numeric threshold (the singleton is the complement
+of leg N's threshold 2; the corroboration threshold is leg W's
+graded 3) — under a protocol frozen before implementation (new
+cohorts 522003-family / 523001-family, now INSPECTED). **Graded
+Failed / Regression (stationary clause) under the protocol's own
+definitions (PRIMARY criterion 18 PASSes on BOTH cohorts, but the
+Failed clause triggers on the additional cohort several times
+over — criteria 6, 1, and 11 FAIL there, criterion 7 PASSes both;
+the Regression clause triggers on the stationary arm:
+control successes −8 development and −12 additional, both past
+the −6 both-cohorts line, on carried abstention firings identical
+to the decisive baseline's).** Stated as prominently as the
+failure: the frozen checkpoint-32 release form held on both
+cohorts for the first time as a PRIMARY (abstentions 0/144,
+non-recent8 0/9, abstained 0/9, successes at exact recent8
+parity) — but it held VACUOUSLY: neither cohort drew a single
+checkpoint-32 routing, all nine k=32 states per cohort are
+recent8 under candidate, decisive baseline, and recent8 alike,
+and leg D fired ZERO times at checkpoint 32 on either cohort —
+**the grading cap is NOT MET; a carried-profile pass with a
+singleton-release null result at checkpoint 32, the leg
+demonstrated nothing there on these draws.** Leg D's only firing
+anywhere was one ungraded state (additional 523001 return-A
+k=16, newest 1 / acting 3, stale 1, purity 0.707): candidate
+retained 10/6 vs decisive abstained 0/0 — productive, of exactly
+the designed shape, and not counted toward the cap. Criteria 9
+and 3 pass both; criteria 17/4 and 2 fail development only
+(ceiling alone; guard comparison alone by 2) and pass additional
+in full; criteria 6 and 1 fail BOTH cohorts on carried draws
+identical to the decisive baseline (stationary firings 2 dev /
+3 add; minority 1/6 dev, 2/6 add). Leg T disarmed zero states
+for the fifth consecutive cycle. Next limitation selected: P1
+stationary selectivity of the carried abstention classes —
+criterion 6 fails both and carries the Regression, on NEW
+cohorts under a NEW protocol. Learner acquisition actions zero;
+external TRAIN actor harm published in full in the report.
+[Complete preregistration, results and limitations](docs/NEWEST_SINGLETON_RELEASE_RECOVERY.md).
+
+
 ### November 11 — Newest window joint breadth recovery: leg N, a newest-window joint-breadth leg replacing leg W on the regular recovery branch (FAILED / REGRESSION at checkpoint 32)
 
 Optional `NewestWindowJointBreadthRecoveryMemory` is identical to
