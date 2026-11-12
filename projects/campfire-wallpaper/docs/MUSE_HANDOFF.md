@@ -375,3 +375,31 @@ superseding `2bd78ce04579…`. Measured on the baked clip: yaw
 −55°/+57.7° at the holds, beak height level (±0.005).
 Re-deployed live the same day (both PC copies hash-verified,
 Lively re-applied).
+
+
+## Arm-separation rebuilds deployed — crow, toasty, axolotl (2026-11-12)
+
+The owner's arm-separation hard requirement (arms/limbs must not be
+fused to the body along their length) failed 6 of the 11 roster
+creatures in the 2026-11-10 audit. Three rebuilds have now passed
+both builder gates (concept preflight + posed-render) and are
+catalogued on builder branch `game-asset-builder/arm-separation-fixes`;
+their GLBs were copied byte-for-byte into `assets/`, superseding the
+audited originals:
+
+| File | Bytes | sha256 | Change vs old |
+| --- | --- | --- | --- |
+| crow-postman.glb | 19,319,632 | `c2e23612d2b2507c0a6458c6558e7f30145369129562c4c1133772b23a69f68a` | was 21,106,560 bytes; 299,290 → 269,509 verts; clips bow/idle/run/walk unchanged |
+| toasty.glb | 22,066,560 | `3818679c9ffcaee8c6298247b3e423fb5e10722c79f9033b60343c812a486d48` | was 21,960,832 bytes; 298,831 → 297,350 verts; clips bounce/idle/run/walk unchanged |
+| axolotl-capybara.glb | 19,814,040 | `a925ab9292794da7dc4b22d1a369581a3373c975dbec0bf631ef6b831ef3d214` | was 19,525,868 bytes; 256,278 → 267,894 verts; clips idle/run/walk/wiggle unchanged |
+
+Disclosed gate weaknesses carried with the rebuilds (builder record):
+the crow's coat side panel sails at a 2.2 rad stress raise (onset
+~1.7 rad; no shipped crow clip exceeds ~0.6 rad arm raise) and
+Toasty peels a body-surface flap at the same out-of-range stress;
+the axolotl gate was clean. Snow-goblin, mandrake-toddler and
+ember-owl-cat remain the ORIGINAL builds in `assets/` — no gated
+replacement exists for them yet (the goblin rebuild's good textured
+mesh is held at the posed gate by its wave-clip fur blade; see the
+builder HANDOFF). Deployed live 2026-11-12: both PC copies
+re-synced and hash-verified, Lively re-applied.

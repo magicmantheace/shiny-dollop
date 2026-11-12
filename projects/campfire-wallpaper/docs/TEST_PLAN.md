@@ -568,3 +568,22 @@ by the gated harness capture above.)
   eleven templates loaded, zero load/console errors.
 - Redeployed live: GLB synced to both PC copies and
   hash-verified; Lively re-applied; live screenshot checked.
+
+
+## Arm-separation rebuild deploy (2026-11-12)
+
+- Three gated builder rebuilds (crow-postman, toasty,
+  axolotl-capybara) copied byte-for-byte from the builder catalog
+  (branch `game-asset-builder/arm-separation-fixes`, catalog-verify
+  MATCH on all three) into `assets/`; sha256 values recorded in
+  `docs/MUSE_HANDOFF.md`.
+- **Frame cost.** No code changes: same scene, same clip sets
+  (walk present in all three, director seam untouched), same
+  on-stage cap (MAX_ACTIVE = 3). Vertex deltas are small (crow
+  −10%, toasty −0.5%, axolotl +4.5%), so steady-state GPU/CPU cost
+  is unchanged in kind; real-GPU frame cost remains unmeasured,
+  the standing caveat.
+- Deployed live: the three GLBs synced to both PC copies
+  (`D:\wallpapers\campfire-wallpaper` and the Lively Library copy)
+  and hash-verified on the PC; Lively re-applied via the library
+  UI; live desktop screenshot checked after re-apply.
