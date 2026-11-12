@@ -902,24 +902,40 @@ GPU stage, and the finished rig gets a posed-render check.
   posed-render half passes. Disclosed: dark/muddy texture on the
   face under the helmet brim; backpack/pickaxe reads as a shoulder
   hump from some angles.
-- **Gloam Lurker — NOT CATALOGUED (texture stage failed twice).**
-  The shipped concept also failed the gate (quadruped preflight:
-  legs read as one fused mass, 0 components after erosion), a
-  separated-legs concept PASSED (3 components, gap 0.0322), and
-  the mesh built clean (317,866 faces). Attempt 1 texture: loaded,
-  then no output for ~7,400 s with the stall signature (GPU 100%
-  at ~62 W, one CPU core, private memory byte-stable 14,383 MB) —
-  killed at the tree root; log preserved at
-  `outputs/gloam-lurker/texture-attempt1.log`. Attempt 2 (fresh
-  dispatch on the same mesh): the stage process died natively
-  after 103 s, exit code 0xC0000005 (access violation) during the
-  paint pipeline's second model-load phase; log at
-  `texture-attempt2.log`. Two different failures on one mesh while
-  the Delver completed the identical stage the same night →
-  asset-local, root cause UNPROVEN. No py-spy on the PC, so no
-  thread dump exists for either failure. Mesh + cutout intact on
-  disk; a future retry needs no re-mesh. Disposition note:
-  `outputs/gloam-lurker/attempt1-texture-note.txt`.
+- **Gloam Lurker — CATALOGUED 2026-11-12 (texture attempt 3
+  succeeded).** The shipped concept also failed the gate
+  (quadruped preflight: legs read as one fused mass, 0 components
+  after erosion), a separated-legs concept PASSED (3 components,
+  gap 0.0322), and the mesh built clean (317,866 faces). Attempt
+  1 texture: loaded, then no output for ~7,400 s with the stall
+  signature (GPU 100% at ~62 W, one CPU core, private memory
+  byte-stable 14,383 MB) — killed at the tree root; log preserved
+  at `outputs/gloam-lurker/texture-attempt1.log`. Attempt 2
+  (fresh dispatch on the same mesh): the stage process died
+  natively after 103 s, exit code 0xC0000005 (access violation)
+  during the paint pipeline's second model-load phase; log at
+  `texture-attempt2.log`. Attempt 3 (2026-11-12, first paint
+  dispatch after the owner's PC reboot, lab shape.glb
+  sha-verified against the local copy first): **exit 0 in
+  615.47 s** (load 115.7 s, texturing 439.9 s, peak VRAM
+  11,823 MiB); textured.glb sha256 `1d48632b8684…` verified
+  identical in the lab and after fetch. Segment (P3-SAM, 11
+  parts), quadruped rig (15 bones, distance-fallback weights —
+  heat rejected by skin_policy, disclosed in the catalog
+  provenance), clips idle/walk/run/shiver, weight coverage 1.0.
+  Final GLB sha256 `f0c881cb9bd3…`, catalog-verify MATCH, suite
+  135 passed. **Posed-render gate (arm/leg separation): PASS** —
+  Cycles renders of rest + walk/run/shiver apexes (front/side/
+  back) inspected: four legs separate with belly daylight in
+  every shipped pose, no webbing at the leg joints; the legs
+  also stay clean in the beyond-spec quadruped stress pose.
+  **Disclosed weakness:** in that same stress pose (neck bent
+  −0.45 rad + hard head yaw + spine twist, far outside any
+  shipped clip) the neck/head shears into slabs — a
+  distance-fallback weight artifact at the neck. No shipped
+  clip approaches that pose; recorded here rather than hidden.
+  The Underreach frontend still uses the ember-dragon critter
+  stand-in; swapping in the lurker is that project's own step.
 - **Lantern (tier-1 oil lantern prop) — CATALOGUED, procedural
   paint.** Mesh exit 0 (343,848 faces). Hunyuan texture spun with
   the stall signature and was killed at the 2,400 s top of the
@@ -938,8 +954,15 @@ GPU stage, and the finished rig gets a posed-render check.
   catalog-verify MATCH. Render: reads as a camp cot; the
   pillow/bedroll boundary is approximate.
 
-Suite after the queue: 135 passed (the UI catalog-set test now
-expects delver/lantern/cot; gloam-lurker correctly absent).
-NOT verified: Godot playback of any of the three new GLBs (a
-later, separate phase); the Underreach frontend still uses its
-stand-in assets until the parent project swaps them.
+Suite after the queue: 135 passed (the UI catalog-set test
+expects delver/lantern/cot and, since 2026-11-12,
+gloam-lurker). Godot status updated 2026-11-12: the Underreach
+frontend swapped the delver/lantern/cot GLBs in (that project's
+commit `f135b33`), and an on-PC pass ran the frontend windowed
+on the RTX 3060 against the live sim (`UNDERREACH_VERIFY_PASS`
+on Windows; the windowed run's error log was empty after a
+headless import pass). NOT verified: the in-engine visual
+appearance of those GLBs — the PC workstation was locked
+during the pass, so no game screenshot could be captured; and
+Godot playback of the gloam-lurker GLB (the critter swap is
+the Underreach project's step, not yet done).

@@ -258,12 +258,14 @@ cloud-generated reference Pip the owner already has.
   assets (see the P5 status note above; branch
   `game-asset-builder/p5-campfire-creatures`).
 - **Underreach queue** — four assets for the Underreach delving
-  colony. **Done 2026-11-10 (3 of 4)**: the Delver (biped, bounce)
-  and the tier-1 Lantern and Cot props are catalogued and verified;
-  the Gloam Lurker's mesh is built but its texture stage failed
-  twice (one stall, one native crash) and it is NOT catalogued.
-  Both rigged-asset concepts were replaced before GPU work under
-  the owner's new arm/leg-separation hard gate; the two props are
-  procedurally painted, recorded as such (see the status note in
-  `docs/MUSE_HANDOFF.md`; branch
+  colony. **Done (4 of 4)**: the Delver (biped, bounce) and the
+  tier-1 Lantern and Cot props were catalogued 2026-11-10; the
+  Gloam Lurker followed on 2026-11-12 after its texture stage —
+  failed twice on 2026-11-11 (one stall, one native crash) —
+  completed cleanly on the first post-reboot retry (exit 0,
+  615 s), and the finished asset passed the leg-separation
+  posed-render gate. Both rigged-asset concepts were replaced
+  before GPU work under the owner's new arm/leg-separation hard
+  gate; the two props are procedurally painted, recorded as such
+  (see the status note in `docs/MUSE_HANDOFF.md`; branch
   `game-asset-builder/underreach-assets`).

@@ -1,0 +1,307 @@
+{
+ "entry_version": 1,
+ "name": "Gloam Lurker",
+ "slug": "gloam-lurker",
+ "source_concept": "media-generation-underreach-gloam-separated-0-ce356932-7811-4f4c-85b5-86c355075861.webp",
+ "asset_file": "gloam-lurker.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "f0c881cb9bd39e0b2223f3d20be45fd46e18fd220de64ae4ed7d9ce05d8ff4c3",
+ "bytes": 20084700,
+ "counts": {
+  "verts": 48551,
+  "faces": 89976,
+  "raw_mesh_verts": 247268,
+  "raw_mesh_faces": 317864
+ },
+ "bones": [
+  "root",
+  "spine",
+  "hips",
+  "neck",
+  "head",
+  "leg.FL",
+  "leg2.FL",
+  "leg.HL",
+  "leg2.HL",
+  "leg.FR",
+  "leg2.FR",
+  "leg.HR",
+  "leg2.HR",
+  "tail.1",
+  "tail.2"
+ ],
+ "actions": [
+  "idle",
+  "run",
+  "shiver",
+  "walk"
+ ],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": true,
+  "rig_template": "quadruped",
+  "signature_clip": "shiver",
+  "weight_method": "distance-to-bone fallback (heat result rejected by skin_policy)",
+  "segmentation": {
+   "model": "P3-SAM (Tencent Hunyuan3D-Part)",
+   "parts": 11,
+   "proxy_faces": 50000,
+   "islands_relabelled": 150,
+   "separated_verts_added": 3563,
+   "labelled_verts": 48551
+  },
+  "label_map": {
+   "0": {
+    "dominant": "leg.FL",
+    "allowed": [
+     "head",
+     "leg.FL",
+     "leg2.FL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FR",
+     "leg2.FR",
+     "leg2.HL",
+     "leg2.HR"
+    ]
+   },
+   "1": {
+    "dominant": "leg.FL",
+    "allowed": [
+     "head",
+     "leg.FL",
+     "leg.HL",
+     "leg2.FL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FR",
+     "leg2.FR",
+     "leg2.HL",
+     "leg2.HR"
+    ]
+   },
+   "2": {
+    "dominant": "leg2.HL",
+    "allowed": [
+     "head",
+     "leg.HL",
+     "leg2.HL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FL",
+     "leg.FR",
+     "leg2.FR",
+     "leg2.HR"
+    ]
+   },
+   "3": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "hips",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FL",
+     "leg.FR",
+     "leg2.FR",
+     "leg2.HL",
+     "leg2.HR"
+    ]
+   },
+   "4": {
+    "dominant": "leg2.HR",
+    "allowed": [
+     "head",
+     "leg.HR",
+     "leg2.FL",
+     "leg2.HR",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FL",
+     "leg.FR",
+     "leg2.FR",
+     "leg2.HL"
+    ]
+   },
+   "5": {
+    "dominant": "leg.FL",
+    "allowed": [
+     "head",
+     "leg.FL",
+     "leg2.FL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FR",
+     "leg2.FR",
+     "leg2.HL",
+     "leg2.HR"
+    ]
+   },
+   "6": {
+    "dominant": "leg2.FR",
+    "allowed": [
+     "head",
+     "leg.FR",
+     "leg2.FR",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FL",
+     "leg2.HL",
+     "leg2.HR"
+    ]
+   },
+   "7": {
+    "dominant": "leg.FL",
+    "allowed": [
+     "head",
+     "leg.FL",
+     "leg2.FL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FR",
+     "leg2.FR",
+     "leg2.HL",
+     "leg2.HR"
+    ]
+   },
+   "8": {
+    "dominant": "leg.FL",
+    "allowed": [
+     "head",
+     "leg.FL",
+     "leg.HL",
+     "leg2.FL",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FR",
+     "leg2.FR",
+     "leg2.HL",
+     "leg2.HR"
+    ]
+   },
+   "9": {
+    "dominant": "leg.FR",
+    "allowed": [
+     "head",
+     "leg.FR",
+     "leg2.FR",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FL",
+     "leg2.HL",
+     "leg2.HR"
+    ]
+   },
+   "10": {
+    "dominant": "leg.FR",
+    "allowed": [
+     "head",
+     "leg.FR",
+     "leg2.FR",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "leg.FL",
+     "leg2.HL",
+     "leg2.HR"
+    ]
+   }
+  },
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "stage": "mesh",
+   "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+   "exit_code": 0,
+   "seconds": 495.62,
+   "verts": 158934,
+   "faces": 317866,
+   "peak_vram_mib": 9047,
+   "output_sha256": "64858477dd51904215d17e77c65b1b6301f4cef641133684c9600092dde795c1",
+   "note": "Genuine record of the 2026-11-11 mesh stage, restored 2026-11-12 after the --resume run overwrote it with a placeholder. Output sha256 re-verified against both the local shape.glb and the lab copy before the texture retry.",
+   "restored_provenance": true
+  },
+  "texture_stage": {
+   "runner": {
+    "name": "gloam-lurker_texture",
+    "exit_code": 0,
+    "seconds": 615.47,
+    "baseline_vram_mib": 4387,
+    "peak_vram_mib": 11823,
+    "peak_delta_mib": 7436,
+    "vram_after_exit_mib": 2562,
+    "n_samples": 1312,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"gloam-lurker_texture\", \"exit_code\": 0, \"seconds\": 615.47, \"baseline_vram_mib\": 4387, \"peak_vram_mib\": 11823, \"peak_delta_mib\": 7436, \"vram_after_exit_mib\": 2562, \"n_samples\": 1312}\r\n"
+   },
+   "stats": {
+    "stage": "texture",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+    "verts": 247268,
+    "faces": 317866,
+    "load_s": 115.69,
+    "texture_s": 439.89,
+    "total_s": 556.27,
+    "torch_peak_mib": 9876.1,
+    "output": "D:\\asset-forge-lab\\out\\gab\\gloam-lurker\\textured.glb"
+   }
+  }
+ },
+ "clips": {
+  "idle": {
+   "frames": 115,
+   "fps": 24,
+   "seconds": 4.79
+  },
+  "run": {
+   "frames": 24,
+   "fps": 24,
+   "seconds": 1.0
+  },
+  "shiver": {
+   "frames": 38,
+   "fps": 24,
+   "seconds": 1.58
+  },
+  "walk": {
+   "frames": 48,
+   "fps": 24,
+   "seconds": 2.0
+  }
+ }
+}

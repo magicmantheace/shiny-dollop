@@ -804,6 +804,20 @@ cost of the new creatures in the wallpaper scene.
   runaway), killed with log preserved. Attempt 2 crashed natively
   (0xC0000005) at 103 s in the second model-load phase. Root
   cause unproven; mesh intact for a future retry.
+- Gloam Lurker (2026-11-12 update): CATALOGUED. Texture attempt
+  3 — the first paint dispatch after the PC reboot — exited 0 in
+  615.47 s; textured.glb sha256 verified lab-side and after
+  fetch (`1d48632b8684…`). Final GLB catalog-verify MATCH
+  (`f0c881cb9bd3…`); 15 bones; clips idle/walk/run/shiver;
+  suite 135 passed (catalog-set test updated). Posed-render
+  gate PASSED on inspection (rest + shipped apexes, legs
+  separate throughout). Disclosed: the beyond-spec stress pose
+  shears the neck/head (distance-fallback weights); no shipped
+  clip is affected. Not verified: Godot playback of the lurker
+  GLB; the Underreach frontend's delver/lantern/cot GLBs were
+  run in-engine on the PC the same day (verify PASS, empty
+  error log) but their appearance was not sighted — the
+  workstation was locked, so no screenshot exists.
 - Lantern: catalog-verify MATCH (`5dffb6360730…`), 4,505 verts,
   procedural vertex-colour paint (Hunyuan texture killed at the
   2,400 s success-curve top). Cot: MATCH (`67e070f2012f…`),

@@ -100,7 +100,8 @@ class CatalogDataTests(unittest.TestCase):
                                           "pine-tree", "boulder", "bush",
                                           "fern", "mushroom-cluster",
                                           "fallen-log", "stump",
-                                          "delver", "lantern", "cot"})
+                                          "delver", "lantern", "cot",
+                                          "gloam-lurker"})
         self.assertEqual(summaries["ember-dragon"]["bone_count"], 14)
         self.assertEqual(summaries["moth-hart"]["bone_count"], 21)
         self.assertEqual(summaries["toasty"]["bone_count"], 11)
@@ -110,6 +111,7 @@ class CatalogDataTests(unittest.TestCase):
         self.assertEqual(summaries["crow-postman"]["bone_count"], 11)
         self.assertEqual(summaries["mandrake-toddler"]["bone_count"], 11)
         self.assertEqual(summaries["ember-owl-cat"]["bone_count"], 14)
+        self.assertEqual(summaries["gloam-lurker"]["bone_count"], 15)
         self.assertFalse(summaries["treasure-chest"]["rigged"])
         for slug in ("pine-tree", "boulder", "bush", "fern",
                      "mushroom-cluster", "fallen-log", "stump"):
