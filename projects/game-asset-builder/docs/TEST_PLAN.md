@@ -880,3 +880,39 @@ in 615 s on the first post-reboot dispatch):
   decisive) and the stress pose sails broadly. Catalog write
   reverted; NOT catalogued (mandrake precedent: a defect in a
   shipped clip's apex is disqualifying).
+- Snow Goblin weight-route fix attempt (2026-11-12, after the
+  queue): two rig variants on the EXISTING textured mesh
+  (61878b0e…), no new paint stage, rig stage run directly with
+  tightened skin_policy knobs. Both FAILED at the policy layer —
+  bone heat was rejected both times, so the shipped weights
+  remained the distance fallback (torso share 0.5389) and no new
+  artifact was produced.
+  - Variant 1 (--veto-factor 0.65 --label-secondary 0.25):
+    NO-OP, byte-identical veto stats (33,601 vetoed / 57,141
+    label-vetoed entries) and identical heat share 0.3768.
+    Cause: the reach radii are floored at --veto-floor x mesh
+    height (0.19 x 2.0 = 0.38), which exceeds the factor-scaled
+    arm bone lengths at both 0.85 and 0.65 — the floor, not the
+    factor, is the binding constraint for the arm bones.
+  - Variant 2 (--veto-factor 0.60 --veto-floor 0.10
+    --label-secondary 0.40): the veto bit harder (39,921 vetoed
+    entries) and the heat torso arm share improved 0.3768 ->
+    0.3211, with hands dominance 0.9073, head 0.955, feet
+    0.7075, coverage 1.0 — still above the 0.25 zone gate, so
+    heat was rejected again. The torso part label (P3-SAM label
+    0, spine-dominant) still lists arm.L/arm.R as ALLOWED even
+    at label-secondary 0.40: the arm bones win that much of the
+    torso label's own field, so the Layer-3 label veto never
+    engages against the upper-arm bones on torso verts.
+    Confirmation render (wave forensics on the variant-2
+    output): the wave-back view shows the same continuous fur
+    blade armpit-to-hip as the failed gate — unchanged.
+  - Verdict: the parameter route is exhausted at two variants.
+    The catalogue still points at the original P5 goblin
+    (c4ba135b…); nothing was catalogued. Remaining directions
+    are the owner's call: a small code change (post-veto zone
+    renormalization, or an explicit arm-bone ban on the torso
+    label in the label map), or the concept/mesh side (deeper
+    armpit notch = new mesh + texture). Attempt records and
+    renders: builder goal hidden_files/goblin-weightfix/
+    (v1/, v2/ rig reports, v2 wave renders).

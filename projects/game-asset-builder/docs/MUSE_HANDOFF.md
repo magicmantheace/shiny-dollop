@@ -979,3 +979,14 @@ Catalogue on this branch only — no wallpaper deployment in this run.
   frames); failure record in outputs/snow-goblin/. A future fix
   needs the wave apex clean — deeper armpit notch on the
   concept/mesh side or a stricter torso-zone weight veto.
+  **Weight-veto route TRIED 2026-11-12 (two variants, both
+  failed — see TEST_PLAN):** tightening --veto-factor alone is
+  a no-op (the --veto-floor x height term binds the arm radii);
+  adding --veto-floor 0.10 + --label-secondary 0.40 improved
+  the heat torso share only to 0.3211 (gate 0.25), heat stayed
+  rejected, and the arms remain "allowed" owners of the torso
+  part label at any tested threshold. The parameter route is
+  exhausted; what remains is a code change (post-veto zone
+  renormalization or an explicit arm ban on the torso label)
+  or the concept/mesh route — owner's call. The catalogue
+  still points at the original P5 goblin (c4ba135b…).
