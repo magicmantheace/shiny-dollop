@@ -292,3 +292,28 @@ Root cause unproven (VRAM headroom suspected — successful paints peaked
 ~11.9/12.3 GiB). All failed assets keep genuine prep/mesh artifacts in
 `outputs/<slug>/` with `ARMFIX-FAILURE-2026-11-11.md` notes for a future
 retry. NOT verified: Godot playback (unchanged from before).
+
+### Retry after the PC reboot (2026-11-12)
+
+The reboot was the untested remedy; the gloam-lurker canary (Underreach
+queue) textured clean on the first post-reboot dispatch, and Adam
+authorized retrying the four texture-blocked rebuilds in order
+(crow → toasty → axolotl → goblin). Deployment to the live wallpaper
+is NOT part of the retry — rebuilt assets are catalogued on this
+branch only; the deployed copies stay untouched until a separate
+re-sync/re-apply step.
+
+- **Crow Postman — SHIPPED to the branch catalog.** Texture exit 0 in
+  1,206.26 s (genuine lab textured.glb sha-verified 92f448a5…).
+  Segment P3-SAM 14 parts; biped rig, distance-fallback weights
+  (disclosed); clips idle/walk/run/bow; catalog-verify MATCH
+  (c2e23612…). Posed gate PASS with a disclosed weakness: rest and
+  all shipped apexes are clean (sleeves separate, daylight in
+  motion), but a forward arm raise drags the coat side panel into a
+  sail — onset between 1.2 and 1.7 rad, full sail at the 2.2 rad
+  stress pose. No shipped crow clip raises the arm past ~0.6 rad.
+  One recovered incident: the dispatch client hit the bridge
+  tracking limit mid-bake and fetched the stale previous-build
+  texture (the goblin pattern); the client was killed before the
+  segment stage consumed it and the genuine result was recovered
+  from the lab — see `outputs/crow-postman/texture-retry-success.txt`.

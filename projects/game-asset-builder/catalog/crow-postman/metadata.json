@@ -2,16 +2,16 @@
  "entry_version": 1,
  "name": "Crow Postman",
  "slug": "crow-postman",
- "source_concept": "media-generation-media-generation-crow-postman-0-4b87b877-f163-4e3b-ad03-7243ffb87da0.webp",
+ "source_concept": "media-generation-armfix-crow-apose-0-cc4c7ecf-627d-437b-9f42-54c008b970ea.webp",
  "asset_file": "crow-postman.glb",
  "asset_location": "outputs/<slug>/ (local; not in git)",
- "sha256": "310942604e8623a07185e6bc03458a83ecf77eb7ca7181304a1d605c2be637a5",
- "bytes": 21106560,
+ "sha256": "c2e23612d2b2507c0a6458c6558e7f30145369129562c4c1133772b23a69f68a",
+ "bytes": 19319632,
  "counts": {
-  "verts": 52537,
-  "faces": 99779,
-  "raw_mesh_verts": 534328,
-  "raw_mesh_faces": 684152
+  "verts": 47063,
+  "faces": 89846,
+  "raw_mesh_verts": 436963,
+  "raw_mesh_faces": 565550
  },
  "bones": [
   "root",
@@ -41,11 +41,11 @@
   "weight_method": "distance-to-bone fallback (heat result rejected by skin_policy)",
   "segmentation": {
    "model": "P3-SAM (Tencent Hunyuan3D-Part)",
-   "parts": 13,
+   "parts": 14,
    "proxy_faces": 50000,
-   "islands_relabelled": 96,
-   "separated_verts_added": 2782,
-   "labelled_verts": 52537
+   "islands_relabelled": 53,
+   "separated_verts_added": 2142,
+   "labelled_verts": 47063
   },
   "label_map": {
    "0": {
@@ -58,42 +58,30 @@
      "spine"
     ],
     "forbidden": [
+     "arm.L",
+     "arm.R",
      "arm2.R",
      "leg2.L",
      "leg2.R"
     ]
    },
    "1": {
-    "dominant": "leg2.R",
+    "dominant": "arm.L",
     "allowed": [
+     "arm.L",
+     "arm2.L",
      "head",
-     "leg.R",
-     "leg2.R",
      "root",
      "spine"
     ],
     "forbidden": [
+     "arm.R",
      "arm2.R",
-     "leg.L",
-     "leg2.L"
+     "leg2.L",
+     "leg2.R"
     ]
    },
    "2": {
-    "dominant": "root",
-    "allowed": [
-     "head",
-     "leg.L",
-     "leg.R",
-     "root",
-     "spine"
-    ],
-    "forbidden": [
-     "arm2.R",
-     "leg2.L",
-     "leg2.R"
-    ]
-   },
-   "3": {
     "dominant": "leg2.R",
     "allowed": [
      "head",
@@ -103,15 +91,15 @@
      "spine"
     ],
     "forbidden": [
+     "arm.L",
+     "arm.R",
      "arm2.R",
-     "leg.L",
      "leg2.L"
     ]
    },
-   "4": {
+   "3": {
     "dominant": "leg2.L",
     "allowed": [
-     "arm2.L",
      "head",
      "leg.L",
      "leg2.L",
@@ -119,12 +107,14 @@
      "spine"
     ],
     "forbidden": [
+     "arm.L",
+     "arm.R",
      "arm2.R",
      "leg2.R"
     ]
    },
-   "5": {
-    "dominant": "head",
+   "4": {
+    "dominant": "spine",
     "allowed": [
      "arm.L",
      "arm.R",
@@ -134,55 +124,104 @@
     ],
     "forbidden": [
      "arm2.R",
-     "leg.L",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "5": {
+    "dominant": "head",
+    "allowed": [
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R",
+     "arm2.R",
      "leg2.L",
      "leg2.R"
     ]
    },
    "6": {
-    "dominant": "leg2.L",
+    "dominant": "leg2.R",
     "allowed": [
      "head",
-     "leg.L",
-     "leg2.L",
+     "leg.R",
+     "leg2.R",
      "root",
      "spine"
     ],
     "forbidden": [
+     "arm.L",
+     "arm.R",
      "arm2.R",
-     "leg2.R"
+     "leg2.L"
     ]
    },
    "7": {
-    "dominant": "leg2.L",
+    "dominant": "head",
     "allowed": [
      "head",
-     "leg.L",
-     "leg2.L",
      "root",
      "spine"
     ],
     "forbidden": [
+     "arm.L",
+     "arm.R",
      "arm2.R",
+     "leg2.L",
      "leg2.R"
     ]
    },
    "8": {
-    "dominant": "root",
+    "dominant": "arm.R",
     "allowed": [
+     "arm.R",
+     "arm2.R",
      "head",
-     "leg.L",
-     "leg.R",
      "root",
      "spine"
     ],
     "forbidden": [
-     "arm2.R",
+     "arm.L",
      "leg2.L",
      "leg2.R"
     ]
    },
    "9": {
+    "dominant": "arm.L",
+    "allowed": [
+     "arm.L",
+     "arm2.L",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.R",
+     "arm2.R",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "10": {
+    "dominant": "arm.L",
+    "allowed": [
+     "arm.L",
+     "arm2.L",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.R",
+     "arm2.R",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "11": {
     "dominant": "arm2.R",
     "allowed": [
      "arm.R",
@@ -192,52 +231,37 @@
      "spine"
     ],
     "forbidden": [
-     "leg.L",
+     "arm.L",
      "leg2.L",
-     "leg2.R"
-    ]
-   },
-   "10": {
-    "dominant": "root",
-    "allowed": [
-     "head",
-     "leg.L",
-     "leg.R",
-     "root",
-     "spine"
-    ],
-    "forbidden": [
-     "arm2.R",
-     "leg2.L",
-     "leg2.R"
-    ]
-   },
-   "11": {
-    "dominant": "leg.L",
-    "allowed": [
-     "head",
-     "leg.L",
-     "leg.R",
-     "leg2.L",
-     "root",
-     "spine"
-    ],
-    "forbidden": [
-     "arm2.R",
      "leg2.R"
     ]
    },
    "12": {
-    "dominant": "root",
+    "dominant": "head",
     "allowed": [
      "head",
-     "leg.L",
-     "leg.R",
      "root",
      "spine"
     ],
     "forbidden": [
+     "arm.L",
+     "arm.R",
      "arm2.R",
+     "leg2.L",
+     "leg2.R"
+    ]
+   },
+   "13": {
+    "dominant": "arm2.R",
+    "allowed": [
+     "arm.R",
+     "arm2.R",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
      "leg2.L",
      "leg2.R"
     ]
@@ -248,10 +272,43 @@
    "agent": "1.1.0"
   },
   "mesh_stage": {
-   "resumed": true
+   "runner": {
+    "name": "crow-postman_shape",
+    "exit_code": 0,
+    "seconds": 314.45,
+    "baseline_vram_mib": 1394,
+    "peak_vram_mib": 7772,
+    "peak_delta_mib": 6378,
+    "vram_after_exit_mib": 1329,
+    "n_samples": 658,
+    "job_state": "failed",
+    "job_stdout_tail": ""
+   },
+   "stats": null
   },
   "texture_stage": {
-   "resumed": true
+   "runner": {
+    "name": "crow-postman_texture",
+    "exit_code": 0,
+    "seconds": 1206.26,
+    "baseline_vram_mib": 3106,
+    "peak_vram_mib": 11881,
+    "peak_delta_mib": 8775,
+    "vram_after_exit_mib": 2611,
+    "n_samples": 2581
+   },
+   "stats": {
+    "stage": "texture",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+    "verts": 436963,
+    "faces": 565552,
+    "load_s": 108.65,
+    "texture_s": 1075.93,
+    "total_s": 1185.34,
+    "torch_peak_mib": 9885.4,
+    "output": "D:\\asset-forge-lab\\out\\gab\\crow-postman\\textured.glb"
+   },
+   "note": "Recovered 2026-11-12: the dispatching client's bridge job hit its tracking limit mid-bake and briefly recorded the STALE previous-build result/texture locally (the 2026-11-11 goblin incident pattern); the client was killed, the stage completed detached on the PC (exit 0, 1206.26 s), and the genuine lab textured.glb (sha256 92f448a5...) was fetched and sha-verified before the --resume finish. Prep/mesh records restored from the pre-retry manifest snapshot."
   }
  },
  "clips": {

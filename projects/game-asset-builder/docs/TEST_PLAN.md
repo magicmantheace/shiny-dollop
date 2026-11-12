@@ -826,3 +826,20 @@ Per-creature gates (concept preflight → catalog-verify → posed renders):
 - Suite after the queue: 135 passed (no catalog changes landed).
 - Final PC sweep: zero asset-forge processes, bridge jobs 0, GPU at
   desktop baseline. Godot playback still NOT verified.
+
+Retry (2026-11-12, post-reboot; canary = gloam-lurker texture exit 0
+in 615 s on the first post-reboot dispatch):
+
+- Crow Postman: texture exit 0, 1,206.26 s (peak VRAM 11,881 MiB);
+  lab textured.glb sha-verified 92f448a5… (19,686,896 B) before the
+  --resume finish. Tracking-limit incident recurred and was
+  recovered by hash (client killed pre-segment; stale fetch deleted;
+  genuine result recovered from the lab). Segment P3-SAM 14 parts;
+  rig coverage 1.0 (distance-fallback weights); clips idle/walk/
+  run/bow; catalog-verify MATCH (c2e23612…). Posed gate viewed
+  (Cycles, rest + walk/run/bow apexes front/side/back + stress):
+  PASS with disclosed weakness — all shipped poses clean (run apex
+  front: both arms swung clear, daylight along the sleeves); coat
+  side panel sails on forward arm raise, onset 1.2–1.7 rad, full
+  sail at the 2.2 rad stress pose; no shipped clip exceeds ~0.6 rad
+  of arm raise.

@@ -908,3 +908,27 @@ modes, in the order a future retry will meet them:
    verify every fetched GLB's sha before letting a resume proceed;
    a local textured.glb whose provenance is not hash-verified must be
    deleted before --resume, or the resume skips texture silently.
+
+## Arm-separation retry (2026-11-12, same branch)
+
+The PC reboot (owner-ordered 2026-11-11) was the untested remedy for
+the paint freeze; the gloam-lurker canary textured clean on the first
+post-reboot dispatch (615 s), and the owner authorized retrying the
+four texture-blocked rebuilds (crow → toasty → axolotl → goblin).
+Catalogue on this branch only — no wallpaper deployment in this run.
+
+- **Crow Postman: DONE.** Texture exit 0 (1,206.26 s; load 108.65 s,
+  bake 1,075.93 s; peak VRAM 11,881 MiB); genuine lab textured.glb
+  sha-verified (92f448a5…). The tracking-limit failure mode in point
+  4 above RECURRED: the client read the stale result at ~15 min and
+  fetched the stale texture; it was killed before segment consumed
+  it (one proxy.glb built from the wrong mesh — deleted), the stage
+  finished detached, and the genuine output was recovered by hash.
+  Finish: P3-SAM 14 parts, biped rig (distance-fallback weights,
+  coverage 1.0), clips idle/walk/run/bow, catalog-verify MATCH
+  (c2e23612…). Posed gate: PASS with disclosed weakness — shipped
+  poses all clean; forward arm raise sails the coat panel (onset
+  1.2–1.7 rad; full sail at the 2.2 rad stress pose); no shipped
+  clip raises the arm past ~0.6 rad. Genuine prep/mesh/texture
+  records restored into the manifest + catalog provenance after
+  the --resume finish overwrote them with placeholders.
