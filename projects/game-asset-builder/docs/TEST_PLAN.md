@@ -971,3 +971,23 @@ in 615 s on the first post-reboot dispatch):
     Deployed to the campfire wallpaper per Adam's Option 1
     approval: byte-for-byte swap in the wallpaper worktree +
     both PC copies hash-verified + Lively re-applied.
+  - **Fringe removal (2026-11-12, Adam's call — the flap
+    "does bother me")**: wave-stretch analysis (rest vs
+    wave-apex edge ratios on the rig) localized the flap to a
+    fur band lying on the forearm surface with leg/spine/
+    head-dominant weights. Two-part fix on the same textured
+    mesh: 975 raw welded verts collapsed flush onto the arm
+    surface (GLB position patch, topology unchanged), re-rig
+    with the zone ban (heat accepted, torso arm share
+    0.0419), then a targeted weight snap of the band's 1,650
+    welded verts to arm/arm2 by inverse segment distance.
+    Full 15-render posed gate re-run: wave front/back/
+    shoulder/side show NO hanging flap; rest/walk/run
+    unchanged; the only residual is beyond-spec (rigid fur
+    panels beside the arm at the 2.2 rad stress raise).
+    **Catalogued sha c92c86cae7…, catalog-verify MATCH;
+    suite 144/144.** 1a build preserved in
+    outputs/snow-goblin/before-fringe/; gate record in the
+    builder goal's hidden_files/goblin-fringe/. Deployed to
+    the live wallpaper the same day (both PC copies
+    hash-verified, Lively re-applied).

@@ -5,11 +5,11 @@
  "source_concept": "media-generation-armfix-goblin-apose3-0-72448c71-f7d9-44f6-960e-5b661e71ebb1.webp",
  "asset_file": "snow-goblin.glb",
  "asset_location": "outputs/<slug>/ (local; not in git)",
- "sha256": "6cfaaa6e706c764d1beeea67c226fa1c5eb06711a1f91c606d234a1a844af301",
- "bytes": 21058412,
+ "sha256": "c92c86cae779f83b5be1bb09ca0a3d077c9339149b570a7051b501deb5b25785",
+ "bytes": 22704632,
  "counts": {
-  "verts": 45825,
-  "faces": 89850,
+  "verts": 50667,
+  "faces": 99574,
   "raw_mesh_verts": 662652,
   "raw_mesh_faces": 836926
  },
@@ -40,14 +40,14 @@
   "rigged": true,
   "rig_template": "biped",
   "signature_clip": "wave",
-  "weight_method": "bone-heat (automatic weights); geodesic distance veto (factor 0.85, floor 0.19); label-aware veto (P3-SAM parts, 92369 entries vetoed by label); cross-zone ban (trunk:arm.L, trunk:arm.R); distance rescue on 3214 verts",
+  "weight_method": "bone-heat (automatic weights); geodesic distance veto (factor 0.85, floor 0.19); label-aware veto (P3-SAM parts, 102376 entries vetoed by label); cross-zone ban (trunk:arm.L, trunk:arm.R); distance rescue on 4255 verts",
   "segmentation": {
    "model": "P3-SAM (Tencent Hunyuan3D-Part)",
    "parts": 7,
    "proxy_faces": 50000,
-   "islands_relabelled": 47,
-   "separated_verts_added": 905,
-   "labelled_verts": 45825
+   "islands_relabelled": 39,
+   "separated_verts_added": 963,
+   "labelled_verts": 50667
   },
   "label_map": {
    "0": {
@@ -75,7 +75,7 @@
      "leg2.L"
     ],
     "forbidden": [
-     "arm2.R",
+     "arm.R",
      "ear.L",
      "ear.R",
      "head",
@@ -85,7 +85,7 @@
     ]
    },
    "2": {
-    "dominant": "arm2.R",
+    "dominant": "arm.R",
     "allowed": [
      "arm.R",
      "arm2.R"
@@ -109,8 +109,8 @@
      "spine"
     ],
     "forbidden": [
+     "arm.R",
      "arm2.L",
-     "arm2.R",
      "ear.L",
      "leg2.R"
     ]
@@ -122,7 +122,7 @@
      "arm2.L"
     ],
     "forbidden": [
-     "arm2.R",
+     "arm.R",
      "ear.L",
      "ear.R",
      "head",
@@ -141,8 +141,8 @@
      "spine"
     ],
     "forbidden": [
+     "arm.R",
      "arm2.L",
-     "arm2.R",
      "ear.L",
      "ear.R"
     ]
@@ -156,8 +156,8 @@
      "spine"
     ],
     "forbidden": [
+     "arm.R",
      "arm2.L",
-     "arm2.R",
      "ear.R",
      "leg2.R"
     ]

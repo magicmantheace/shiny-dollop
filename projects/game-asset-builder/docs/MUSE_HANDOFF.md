@@ -1016,3 +1016,28 @@ Catalogue on this branch only — no wallpaper deployment in this run.
   Suite 144/144. The wallpaper's remaining arm-gate violators
   are now only mandrake-toddler (redesign) and ember-owl-cat
   (concept gate) — both still the owner's call.
+- **Snow Goblin: fringe REMOVED — catalogued + deployed
+  (2026-11-12).** Adam, shown the 1a wave render, said the
+  under-arm fur flap "does bother me". Diagnosis: the flap is
+  a fur band lying ON the forearm surface whose verts carried
+  leg/spine/head-dominant weights, so it trailed the rising
+  arm. Fix in two parts on the 1a textured mesh: (1) a
+  mesh-level collapse (wave-stretch analysis; 975 raw welded
+  verts moved flush onto the arm surface in the GLB binary —
+  topology unchanged; necessary but NOT sufficient, the
+  re-rig's heat re-diluted the band); (2) after re-rigging
+  with the same zone-ban flags (heat accepted, torso arm
+  share 0.0419), a targeted weight snap — the 1,650 welded
+  verts of the wave's stretch-hot band had all groups
+  replaced by arm/arm2 weights from inverse bone-segment
+  distance. Posed gate PASS: wave front/back/shoulder/side
+  clean, no flap; rest/walk/run unchanged; disclosed
+  beyond-spec note — at the 2.2 rad stress raise the band
+  reads as rigid fur panels beside the arm (same class as
+  the 1a build's slivers; shipped clips peak ~0.95 rad).
+  **Catalog sha c92c86ca…, catalog-verify MATCH; suite
+  144/144; swapped into the live wallpaper the same day.**
+  Superseded 1a build preserved in
+  outputs/snow-goblin/before-fringe/; working files +
+  overlays in outputs/snow-goblin/fringe-work/; gate record
+  in the builder goal's hidden_files/goblin-fringe/.
