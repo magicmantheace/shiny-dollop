@@ -14,6 +14,7 @@ This repository is a permanent, **multi-project** workspace. Its root is an inde
 | Drabbit Pet | [`projects/drabbit-pet/`](projects/drabbit-pet/README.md) | In development — P0/P1 (design + pet-brain core) built on a review branch; desktop/Android slices planned |
 | Muse PC Bridge | [`projects/muse-pc-bridge/`](projects/muse-pc-bridge/README.md) | v0 foundation on an unmerged branch; VM-tested only — not yet installed on the owner's PC |
 | Game Asset Builder | [`projects/game-asset-builder/`](projects/game-asset-builder/README.md) | Fully local, no-API game asset pipeline (owner-commissioned 2026-11-06); scaffold + model bake-off on its own branch/PR — do not overwrite |
+| Campfire Wallpaper | [`projects/campfire-wallpaper/`](projects/campfire-wallpaper/README.md) | Live Lively/three.js desktop wallpaper (owner-commissioned 2026-11-08); initial build on its own branch/PR — do not overwrite |
 
 ## New Muse application queue — specifications only
 
