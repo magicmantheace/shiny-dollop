@@ -341,3 +341,12 @@ re-sync/re-apply step.
   the genuine bake finished once RAM recovered, and the result
   was recovered from the lab by hash — see
   `outputs/axolotl-capybara/texture-retry-success.txt`.
+- **Snow Goblin — texture OK, posed gate FAILED, NOT catalogued.**
+  Texture exit 0 in 893.03 s (genuine lab textured.glb sha-verified
+  61878b0e…; the queue's only clean end-to-end run); biped+ears rig,
+  clips idle/wave/walk/run. But at the wave apex the raised arm
+  drags a continuous fur blade from armpit to hip — the audited
+  defect, in a shipped clip (torso arm-weight share 0.5389). Rest
+  and walk are clean; per the mandrake precedent a shipped-clip
+  defect means no catalogue: the catalog write was reverted. See
+  `outputs/snow-goblin/texture-retry-GATE-FAILURE-2026-11-12.txt`.

@@ -868,3 +868,15 @@ in 615 s on the first post-reboot dispatch):
   close-ups at walk apex and stress): PASS, clean — legs are
   distinct limbs with daylight between them in every pose; the
   belly stays smooth through the -0.9 rad front-leg stress tuck.
+- Snow Goblin: texture exit 0, 893.03 s (peak VRAM 11,971 MiB);
+  lab textured.glb sha-verified 61878b0e… (29,182,948 B); clean
+  end-to-end run. Biped+ears rig 13 bones, distance-fallback
+  weights, torso arm share 0.5389, coverage 1.0; clips
+  idle/wave/walk/run. Posed gate viewed (rest + wave/walk/run
+  apexes + biped stress + shoulder close-ups + wave back view
+  and apex frame series): FAIL — rest/walk/run clean with full
+  arm daylight, but the wave apex (f29) drags a continuous fur
+  blade from armpit to hip on the raised side (back view
+  decisive) and the stress pose sails broadly. Catalog write
+  reverted; NOT catalogued (mandrake precedent: a defect in a
+  shipped clip's apex is disqualifying).

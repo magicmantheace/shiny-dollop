@@ -962,3 +962,20 @@ Catalogue on this branch only — no wallpaper deployment in this run.
   belly close-ups show daylight between the legs and a smooth
   belly through the stress tuck; the audited paddle-belly
   defect is gone.
+- **Snow Goblin: texture DONE, gate FAILED — not catalogued.**
+  Texture exit 0 (893.03 s; load 112.79 s, bake 749.17 s; peak
+  VRAM 11,971 MiB); genuine lab textured.glb sha-verified
+  (61878b0e…); clean end-to-end run, no incident. Finish:
+  biped+ears rig 13 bones, distance-fallback weights, torso arm
+  share 0.5389, clips idle/wave/walk/run. Posed gate FAIL: rest
+  + walk/run apexes clean (arms fully separate — a real
+  improvement), but the WAVE apex re-creates the audited fur
+  blade: back view shows one continuous sheet from the raised
+  arm's armpit to the hip; front-left close-up shows the
+  chest-side surface stretched into a streaked fan. Stress pose
+  worse. Catalog write reverted per the mandrake precedent.
+  Evidence: builder goal hidden_files/armfix-retry/
+  goblin-renders (wave-back.png, wave-fin.png are the decisive
+  frames); failure record in outputs/snow-goblin/. A future fix
+  needs the wave apex clean — deeper armpit notch on the
+  concept/mesh side or a stricter torso-zone weight veto.
