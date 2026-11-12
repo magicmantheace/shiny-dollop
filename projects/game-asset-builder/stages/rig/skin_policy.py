@@ -24,6 +24,21 @@ axial trunk bones are exempt: their segments run through the body
 mass they own, so distance-to-segment measures body radius there,
 not bleed. ``assess_zone_share`` is the acceptance gate that catches
 a bleed the veto missed.
+
+The cross-zone ban (``chain_groups`` + ``zone_ban_map``) closes the
+gap the label veto structurally cannot reach: Layer 3 forbids only
+bones that DOMINATE another part label, so a proximal appendage bone
+(arm.L) is never banned on torso flesh — the arm part's label is
+dominated by its distal bone (arm2.L), and arm.L sits in the torso
+label's allowed set as the dominants' chain parent and a plurality
+winner in the fused shoulder mass. On the Snow Goblin rebuild that
+hole was the whole failure: every parameter tightening left the
+heat's torso arm share at 0.32+ against the 0.25 gate, and the wave
+dragged a fur blade from armpit to hip. The ban names zone pairs
+(trunk <-> an appendage chain) and forbids each side's bones on the
+other side's labels outright; the rig's existing enforcement
+(label-boundary vertices within the banned bone's reach keep their
+blend) is what leaves a narrow blend band at the joint.
 """
 
 
@@ -95,7 +110,12 @@ def apply_veto(weights, distances, radii, veto_cols, beyond_end=None,
     and a forbidden bone is never rescue-eligible for that vertex.
     Distance asks "how far is the flesh from the bone"; labels
     answer "whose flesh is it" first. Forbidden vetoes are counted
-    separately in the stats (``label_vetoed_entries``).
+    separately in the stats (``label_vetoed_entries``). Forbidden
+    pairs are enforced on EVERY column, not just ``veto_cols``: the
+    distance test remains appendage-only (the trunk is never
+    distance-vetoed), but a label ban can name a trunk bone (the
+    cross-zone ban bans the spine on arm-labelled flesh), and a ban
+    that silently does not bind is worse than none.
 
     Returns (new_weights, stats) with stats counting the vetoed
     (vertex, bone) entries, the vertices touched, and the rescued
@@ -106,12 +126,18 @@ def apply_veto(weights, distances, radii, veto_cols, beyond_end=None,
     verts_touched = 0
     rescued = []
     out = []
+    veto_set = set(veto_cols)
+    check_cols = list(veto_cols)
+    if forbidden is not None and weights:
+        extra = {c for row_f in forbidden for c, f in enumerate(row_f)
+                 if f and c not in veto_set}
+        check_cols += sorted(extra)
     for vi, row in enumerate(weights):
         new = list(row)
         touched = False
         vetoed_here = set()
         forbidden_here = set()
-        for c in veto_cols:
+        for c in check_cols:
             if forbidden is not None and forbidden[vi][c]:
                 if new[c] > 0.0:
                     new[c] = 0.0
@@ -120,6 +146,9 @@ def apply_veto(weights, distances, radii, veto_cols, beyond_end=None,
                 vetoed_here.add(c)
                 forbidden_here.add(c)
                 continue
+            if c not in veto_set:
+                continue  # label bans bind every column; the
+                # distance test below is appendage-only by design
             if (beyond_tail is not None and beyond_tail[vi][c]):
                 continue  # continuation flesh past the bone's tail
             reach = (veto_distances[vi][c] if veto_distances is not None
@@ -177,3 +206,93 @@ def assess_zone_share(share: float, max_share: float = 0.25,
         return [f"{zone_label} {group_label} weight share "
                 f"{share:.3f} > {max_share:.2f}"]
     return []
+
+
+def chain_groups(parent: dict, trunk: set) -> dict:
+    """Group bone names into skinning chains.
+
+    ``parent`` maps every bone name to its parent's name (or None);
+    ``trunk`` is the axial chain set (see template.trunk_chain).
+    Returns {"trunk": {trunk bones}, <chain root>: {its bones}}:
+    each non-trunk bone belongs to the chain rooted at its highest
+    non-trunk ancestor — the bone whose own parent is a trunk bone
+    (or nothing). On the biped: arm.L -> {arm.L, arm2.L},
+    leg.R -> {leg.R, leg2.R}, ear.L -> {ear.L}. The chain, not the
+    single bone, is the unit a body part's flesh belongs to: a
+    part label may be dominated by the chain's distal bone while
+    its proximal bone does the damage elsewhere."""
+    groups = {"trunk": set(trunk)}
+
+    def chain_root(name):
+        cur, seen = name, set()
+        while cur is not None and cur not in trunk and cur not in seen:
+            seen.add(cur)
+            up = parent.get(cur)
+            if up is None or up in trunk:
+                return cur
+            cur = up
+        return None
+
+    for name in parent:
+        if name in trunk:
+            continue
+        root = chain_root(name)
+        if root is not None:
+            groups.setdefault(root, set()).add(name)
+    return groups
+
+
+def zone_ban_map(label_map: dict, parent: dict, trunk: set,
+                 ban_pairs) -> tuple[dict, dict]:
+    """Merge cross-zone bone bans into a ``label_bone_map`` result.
+
+    ``ban_pairs`` names zone pairs whose bones may not own each
+    other's flesh: ("trunk", "arm.L") bans the whole arm.L chain
+    (arm.L + arm2.L) on every label whose dominant bone is a trunk
+    bone, and bans the trunk bones (root, spine, head) on every
+    label whose dominant sits in the arm.L chain. Group ids are
+    "trunk" or a chain-root bone name (see ``chain_groups``); an
+    unknown id raises ValueError — a ban that names nothing must
+    fail loudly, never silently no-op.
+
+    The ban merges into each label's "forbidden" list (and out of
+    its "allowed" list, so the recorded map stays honest); the rig
+    enforces it through the same Layer-3 machinery as the label
+    veto, so label-boundary vertices within the banned bone's
+    reach radius keep their blend — that carve-out IS the blend
+    band at the joint. A label's own dominant bone is never banned
+    on it. Returns (new_label_map, bans) with bans =
+    {label: [bone names the ban added]} for the rig report."""
+    groups = chain_groups(parent, trunk)
+    pairs = []
+    for a, b in ban_pairs:
+        for group in (a, b):
+            if group not in groups:
+                raise ValueError(
+                    f"zone ban names unknown bone group {group!r} "
+                    f"(known groups: {sorted(groups)})")
+        pairs.append((a, b))
+    group_of = {}
+    for group, members in groups.items():
+        for name in members:
+            group_of[name] = group
+    out = {}
+    bans = {}
+    for label, info in label_map.items():
+        home = group_of.get(info["dominant"])
+        banned = set()
+        if home is not None:
+            for a, b in pairs:
+                if home == a:
+                    banned |= groups[b]
+                elif home == b:
+                    banned |= groups[a]
+        banned.discard(info["dominant"])
+        entry = dict(info)
+        entry["allowed"] = [n for n in info["allowed"]
+                            if n not in banned]
+        entry["forbidden"] = sorted(set(info["forbidden"]) | banned)
+        out[label] = entry
+        if banned:
+            bans[label] = sorted(banned)
+    return out, bans

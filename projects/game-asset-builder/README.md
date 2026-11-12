@@ -350,3 +350,40 @@ re-sync/re-apply step.
   and walk are clean; per the mandrake precedent a shipped-clip
   defect means no catalogue: the catalog write was reverted. See
   `outputs/snow-goblin/texture-retry-GATE-FAILURE-2026-11-12.txt`.
+
+### Snow Goblin — Option 1 code fix: cross-zone bone ban (2026-11-12)
+
+Adam picked the code route. The rig's weight machinery gained a
+**cross-zone bone ban** (`skin_policy.chain_groups` +
+`zone_ban_map`; rig flag `--zone-ban GROUP:GROUP`, off by
+default): bones are grouped into chains (trunk + one chain per
+appendage root), and a named pair of zones may not own each
+other's part-labelled flesh — `trunk:arm.L` bans the whole arm.L
+chain on trunk-dominated labels and the trunk bones on arm-chain
+labels. It closes the hole the parameter variants could not:
+Layer 3 only forbids bones that DOMINATE another label, and the
+arm labels are dominated by arm2, so arm.L/arm.R were never
+banned on torso flesh. Enforcement reuses the Layer-3 machinery
+(label-boundary vertices within the banned bone's reach keep
+their blend — the shoulder's blend band), and `apply_veto` now
+enforces label bans on trunk columns too (a ban on the spine
+previously bound nothing).
+
+The goblin's existing textured mesh (61878b0e…) was re-rigged
+with `--zone-ban trunk:arm.L --zone-ban trunk:arm.R` — no mesh,
+paint or segment stage re-ran. **Bone heat ACCEPTED for the
+first time on this mesh: torso arm share 0.0385** (gate 0.25;
+the rejected heats were 0.3768/0.3211, the fallback 0.5389),
+coverage 1.0, head dominance 0.97. Posed gate PASS: the wave
+from behind shows no continuous sheet armpit→hip — the raised
+arm reads as an arm and the back stays home; rest/walk/run
+clean, shoulders blended. Disclosed weakness (the crow/toasty
+class): the arm's own underside fur fringe — flat fur-card
+geometry in the mesh — hangs as a soft flap under the raised
+arm in the wave and spikes into slivers at the beyond-spec
+2.2 rad stress raise; shipped clips (≤ ~0.95 rad) show the
+flap only. **Catalogued: sha 6cfaaa6e…, catalog-verify MATCH;
+deployed to the campfire wallpaper the same day** (both PC
+copies hash-verified, Lively re-applied). Suite 144/144
+(9 new zone-ban tests). The failed rig's artifacts are kept in
+`outputs/snow-goblin/before-zoneban/`.

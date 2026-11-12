@@ -2,16 +2,16 @@
  "entry_version": 1,
  "name": "Snow Goblin",
  "slug": "snow-goblin",
- "source_concept": "media-generation-biped-snowgoblin-concept-0-7a45eb0e-b49c-4ecd-93c2-2db237069047.webp",
+ "source_concept": "media-generation-armfix-goblin-apose3-0-72448c71-f7d9-44f6-960e-5b661e71ebb1.webp",
  "asset_file": "snow-goblin.glb",
  "asset_location": "outputs/<slug>/ (local; not in git)",
- "sha256": "c4ba135bcb26a85dde5012b367dd7c5417c99ba8a3ee60dbc1fe51a985721670",
- "bytes": 22227900,
+ "sha256": "6cfaaa6e706c764d1beeea67c226fa1c5eb06711a1f91c606d234a1a844af301",
+ "bytes": 21058412,
  "counts": {
-  "verts": 50883,
-  "faces": 98583,
-  "raw_mesh_verts": 854106,
-  "raw_mesh_faces": 1072406
+  "verts": 45825,
+  "faces": 89850,
+  "raw_mesh_verts": 662652,
+  "raw_mesh_faces": 836926
  },
  "bones": [
   "root",
@@ -39,36 +39,99 @@
   "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
   "rigged": true,
   "rig_template": "biped",
-  "weight_method": "bone-heat (automatic weights); geodesic distance veto (factor 0.85, floor 0.19); label-aware veto (P3-SAM parts, 50965 entries vetoed by label); distance rescue on 2753 verts",
+  "signature_clip": "wave",
+  "weight_method": "bone-heat (automatic weights); geodesic distance veto (factor 0.85, floor 0.19); label-aware veto (P3-SAM parts, 92369 entries vetoed by label); cross-zone ban (trunk:arm.L, trunk:arm.R); distance rescue on 3214 verts",
   "segmentation": {
    "model": "P3-SAM (Tencent Hunyuan3D-Part)",
-   "parts": 9,
-   "proxy_faces": 49999,
-   "islands_relabelled": 103,
-   "separated_verts_added": 1803,
-   "labelled_verts": 50883
+   "parts": 7,
+   "proxy_faces": 50000,
+   "islands_relabelled": 47,
+   "separated_verts_added": 905,
+   "labelled_verts": 45825
   },
   "label_map": {
    "0": {
-    "dominant": "leg2.L",
+    "dominant": "spine",
     "allowed": [
      "head",
-     "leg.L",
-     "leg2.L",
      "root",
      "spine"
     ],
     "forbidden": [
      "arm.L",
-     "arm.L",
-     "arm.L",
      "arm.R",
+     "arm2.L",
+     "arm2.R",
+     "ear.L",
+     "ear.R",
+     "leg2.R"
+    ]
+   },
+   "1": {
+    "dominant": "arm2.L",
+    "allowed": [
+     "arm.L",
+     "arm2.L",
+     "leg2.L"
+    ],
+    "forbidden": [
+     "arm2.R",
+     "ear.L",
+     "ear.R",
+     "head",
+     "leg2.R",
+     "root",
+     "spine"
+    ]
+   },
+   "2": {
+    "dominant": "arm2.R",
+    "allowed": [
+     "arm.R",
+     "arm2.R"
+    ],
+    "forbidden": [
+     "arm2.L",
+     "ear.L",
+     "ear.R",
+     "head",
+     "leg2.R",
+     "root",
+     "spine"
+    ]
+   },
+   "3": {
+    "dominant": "ear.R",
+    "allowed": [
+     "ear.R",
+     "head",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm2.L",
      "arm2.R",
      "ear.L",
      "leg2.R"
     ]
    },
-   "1": {
+   "4": {
+    "dominant": "arm2.L",
+    "allowed": [
+     "arm.L",
+     "arm2.L"
+    ],
+    "forbidden": [
+     "arm2.R",
+     "ear.L",
+     "ear.R",
+     "head",
+     "leg2.R",
+     "root",
+     "spine"
+    ]
+   },
+   "5": {
     "dominant": "leg2.R",
     "allowed": [
      "head",
@@ -78,130 +141,13 @@
      "spine"
     ],
     "forbidden": [
-     "arm.L",
-     "arm.L",
-     "arm.L",
-     "arm.R",
-     "arm2.R",
-     "ear.L",
-     "leg2.L",
-     "leg2.L"
-    ]
-   },
-   "2": {
-    "dominant": "arm.L",
-    "allowed": [
-     "arm.L",
      "arm2.L",
-     "ear.R",
-     "head",
-     "root",
-     "spine"
-    ],
-    "forbidden": [
-     "arm.R",
      "arm2.R",
      "ear.L",
-     "leg2.L",
-     "leg2.L",
-     "leg2.R"
-    ]
-   },
-   "3": {
-    "dominant": "arm.R",
-    "allowed": [
-     "arm.R",
-     "arm2.R",
-     "head",
-     "root",
-     "spine"
-    ],
-    "forbidden": [
-     "arm.L",
-     "arm.L",
-     "arm.L",
-     "ear.L",
-     "leg2.L",
-     "leg2.L",
-     "leg2.R"
-    ]
-   },
-   "4": {
-    "dominant": "arm.L",
-    "allowed": [
-     "arm.L",
-     "arm2.L",
-     "head",
-     "root",
-     "spine"
-    ],
-    "forbidden": [
-     "arm.R",
-     "arm2.R",
-     "ear.L",
-     "leg2.L",
-     "leg2.L",
-     "leg2.R"
-    ]
-   },
-   "5": {
-    "dominant": "arm2.R",
-    "allowed": [
-     "arm.R",
-     "arm2.R",
-     "head",
-     "root",
-     "spine"
-    ],
-    "forbidden": [
-     "arm.L",
-     "arm.L",
-     "arm.L",
-     "ear.L",
-     "leg2.L",
-     "leg2.L",
-     "leg2.R"
+     "ear.R"
     ]
    },
    "6": {
-    "dominant": "arm.L",
-    "allowed": [
-     "arm.L",
-     "arm2.L",
-     "head",
-     "root",
-     "spine"
-    ],
-    "forbidden": [
-     "arm.R",
-     "arm2.R",
-     "ear.L",
-     "leg2.L",
-     "leg2.L",
-     "leg2.R"
-    ]
-   },
-   "7": {
-    "dominant": "leg2.L",
-    "allowed": [
-     "arm2.L",
-     "head",
-     "leg.L",
-     "leg2.L",
-     "root",
-     "spine"
-    ],
-    "forbidden": [
-     "arm.L",
-     "arm.L",
-     "arm.L",
-     "arm.R",
-     "arm2.R",
-     "ear.L",
-     "leg2.R"
-    ]
-   },
-   "8": {
     "dominant": "ear.L",
     "allowed": [
      "ear.L",
@@ -210,89 +156,67 @@
      "spine"
     ],
     "forbidden": [
-     "arm.L",
-     "arm.L",
-     "arm.L",
-     "arm.R",
+     "arm2.L",
      "arm2.R",
-     "leg2.L",
-     "leg2.L",
+     "ear.R",
      "leg2.R"
     ]
    }
   },
   "gpu_host": {
    "hostname": "AthenZ971",
-   "agent": "1.0.0"
+   "agent": "1.1.0"
   },
   "mesh_stage": {
-   "runner": {
-    "name": "snow-goblin_shape",
-    "exit_code": 0,
-    "seconds": 296.37,
-    "baseline_vram_mib": 791,
-    "peak_vram_mib": 7280,
-    "peak_delta_mib": 6489,
-    "vram_after_exit_mib": 867,
-    "n_samples": 613
-   },
-   "stats": {
-    "stage": "mesh",
-    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
-    "verts": 536095,
-    "faces": 1072416,
-    "load_s": 113.27,
-    "inference_s": 156.19,
-    "total_s": 269.57,
-    "torch_peak_mib": 5707.8,
-    "output": "D:\\asset-forge-lab\\out\\gab\\snow-goblin\\shape.glb"
-   }
+   "resumed": true
   },
   "texture_stage": {
    "runner": {
     "name": "snow-goblin_texture",
     "exit_code": 0,
-    "seconds": 1479.43,
-    "baseline_vram_mib": 836,
-    "peak_vram_mib": 12010,
-    "peak_delta_mib": 11174,
-    "vram_after_exit_mib": 770,
-    "n_samples": 3102
+    "seconds": 893.03,
+    "baseline_vram_mib": 1433,
+    "peak_vram_mib": 11971,
+    "peak_delta_mib": 10538,
+    "vram_after_exit_mib": 2024,
+    "n_samples": 1866,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"snow-goblin_texture\", \"exit_code\": 0, \"seconds\": 893.03, \"baseline_vram_mib\": 1433, \"peak_vram_mib\": 11971, \"peak_delta_mib\": 10538, \"vram_after_exit_mib\": 2024, \"n_samples\": 1866}\r\n"
    },
    "stats": {
     "stage": "texture",
     "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
-    "verts": 854106,
-    "faces": 1072416,
-    "load_s": 103.38,
-    "texture_s": 1350.51,
-    "total_s": 1454.81,
-    "torch_peak_mib": 9960.9,
+    "verts": 662652,
+    "faces": 836926,
+    "load_s": 112.79,
+    "texture_s": 749.17,
+    "total_s": 862.85,
+    "torch_peak_mib": 9895.9,
     "output": "D:\\asset-forge-lab\\out\\gab\\snow-goblin\\textured.glb"
    }
   },
-  "animation_revision": "2026-11-08, branch game-asset-builder/p4-game-animations: walk/run procedural gaits baked by the animate stage from the existing rigged.glb; mesh, texture and rig unchanged."
+  "weight_revision": "2026-11-12, Option 1a: re-rig of the armfix rebuild's textured mesh (sha 61878b0e...) with the cross-zone bone ban (skin_policy.zone_ban_map; --zone-ban trunk:arm.L --zone-ban trunk:arm.R). Bone heat ACCEPTED for the first time on this mesh (torso arm share 0.0385 vs the 0.25 gate; the two earlier parameter variants were rejected at 0.3768/0.3211 and shipped the distance fallback whose wave dragged a fur blade armpit-to-hip). Mesh, texture, segmentation and concept unchanged."
  },
  "clips": {
   "idle": {
-   "seconds": 4.79,
    "frames": 115,
-   "fps": 24
+   "fps": 24,
+   "seconds": 4.79
   },
   "run": {
-   "seconds": 1.0,
    "frames": 24,
-   "fps": 24
+   "fps": 24,
+   "seconds": 1.0
   },
   "walk": {
-   "seconds": 1.5,
    "frames": 36,
-   "fps": 24
+   "fps": 24,
+   "seconds": 1.5
   },
   "wave": {
-   "seconds": 2.42,
    "frames": 58,
-   "fps": 24
+   "fps": 24,
+   "seconds": 2.42
   }
  }
 }

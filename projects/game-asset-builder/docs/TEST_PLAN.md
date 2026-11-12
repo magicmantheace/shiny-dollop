@@ -916,3 +916,58 @@ in 615 s on the first post-reboot dispatch):
     armpit notch = new mesh + texture). Attempt records and
     renders: builder goal hidden_files/goblin-weightfix/
     (v1/, v2/ rig reports, v2 wave renders).
+- Snow Goblin Option 1a — cross-zone bone ban (2026-11-12, Adam
+  approved the code route): new machinery in skin_policy
+  (chain_groups + zone_ban_map) and the rig stage (--zone-ban
+  GROUP:GROUP, repeatable, default off). Bones group into chains
+  (trunk + one per appendage root); a banned pair's chains may
+  not own each other's part-labelled flesh, merged into the
+  label map's forbidden sets and enforced by the existing
+  Layer-3 path (boundary verts within reach keep their blend =
+  the joint's blend band). apply_veto now enforces forbidden
+  pairs on trunk columns as well — a ban naming the spine
+  previously bound nothing, since the distance test (unchanged)
+  only iterates veto columns. 9 new unit tests
+  (tests/test_zone_ban.py: chain grouping, ban symmetry,
+  unpaired groups untouched, own-dominant guard, unknown group
+  fails loudly, trunk-column enforcement + rescue exclusion);
+  suite 144/144.
+  - Run: the EXISTING textured mesh (61878b0e…) re-rigged
+    directly (no mesh/paint/segment stages; labels unchanged)
+    with --zone-ban trunk:arm.L --zone-ban trunk:arm.R, default
+    veto factor/floor otherwise, then re-animated.
+    **Bone heat ACCEPTED — first acceptance on this mesh:**
+    torso arm share **0.0385** (gate 0.25; rejected heats were
+    0.3768/0.3211, the shipped fallback 0.5389), coverage 1.0,
+    head dominance 0.97, feet 0.7081, hands 0.6694 (lower than
+    the failed rig's 0.9118 because the bbox hand zone counts
+    shoulder-cap torso flesh the bleed used to top with arm
+    bones; now spine-topped — the fix, not damage; still above
+    the assess floor). Label vetoes 92,369 entries incl. the
+    ban; rescue on 3,214 verts.
+  - Posed gate **PASS** (all renders viewed; record in builder
+    goal hidden_files/goblin-zoneban/1a/GATE-VERDICT.md):
+    wave-back — the decisive view vs the failed reference —
+    shows NO continuous sheet armpit→hip; the raised arm reads
+    as an arm clear of the body and the back stays home. Wave
+    front/side/f15/f45 and the shoulder close-up: shoulder
+    blended into the ruff, no seam tear, no detached look, arm
+    bends naturally. Rest front/side/back: full arm daylight.
+    Walk/run apexes clean. DISCLOSED WEAKNESS (crow/toasty
+    class): the arm's underside fur fringe — flat fur-card
+    geometry belonging to the mesh — hangs as a soft flap under
+    the raised arm in the wave (attached along the arm, moves
+    with it; not torso flesh) and spikes into thin slivers at
+    the beyond-spec 2.2 rad stress raise (stress front/side/
+    back + shoulder close-up all keep the BODY intact);
+    shipped clips peak ≈0.95 rad and show the flap only.
+  - Finish (no pipeline resume — it would re-dispatch segment
+    to the PC): artifacts installed into outputs/snow-goblin/
+    (failed rig preserved in before-zoneban/), catalog entry
+    written via the pipeline's step-6 shape with the genuine
+    mesh/texture manifest records preserved, pipeline verify
+    step run (rest + wave renders clean on cold re-import).
+    **Catalogued sha 6cfaaa6e706c…, catalog-verify MATCH.**
+    Deployed to the campfire wallpaper per Adam's Option 1
+    approval: byte-for-byte swap in the wallpaper worktree +
+    both PC copies hash-verified + Lively re-applied.

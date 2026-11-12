@@ -990,3 +990,29 @@ Catalogue on this branch only — no wallpaper deployment in this run.
   renormalization or an explicit arm ban on the torso label)
   or the concept/mesh route — owner's call. The catalogue
   still points at the original P5 goblin (c4ba135b…).
+- **Snow Goblin: Option 1a LANDED — catalogued + deployed
+  (2026-11-12).** Adam chose the code route ("Try option 1").
+  The rig gained a cross-zone bone ban: `skin_policy.
+  chain_groups` groups bones into chains (trunk + one per
+  appendage root) and `zone_ban_map` merges a named zone pair's
+  chains into each other's label forbidden sets (rig flag
+  `--zone-ban trunk:arm.L`, repeatable, default off; enforced
+  through Layer 3, so boundary verts within reach keep the
+  blend band; `apply_veto` now honours forbidden pairs on
+  trunk columns too). Why it works where parameters could
+  not: Layer 3 forbids only foreign DOMINANTS — the arm
+  labels are arm2-dominated, so arm.L/arm.R were structurally
+  unbannable on torso flesh. Re-rig of the existing textured
+  mesh (61878b0e…, no GPU stages): **heat ACCEPTED, torso arm
+  share 0.0385** (gate 0.25), coverage 1.0. Posed gate PASS —
+  wave-from-behind has no armpit→hip sheet; disclosed
+  weakness: the mesh's own under-arm fur fringe flaps softly
+  in the wave and slivers only at the 2.2 rad stress raise
+  (crow/toasty class). **Catalog sha 6cfaaa6e…, catalog-verify
+  MATCH; swapped into the live wallpaper the same day (both
+  PC copies hash-verified, Lively re-applied).** Failed rig
+  preserved in outputs/snow-goblin/before-zoneban/; gate
+  record in the builder goal's hidden_files/goblin-zoneban/.
+  Suite 144/144. The wallpaper's remaining arm-gate violators
+  are now only mandrake-toddler (redesign) and ember-owl-cat
+  (concept gate) — both still the owner's call.
