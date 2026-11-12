@@ -855,3 +855,16 @@ in 615 s on the first post-reboot dispatch):
   daylight in every pose (bounce apex front: both legs free, rim
   intact; stress step: legs clean); body surface peels into a
   standing flap beside the arm only at the 2.2 rad stress raise.
+- Axolotl Capybara: texture exit 0, 1,362.99 s (peak VRAM
+  11,996 MiB); lab textured.glb sha-verified 3b01e97c…
+  (17,142,960 B). Tracking-limit incident (stale fetch +
+  wrongly-dispatched segment stage, free RAM 0.48 GB) recovered
+  by killing the client + segment tree; the genuine bake
+  finished after RAM recovered; false artifacts sha-verified
+  stale and deleted before the finish. Quadruped rig 15 bones,
+  distance-fallback weights, coverage 1.0; clips idle/walk/run/
+  wiggle; catalog-verify MATCH (a925ab92…). Posed gate viewed
+  (rest + walk/run/wiggle apexes + quadruped stress + belly
+  close-ups at walk apex and stress): PASS, clean — legs are
+  distinct limbs with daylight between them in every pose; the
+  belly stays smooth through the -0.9 rad front-leg stress tuck.

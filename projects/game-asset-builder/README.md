@@ -328,3 +328,16 @@ re-sync/re-apply step.
   legs hanging free, rim intact; stress step clean), but at the
   2.2 rad stress arm raise the body surface beside the arm peels
   into a standing flap — outside every shipped clip's arm range.
+- **Axolotl Capybara — SHIPPED to the branch catalog.** Texture
+  exit 0 in 1,362.99 s (genuine lab textured.glb sha-verified
+  3b01e97c…); quadruped rig 15 bones, clips idle/walk/run/wiggle;
+  catalog-verify MATCH (a925ab92…). Posed gate PASS, clean: the
+  audited paddle-belly is gone — walk-apex belly close-up shows
+  four distinct legs with daylight between them; the stress tuck
+  drags no membrane. One recovered incident: the dispatch client
+  hit the bridge tracking limit mid-bake, fetched the stale
+  texture, and dispatched segment against it (PC free RAM fell to
+  0.48 GB); the client and the wrong segment tree were killed,
+  the genuine bake finished once RAM recovered, and the result
+  was recovered from the lab by hash — see
+  `outputs/axolotl-capybara/texture-retry-success.txt`.

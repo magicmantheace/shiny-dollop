@@ -946,3 +946,19 @@ Catalogue on this branch only — no wallpaper deployment in this run.
   every pose incl. the stress step; body surface peels into a
   flap beside the arm only at the 2.2 rad stress raise, far
   beyond any shipped clip's arm motion.
+- **Axolotl Capybara: DONE.** Texture exit 0 (1,362.99 s; load
+  106.97 s, bake 1,228.79 s; peak VRAM 11,996 MiB); genuine lab
+  textured.glb sha-verified (3b01e97c…). Incident: the client
+  hit the bridge tracking limit mid-bake, read the stale P5
+  result, fetched the stale texture, and dispatched segment
+  against it — free RAM fell to 0.48 GB. Client + wrong segment
+  tree killed; the genuine texture stage stalled under the RAM
+  starvation, recovered after the kill, and completed. False
+  local artifacts (sha-verified stale) deleted; genuine result
+  recovered from the lab by hash. Finish: quadruped rig 15
+  bones, distance-fallback weights, coverage 1.0, clips
+  idle/walk/run/wiggle, catalog-verify MATCH (a925ab92…).
+  Posed gate: PASS, clean — four distinct legs in every view,
+  belly close-ups show daylight between the legs and a smooth
+  belly through the stress tuck; the audited paddle-belly
+  defect is gone.
