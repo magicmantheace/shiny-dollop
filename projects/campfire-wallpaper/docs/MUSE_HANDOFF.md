@@ -403,3 +403,32 @@ replacement exists for them yet (the goblin rebuild's good textured
 mesh is held at the posed gate by its wave-clip fur blade; see the
 builder HANDOFF). Deployed live 2026-11-12: both PC copies
 re-synced and hash-verified, Lively re-applied.
+
+
+## Arm-separation rebuild deployed — snow-goblin (2026-11-12)
+
+The goblin's wave-clip fur blade is fixed — not by a re-bake but by
+a new rig policy in the builder (the cross-zone bone ban,
+`--zone-ban trunk:arm.L/trunk:arm.R`; see the builder HANDOFF).
+The rebuild's existing textured mesh was re-rigged with arm bones
+banned from owning torso-labelled flesh: bone heat accepted with
+torso arm share 0.0385 (gate 0.25; the deployed original's rebuild
+attempts sat at 0.32–0.54), and the posed gate passed — at the
+wave apex the raised arm no longer drags a continuous sheet from
+armpit to hip. The gated GLB was copied byte-for-byte into
+`assets/`, superseding the audited original:
+
+| File | Bytes | sha256 | Change vs old |
+| --- | --- | --- | --- |
+| snow-goblin.glb | 21,058,412 | `6cfaaa6e706c764d1beeea67c226fa1c5eb06711a1f91c606d234a1a844af301` | was 22,227,900 bytes (`c4ba135b…`); 50,883 → 45,825 verts; clips idle/run/walk/wave unchanged |
+
+Disclosed gate weakness carried with the rebuild (builder record):
+the arm's own underside fur fringe — flat fur-card geometry in the
+mesh — hangs as a soft flap under the raised arm during the wave
+(it moves with the arm; the torso contributes nothing) and spikes
+into thin slivers only at a beyond-spec 2.2 rad stress raise no
+shipped clip approaches (wave apex ≈0.95 rad). Mandrake-toddler
+and ember-owl-cat remain the ORIGINAL builds — the last two
+arm-gate violators; both need redesign work, owner's call.
+Deployed live 2026-11-12: both PC copies re-synced and
+hash-verified, Lively re-applied.

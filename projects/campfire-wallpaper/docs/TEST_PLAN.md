@@ -587,3 +587,25 @@ by the gated harness capture above.)
   (`D:\wallpapers\campfire-wallpaper` and the Lively Library copy)
   and hash-verified on the PC; Lively re-applied via the library
   UI; live desktop screenshot checked after re-apply.
+
+
+## Snow-goblin arm-fix deploy (2026-11-12)
+
+- One gated builder rebuild (snow-goblin) copied byte-for-byte
+  from the builder catalog (branch
+  `game-asset-builder/arm-separation-fixes`, catalog-verify
+  MATCH) into `assets/`; sha256 recorded in
+  `docs/MUSE_HANDOFF.md`. The fix was a re-rig of the rebuild's
+  textured mesh with the builder's new cross-zone bone ban —
+  the wave-clip armpit-to-hip fur blade is gone in the builder's
+  posed gate (wave-from-behind decisive); clips idle/run/walk/
+  wave unchanged (`walk` present, director seam untouched).
+- **Frame cost.** No code changes: same scene, same clip set,
+  same on-stage cap (MAX_ACTIVE = 3). The goblin's vertex count
+  drops ~10% (50,883 → 45,825), so steady-state GPU/CPU cost is
+  unchanged in kind or slightly lower; real-GPU frame cost
+  remains unmeasured, the standing caveat.
+- Deployed live: the GLB synced to both PC copies
+  (`D:\wallpapers\campfire-wallpaper` and the Lively Library
+  copy) and hash-verified on the PC; Lively re-applied via the
+  library UI; live desktop screenshot checked after re-apply.
