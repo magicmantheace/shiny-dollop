@@ -843,3 +843,15 @@ in 615 s on the first post-reboot dispatch):
   side panel sails on forward arm raise, onset 1.2–1.7 rad, full
   sail at the 2.2 rad stress pose; no shipped clip exceeds ~0.6 rad
   of arm raise.
+- Toasty: texture exit 0, 906.87 s (peak VRAM 11,823 MiB); lab
+  textured.glb sha-verified b5ed9eda… (28,534,868 B). VM runtime
+  restarted mid-run; genuine result recovered from the lab by hash
+  (client-written manifest record corroborated by the lab result
+  JSON + STAGE_JSON); no re-dispatch. Segment P3-SAM 7 parts; rig
+  bone-heat accepted, torso arm share 0.0238, coverage 1.0; clips
+  idle/walk/run/bounce; catalog-verify MATCH (3818679c…). Posed
+  gate viewed (rest + walk/run/bounce apexes + stress + hip
+  close-ups): PASS with disclosed weakness — legs separate with
+  daylight in every pose (bounce apex front: both legs free, rim
+  intact; stress step: legs clean); body surface peels into a
+  standing flap beside the arm only at the 2.2 rad stress raise.

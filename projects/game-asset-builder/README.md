@@ -317,3 +317,14 @@ re-sync/re-apply step.
   texture (the goblin pattern); the client was killed before the
   segment stage consumed it and the genuine result was recovered
   from the lab — see `outputs/crow-postman/texture-retry-success.txt`.
+- **Toasty — SHIPPED to the branch catalog.** Texture exit 0 in
+  906.87 s (genuine lab textured.glb sha-verified b5ed9eda…); the
+  VM runtime restarted mid-run but the genuine result was recovered
+  from the lab by hash — no re-dispatch. Segment P3-SAM 7 parts;
+  biped rig with **bone-heat weights accepted** (torso arm share
+  0.0238); clips idle/walk/run/bounce; catalog-verify MATCH
+  (3818679c…). Posed gate PASS with a disclosed weakness: the
+  audited leg fusion is gone in every pose (bounce apex shows both
+  legs hanging free, rim intact; stress step clean), but at the
+  2.2 rad stress arm raise the body surface beside the arm peels
+  into a standing flap — outside every shipped clip's arm range.

@@ -932,3 +932,17 @@ Catalogue on this branch only — no wallpaper deployment in this run.
   clip raises the arm past ~0.6 rad. Genuine prep/mesh/texture
   records restored into the manifest + catalog provenance after
   the --resume finish overwrote them with placeholders.
+- **Toasty: DONE.** Texture exit 0 (906.87 s; load 112.82 s, bake
+  773.77 s; peak VRAM 11,823 MiB); genuine lab textured.glb
+  sha-verified (b5ed9eda…). The VM runtime restarted mid-run: the
+  client had already recorded the genuine texture result locally
+  (verified against the lab result JSON + STAGE_JSON re-read after
+  the restart) but died before fetching the GLB — recovered from
+  the lab by hash, no re-dispatch. Finish: P3-SAM 7 parts, biped
+  rig with bone-heat weights ACCEPTED (geodesic + label vetoes;
+  torso arm share 0.0238; coverage 1.0), clips idle/walk/run/
+  bounce, catalog-verify MATCH (3818679c…). Posed gate: PASS with
+  disclosed weakness — leg fusion (the audited defect) absent in
+  every pose incl. the stress step; body surface peels into a
+  flap beside the arm only at the 2.2 rad stress raise, far
+  beyond any shipped clip's arm motion.

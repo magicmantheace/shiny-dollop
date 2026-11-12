@@ -2,16 +2,16 @@
  "entry_version": 1,
  "name": "Toasty",
  "slug": "toasty",
- "source_concept": "media-generation-toasty-reference-0-c499c12f-7eba-4d9a-ace4-3387d2c29fd3.webp",
+ "source_concept": "media-generation-armfix-toasty-apose-0-7daf70b1-73cf-452a-ab02-fd36054be834.webp",
  "asset_file": "toasty.glb",
  "asset_location": "outputs/<slug>/ (local; not in git)",
- "sha256": "62289b927b6c161b968726fb8455987de5ca397a3947f812f93de719c59d043e",
- "bytes": 21960832,
+ "sha256": "3818679c9ffcaee8c6298247b3e423fb5e10722c79f9033b60343c812a486d48",
+ "bytes": 22066560,
  "counts": {
-  "verts": 50794,
-  "faces": 99640,
-  "raw_mesh_verts": 762980,
-  "raw_mesh_faces": 997532
+  "verts": 50626,
+  "faces": 99146,
+  "raw_mesh_verts": 654296,
+  "raw_mesh_faces": 841574
  },
  "bones": [
   "root",
@@ -38,14 +38,14 @@
   "rigged": true,
   "rig_template": "biped",
   "signature_clip": "bounce",
-  "weight_method": "bone-heat (automatic weights); geodesic distance veto (factor 0.85, floor 0.19); label-aware veto (P3-SAM parts, 55536 entries vetoed by label); distance rescue on 3559 verts",
+  "weight_method": "bone-heat (automatic weights); geodesic distance veto (factor 0.85, floor 0.19); label-aware veto (P3-SAM parts, 43111 entries vetoed by label); distance rescue on 2696 verts",
   "segmentation": {
    "model": "P3-SAM (Tencent Hunyuan3D-Part)",
    "parts": 7,
-   "proxy_faces": 53085,
-   "islands_relabelled": 21,
-   "separated_verts_added": 1060,
-   "labelled_verts": 50794
+   "proxy_faces": 49999,
+   "islands_relabelled": 19,
+   "separated_verts_added": 1137,
+   "labelled_verts": 50626
   },
   "label_map": {
    "0": {
@@ -59,11 +59,24 @@
     ],
     "forbidden": [
      "arm.R",
-     "leg2.L",
      "leg2.R"
     ]
    },
    "1": {
+    "dominant": "leg2.R",
+    "allowed": [
+     "head",
+     "leg.R",
+     "leg2.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": [
+     "arm.L",
+     "arm.R"
+    ]
+   },
+   "2": {
     "dominant": "arm.R",
     "allowed": [
      "arm.R",
@@ -74,29 +87,14 @@
     ],
     "forbidden": [
      "arm.L",
-     "leg2.L",
      "leg2.R"
     ]
    },
-   "2": {
-    "dominant": "leg2.R",
-    "allowed": [
-     "head",
-     "leg.R",
-     "leg2.R",
-     "root",
-     "spine"
-    ],
-    "forbidden": [
-     "arm.L",
-     "arm.R",
-     "leg2.L"
-    ]
-   },
    "3": {
-    "dominant": "head",
+    "dominant": "root",
     "allowed": [
      "head",
+     "leg.L",
      "leg.R",
      "root",
      "spine"
@@ -104,16 +102,13 @@
     "forbidden": [
      "arm.L",
      "arm.R",
-     "leg2.L",
      "leg2.R"
     ]
    },
    "4": {
-    "dominant": "leg2.L",
+    "dominant": "head",
     "allowed": [
      "head",
-     "leg.L",
-     "leg2.L",
      "root",
      "spine"
     ],
@@ -124,18 +119,16 @@
     ]
    },
    "5": {
-    "dominant": "leg2.R",
+    "dominant": "head",
     "allowed": [
      "head",
-     "leg.R",
-     "leg2.R",
      "root",
      "spine"
     ],
     "forbidden": [
      "arm.L",
      "arm.R",
-     "leg2.L"
+     "leg2.R"
     ]
    },
    "6": {
@@ -148,7 +141,6 @@
     "forbidden": [
      "arm.L",
      "arm.R",
-     "leg2.L",
      "leg2.R"
     ]
    }
@@ -158,10 +150,55 @@
    "agent": "1.1.0"
   },
   "mesh_stage": {
-   "resumed": true
+   "runner": {
+    "name": "toasty_shape",
+    "exit_code": 0,
+    "seconds": 492.08,
+    "baseline_vram_mib": 1924,
+    "peak_vram_mib": 8482,
+    "peak_delta_mib": 6558,
+    "vram_after_exit_mib": 2040,
+    "n_samples": 1018,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"toasty_shape\", \"exit_code\": 0, \"seconds\": 492.08, \"baseline_vram_mib\": 1924, \"peak_vram_mib\": 8482, \"peak_delta_mib\": 6558, \"vram_after_exit_mib\": 2040, \"n_samples\": 1018}\r\n"
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 420711,
+    "faces": 841578,
+    "load_s": 114.76,
+    "inference_s": 347.31,
+    "total_s": 462.17,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\toasty\\shape.glb"
+   }
   },
   "texture_stage": {
-   "resumed": true
+   "runner": {
+    "name": "toasty_texture",
+    "exit_code": 0,
+    "seconds": 906.87,
+    "baseline_vram_mib": 3063,
+    "peak_vram_mib": 11823,
+    "peak_delta_mib": 8760,
+    "vram_after_exit_mib": 2459,
+    "n_samples": 1921,
+    "job_state": "failed",
+    "job_stdout_tail": "{\"name\": \"toasty_texture\", \"exit_code\": 0, \"seconds\": 906.87, \"baseline_vram_mib\": 3063, \"peak_vram_mib\": 11823, \"peak_delta_mib\": 8760, \"vram_after_exit_mib\": 2459, \"n_samples\": 1921}\r\n"
+   },
+   "stats": {
+    "stage": "texture",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+    "verts": 654296,
+    "faces": 841578,
+    "load_s": 112.82,
+    "texture_s": 773.77,
+    "total_s": 887.51,
+    "torch_peak_mib": 9895.9,
+    "output": "D:\\asset-forge-lab\\out\\gab\\toasty\\textured.glb"
+   },
+   "note": "Genuine record written by the dispatching client before the VM runtime restarted mid-run (the client died before fetching the textured GLB; its runner job_state reads 'failed' from the bridge tracking layer, but the stage's own result \u2014 exit 0, 906.87 s \u2014 is corroborated by the lab result JSON and log STAGE_JSON, both re-read after the restart). Genuine lab textured.glb (sha256 b5ed9eda...) fetched and sha-verified post-restart; no re-dispatch. Prep/mesh records restored from the pre-retry snapshot after the --resume finish overwrote them with placeholders."
   }
  },
  "clips": {
