@@ -43,3 +43,4 @@ To view the **procedural capsule-character** preview: open `godot/project.godot`
 5. Promote generated assets only after mechanical and visual checks; preserve asset versions.
 6. No proprietary character/voice data or private recordings in Git.
 7. Explicitly report actual test results, limitations and hardware measurements.
+8. Procedural generators must be byte-deterministic **across platforms**, not just per machine (ADR-010): no platform-libm results (e.g. `math.sin`/`math.cos`) in output bytes — the lantern generator's pure-Python trigonometry is the reference implementation.
