@@ -121,9 +121,17 @@ func _verify_asset(asset: Dictionary) -> Dictionary:
 		player.seek(maxf(anim.length * 0.5, 0.01), true)
 		var p1 := _sample_poses(skel)
 		var delta := _max_delta(p0, p1)
+		# P4 follow-up (additive reporting; pass criteria unchanged):
+		# quarter-cycle delta counters the documented mid-cycle blind
+		# spot for anti-phase gaits, and loop_mode records how the
+		# engine imported the clip (0 none, 1 linear, 2 pingpong).
+		player.seek(maxf(anim.length * 0.25, 0.01), true)
+		var pq := _sample_poses(skel)
+		var delta_q := _max_delta(p0, pq)
 		var clip_ok: bool = anim.length > 0.0 and delta > 0.0005
 		r["clips"][action] = {"found": true, "length_s": anim.length,
-			"max_bone_delta": delta, "ok": clip_ok}
+			"max_bone_delta": delta, "max_bone_delta_quarter": delta_q,
+			"loop_mode": anim.loop_mode, "ok": clip_ok}
 		ok = ok and clip_ok
 	r["ok"] = ok
 	inst.queue_free()

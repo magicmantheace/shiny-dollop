@@ -409,13 +409,90 @@ playback of the baked clips).
   sample poses, not frames), the Godot editor GUI path, any
   shipped-game integration.
 
+## P4 game animations — BUILT AND VERIFIED (2026-11-08, branch game-asset-builder/p4-game-animations, stacked on p3-handoff)
+
+Owner directed game-ready animation production (walking + any
+animation a game needs) on 2026-11-08. Scope landed: the standard
+locomotion set — `walk` + `run` for all three rig templates —
+from a parametric gait model in `stages/animate/poses.py` (P4
+section; model + phase patterns in `docs/DESIGN.md` "Locomotion
+(P4)"). The animate stage bakes them like every other recipe; no
+new stage, no new meshes, no GPU work, no re-rigging.
+
+- Drivers added (axis-probed on the shipped rigs, numbers in
+  `animate_blender.py`'s header): legs on all templates
+  (winged/biped had none), biped knee fold, biped fore-aft arm
+  swing on local Z with mirrored per-side signs, winged arm
+  counter-swing. Quadruped needed no driver changes.
+- The three catalogued creatures were re-animated in place from
+  `outputs/<slug>/rigged.glb`; previous finals kept under
+  `outputs/<slug>/before-p4/`. Each now carries 4 clips (new:
+  dragon walk 1.5 s / run 1.0 s; goblin walk 1.5 / run 1.0;
+  triceratops walk 2.0 / run 1.0). Catalog entries updated:
+  `actions`, a new per-clip `clips` duration map, sha256/bytes,
+  and `provenance.animation_revision`; catalog-verify MATCH ×3.
+  `handoff/threejs/run_verify.mjs` clip lists updated to match.
+- Suite **113/113** (pytest; +12 in
+  `tests/test_game_animations.py` — gait invariants, loop
+  closure, phase patterns, fold timing, GLB clip presence /
+  durations via the new stdlib reader
+  `stages/animate/glb_clips.py`, hermetic synthetic-GLB test for
+  the reader itself).
+- three.js playback of the new clips VERIFIED on the build VM
+  (Electron Chromium + SwiftShader driving the project's
+  verify.html; per-clip numbers in `docs/TEST_PLAN.md`). The
+  mid-cycle sampling blind spot for anti-phase gaits was found
+  and documented there; quarter-cycle deltas are the meaningful
+  figures for walk/run.
+- Ground/intersection checks: evaluated-mesh min-Z across each
+  walk stays within 0.007 units of rest (no material
+  penetration); swing-peak Cycles stills read as a mid-stride
+  on goblin + triceratops, a shuffle-step on the dragon (seated
+  body plan, single-segment legs — its honest limit).
+- NOT done / not verified: Godot playback of the new clips
+  (P3's Godot proof predates them), rendered engine pixels, a
+  `turn`/`jump`/`attack` set beyond locomotion (the model
+  extends by adding recipes — no blocker, just not this slice),
+  PC-side re-export of the hand-off packages (the catalog GLBs
+  changed, so P3's exported packages are stale until re-run).
+
 Next:
 1. Owner decisions: merges of PR #38, the p2-cleanup PR, the P2
-   UI PR, and this slice's PR are the owner's call.
+   UI PR, the P3 PR, and this slice's PR are the owner's call.
 2. Possible follow-ups if wanted: a rendered-frame engine check
    (Godot viewport capture / three.js screenshot) to cover the
    seam-under-rendering question; running the studio hand-off
    into the live store.
+
+## P4 follow-up — Godot playback of walk/run + hand-off re-export (2026-11-08, same branch)
+
+Owner directed both loose ends closed the same evening:
+
+- **Hand-off packages re-exported** from the P4-tip catalogued
+  GLBs (all four assets × godot/threejs/studio-into-scratch-root,
+  under `outputs/handoff/`). Independent clip-reader re-check:
+  all 12 packaged GLBs carry the full post-P4 clip sets with
+  matching durations; manifest action lists match the catalog.
+  The P3 "stale packages" note in the P4 section above is closed.
+- **Godot playback of the new clips — VERIFIED ON THE BUILD VM**
+  (Godot 4.7.2.stable headless; `GODOT_VERIFY_DONE ok=true`
+  against the new exported packages). The owner's PC no longer
+  has a 4.7.2 Windows build (exhaustive bridge search; only a
+  4.6.1 mono build for another project), so per the project's
+  honesty rule this is recorded as a VM verification, not an
+  owner-hardware one. Walk/run deltas are large and unambiguous
+  (mid-cycle 0.087–0.812; quarter-cycle figures in TEST_PLAN),
+  and the established clips reproduce the P3 PC run's deltas to
+  the digit in the same harness, cross-validating the method.
+  Re-running on the PC takes minutes once a 4.7.2 build returns;
+  the staged scratch remains in the bridge file root (`gab-p4/`).
+- `handoff/godot/verify_handoff.gd`: quarter-cycle delta +
+  `loop_mode` now reported per clip (additive; pass criteria
+  unchanged). All clips import with loop_mode 0 — seamless
+  looping is a bake property (P4 closure tests) enabled at play
+  time, exactly as for the P3-proven clips.
+- Suite 113/113. Numbers: `docs/TEST_PLAN.md` (P4 follow-up
+  section).
 
 Boundaries: no cloud fallback exists or may be added; weights and outputs
 never enter git; GPU claims only from PC runs; merges are the owner's call.

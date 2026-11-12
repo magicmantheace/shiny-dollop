@@ -24,9 +24,9 @@ if (!DIR) {
 const PORT = 8931;
 const CDP_PORT = 9223;
 const ASSETS = [
-  { slug: 'ember-dragon', clips: 'hop,idle', bones: 14 },
-  { slug: 'snow-goblin', clips: 'idle,wave', bones: 13 },
-  { slug: 'triceratops', clips: 'bounce,idle', bones: 15 },
+  { slug: 'ember-dragon', clips: 'hop,idle,run,walk', bones: 14 },
+  { slug: 'snow-goblin', clips: 'idle,run,walk,wave', bones: 13 },
+  { slug: 'triceratops', clips: 'bounce,idle,run,walk', bones: 15 },
   { slug: 'treasure-chest', clips: '', bones: 0 },
 ];
 

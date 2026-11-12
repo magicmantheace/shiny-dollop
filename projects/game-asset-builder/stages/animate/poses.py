@@ -21,6 +21,14 @@ template doesn't have are skipped by the animate stage.
 P1 adds per-template recipe sets (``TEMPLATE_RECIPES`` below):
 quadruped idle + bounce, biped idle + wave. The winged set stays the
 module-level ``RECIPES``/``CHANNELS`` for backward compatibility.
+
+P4 adds procedural locomotion (``walk`` / ``run`` for every template)
+from the parametric gait model at the bottom of this module: a leg's
+cycle is a phase offset into one shared swing/fold pair of curves, so
+rig classes differ only in their phase pattern (biped anti-phase,
+quadruped lateral-sequence walk, bounding-gallop run) and loops close
+exactly by construction. These are functional game locomotion, not
+mocap: no IK, so foot placement is approximate.
 """
 
 import math
@@ -28,7 +36,10 @@ import math
 TAU = math.pi * 2
 
 CHANNELS = ("root_y", "sway", "head_pitch", "ear_pitch", "wing_pitch",
-            "wing2_pitch", "arm_pitch", "tail_yaw")
+            "wing2_pitch", "arm_pitch", "tail_yaw",
+            # P4 gait channels: per-leg swing (+ = foot forward) and
+            # per-arm swing (+ = hand forward), winged template.
+            "leg.L", "leg.R", "arm.L", "arm.R")
 
 REST = dict.fromkeys(CHANNELS, 0.0)
 
@@ -147,7 +158,13 @@ QUAD_RECIPES = {
 # ---------------------------------------------------------------------
 
 BIPED_CHANNELS = ("root_y", "sway", "head_pitch", "head_tilt",
-                  "ear_pitch", "arm_sway", "arm_wave", "arm2_wave")
+                  "ear_pitch", "arm_sway", "arm_wave", "arm2_wave",
+                  # P4 gait channels: per-leg swing (+ = foot
+                  # forward), per-leg knee fold (+ = shin folds
+                  # back), per-arm fore-aft swing (+ = hand
+                  # forward) with forearm follow.
+                  "leg.L", "leg.R", "leg2.L", "leg2.R",
+                  "arm.L", "arm.R", "arm2.L", "arm2.R")
 BREST = dict.fromkeys(BIPED_CHANNELS, 0.0)
 
 
@@ -228,3 +245,189 @@ def sample_for(template: str, recipe: str,
 
 def showcase_clip(template: str) -> str:
     return template_spec(template)["showcase"]
+
+
+# ---------------------------------------------------------------------
+# P4 locomotion: a parametric gait model shared by all three rig
+# classes. One step cycle is a phase phi in [0, 1). Every leg follows
+# the same two curves, shifted by its phase offset:
+#
+#   gait_swing(phi) = sin(TAU * phi)         +1: foot fully forward,
+#                                            -1: fully back
+#   gait_fold(phi)  = max(0, sin(TAU * (phi + 0.12))) ** 3
+#                     lower-leg fold: zero through the stance phase
+#                     (leg loaded, moving back), peaking at phi 0.13,
+#                     just after the leg passes vertical into its
+#                     forward swing-through.
+#
+# Every term is a sinusoid (or a clipped sinusoid power) of the cycle
+# phase, so pose(0) == pose(period) exactly and the baked clips loop
+# seamlessly by construction. Classes differ only in phase pattern:
+#
+#   biped / winged   anti-phase pair (L 0.0, R 0.5); arms counter-
+#                    swing against the same-side leg.
+#   quadruped walk   lateral sequence FL 0.0, HR 0.25, FR 0.5,
+#                    HL 0.75 (each foot steps in turn).
+#   quadruped run    bounding gallop: front pair together (0.0),
+#                    hind pair together (0.5), spine rocking and a
+#                    once-per-cycle body bounce.
+#
+# Amplitudes are radians at the bone. Channel sign conventions match
+# the animate stage's probed drivers (stages/animate/
+# animate_blender.py): biped/winged leg channels are + = foot
+# forward; biped leg2 channels are + = knee fold; quadruped leg
+# channels keep the P1 convention (+ = foot trails back, the bounce
+# tuck direction) and leg2 + = shin fold, so the gait writes the
+# quadruped swing negated. The winged template's legs are single-
+# segment (no leg2 bone), so its gaits have no knee fold — the
+# honest limit of that rig.
+# ---------------------------------------------------------------------
+
+
+def gait_swing(phase: float) -> float:
+    return math.sin(TAU * phase)
+
+
+def gait_fold(phase: float) -> float:
+    return max(0.0, math.sin(TAU * (phase + 0.12))) ** 3
+
+
+def _ph(t: float, period: float, offset: float = 0.0) -> float:
+    return (t / period + offset) % 1.0
+
+
+# --- winged-creature (upright two-leg plan; arms counter-swing) ------
+
+def winged_walk(t: float) -> dict:
+    period = 1.5
+    swing = gait_swing(_ph(t, period))
+    return {
+        **REST,
+        "leg.L": 0.50 * swing,
+        "leg.R": -0.50 * swing,
+        "arm.L": -0.35 * swing,
+        "arm.R": 0.35 * swing,
+        "root_y": -0.015 * (0.5 + 0.5 * math.cos(2 * TAU * (t / period))),
+        "head_pitch": 0.04 * math.sin(2 * TAU * (t / period)),
+        "ear_pitch": 0.05 * math.sin(2 * TAU * (t / period) - 0.5),
+        "wing_pitch": 0.05 * math.sin(2 * TAU * (t / period)),
+        "wing2_pitch": 0.03 * math.sin(2 * TAU * (t / period) - 0.4),
+        "tail_yaw": 0.15 * math.sin(TAU * (t / period)),
+    }
+
+
+def winged_run(t: float) -> dict:
+    period = 1.0
+    swing = gait_swing(_ph(t, period))
+    return {
+        **REST,
+        "leg.L": 0.70 * swing,
+        "leg.R": -0.70 * swing,
+        "arm.L": -0.50 * swing,
+        "arm.R": 0.50 * swing,
+        "root_y": 0.02 + 0.028 * math.sin(2 * TAU * (t / period)),
+        "head_pitch": 0.08 + 0.03 * math.sin(2 * TAU * (t / period)),
+        "ear_pitch": -0.06 + 0.04 * math.sin(2 * TAU * (t / period) - 0.5),
+        "wing_pitch": 0.16 + 0.10 * math.sin(TAU * (t / period)),
+        "wing2_pitch": 0.10 + 0.06 * math.sin(TAU * (t / period) - 0.4),
+        "tail_yaw": 0.18 * math.sin(TAU * (t / period)),
+    }
+
+
+# --- biped ------------------------------------------------------------
+
+def biped_walk(t: float) -> dict:
+    period = 1.5
+    ph = _ph(t, period)
+    swing = gait_swing(ph)
+    return {
+        **BREST,
+        "leg.L": 0.50 * swing,
+        "leg.R": -0.50 * swing,
+        "leg2.L": 0.70 * gait_fold(ph),
+        "leg2.R": 0.70 * gait_fold(_ph(t, period, 0.5)),
+        "arm.L": -0.38 * swing,
+        "arm.R": 0.38 * swing,
+        "arm2.L": -0.19 * swing + 0.10,
+        "arm2.R": 0.19 * swing + 0.10,
+        "root_y": -0.018 * (0.5 + 0.5 * math.cos(2 * TAU * ph)),
+        "sway": 0.035 * math.sin(TAU * ph),
+        "head_pitch": 0.03 * math.sin(2 * TAU * ph),
+        "ear_pitch": 0.03 * math.sin(2 * TAU * ph - 0.5),
+    }
+
+
+def biped_run(t: float) -> dict:
+    period = 1.0
+    ph = _ph(t, period)
+    swing = gait_swing(ph)
+    return {
+        **BREST,
+        "leg.L": 0.78 * swing,
+        "leg.R": -0.78 * swing,
+        "leg2.L": 1.05 * gait_fold(ph),
+        "leg2.R": 1.05 * gait_fold(_ph(t, period, 0.5)),
+        "arm.L": -0.55 * swing,
+        "arm.R": 0.55 * swing,
+        "arm2.L": -0.30 * swing + 0.35,
+        "arm2.R": 0.30 * swing + 0.35,
+        "root_y": 0.02 + 0.026 * math.sin(2 * TAU * ph),
+        "sway": 0.03 * math.sin(TAU * ph),
+        "head_pitch": 0.12 + 0.03 * math.sin(2 * TAU * ph),
+        "ear_pitch": -0.04 + 0.03 * math.sin(2 * TAU * ph - 0.5),
+    }
+
+
+# --- quadruped ----------------------------------------------------------
+
+QUAD_WALK_OFFSETS = {"FL": 0.0, "HR": 0.25, "FR": 0.5, "HL": 0.75}
+QUAD_RUN_OFFSETS = {"FL": 0.0, "FR": 0.0, "HL": 0.5, "HR": 0.5}
+
+
+def _quad_gait(t: float, period: float, offsets: dict,
+               swing_amp: float, fold_amp: float) -> dict:
+    pose = dict(QREST)
+    for corner, off in offsets.items():
+        ph = _ph(t, period, off)
+        # Quadruped channel convention: leg + trails the foot back
+        # (the P1 tuck direction), so forward swing is negative.
+        pose[f"leg.{corner}"] = -swing_amp * gait_swing(ph)
+        pose[f"leg2.{corner}"] = fold_amp * gait_fold(ph)
+    return pose
+
+
+def quad_walk(t: float) -> dict:
+    period = 2.0
+    ph = _ph(t, period)
+    pose = _quad_gait(t, period, QUAD_WALK_OFFSETS, 0.42, 0.55)
+    pose.update({
+        "root_y": 0.012 * math.sin(2 * TAU * ph),
+        "spine_pitch": 0.025 * math.sin(2 * TAU * ph + 0.5),
+        "neck_pitch": -0.05 * math.sin(TAU * ph + 0.4),
+        "head_pitch": 0.04 * math.sin(TAU * ph + 0.9),
+        "sway": 0.02 * math.sin(TAU * ph),
+        "tail_yaw": 0.12 * math.sin(TAU * ph + 0.5),
+    })
+    return pose
+
+
+def quad_run(t: float) -> dict:
+    period = 1.0
+    ph = _ph(t, period)
+    pose = _quad_gait(t, period, QUAD_RUN_OFFSETS, 0.62, 0.85)
+    pose.update({
+        "root_y": 0.055 * math.sin(TAU * ph - 0.5),
+        "spine_pitch": 0.11 * math.sin(TAU * ph),
+        "neck_pitch": -0.09 * math.sin(TAU * ph),
+        "head_pitch": 0.06 * math.sin(TAU * ph + 0.6),
+        "tail_yaw": 0.16 * math.sin(TAU * ph + 1.2),
+    })
+    return pose
+
+
+RECIPES["walk"] = (winged_walk, 1.5)
+RECIPES["run"] = (winged_run, 1.0)
+BIPED_RECIPES["walk"] = (biped_walk, 1.5)
+BIPED_RECIPES["run"] = (biped_run, 1.0)
+QUAD_RECIPES["walk"] = (quad_walk, 2.0)
+QUAD_RECIPES["run"] = (quad_run, 1.0)

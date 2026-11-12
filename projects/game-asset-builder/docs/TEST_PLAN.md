@@ -379,6 +379,144 @@ load is still in flight (with and without virtual-time budgets),
 so the driver polls the result element over the DevTools
 protocol instead.
 
+## Verified — 2026-11-08 (P4 game animations: walk/run gaits)
+
+Gait model + regeneration (build VM, Blender 4.2.3 headless):
+
+- Suite **113/113** under pytest (101 baseline + 12 new in
+  `tests/test_game_animations.py`): every template registers
+  `walk` + `run` at the documented durations; gait recipes return
+  exactly their template's channel set; loop closure holds
+  (pose(0) == pose(period) per channel, and the baked last frame
+  wraps to the first with no jump); biped/winged legs are exactly
+  anti-phase with arms counter-swinging; the quadruped walk
+  matches the lateral-sequence offsets (FL 0, HR 0.25, FR 0.5,
+  HL 0.75) and its run moves front/hind pairs together in
+  anti-phase; the fold curve is zero through mid-stance and
+  non-negative everywhere; each run is shorter-period and
+  larger-amplitude than its walk. A synthetic-GLB test covers the
+  new stdlib clip reader (`stages/animate/glb_clips.py`)
+  hermetically.
+- New drivers axis-probed on the shipped rigged GLBs before use
+  (+0.5 rad, bone-tail world displacement vs facing): legs swing
+  forward on +local X on all templates (dragon +0.22, goblin
+  +0.145, trike FL +0.216); the goblin's fore-aft arm swing is
+  local Z, mirrored (+Z: .L hand back −0.21, .R hand forward
+  +0.21). One false start recorded: a root→head facing heuristic
+  misread the goblin's facing by 90°; the probe values only make
+  sense against the −Y facing the other two rigs share, which the
+  wave axis (+X raise, up + outward) confirms.
+- The three creatures were re-animated from their existing
+  `rigged.glb` files (mesh/texture/rig untouched; the previous
+  finals are kept under `outputs/<slug>/before-p4/`). New clip
+  sets, from the animate reports: Ember Dragon hop 1.25 / idle
+  4.79 / **walk 1.5 (36 f)** / **run 1.0 (24 f)**; Snow Goblin
+  idle 4.79 / wave 2.42 / **walk 1.5** / **run 1.0**;
+  Triceratops bounce 1.25 / idle 4.79 / **walk 2.0 (48 f)** /
+  **run 1.0**. Catalog entries updated (actions, per-clip
+  durations in a new `clips` map, provenance
+  `animation_revision`) — `catalog-verify` MATCH on all three new
+  sha256 (dragon `2837c6b2…`, goblin `c4ba135b…`, trike
+  `39b5f934…`). The GLB-level test re-reads the exported files
+  and confirms clip presence + durations independently of the
+  Blender reports.
+- Ground check (evaluated-mesh minimum Z across each walk cycle,
+  vs rest): dragon never reaches its rest minimum (lowest point
+  rises up to +0.107 during the cycle); goblin and triceratops
+  dip ≤ 0.007 units below rest on a 2-unit character — no
+  material ground penetration. Swing-peak stills (Cycles renders)
+  show a readable mid-stride on goblin and triceratops with no
+  visible limb interpenetration; the dragon's walk reads as a
+  shuffle-step on its seated body plan.
+
+three.js playback (build VM, Electron Chromium + SwiftShader,
+three 0.180, the project's `handoff/threejs/verify.html` harness
+page; the VM's managed Chrome refuses standalone launch, so an
+Electron driver polled the result element the same way
+`run_verify.mjs` does over CDP):
+
+- **THREE_VERIFY_DONE ok=true** for all three creatures: bone
+  counts match the catalog (14/13/15), all four clips per
+  creature present with duration > 0 and real skeleton motion.
+  Project-standard sampling (t=0 vs mid-clip) max bone deltas
+  for the NEW clips: dragon walk Δ0.016 / run Δ0.032; goblin
+  walk Δ0.030 / run Δ0.066; triceratops walk Δ0.330 / run
+  Δ0.120. Note the method's blind spot: at mid-cycle an
+  anti-phase gait passes through neutral, so biped-plan deltas
+  read small; a second pass at quarter-cycle (legs at full
+  swing) gives dragon walk Δ0.078 / run Δ0.083, goblin walk
+  Δ0.146 / run Δ0.174, triceratops walk Δ0.182 / run Δ0.336 —
+  in line with the established clips' deltas (dragon hop
+  0.074–0.085).
+- Not covered by this run: Godot playback of the new clips (the
+  P3 Godot proof predates them; the GLBs differ only in added
+  actions), rendered pixels in an engine, and any judgement of
+  gait quality beyond the stills + deltas above. Foot-slip is
+  not measurable in an in-place cycle — it depends on the
+  consuming game's root-motion speed matching.
+
+## Verified — 2026-11-08 (P4 follow-up: Godot playback of walk/run + hand-off re-export)
+
+Owner-directed follow-up closing the two gaps the P4 section left
+open. Suite **113/113** (`python3 -m pytest tests/`), unchanged.
+
+Hand-off re-export (build VM, from the P4-tip catalogued GLBs):
+
+- All four assets re-exported to all three targets
+  (`outputs/handoff/godot/`, `outputs/handoff/threejs/`, studio
+  export against the scratch root `outputs/handoff/studio-root/`
+  — the live studio store remains the studio side's step, as at
+  P3). Every export sha-verified against the catalog record by
+  the exporter itself, as designed.
+- Independent re-read of the packaged bytes with the stdlib clip
+  reader (`stages/animate/glb_clips.py`): **all 12 packaged GLBs
+  carry the full post-P4 clip sets** — clip names exactly the
+  catalog's, durations within 0.01 s of the catalog's frames/fps
+  (dragon hop/idle/walk 1.5/run 1.0; goblin idle/wave/walk/run;
+  triceratops bounce/idle/walk 2.0/run; chest none). The
+  godot/threejs `handoff-manifest.json` action lists match the
+  catalog. The P3 packages are current again as of the P4 tip.
+
+Godot playback of the new clips (build VM — labelled VM-only):
+
+- Where it ran, honestly: the owner's PC no longer carries a
+  Godot 4.7.2 Windows build (searched via the bridge: Program
+  Files, the user profile, both Steam libraries,
+  `D:\asset-forge-lab`, `D:\bridge-work`, `D:\shiny-dollop`,
+  registry uninstall keys, PATH, the bridge audit log — the only
+  Godot present is a 4.6.1 mono build for another project at
+  `D:\AIgame\.tools\godot`). Rather than substitute a different
+  engine version on the PC, the check ran with this VM's
+  **Godot 4.7.2.stable** headless, and is recorded as a VM run.
+  Re-running on the PC is a two-minute job once a 4.7.2 build is
+  back on it; the staged scratch files remain in the bridge file
+  root under `gab-p4/`.
+- Scratch project from `handoff/godot/` + the NEW exported
+  packages under `assets/`: `--import` exit 0, then
+  `verify_handoff.gd` — **GODOT_VERIFY_DONE ok=true**, exit 0.
+  Bone sets equal the catalog (14/13/15; chest static: mesh,
+  0 bones, 0 animations). Bone global-pose deltas for the NEW
+  clips (t=0 vs mid-clip; quarter-cycle in parentheses — the
+  anti-phase blind spot documented at P4 applies to the mid
+  figure): Ember Dragon walk Δ0.087 (Δ0.409) / run Δ0.181
+  (Δ0.504); Snow Goblin walk Δ0.273 (Δ0.486) / run Δ0.442
+  (Δ0.768); Triceratops walk Δ0.812 (Δ0.414) / run Δ0.452
+  (Δ0.688). All lengths match the catalog (walk 1.5/1.5/2.0 s,
+  run 1.0 s).
+- Cross-validation: the established clips reproduce the P3
+  owner's-PC run's numbers to the digit in this harness (dragon
+  hop Δ0.085, goblin wave Δ1.69, triceratops bounce Δ0.096,
+  idles Δ0.0062/0.035/0.156) — the VM run measures the same
+  quantity the PC proof measured.
+- Harness change (additive; P3 pass criteria unchanged):
+  `verify_handoff.gd` now also reports a quarter-cycle delta and
+  the imported `loop_mode` per clip. Every clip — new and
+  previously proven alike — imports with loop_mode 0 (none):
+  the glTF import does not flag looping. The baked cycles are
+  seamless by construction (P4 loop-closure tests); looping is
+  enabled at play time by the consuming engine/game, as with
+  the clips P3 already proved.
+
 ## Not yet verified
 
 - TRELLIS's proper textured export — blocked on the

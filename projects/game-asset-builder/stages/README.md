@@ -18,8 +18,10 @@ live in `../stages.py`; the orchestrator is `../pipeline.py`
   (bone-heat attempted first; deterministic distance-to-bone fallback
   is what actually skins Hunyuan meshes — see docs/TEST_PLAN.md).
 - `animate/poses.py` — procedural pose recipes ported from Drabbit
-  Pet's pose driver (pure functions). `animate/animate_blender.py` —
-  bakes them as named GLB actions (idle, hop).
+  Pet's pose driver (pure functions), plus the P4 parametric gait
+  model (walk/run for every template). `animate/animate_blender.py` —
+  bakes them as named GLB actions. `animate/glb_clips.py` — stdlib
+  reader for a GLB's clip names + durations.
 - `catalog/catalog.py` — metadata JSON + sha256 (stdlib).
   `catalog/render_verify.py` — Blender cold re-import check + preview
   renders (rest + hop apex) for every catalogued asset.

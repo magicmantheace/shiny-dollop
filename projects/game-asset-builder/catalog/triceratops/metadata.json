@@ -5,8 +5,8 @@
  "source_concept": "media-generation-quadruped-triceratops-v2-conce-0-ee82e801-a2f9-4911-9b7a-63fa35f916c2.webp",
  "asset_file": "triceratops.glb",
  "asset_location": "outputs/<slug>/ (local; not in git)",
- "sha256": "06c5a1e2e837b5324ae9062e9e364ae0bdc5d0c6f972c8aeba1dd033d452bf0a",
- "bytes": 20292012,
+ "sha256": "39b5f934eb2e1943a11208c43141fcb99ab49606812d1003bfba4d9b8eb3acc6",
+ "bytes": 20330868,
  "counts": {
   "verts": 45756,
   "faces": 89998,
@@ -32,7 +32,9 @@
  ],
  "actions": [
   "bounce",
-  "idle"
+  "idle",
+  "run",
+  "walk"
  ],
  "provenance": {
   "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
@@ -180,6 +182,29 @@
     "torch_peak_mib": 9938.7,
     "output": "D:\\asset-forge-lab\\out\\gab\\triceratops\\textured.glb"
    }
+  },
+  "animation_revision": "2026-11-08, branch game-asset-builder/p4-game-animations: walk/run procedural gaits baked by the animate stage from the existing rigged.glb; mesh, texture and rig unchanged."
+ },
+ "clips": {
+  "bounce": {
+   "seconds": 1.25,
+   "frames": 30,
+   "fps": 24
+  },
+  "idle": {
+   "seconds": 4.79,
+   "frames": 115,
+   "fps": 24
+  },
+  "run": {
+   "seconds": 1.0,
+   "frames": 24,
+   "fps": 24
+  },
+  "walk": {
+   "seconds": 2.0,
+   "frames": 48,
+   "fps": 24
   }
  }
 }

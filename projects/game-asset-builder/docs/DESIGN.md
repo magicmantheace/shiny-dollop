@@ -92,14 +92,19 @@ structural, not a promise.
 - `quadruped` — 15 bones: a spine/hips pair splitting the root so the
   front and rear can pitch independently, neck + head at the front,
   two-segment legs at all four corners, tail.1–2. Recipes: `idle`,
-  `bounce` (a two-hop happy bounce; a walk cycle was considered and
-  rejected — without ground-truth footfall timing it would be
+  `bounce` (a two-hop happy bounce). P1 considered and rejected a
+  walk cycle — without ground-truth footfall timing it would be
   invented motion, while the bounce's honesty is checkable in a
-  still). Landed with P1.
+  still. **Superseded by P4 (2026-11-08) at the owner's direction:**
+  the builder now produces game locomotion from a stated phase
+  model whose invariants (loop closure, phase offsets, fold timing)
+  are checkable mathematically and in playback — see "Locomotion
+  (P4)" below. Landed with P1.
 - `biped` — 11 bones (13 with `--ears`): vertical root/spine/head,
   two-segment arms and legs. The arm bones use a horizontal roll —
   measured in Blender, that is what makes local +X the symmetric
-  raise axis a wave needs. Recipes: `idle`, `wave`. Landed with P1.
+  raise axis a wave needs. Recipes: `idle`, `wave` (plus P4
+  locomotion — see below). Landed with P1.
 - Props — not a template: a pipeline mode (`--prop`) that runs
   prep → mesh → texture → clean static export → catalog with no rig
   or animate stage, and catalog provenance that records the asset as
@@ -110,6 +115,49 @@ structural, not a promise.
   `--rotate-z {0,90,180,270}`, recorded in the rig report and the
   catalog provenance. (The first quadruped mesh arrived sideways;
   the correction is how the template was proven on it.)
+
+## Locomotion (P4)
+
+Added 2026-11-08 at the owner's direction: the builder produces
+walking animations and the other animation a game needs, starting
+with a standard locomotion set — `walk` and `run` for every rig
+template, baked by the same animate stage from the same pose-recipe
+machinery as `idle`/`hop`/`wave`/`bounce` (no new stage, no new
+meshes, no GPU work).
+
+The gait model (`stages/animate/poses.py`, P4 section) is one pair
+of curves per leg over a step-cycle phase φ ∈ [0, 1):
+`gait_swing(φ) = sin(2πφ)` (+1 foot fully forward) and
+`gait_fold(φ) = max(0, sin(2π(φ + 0.12)))³` — the lower-leg fold,
+zero through stance and peaking just after the leg passes vertical
+into swing-through. Rig classes differ only in phase pattern:
+biped-plan templates (biped, winged-creature) run an anti-phase
+pair (L 0.0, R 0.5) with arms counter-swinging; the quadruped walk
+is a lateral sequence (FL 0.0, HR 0.25, FR 0.5, HL 0.75) and its
+run is a bounding gallop (front pair 0.0, hind pair 0.5, spine
+rocking, once-per-cycle body bounce). Runs use the same patterns
+at a shorter period with larger swing/fold amplitudes and a
+forward lean. Every term is periodic in the cycle, so loops close
+exactly by construction. New drivers (legs on all templates, the
+biped's fore-aft arm swing on local Z with mirrored signs) were
+axis-probed on the shipped rigged GLBs before use, the same
+empirical discipline as P0/P1; the probe numbers are recorded in
+`stages/animate/animate_blender.py`.
+
+Honest limits: these are procedural gaits — functional game
+locomotion, not mocap. There is no IK and no ground-truth footfall
+data behind the phase model (the P1 reservation stands as a
+description of what the model is not); foot placement is
+approximate, and foot-slip against ground speed is a property of
+the consuming game's root-motion matching, not measurable in an
+in-place cycle. The winged template's legs are single-segment, so
+its gaits have no knee fold, and on the Ember Dragon's seated
+upright body plan the walk reads as a shuffle-step rather than a
+stride. Ground clearance was measured across the walk cycles
+(evaluated-mesh minimum Z vs rest): no material penetration
+(worst case ≈ 0.007 units on a 2-unit character, Snow Goblin and
+Triceratops; the dragon's lowest point never reaches its rest
+minimum).
 
 ## Out of scope for P0
 

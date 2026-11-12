@@ -5,8 +5,8 @@
  "source_concept": "media-generation-ember-dragon-concept-0-4fbea5a5-5e6a-4bac-8735-6168ae8e57eb.webp",
  "asset_file": "ember-dragon.glb",
  "asset_location": "outputs/<slug>/ (local; not in git)",
- "sha256": "6b424784874b07a33ae813e14331af2f37c292f8ff9fbf50e66f1bfaecf4f7e2",
- "bytes": 20638740,
+ "sha256": "2837c6b2969f0bf628314b19c8230c92fb3bc8480b045f8462bd1f1540ef6bb2",
+ "bytes": 20671744,
  "counts": {
   "verts": 44707,
   "faces": 89414,
@@ -31,7 +31,9 @@
  ],
  "actions": [
   "hop",
-  "idle"
+  "idle",
+  "run",
+  "walk"
  ],
  "provenance": {
   "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
@@ -91,6 +93,29 @@
    },
    "recovered": "local poller died on a transient bridge disconnect (http.client.RemoteDisconnected); job 108e618f9b53 kept running server-side and its outputs were adopted via gpu_bridge reattach + fetch"
   },
-  "skinning_revision": "2026-11-06, branch game-asset-builder/skinning: rig stage gained geometry cleanup (manifold repair) + bone-endpoint snapping; the existing textured.glb was re-rigged with bone-heat weights on the build VM. GPU stages were not re-run; mesh/texture provenance above is from the original P0 run."
+  "skinning_revision": "2026-11-06, branch game-asset-builder/skinning: rig stage gained geometry cleanup (manifold repair) + bone-endpoint snapping; the existing textured.glb was re-rigged with bone-heat weights on the build VM. GPU stages were not re-run; mesh/texture provenance above is from the original P0 run.",
+  "animation_revision": "2026-11-08, branch game-asset-builder/p4-game-animations: walk/run procedural gaits baked by the animate stage from the existing rigged.glb; mesh, texture and rig unchanged."
+ },
+ "clips": {
+  "hop": {
+   "seconds": 1.25,
+   "frames": 30,
+   "fps": 24
+  },
+  "idle": {
+   "seconds": 4.79,
+   "frames": 115,
+   "fps": 24
+  },
+  "run": {
+   "seconds": 1.0,
+   "frames": 24,
+   "fps": 24
+  },
+  "walk": {
+   "seconds": 1.5,
+   "frames": 36,
+   "fps": 24
+  }
  }
 }
