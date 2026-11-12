@@ -42,6 +42,23 @@ Initialises the S3 colony through the bridge, lights the way, drives
 and the rendered entity/floor state matches the sim view. Prints
 `UNDERREACH_VERIFY_PASS ...` on success.
 
+Since S6 the verify runs a **second pass**: it initialises the `gen`
+scenario (the same colony founded on a procedurally generated
+Floor 1), jumps the view layer to the descent's depth, queues the
+`open_floor1` command (lanterns down the passages to the first
+face), drives another 4,000 ticks, and prints a second line —
+`UNDERREACH_VERIFY_PASS scenario=gen goods=24 delvers=5
+floor_instances=61 tick=4000` (floor_instances = carved cells on
+the descent layer, a generated number).
+
+The `gen` scenario also appears in the Scenario button row, with
+an **Open Floor 1 (gen)** colony button. Generated-floor features
+render as placeholder markers: the descent is an emissive violet
+block, dens are dark red-brown blocks, dressing anchors are small
+coloured boxes by kind, and loose-rock / bad-air rock rims are
+tinted (amber-brown / green). Placeholder → asset mapping:
+`../docs/FLOOR_GENERATION.md`.
+
 ## Assets
 
 All models are byte-for-byte **Game Asset Builder** catalog files —

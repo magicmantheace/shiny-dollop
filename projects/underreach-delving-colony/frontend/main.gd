@@ -240,6 +240,12 @@ func rebuild_layer() -> void:
 	var face_by_key := {}
 	for f in view.get("faces", []):
 		face_by_key[key_of(f["rock"])] = f
+	# Embedded hazard rock (S6): loose rock and bad-air pockets
+	# get their own rim colours so a delver can see the warning
+	# in the rock before carving into it.
+	var hazard_by_key := {}
+	for h in view.get("hazards", []):
+		hazard_by_key[key_of(h["pos"])] = str(h["kind"])
 
 	for c in carved:
 		if int(c[1]) != layer:
@@ -253,7 +259,9 @@ func rebuild_layer() -> void:
 			if not carved_set.has(key_of(n)):
 				var rp := Vector3(float(n[0]), -float(layer), float(n[2]))
 				var rc := Color(0.16, 0.14, 0.13)
-				if face_by_key.has(key_of(n)):
+				if hazard_by_key.has(key_of(n)):
+					rc = Color(0.5, 0.32, 0.1) if hazard_by_key[key_of(n)] == "LooseRock" else Color(0.2, 0.42, 0.18)
+				elif face_by_key.has(key_of(n)):
 					var y = face_by_key[key_of(n)]["yield"]
 					rc = Color(0.6, 0.38, 0.16) if y == "Ore" else Color(0.2, 0.55, 0.42)
 				rocks.append([Transform3D(Basis(), rp), rc])
@@ -361,6 +369,79 @@ func rebuild_props() -> void:
 		bed.position = cell_to_world(b) + Vector3(0, 0.02, 0)
 		props_root.add_child(bed)
 		call_deferred("measure_and_scale", bed)
+	# Generated-floor features (S6) — placeholder markers until
+	# the queued Game Asset Builder assets land (see
+	# ../docs/FLOOR_GENERATION.md for the mapping). The descent
+	# marker is the emissive violet block in the descent cavern;
+	# the DescentStairs dressing anchor sits on the same cell
+	# and is covered by it, so it is skipped below.
+	var descent: Array = view.get("descent", [])
+	if not descent.is_empty() and int(descent[1]) == layer:
+		var dm := make_marker(Vector3(0.5, 0.5, 0.5), Color(0.62, 0.4, 1.0), true)
+		dm.position = cell_to_world(descent) + Vector3(0, 0.1, 0)
+		props_root.add_child(dm)
+	for den in view.get("dens", []):
+		if int(den[1]) != layer:
+			continue
+		var dn := make_marker(Vector3(0.7, 0.55, 0.7), Color(0.35, 0.16, 0.12), false)
+		dn.position = cell_to_world(den) + Vector3(0, 0.05, 0)
+		props_root.add_child(dn)
+	for a in view.get("dressing", []):
+		var kind := str(a["kind"])
+		if kind == "DescentStairs":
+			continue
+		var p: Array = a["pos"]
+		if int(p[1]) != layer:
+			continue
+		var style := dressing_style(kind)
+		var mk := make_marker(style[0], style[1], false)
+		mk.position = cell_to_world(p) + Vector3(0, float(style[2]), 0)
+		props_root.add_child(mk)
+
+func make_marker(size: Vector3, color: Color, emissive: bool) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = size
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color
+	if emissive:
+		mat.emission_enabled = true
+		mat.emission = color
+		mat.emission_energy_multiplier = 2.0
+	box.material = mat
+	mi.mesh = box
+	return mi
+
+## Placeholder look per dressing kind: [size, colour, y offset].
+## Colours are grouped by band family so a floor reads at a
+## glance; sizes stay inside one cell.
+func dressing_style(kind: String) -> Array:
+	match kind:
+		"Stalactite":
+			return [Vector3(0.28, 0.5, 0.28), Color(0.55, 0.6, 0.7), 0.3]
+		"Stalagmite":
+			return [Vector3(0.3, 0.45, 0.3), Color(0.6, 0.58, 0.5), 0.05]
+		"Rubble":
+			return [Vector3(0.5, 0.15, 0.5), Color(0.45, 0.4, 0.35), 0.02]
+		"Boulder":
+			return [Vector3(0.55, 0.5, 0.55), Color(0.5, 0.48, 0.45), 0.05]
+		"SporePod":
+			return [Vector3(0.3, 0.35, 0.3), Color(0.45, 0.7, 0.35), 0.05]
+		"GiantMushroom":
+			return [Vector3(0.5, 0.6, 0.5), Color(0.65, 0.4, 0.55), 0.1]
+		"Pump":
+			return [Vector3(0.4, 0.4, 0.4), Color(0.35, 0.5, 0.6), 0.05]
+		"AirBell":
+			return [Vector3(0.45, 0.35, 0.45), Color(0.6, 0.65, 0.4), 0.05]
+		"CrystalFormation":
+			return [Vector3(0.3, 0.55, 0.3), Color(0.55, 0.75, 0.9), 0.1]
+		"LensPost":
+			return [Vector3(0.2, 0.6, 0.2), Color(0.8, 0.75, 0.45), 0.1]
+		"BasaltColumn":
+			return [Vector3(0.35, 0.9, 0.35), Color(0.3, 0.28, 0.3), 0.1]
+		"HeatPipe":
+			return [Vector3(0.25, 0.5, 0.25), Color(0.75, 0.4, 0.25), 0.05]
+	return [Vector3(0.3, 0.3, 0.3), Color(0.5, 0.5, 0.5), 0.05]
 
 # ---------------------------------------------------------------------------
 # Entities
@@ -589,7 +670,7 @@ func build_ui() -> void:
 	var scen_label := Label.new()
 	scen_label.text = "Scenario"
 	left.add_child(scen_label)
-	for s in ["s1", "s2", "s3", "s5"]:
+	for s in ["s1", "s2", "s3", "s5", "gen"]:
 		var sn: String = s
 		left.add_child(make_button(sn.to_upper(), func() -> void: init_scenario(sn)))
 	var tool_head := Label.new()
@@ -609,6 +690,7 @@ func build_ui() -> void:
 	left.add_child(act)
 	left.add_child(make_button("Light the way", func() -> void: queue({"cmd": "light_the_way"})))
 	left.add_child(make_button("Light the deep (S5)", func() -> void: queue({"cmd": "light_the_deep"})))
+	left.add_child(make_button("Open Floor 1 (gen)", func() -> void: queue({"cmd": "open_floor1"})))
 	left.add_child(make_button("Craft mask (2 goods)", func() -> void: queue({"cmd": "craft_mask"})))
 
 	var right := PanelContainer.new()
@@ -698,6 +780,7 @@ func update_delver_panel() -> void:
 
 func run_verify() -> void:
 	playing = false
+	# Part 1 — the original hand-built S3 check, unchanged.
 	init_scenario("s3")
 	if view.is_empty():
 		print("UNDERREACH_VERIFY_FAIL no view from bridge")
@@ -709,10 +792,33 @@ func run_verify() -> void:
 	var goods := int(view.get("stores", {}).get("goods", 0))
 	var floors := floors_mmi.multimesh.instance_count
 	var ok := goods >= 1 and floors > 0 and delver_nodes.size() == (view.get("delvers", []) as Array).size()
+	if not ok:
+		print("UNDERREACH_VERIFY_FAIL goods=%d floors=%d nodes=%d" % [goods, floors, delver_nodes.size()])
+		get_tree().quit(1)
+		return
+	print("UNDERREACH_VERIFY_PASS goods=%d delvers=%d floor_instances=%d tick=%d" % [
+		goods, delver_nodes.size(), floors, int(view.get("tick", 0))])
+	# Part 2 — the same colony loop on a generated Floor 1 (S6).
+	# The camera layer jumps to the descent's depth so the floor
+	# instance count is the descent layer's carved cells — a
+	# genuinely generated number, recorded in TEST_PLAN.md.
+	init_scenario("gen")
+	if view.is_empty() or view.get("descent", []).is_empty():
+		print("UNDERREACH_VERIFY_FAIL scenario=gen no generated floor in view")
+		get_tree().quit(1)
+		return
+	layer = int(view["descent"][1])
+	apply_view()
+	queue({"cmd": "open_floor1"})
+	for i in 40:
+		step(100)
+	goods = int(view.get("stores", {}).get("goods", 0))
+	floors = floors_mmi.multimesh.instance_count
+	ok = goods >= 1 and floors > 0 and delver_nodes.size() == (view.get("delvers", []) as Array).size()
 	if ok:
-		print("UNDERREACH_VERIFY_PASS goods=%d delvers=%d floor_instances=%d tick=%d" % [
+		print("UNDERREACH_VERIFY_PASS scenario=gen goods=%d delvers=%d floor_instances=%d tick=%d" % [
 			goods, delver_nodes.size(), floors, int(view.get("tick", 0))])
 		get_tree().quit(0)
 	else:
-		print("UNDERREACH_VERIFY_FAIL goods=%d floors=%d nodes=%d" % [goods, floors, delver_nodes.size()])
+		print("UNDERREACH_VERIFY_FAIL scenario=gen goods=%d floors=%d nodes=%d" % [goods, floors, delver_nodes.size()])
 		get_tree().quit(1)
