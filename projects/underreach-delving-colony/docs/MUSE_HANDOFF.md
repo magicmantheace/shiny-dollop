@@ -162,23 +162,35 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   windowed on the owner's PC against a live cross-compiled sim
   bridge: `UNDERREACH_VERIFY_PASS` on Windows with identical
   numbers and zero script errors. Details in `docs/TEST_PLAN.md`.
-- **CONFLICT RECORDED 2026-11-12 (rule 3 — implementation reality
-  vs the spec's working-prototype expectation):** the capture redo
-  ran on the owner's PC with the workstation unlocked. The sim is
-  genuinely live (live `state.json`: 15 carved/lit cells at the
-  viewed layer, 4 delvers and a lantern beside the camera target;
-  HUD tick/Food/Delvers advancing; zero script errors) — **but the
-  3D viewport renders pitch black in every frame**: no terrain, no
-  delver, no lantern prop or light pool, no labels. The headless
-  verify counts instances and nodes and never checks pixels, which
-  is how this survived every earlier pass. Root cause is NOT
-  proven; candidates from the code read are MultiMesh
-  instance-colour handling with `vertex_color_use_as_albedo` under
-  the Compatibility renderer, or world-node setup. Recorded here
-  rather than silently worked around; diagnosis/fix is the next
-  step, on the owner's go. Until then the frontend's rendered
-  appearance (delver, lantern, cot, gloam-lurker in scene) is
-  unverified and the 3D view must be treated as not working.
+- **CONFLICT RECORDED 2026-11-12, RESOLVED 2026-11-12 (rule 3):**
+  the capture redo reported the 3D viewport pitch black in every
+  frame despite a live sim. A same-day diagnosis pass on the
+  owner's PC (owner's go given) could NOT reproduce any rendering
+  defect: with the game window fully on-screen, the unmodified
+  frontend renders the world on the RTX 3060 — lit/unlit floor
+  MultiMesh with instance colours, rock rim, chest, cots, lantern
+  prop with its OmniLight pool, and delver figures — across two
+  scenarios (s3, s5), two process instances, 800+ live ticks, and
+  a minimize/restore cycle. Pixel analysis of the original
+  "black" captures shows the viewport uniformly at the
+  Environment background colour (5,5,11) — the camera and
+  environment were rendering even then; the lit room is small and
+  centred, and that session's window was mostly off-screen /
+  behind other windows while being chased via minimize/restore,
+  so the captures never contained the room. Ruled out with
+  evidence: camera-never-current (background renders), broken
+  environment, MultiMesh instance-colour failure under the
+  Compatibility renderer (floors/rocks render coloured), GLB prop
+  failure, minimize/restore window-state loss. The historical
+  captures' exact mechanism is not proven beyond that, but no
+  frontend code defect reproduces, so NO code change was made —
+  full evidence in `docs/TEST_PLAN.md`. Capture protocol lesson:
+  place the window fully on-screen (`--position`) and pixel-check
+  a capture before declaring a render defect. Still not observed
+  on PC: a critter in frame (both scenarios sat at Critters 0) and
+  readable name-label detail at capture zoom; delver clip motion
+  rests on the headless verifies plus figures re-posing between
+  captures.
 - **On-PC run note:** the PC verify/launch needs the
   `UNDERREACH_BRIDGE` environment variable set to the release
   `bridge.exe` path; without it the frontend falls back to a
@@ -186,7 +198,8 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
 - **Planned:** the "Later" list above (Drowned/Crystal/Magma
   mechanics, co-op, succession, generations) — future programs, not
   part of the 2026-11-10 all-slices build.
-- **Outstanding on owner hardware:** the on-PC visual pass of the
-  frontend (the 2026-11-10 stop was lifted 2026-11-10 ~22:13, so
-  this is unscheduled rather than blocked).
-- No performance claims: nothing has run on owner hardware.
+- **On-PC visual pass: DONE 2026-11-12** (see the resolution
+  above and TEST_PLAN's diagnosis section). The frontend renders
+  and plays live on the owner's PC.
+- No performance claims: the frontend has run on owner hardware,
+  but no frame-time measurement has been taken there.

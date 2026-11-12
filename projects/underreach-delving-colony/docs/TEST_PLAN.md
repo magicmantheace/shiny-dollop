@@ -200,6 +200,61 @@ A scripted Shallows colony: camp chamber, shaft, tunnel, ore face.
   rendering defect, not on access. Root cause unproven; the
   conflict is recorded in `docs/MUSE_HANDOFF.md` (rule 3).
 
+## Black-viewport diagnosis — no defect reproduces (2026-11-12)
+
+- Owner gave the go the same day. Method: read `frontend/main.gd`
+  end to end first (camera, environment, MultiMesh setup, entity
+  sync), then controlled launches of the UNMODIFIED staged build
+  on the PC (`UNDERREACH_BRIDGE` set to the release `bridge.exe`,
+  window placed fully on-screen with `--position 100,60`).
+- **The world renders.** Screenshots (viewed, incl. a centre crop)
+  show: lit tan floor tiles with grid seams (MultiMesh floors in
+  the lit colour), dark rock-rim walls, the treasure chest, three
+  cots, the lantern prop with a warm OmniLight pool on the floor,
+  and standing delver figures. Two scenarios (s3: 3 delvers, tick
+  804+; s5: 4 delvers incl. the Herbalist, Goods 4), two separate
+  process instances, and a minimize/restore cycle in between —
+  rendering intact in every capture.
+- **Pixel evidence on the original captures:** all three redo
+  captures sample 100% uniformly (5,5,11) across the viewport —
+  exactly the Environment background colour. The camera WAS
+  active and the environment WAS rendering in that session; what
+  never appeared is geometry. That session's window spent its
+  life mostly off-screen / behind other windows (it had to be
+  chased by minimizing the owner's apps), and the carved room is
+  small and centred — the captures' visible areas never contained
+  it. The exact historical mechanism is not provable from here;
+  what is proven is that no code path in the frontend reproduces
+  it under controlled conditions.
+- **Ruled out, each with evidence:** camera never made current
+  (background + full scene render; Godot activates the first
+  camera), environment/ambient setup (background is the env
+  colour; scene is lit by sun + ambient + lantern omni),
+  MultiMesh instance colours under gl_compatibility (floor/rock
+  instance colours render distinctly), world-node transforms
+  (room sits at the camera target in frame), GLB load failure
+  (chest/cots/lantern/delvers all draw), minimize/restore
+  swapchain loss (post-cycle capture renders).
+- **Disposition:** no frontend code change — there is no
+  reproduced defect to fix, and changing code against an
+  unreproduced report is how this record got muddy in the first
+  place. The rule-3 conflict in `docs/MUSE_HANDOFF.md` is closed
+  as capture-conditions, with the protocol lesson recorded there.
+  VM checks after the pass: `cargo test` all suites ok (25/25),
+  `scenario` clean to tick 6000, headless verify again
+  `UNDERREACH_VERIFY_PASS goods=20 delvers=5 floor_instances=15
+  tick=4000`.
+- **Still unverified:** a critter (gloam-lurker) in frame on PC —
+  both live scenarios sat at Critters 0 for the whole session;
+  name-label legibility at capture zoom (labels exist in code;
+  figures visibly re-pose between captures, but clip playback as
+  such rests on the headless verifies); layer switching on PC
+  (Godot's UI exposes no UIA controls to the bridge and there is
+  no key-injection route; the layer path is the same
+  `rebuild_layer` the verify exercises). Cots read plain white at
+  capture zoom — cosmetic, matches the prop's pale paint; noted,
+  not treated as a defect.
+
 ## Asset swap — gloam-lurker critter (verified 2026-11-12, VM headless)
 
 - The builder's gloam-lurker GLB (catalog sha256 `f0c881cb9bd3…`,
