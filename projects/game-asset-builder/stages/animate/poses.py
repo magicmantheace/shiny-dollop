@@ -696,6 +696,92 @@ def biped_bow(t: float) -> dict:
     }
 
 
+def biped_plant(t: float) -> dict:
+    """Frontier Bearer signature (plant-light): the right arm lifts
+    the great lantern high, carries it forward and down, and plants
+    it — a small crouch and a look down at the plant point, a held
+    beat while the light catches, then a straighten and recover."""
+    period = 2.4
+    tt = t % period
+    if tt < 0.7:
+        raise_ = _smoothstep(tt / 0.7)
+        lower = 0.0
+        recover = 0.0
+    elif tt < 1.3:
+        raise_ = 1.0
+        lower = _smoothstep((tt - 0.7) / 0.6)
+        recover = 0.0
+    elif tt < 1.8:
+        raise_ = 1.0
+        lower = 1.0
+        recover = 0.0
+    else:
+        raise_ = 1.0
+        lower = 1.0
+        recover = _smoothstep((tt - 1.8) / 0.6)
+    lift = raise_ * (1.0 - lower) + 0.25 * lower * (1.0 - recover)
+    plant = lower * (1.0 - recover)
+    return {
+        **BREST,
+        "root_y": 0.01 * lift - 0.055 * plant,
+        "head_pitch": -0.10 * lift + 0.28 * plant,
+        "arm_wave": 1.85 * lift,
+        "arm2_wave": 0.30 * lift + 0.15 * plant,
+        "arm.R": 0.85 * plant,
+        "arm.L": 0.25 * plant,
+        "arm2.R": 0.35 * plant,
+        "leg.L": 0.10 * plant,
+        "leg.R": -0.08 * plant,
+        "leg2.L": 0.18 * plant,
+        "leg2.R": 0.12 * plant,
+    }
+
+
+def biped_swing(t: float) -> dict:
+    """Frontier Bearer signature (carve swing): a two-handed pick
+    swing — wind back and up, a fast chop down-forward with the
+    whole body dropping into it, a short bite shudder, recover."""
+    period = 1.6
+    tt = t % period
+    if tt < 0.5:
+        wind = _smoothstep(tt / 0.5)
+        chop = 0.0
+        shudder = 0.0
+        recover = 0.0
+    elif tt < 0.75:
+        wind = 1.0
+        chop = _smoothstep((tt - 0.5) / 0.25)
+        shudder = 0.0
+        recover = 0.0
+    elif tt < 1.0:
+        wind = 1.0
+        chop = 1.0
+        shudder = math.sin(TAU * 5.0 * (tt - 0.75))
+        recover = 0.0
+    else:
+        wind = 1.0
+        chop = 1.0
+        shudder = 0.0
+        recover = _smoothstep((tt - 1.0) / 0.6)
+    back = wind * (1.0 - chop)
+    hit = chop * (1.0 - recover)
+    return {
+        **BREST,
+        "root_y": 0.015 * back - 0.05 * hit,
+        "head_pitch": -0.12 * back + 0.30 * hit,
+        "head_tilt": 0.08 * back - 0.05 * hit,
+        "arm_sway": 0.80 * back,
+        "arm.L": -0.90 * back + 1.15 * hit,
+        "arm.R": -0.90 * back + 1.15 * hit,
+        "arm2.L": -0.20 * back + 0.30 * hit + 0.05 * shudder * hit,
+        "arm2.R": -0.20 * back + 0.30 * hit + 0.05 * shudder * hit,
+        "leg.L": 0.12 * hit,
+        "leg.R": -0.10 * hit,
+        "leg2.L": 0.15 * hit,
+        "leg2.R": 0.10 * hit,
+    }
+
+
 def quad_shiver(t: float) -> dict:
     """Geode Tortoise signature: a short full-body shiver — the
     shell-sparkle shake — quick small oscillations through the spine
@@ -768,7 +854,9 @@ SIGNATURES = {
     "winged-quadruped": {"fan": (wq_fan, 2.8)},
     "biped": {"bounce": (biped_bounce, 1.24),
               "scream": (biped_scream, 3.0),
-              "bow": (biped_bow, 2.6)},
+              "bow": (biped_bow, 2.6),
+              "plant": (biped_plant, 2.4),
+              "swing": (biped_swing, 1.6)},
     "quadruped": {"shiver": (quad_shiver, 1.6),
                   "wiggle": (quad_wiggle, 2.4),
                   "bite": (quad_bite, 1.4)},

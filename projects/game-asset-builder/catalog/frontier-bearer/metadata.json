@@ -1,0 +1,302 @@
+{
+ "entry_version": 1,
+ "name": "Frontier Bearer",
+ "slug": "frontier-bearer",
+ "source_concept": "media-generation-frontier-bearer-concept-a-0-67643ce1-613e-43da-9086-2f739575b77c.webp",
+ "asset_file": "frontier-bearer.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "02622dd54d81c04edda6eb5c1a9a150ee114761f6c74105dc0923b20a7e7ccb0",
+ "bytes": 55164516,
+ "counts": {
+  "verts": 155978,
+  "faces": 299236,
+  "raw_mesh_verts": 374836,
+  "raw_mesh_faces": 482386
+ },
+ "bones": [
+  "root",
+  "spine",
+  "head",
+  "arm.L",
+  "arm2.L",
+  "arm.R",
+  "arm2.R",
+  "leg.L",
+  "leg2.L",
+  "leg.R",
+  "leg2.R"
+ ],
+ "actions": [
+  "idle",
+  "plant",
+  "run",
+  "walk"
+ ],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": true,
+  "rig_template": "biped",
+  "signature_clip": "plant",
+  "weight_method": "distance-to-bone fallback, then two targeted repairs (hand-edited weights, gate-driven): (1) coat-skirt strip \u2014 arm-bone weight removed from the coat/trunk region below the waist inside the body column (smooth ramps), because the fallback left torso arm share 0.5315 and the plant raise tore the coat into a sail; (2) the great lantern rigid-assigned to the hand bone arm2.R (11,477 verts of its loose component set to exactly 1.0) because its smeared weights stretched it in every arm-moving clip. The cross-zone bone ban (ported from the arm-separation branch, commit 8192c2e) was tried first and is NOT usable on this mesh: P3-SAM's 17 parts all evaluate to dominant bone 'root', so the ban forbade the arm chains on every label and heat ended with zero arm verts. Posed gate PASS at the owner's bar over rest/idle/walk/run/plant/swing (wind-up, apex, recovery inspected): arms separated, coat home in all clips, lantern rigid; the 2.2 rad arm-raise stress pose twists the coat but surfaces hold (beyond-spec class).",
+  "segmentation": {
+   "model": "P3-SAM (Tencent Hunyuan3D-Part)",
+   "parts": 17,
+   "proxy_faces": 50000,
+   "islands_relabelled": 55,
+   "separated_verts_added": 6387,
+   "labelled_verts": 155978
+  },
+  "label_map": {
+   "0": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "1": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "2": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "3": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "4": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "5": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "6": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "7": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "8": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "9": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "10": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "11": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "12": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "13": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "14": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "15": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "16": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "leg.L",
+     "leg.R",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   }
+  },
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "runner": {
+    "name": "frontier-bearer_shape",
+    "exit_code": 0,
+    "seconds": 483.51,
+    "baseline_vram_mib": 2895,
+    "peak_vram_mib": 9333,
+    "peak_delta_mib": 6438,
+    "vram_after_exit_mib": 2890,
+    "n_samples": 1036,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"frontier-bearer_shape\", \"exit_code\": 0, \"seconds\": 483.51, \"baseline_vram_mib\": 2895, \"peak_vram_mib\": 9333, \"peak_delta_mib\": 6438, \"vram_after_exit_mib\": 2890, \"n_samples\": 1036}\r\n"
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 241173,
+    "faces": 482388,
+    "load_s": 116.18,
+    "inference_s": 340.32,
+    "total_s": 456.56,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\frontier-bearer\\shape.glb"
+   }
+  },
+  "texture_stage": {
+   "runner": {
+    "name": "frontier-bearer_texture",
+    "exit_code": 0,
+    "seconds": 776.33,
+    "baseline_vram_mib": 2911,
+    "peak_vram_mib": 11824,
+    "peak_delta_mib": 8913,
+    "vram_after_exit_mib": 2295,
+    "n_samples": 1654,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"frontier-bearer_texture\", \"exit_code\": 0, \"seconds\": 776.33, \"baseline_vram_mib\": 2911, \"peak_vram_mib\": 11824, \"peak_delta_mib\": 8913, \"vram_after_exit_mib\": 2295, \"n_samples\": 1654}\r\n"
+   },
+   "stats": {
+    "stage": "texture",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+    "verts": 374836,
+    "faces": 482388,
+    "load_s": 108.95,
+    "texture_s": 605.66,
+    "total_s": 715.44,
+    "torch_peak_mib": 9882.3,
+    "output": "D:\\asset-forge-lab\\out\\gab\\frontier-bearer\\textured.glb"
+   }
+  },
+  "extra_clips": "swing (carve swing) baked in a second animate pass from the same repaired rig and merged into the final GLB; both signatures are new biped recipes added for this asset (poses.py + tests)"
+ },
+ "clips": [
+  "idle",
+  "walk",
+  "run",
+  "plant",
+  "swing"
+ ]
+}

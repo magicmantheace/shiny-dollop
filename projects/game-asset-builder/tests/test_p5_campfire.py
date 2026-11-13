@@ -151,6 +151,41 @@ class SignatureShapeTests(unittest.TestCase):
         self.assertGreater(max(sway), 0.03)
         self.assertLess(min(sway), -0.03)
 
+    def test_plant_raises_then_plants_the_lantern(self):
+        fn, seconds = poses.SIGNATURES["biped"]["plant"]
+        self.assertAlmostEqual(seconds, 2.4)
+        for channel, value in fn(0.0).items():
+            self.assertAlmostEqual(value, 0.0, places=6, msg=channel)
+        # Raise: the right (lantern) arm goes high first.
+        self.assertGreater(fn(0.7)["arm_wave"], 1.5)
+        # Plant apex: arm carried forward, body crouched, head down.
+        apex = fn(1.55)
+        self.assertGreater(apex["arm.R"], 0.7)
+        self.assertLess(apex["root_y"], -0.04)
+        self.assertGreater(apex["head_pitch"], 0.2)
+        for i in range(65):
+            pose = fn(i * seconds / 64)
+            for channel, value in pose.items():
+                self.assertLessEqual(abs(value), 1.9, channel)
+
+    def test_swing_winds_back_then_chops_forward(self):
+        fn, seconds = poses.SIGNATURES["biped"]["swing"]
+        self.assertAlmostEqual(seconds, 1.6)
+        for channel, value in fn(0.0).items():
+            self.assertAlmostEqual(value, 0.0, places=6, msg=channel)
+        # Wind-up: both arms back, raised on the sway axis.
+        self.assertLess(fn(0.5)["arm.L"], -0.7)
+        self.assertGreater(fn(0.5)["arm_sway"], 0.6)
+        # Chop apex: both arms drive forward, head and body drop in.
+        apex = fn(0.9)
+        self.assertGreater(apex["arm.L"], 1.0)
+        self.assertGreater(apex["arm.R"], 1.0)
+        self.assertLess(apex["root_y"], -0.04)
+        for i in range(65):
+            pose = fn(i * seconds / 64)
+            for channel, value in pose.items():
+                self.assertLessEqual(abs(value), 1.3, channel)
+
     def test_bite_winds_up_then_snaps_down(self):
         fn, seconds = poses.SIGNATURES["quadruped"]["bite"]
         self.assertAlmostEqual(seconds, 1.4)

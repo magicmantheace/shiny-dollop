@@ -58,7 +58,7 @@ from mathutils.bvhtree import BVHTree
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
 from template import build_template, trunk_chain  # noqa: E402
 from skin_policy import (  # noqa: E402
-    apply_veto, assess_heat, assess_zone_share)
+    apply_veto, assess_heat, assess_zone_share, zone_ban_map)
 from geodesic import geodesic_distance_matrix  # noqa: E402
 
 
@@ -105,6 +105,18 @@ def parse_args():
                         "geodesic.py) so reach cannot leak across a "
                         "fused web; 'euclidean' is the P1.1 "
                         "straight-line behaviour")
+    p.add_argument("--zone-ban", action="append", default=None,
+                   metavar="GROUP:GROUP",
+                   help="cross-zone bone ban (repeatable): the two "
+                        "named bone groups may not own each other's "
+                        "part-labelled flesh — e.g. trunk:arm.L bans "
+                        "the arm.L chain on trunk-dominated labels "
+                        "and the trunk bones on arm-chain labels. "
+                        "Groups are 'trunk' or a chain-root bone "
+                        "name (skin_policy.chain_groups). Enforced "
+                        "through the Layer-3 label veto, so joint "
+                        "boundary vertices within reach keep their "
+                        "blend. Off by default; needs --labels")
     return p.parse_args(argv)
 
 
@@ -938,7 +950,7 @@ def label_bone_map(weights, vert_labels, bone_names, bones,
 
 def apply_distance_veto(obj, arm, bones, dims, factor, floor_frac,
                         metric="geodesic", vert_labels=None,
-                        label_secondary=0.10):
+                        label_secondary=0.10, zone_ban=()):
     """Restrain the heat weights in place with skin_policy's veto.
 
     Reach radius per bone = max(factor * bone length, floor_frac *
@@ -987,6 +999,10 @@ def apply_distance_veto(obj, arm, bones, dims, factor, floor_frac,
     weights = _weight_matrix(obj, names)
     label_map = None
     forbidden = None
+    zone_ban_stats = None
+    if zone_ban and vert_labels is None:
+        raise ValueError("--zone-ban needs part labels (--labels): "
+                         "the ban is defined over part labels")
     if vert_labels is not None:
         # Label-aware veto (Layer 3): the forbidden pairs are
         # (vertex, bone) where the bone is the named owner of a
@@ -1009,6 +1025,30 @@ def apply_distance_veto(obj, arm, bones, dims, factor, floor_frac,
         #     distance-blind version.
         label_map = label_bone_map(weights, vert_labels, names, bones,
                                    secondary_share=label_secondary)
+        if zone_ban:
+            # Cross-zone ban: Layer 3's forbidden set only ever
+            # names other labels' DOMINANT bones, so a proximal
+            # appendage bone (arm.L — chain parent of the arm
+            # labels' arm2 dominants, and a plurality winner in the
+            # fused shoulder mass) is never banned on the flesh it
+            # bleeds into. The ban forbids whole CHAINS across the
+            # named zone boundary (skin_policy.zone_ban_map); the
+            # enforcement below is unchanged, so boundary vertices
+            # within the banned bone's reach keep their blend —
+            # the joint's blend band.
+            pairs = []
+            for raw in zone_ban:
+                bits = raw.split(":")
+                if len(bits) != 2:
+                    raise ValueError(
+                        f"--zone-ban expects GROUP:GROUP, got {raw!r}")
+                pairs.append((bits[0], bits[1]))
+            label_map, ban_info = zone_ban_map(
+                label_map, {b.name: b.parent for b in bones},
+                trunk_chain(bones), pairs)
+            zone_ban_stats = {
+                "pairs": [list(p) for p in pairs],
+                "banned": {str(k): v for k, v in ban_info.items()}}
         boundary = np.zeros(len(vert_labels), dtype=bool)
         edges = np.empty(len(obj.data.edges) * 2, dtype=np.int64)
         obj.data.edges.foreach_get("vertices", edges)
@@ -1069,6 +1109,7 @@ def apply_distance_veto(obj, arm, bones, dims, factor, floor_frac,
         "metric": metric,
         "label_map": ({str(k): v for k, v in label_map.items()}
                       if label_map else None),
+        "zone_ban": zone_ban_stats,
         "label_vetoed_entries": stats.get("label_vetoed_entries", 0),
         **extra,
         "trunk_bones": [n for n in names if n in trunk],
@@ -1219,7 +1260,8 @@ def main():
         veto_stats = apply_distance_veto(
             obj, arm, bones, dims, args.veto_factor, args.veto_floor,
             metric=args.veto_metric, vert_labels=vert_labels,
-            label_secondary=args.label_secondary)
+            label_secondary=args.label_secondary,
+            zone_ban=args.zone_ban or ())
         rescue_filled = veto_stats["rescued_verts"]
         # Rescue: any vert still carrying no meaningful weight (the
         # veto's nearest-bone rescue normally covers these) gets
@@ -1266,6 +1308,11 @@ def main():
                 method += ("; label-aware veto (P3-SAM parts, "
                            f"{veto_stats['label_vetoed_entries']} "
                            "entries vetoed by label)")
+            if veto_stats and veto_stats.get("zone_ban"):
+                pairs = ", ".join(
+                    ":".join(p)
+                    for p in veto_stats["zone_ban"]["pairs"])
+                method += f"; cross-zone ban ({pairs})"
             if rescue_filled:
                 method += f"; distance rescue on {rescue_filled} verts"
         else:

@@ -273,4 +273,10 @@ cloud-generated reference Pip the owner already has.
   **Queue continued 2026-11-13:** the **Gloam Rat** (quadruped,
   idle/walk/run + the new `bite` signature) is catalogued
   (sha256 `aec00e60…`, catalog-verify MATCH, posed gate PASS —
-  detail in `docs/MUSE_HANDOFF.md`).
+  detail in `docs/MUSE_HANDOFF.md`). The **Frontier Bearer**
+  (the player; biped with the great lantern, idle/walk/run +
+  the new `plant` and `swing` signatures) followed the same
+  day (sha256 `02622dd5…`, catalog-verify MATCH, posed gate
+  PASS after a coat-skirt weight strip and a rigid lantern
+  assignment — the ported zone ban proved unusable on this
+  mesh's labels; detail in `docs/MUSE_HANDOFF.md`).

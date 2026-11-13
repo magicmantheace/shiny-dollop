@@ -844,3 +844,21 @@ cost of the new creatures in the wallpaper scene.
   frontend renders GloamRat critters with this asset since
   2026-11-13 (kind-aware critter models); headless
   UNDERREACH_VERIFY_PASS with unchanged numbers.
+- Frontier Bearer (2026-11-13): CATALOGUED. Concept preflight
+  PASS (arm daylight 0.5393). GPU stages clean first run
+  (mesh 483.5 s, texture 776.3 s, segment 17 parts). Heat
+  rejected (torso arm share 0.647); distance fallback (0.5315)
+  FAILED the posed gate — coat sail on the plant raise,
+  lantern stretching under smeared weights. Zone-ban re-rig
+  (ported 8192c2e) unusable here: all 17 labels dominant
+  "root" → arms zeroed under heat. Repairs: coat-skirt arm
+  strip + rigid lantern (arm2.R = 1.0 on 11,477 verts).
+  Final GLB catalog-verify MATCH (`02622dd54d81…`); 11 bones;
+  clips idle/walk/run + new signatures plant + swing (two
+  animate passes merged). Posed gate PASSED on inspection —
+  rest (4 views), idle, walk, run, plant raise/apex/recovery,
+  swing wind/apex: arms separated, coat home, lantern rigid;
+  2.2 rad stress raise acceptable (beyond-spec class). Cold
+  render_verify: coverage 1.0, ground 0.001 / −0.064 (plant
+  crouch). Not verified: in-engine playback (no frontend
+  player slot exists yet).

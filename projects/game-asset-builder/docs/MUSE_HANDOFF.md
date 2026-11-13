@@ -990,3 +990,32 @@ appearance of those GLBs — the PC workstation was locked
 during the pass, so no game screenshot could be captured; and
 Godot playback of the gloam-lurker GLB (the critter swap is
 the Underreach project's step, not yet done).
+
+- **Frontier Bearer (Underreach player) — CATALOGUED
+  2026-11-13.** Biped with the great lantern; idle/walk/run +
+  TWO new biped signatures written for this asset: `plant`
+  (plant-light) and `swing` (carve swing), each baked in its
+  own animate pass from the same rig and merged into one GLB.
+  Concept preflight PASS (arm daylight 0.5393). All GPU stages
+  clean on the first run (mesh 483.5 s, texture 776.3 s,
+  segment P3-SAM 17 parts). Heat rejected (torso arm share
+  0.647) → distance fallback (torso share 0.5315), which
+  FAILED the posed gate: the plant raise tore the long coat
+  into a sail, and the lantern — smeared across hand/leg/
+  spine weights — stretched in every arm-moving clip. The
+  cross-zone bone ban was ported from the arm-separation
+  branch (8192c2e; suite +9 tests) and tried: NOT usable on
+  this mesh — all 17 part labels evaluate to dominant bone
+  "root", so the ban zeroed the arm chains under heat.
+  Shipped repairs (hand-edited weights on the fallback rig):
+  a coat-skirt arm strip (smooth ramps below the waist inside
+  the body column; 67,265 verts adjusted) and the lantern
+  rigid-assigned to arm2.R (11,477 verts at exactly 1.0 via
+  loose-component flood + rest-bbox clip). Re-gated PASS at
+  the owner's bar: coat home in all clips, lantern rigid,
+  2.2 rad stress raise twists the coat but surfaces hold.
+  Final 155,978 verts / 299,236 faces; sha256
+  `02622dd54d81c04edda6eb5c1a9a150ee114761f6c74105dc0923b20a7e7ccb0`;
+  catalog-verify MATCH. No frontend swap: the game has no
+  player-avatar slot yet (the Bearer is the player's role;
+  delvers render the colony). Suite: 146 passed, 1 skipped.
