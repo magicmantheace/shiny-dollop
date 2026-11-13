@@ -825,3 +825,22 @@ cost of the new creatures in the wallpaper scene.
   design). Both renders inspected on Cycles CPU.
 - Suite: 135 passed. Not verified: Godot playback of the new
   GLBs; no claim made.
+- Gloam Rat (2026-11-13): CATALOGUED. Concept preflight WARN
+  (min leg gap 0.0006 in the concept stance; 4 leg components).
+  Mesh exit 0 (491 s). Paint attempt 1 froze at `[paint] input
+  mesh` (intermittent freeze signature; tree killed, GPU
+  recovered); attempt 2 exit 0, texturing 607.9 s, fetched by
+  the pipeline. Segment P3-SAM: 12 parts, 0 unlabelled. Heat
+  rejected by skin_policy (belly leg share 0.441) → distance
+  fallback. Final GLB catalog-verify MATCH (`aec00e60646e…`);
+  15 bones; clips idle/walk/run/bite (bite is a new quadruped
+  signature: recipe + registry + unit test). Posed-render gate
+  PASSED on inspection — rest (4 views), idle, walk, run, bite
+  wind-up/apex/recovery, top: legs separated with daylight in
+  rest and motion, no shipped-pose defects; compounded
+  beyond-spec stress (1.6 rad leg tuck + max neck snap)
+  crumples the mesh, no shipped clip affected. Godot load test:
+  scene instantiates with all four clips. The Underreach
+  frontend renders GloamRat critters with this asset since
+  2026-11-13 (kind-aware critter models); headless
+  UNDERREACH_VERIFY_PASS with unchanged numbers.

@@ -151,6 +151,23 @@ class SignatureShapeTests(unittest.TestCase):
         self.assertGreater(max(sway), 0.03)
         self.assertLess(min(sway), -0.03)
 
+    def test_bite_winds_up_then_snaps_down(self):
+        fn, seconds = poses.SIGNATURES["quadruped"]["bite"]
+        self.assertAlmostEqual(seconds, 1.4)
+        for channel, value in fn(0.0).items():
+            self.assertAlmostEqual(value, 0.0, places=6, msg=channel)
+        # Wind-up: head rears (positive neck pitch) before the snap.
+        self.assertGreater(fn(0.35)["neck_pitch"], 0.1)
+        # Snap apex: neck and head drive down-forward, hind legs push.
+        apex = fn(0.55)
+        self.assertLess(apex["neck_pitch"], -0.4)
+        self.assertLess(apex["head_pitch"], -0.25)
+        self.assertGreater(apex["leg.HL"], 0.1)
+        for i in range(65):
+            pose = fn(i * seconds / 64)
+            for channel, value in pose.items():
+                self.assertLessEqual(abs(value), 0.65, channel)
+
     def test_wiggle_travels_to_the_tail(self):
         fn, seconds = poses.SIGNATURES["quadruped"]["wiggle"]
         peak = max(fn(i * seconds / 96)["tail_yaw"] for i in range(97))

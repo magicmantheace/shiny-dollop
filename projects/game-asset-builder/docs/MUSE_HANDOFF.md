@@ -954,9 +954,33 @@ GPU stage, and the finished rig gets a posed-render check.
   catalog-verify MATCH. Render: reads as a camp cot; the
   pillow/bedroll boundary is approximate.
 
-Suite after the queue: 135 passed (the UI catalog-set test
-expects delver/lantern/cot and, since 2026-11-12,
-gloam-lurker). Godot status updated 2026-11-12: the Underreach
+- **Gloam Rat (Underreach critter) — CATALOGUED 2026-11-13.**
+  Quadruped, small; idle/walk/run + a NEW quadruped signature
+  `bite` (wind-up rear, snap-down lunge, shake-off; registry
+  entry + recipe + test added to the animate stage). Concept
+  preflight WARN (4 leg components after erosion, but min leg
+  gap 0.0006 in the concept's walking stance) — the generated
+  mesh itself is separated, verified in clay renders (legs
+  distinct, belly daylight, profile and head-on). Mesh exit 0
+  (491 s, 407,030 faces raw). Paint attempt 1 froze at
+  `[paint] input mesh` (the intermittent freeze; tree killed);
+  attempt 2 exit 0 (texturing 607.9 s) and the pipeline fetched
+  the result itself. Segment: P3-SAM 12 parts, 0 unlabelled.
+  Heat weights REJECTED by skin_policy (belly leg share 0.441)
+  → distance fallback; posed gate PASS at the owner's bar over
+  rest/idle/walk/run/bite (wind-up, apex, recovery inspected):
+  legs separated with daylight in rest and in motion, no
+  shipped-pose defects; the compounded 1.6 rad leg-tuck +
+  max-neck-snap stress pose crumples the mesh (beyond-spec
+  class). Final 44,853 verts / 87,765 faces; sha256
+  `aec00e60646eefefbfe9bb7b30e33645cc6141bdb087ea341b0777dc66f11488`;
+  catalog-verify MATCH. Rig facing matches the gloam-lurker
+  convention (head −Y), so the Underreach frontend treats both
+  critters identically.
+
+Suite after the gloam rat: 135 passed, 1 skipped (the UI
+catalog-set test expects delver/lantern/cot, gloam-lurker
+(2026-11-12) and gloam-rat (2026-11-13)). Godot status updated 2026-11-12: the Underreach
 frontend swapped the delver/lantern/cot GLBs in (that project's
 commit `f135b33`), and an on-PC pass ran the frontend windowed
 on the RTX 3060 against the live sim (`UNDERREACH_VERIFY_PASS`

@@ -146,7 +146,8 @@ ear/antenna bones) and `snail` (legless body chain + eye stalks +
 shell bone; locomotion is an undulation `glide`, showcase is
 `retract`), plus a per-creature SIGNATURES registry in the animate
 stage (`fan`, `headturn`, `bounce`, `scream`, `bow`, `shiver`,
-`wiggle`). **Built, catalogued, and verified end to end**
+`wiggle`; a quadruped `bite` lunge was added 2026-11-13 for the
+Underreach gloam rat). **Built, catalogued, and verified end to end**
 (catalog-verify MATCH + three.js playback with bone deltas for
 every one): **Moth-Hart** (winged-quadruped + ears, `fan`, 21
 bones), **Toasty** (biped, `bounce`, 11 bones), **Lantern Snail**
@@ -269,3 +270,7 @@ cloud-generated reference Pip the owner already has.
   gate; the two props are procedurally painted, recorded as such
   (see the status note in `docs/MUSE_HANDOFF.md`; branch
   `game-asset-builder/underreach-assets`).
+  **Queue continued 2026-11-13:** the **Gloam Rat** (quadruped,
+  idle/walk/run + the new `bite` signature) is catalogued
+  (sha256 `aec00e60…`, catalog-verify MATCH, posed gate PASS —
+  detail in `docs/MUSE_HANDOFF.md`).

@@ -101,7 +101,7 @@ class CatalogDataTests(unittest.TestCase):
                                           "fern", "mushroom-cluster",
                                           "fallen-log", "stump",
                                           "delver", "lantern", "cot",
-                                          "gloam-lurker"})
+                                          "gloam-lurker", "gloam-rat"})
         self.assertEqual(summaries["ember-dragon"]["bone_count"], 14)
         self.assertEqual(summaries["moth-hart"]["bone_count"], 21)
         self.assertEqual(summaries["toasty"]["bone_count"], 11)

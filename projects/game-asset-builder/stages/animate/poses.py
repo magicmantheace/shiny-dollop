@@ -715,6 +715,33 @@ def quad_shiver(t: float) -> dict:
     }
 
 
+def quad_bite(t: float) -> dict:
+    """Gloam Rat signature: a bite lunge — a short wind-up (head
+    rears, front end rises, body crouches), a fast neck/head snap
+    down-forward, then a shake-off recovery. No root translation
+    channel exists for the quadruped, so the lunge reads through
+    the spine/neck/head chain and the hind-leg push."""
+    period = 1.4
+    tt = t % period
+    wind = _smoothstep(tt / 0.35) * _smoothstep((0.55 - tt) / 0.20)
+    snap = _smoothstep((tt - 0.35) / 0.20) * _smoothstep((1.05 - tt) / 0.50)
+    shake = _smoothstep((tt - 0.55) / 0.15) * _smoothstep((period - tt) / 0.30)
+    return {
+        **QREST,
+        "root_y": -0.020 * wind + 0.010 * snap,
+        "spine_pitch": 0.04 * wind - 0.10 * snap,
+        "neck_pitch": 0.18 * wind - 0.55 * snap,
+        "head_pitch": 0.10 * wind - 0.35 * snap,
+        "leg.FL": 0.08 * wind,
+        "leg.FR": 0.08 * wind,
+        "leg.HL": 0.15 * snap,
+        "leg.HR": 0.15 * snap,
+        "leg2.HL": 0.10 * snap,
+        "leg2.HR": 0.10 * snap,
+        "tail_yaw": 0.15 * shake * math.sin(TAU * 3.0 * tt),
+    }
+
+
 def quad_wiggle(t: float) -> dict:
     """Axolotl-Capybara signature: a full-body happy wiggle — the
     sway travels root -> spine -> tail with phase lag, head
@@ -743,7 +770,8 @@ SIGNATURES = {
               "scream": (biped_scream, 3.0),
               "bow": (biped_bow, 2.6)},
     "quadruped": {"shiver": (quad_shiver, 1.6),
-                  "wiggle": (quad_wiggle, 2.4)},
+                  "wiggle": (quad_wiggle, 2.4),
+                  "bite": (quad_bite, 1.4)},
     "snail": {},
 }
 

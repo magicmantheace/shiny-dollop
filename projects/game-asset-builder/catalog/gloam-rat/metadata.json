@@ -1,0 +1,223 @@
+{
+ "entry_version": 1,
+ "name": "Gloam Rat",
+ "slug": "gloam-rat",
+ "source_concept": "media-generation-media-generation-underreach-gl-0-ad12f705-4df0-4e03-8652-a67db8896003.webp",
+ "asset_file": "gloam-rat.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "aec00e60646eefefbfe9bb7b30e33645cc6141bdb087ea341b0777dc66f11488",
+ "bytes": 20107080,
+ "counts": {
+  "verts": 44853,
+  "faces": 87765,
+  "raw_mesh_verts": 325632,
+  "raw_mesh_faces": 407024
+ },
+ "bones": [
+  "root",
+  "spine",
+  "hips",
+  "neck",
+  "head",
+  "leg.FL",
+  "leg2.FL",
+  "leg.HL",
+  "leg2.HL",
+  "leg.FR",
+  "leg2.FR",
+  "leg.HR",
+  "leg2.HR",
+  "tail.1",
+  "tail.2"
+ ],
+ "actions": [
+  "bite",
+  "idle",
+  "run",
+  "walk"
+ ],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": true,
+  "rig_template": "quadruped",
+  "signature_clip": "bite",
+  "weight_method": "distance-to-bone fallback (heat result rejected by skin_policy: belly leg weight share 0.441); posed gate PASS at the owner's bar over rest/idle/walk/run/bite (wind-up, apex, recovery inspected) \u2014 legs separated with daylight in rest and in motion, no shipped-pose defects; compounded 1.6 rad leg-tuck + max neck-snap stress pose crumples the mesh (beyond-spec class). Concept preflight WARN (4 leg components, min leg gap 0.0006 in the concept's walking stance) \u2014 the generated mesh itself is separated, verified in clay renders and the posed gate.",
+  "segmentation": {
+   "model": "P3-SAM (Tencent Hunyuan3D-Part)",
+   "parts": 12,
+   "proxy_faces": 50000,
+   "islands_relabelled": 55,
+   "separated_verts_added": 1022,
+   "labelled_verts": 44853
+  },
+  "label_map": {
+   "0": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "hips",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "1": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "hips",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "2": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "hips",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "3": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "hips",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "4": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "hips",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "5": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "hips",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "6": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "hips",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "7": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "hips",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "8": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "hips",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "9": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "hips",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "10": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "hips",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   },
+   "11": {
+    "dominant": "root",
+    "allowed": [
+     "head",
+     "hips",
+     "neck",
+     "root",
+     "spine"
+    ],
+    "forbidden": []
+   }
+  },
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "resumed": true,
+   "note": "shape generated in run 1: exit 0, 491.33 s, peak VRAM 9697 MiB; later runs resumed from the on-disk artifact"
+  },
+  "texture_stage": {
+   "resumed": true,
+   "note": "attempt 1 hit the intermittent paint freeze at '[paint] input mesh' and was killed; attempt 2 exit 0 (runner 766.17 s, texturing 607.9 s, peak VRAM 11824 MiB), fetched by the pipeline from the lab"
+  }
+ },
+ "clips": {
+  "bite": {
+   "frames": 34,
+   "fps": 24,
+   "seconds": 1.42
+  },
+  "idle": {
+   "frames": 115,
+   "fps": 24,
+   "seconds": 4.79
+  },
+  "run": {
+   "frames": 24,
+   "fps": 24,
+   "seconds": 1.0
+  },
+  "walk": {
+   "frames": 48,
+   "fps": 24,
+   "seconds": 2.0
+  }
+ }
+}
