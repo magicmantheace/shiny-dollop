@@ -167,3 +167,15 @@ the management scripts stop the bridge through an **audited
 graceful stop-request** instead of killing processes; and
 display-state publishing follows label changes, not just state
 changes. **VM suite: 147 tests, OK (3 skips).**
+
+**Update (2026-11-13, v1.2 — SPEC ONLY, branch
+`muse-pc-bridge/v1-2-spec`):** the owner specced the next version:
+(1) **UAC pre-flight** — an exec/queue submission is assessed for
+likely UAC prompts *before* it runs, with an opt-in
+`require_no_uac` refusal; (2) **audit read** — a token-authed
+`GET /v1/audit` over the agent's own log file only; (3) **resident
+queue runner** — a thread in the existing core drains a queue of
+hash-pinned, pre-approved jobs while Muse is disconnected, with a
+local PAUSED kill switch and skip-if-likely UAC policy. Full design:
+`docs/V1_2_SPEC.md`. **Nothing is built or verified; this is planned
+work.** Production still runs v1.1.

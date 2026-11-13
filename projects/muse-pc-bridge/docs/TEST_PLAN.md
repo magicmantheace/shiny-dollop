@@ -425,6 +425,26 @@ PC during install verification.
   jobs with WinError 1920, and cmd / full-path jobs are the
   working route.**
 
+## Planned — v1.2 (spec only; none of these tests exist yet)
+
+Per `docs/V1_2_SPEC.md` §4, all required before the agent reports
+`1.2.0`:
+
+- **UAC pre-flight**: classifier positive/negative cases per
+  heuristic family; `require_no_uac` returns 409 and executes
+  nothing.
+- **Audit read**: auth required; `since`/`limit` paging; the
+  token-absence regression (token seeded into a command appears in
+  neither the audit file nor the endpoint output); the endpoint
+  cannot be pointed at any file but the configured audit log.
+- **Queue runner**: submit → run → done; `on_failure` stop vs
+  continue; script hash-mismatch refusal; PAUSED blocks new starts
+  and resumes cleanly; restart recovery moves `running/` jobs to
+  `failed/core_restarted` (never silently re-runs);
+  `skip-if-likely` jobs never execute; `waiting_uac` grace expiry.
+- Full existing suite stays green; Windows smoke on the owner's PC
+  (non-elevated) before any production switch.
+
 ## What the tests cannot prove
 
 These require the owner's PC and are **not** claimed by any VM test:

@@ -848,3 +848,25 @@ boot task); the running core still executes its pre-fix code,
 so until then powershell jobs keep failing with WinError 1920
 and cmd / full-path jobs are the working route. PR #47 stays
 open and unmerged.
+
+## 2026-11-13 — v1.2 spec written (branch `muse-pc-bridge/v1-2-spec`), PLANNED, nothing built
+
+The owner specced v1.2 on a voice call: (1) **UAC pre-flight
+surfacing** — assess a submission for likely UAC prompts before it
+runs (static heuristics + the v1.1 consent detection), with an
+opt-in `require_no_uac` refusal; (2) **audit read access** —
+`GET /v1/audit` over the agent's own configured log file only,
+token-authed, paged; (3) **resident queue runner** — a thread in the
+existing core draining a file-backed queue of hash-pinned,
+pre-approved jobs while Muse is disconnected; strictly sequential;
+`PAUSED` file as a local kill switch (and the way owner pause orders
+take effect); default UAC policy `skip-if-likely` so no job ever
+stalls the queue waiting for a click; restart recovery fails —
+never silently re-runs — an interrupted job.
+
+Full design, API shapes, invariants, and the required test list:
+`docs/V1_2_SPEC.md` (§0 restates the standing invariants: stdlib
+only, token never logged, audit non-negotiable, UAC stays the
+owner's click). Build order: audit read → UAC pre-flight → queue
+runner, on a future `muse-pc-bridge/v1-2` branch. **State: spec
+only — no code, no tests, nothing deployed; production runs v1.1.**
