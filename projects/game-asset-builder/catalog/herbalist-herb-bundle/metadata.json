@@ -1,0 +1,98 @@
+{
+ "entry_version": 1,
+ "name": "Herbalist Herb Bundle",
+ "slug": "herbalist-herb-bundle",
+ "source_concept": "media-generation-underreach-herbalist-herb-bund-0-d62f600e-7b36-498d-8391-0b3922e85a21.webp",
+ "asset_file": "herbalist-herb-bundle.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "0aad75f6e27187ed8c77c507d8463def2a8289e27e5aadf7513bf06547f1e60c",
+ "bytes": 11566904,
+ "counts": {
+  "verts": 27001,
+  "faces": 52720,
+  "raw_mesh_verts": 1245535,
+  "raw_mesh_faces": 1595638
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  },
+  "prep": {
+   "seconds": 3.7,
+   "input": "/home/hatch/workspace/creature-refs/media-generation-underreach-herbalist-herb-bund-0-d62f600e-7b36-498d-8391-0b3922e85a21.webp",
+   "output": "/home/hatch/workspace/_build-assets/projects/game-asset-builder/outputs/herbalist-herb-bundle/cutout.png",
+   "size": [
+    877,
+    1194
+   ],
+   "source_size": [
+    1920,
+    1280
+   ],
+   "background_rgb": [
+    208,
+    208,
+    208
+   ],
+   "foreground_fraction": 0.2409,
+   "foreground_bbox": [
+    519,
+    62,
+    1347,
+    1207
+   ]
+  },
+  "mesh": {
+   "runner": {
+    "name": "herbalist-herb-bundle_shape",
+    "exit_code": 0,
+    "seconds": 511.13,
+    "baseline_vram_mib": 2750,
+    "peak_vram_mib": 9180,
+    "peak_delta_mib": 6430,
+    "vram_after_exit_mib": 2737,
+    "n_samples": 1092,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"herbalist-herb-bundle_shape\", \"exit_code\": 0, \"seconds\": 511.13, \"baseline_vram_mib\": 2750, \"peak_vram_mib\": 9180, \"peak_delta_mib\": 6430, \"vram_after_exit_mib\": 2737, \"n_samples\": 1092}\r\n"
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 797801,
+    "faces": 1595650,
+    "load_s": 113.51,
+    "inference_s": 371.91,
+    "total_s": 485.65,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\herbalist-herb-bundle\\shape.glb"
+   }
+  },
+  "texture": {
+   "stage": "texture",
+   "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+   "verts": 1245535,
+   "faces": 1595650,
+   "load_s": 105.76,
+   "texture_s": 3406.07,
+   "total_s": 3512.96,
+   "torch_peak_mib": 9924.4,
+   "job_state": "done",
+   "adopted_from_lab": true,
+   "note": "bridge job cap expired during fetch; stage completed on PC, result adopted from lab and hash-verified (textured.glb sha256 406346f9a9c92a7f9fc2aeb92af00dd222f0203311794ba61be224a80273ec62, 49931644 bytes); bridge seconds 3539.43. Longest bake in the queue so far; aliveness verified mid-bake by CPU-growth sampling (full core over 60s, private memory 15.4 GB plateau, free RAM 11.8 GB)."
+  }
+ }
+}
