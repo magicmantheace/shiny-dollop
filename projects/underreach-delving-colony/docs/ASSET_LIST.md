@@ -25,7 +25,7 @@ terrain is dressing and kit pieces per band.
 | Farmer kit — sickle + pouch | Hand/belt props | ✅ catalogued 2026-11-13 (`farmer-sickle` 0c7a2177…, `farmer-pouch` effbd495…; unrigged props, no frontend equipment slot yet) |
 | Herbalist kit — herb bundle + satchel | Hand/shoulder props | ✅ catalogued 2026-11-13 (`herbalist-herb-bundle` 0aad75f6…, `herbalist-satchel` 5ae94948…; unrigged props, no frontend equipment slot yet) |
 | Spore mask | Worn face prop (equipped visual for the S5 gate) | ✅ catalogued 2026-11-13 (`spore-mask` adf3774f…; unrigged prop, no frontend equipment slot yet) |
-| Harness + rope | Worn prop (Crystal Dark gate) | ⬜ |
+| Harness + rope | Worn prop (Crystal Dark gate) | ✅ catalogued 2026-11-13 (`harness-and-rope` c88cebdf…; unrigged prop, no frontend equipment slot yet) |
 | Quiet gear — padded wraps | Worn prop set (Crystal Dark gate) | ⬜ |
 | Cooling gear — insulated suit pieces | Worn prop set (Magma gate) | ⬜ |
 
