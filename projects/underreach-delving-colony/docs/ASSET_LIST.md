@@ -23,7 +23,7 @@ terrain is dressing and kit pieces per band.
 | Miner kit — pickaxe + helmet lamp | Hand/back props, attachable | ✅ catalogued 2026-11-13 (`miner-pickaxe` aaba8c8e…, `miner-helmet-lamp` 389dded4…; unrigged props, no frontend equipment slot yet) |
 | Hauler kit — carry sack / ore basket | Back prop | ✅ catalogued 2026-11-13 (`hauler-ore-basket` 076c73f4…; built as the ore-basket form, unrigged prop, no frontend equipment slot yet) |
 | Farmer kit — sickle + pouch | Hand/belt props | ✅ catalogued 2026-11-13 (`farmer-sickle` 0c7a2177…, `farmer-pouch` effbd495…; unrigged props, no frontend equipment slot yet) |
-| Herbalist kit — herb bundle + satchel | Hand/shoulder props | ⬜ |
+| Herbalist kit — herb bundle + satchel | Hand/shoulder props | ✅ catalogued 2026-11-13 (`herbalist-herb-bundle` 0aad75f6…, `herbalist-satchel` 5ae94948…; unrigged props, no frontend equipment slot yet) |
 | Spore mask | Worn face prop (equipped visual for the S5 gate) | ⬜ |
 | Harness + rope | Worn prop (Crystal Dark gate) | ⬜ |
 | Quiet gear — padded wraps | Worn prop set (Crystal Dark gate) | ⬜ |
