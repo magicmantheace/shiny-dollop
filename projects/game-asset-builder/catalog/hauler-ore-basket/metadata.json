@@ -1,0 +1,87 @@
+{
+ "entry_version": 1,
+ "name": "Hauler Ore Basket",
+ "slug": "hauler-ore-basket",
+ "source_concept": "media-generation-underreach-hauler-ore-basket-r-0-e5d36cf7-3b70-4fb2-99d5-2d0631a44618.webp",
+ "asset_file": "hauler-ore-basket.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "076c73f4e7e67cfe854b246e9e0c3bdf7b5196a0779c12d9b2b258284a933b23",
+ "bytes": 11643452,
+ "counts": {
+  "verts": 27021,
+  "faces": 49942,
+  "raw_mesh_verts": 1103647,
+  "raw_mesh_faces": 1443692
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  },
+  "mesh": {
+   "runner": {
+    "name": "hauler-ore-basket_shape",
+    "exit_code": 0,
+    "seconds": 487.51,
+    "baseline_vram_mib": 2701,
+    "peak_vram_mib": 9114,
+    "peak_delta_mib": 6413,
+    "vram_after_exit_mib": 2671,
+    "n_samples": 1044,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"hauler-ore-basket_shape\", \"exit_code\": 0, \"seconds\": 487.51, \"baseline_vram_mib\": 2701, \"peak_vram_mib\": 9114, \"peak_delta_mib\": 6413, \"vram_after_exit_mib\": 2671, \"n_samples\": 1044}\r\n"
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 721928,
+    "faces": 1443696,
+    "load_s": 111.7,
+    "inference_s": 348.17,
+    "total_s": 460.07,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\hauler-ore-basket\\shape.glb"
+   }
+  },
+  "texture": {
+   "runner": {
+    "name": "hauler-ore-basket_texture",
+    "exit_code": 0,
+    "seconds": 2817.87,
+    "baseline_vram_mib": 2692,
+    "peak_vram_mib": 11870,
+    "peak_delta_mib": 9178,
+    "vram_after_exit_mib": 2384,
+    "n_samples": 6017,
+    "job_state": "done",
+    "adopted_from_lab": true,
+    "note": "pipeline client hit the bridge job cap during fetch; stage completed on the PC and its result + textured.glb were adopted and hash-verified (textured.glb sha256 58793c2fd0cef0d6f7733caa709096618904186e9277f6f10bc0f664ce225c92)"
+   },
+   "stats": {
+    "stage": "texture",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+    "verts": 1103647,
+    "faces": 1443696,
+    "load_s": 104.49,
+    "texture_s": 2686.46,
+    "total_s": 2791.93,
+    "torch_peak_mib": 9918.2,
+    "output": "D:\\asset-forge-lab\\out\\gab\\hauler-ore-basket\\textured.glb"
+   }
+  },
+  "post_catalog_fix": "Post-catalog gate fix (2026-11-13): the shape stage had generated a flat 'ground shadow' plate under the basket (338 near-horizontal faces, centroid z<0.065, |nz|>0.75) plus a curled rim remnant on the +x side (444 faces in the box x[0.48,0.75] y[-0.18,0.47] z[0.03,0.16], |nz|>0.45). Both were deleted from the final GLB after isolated renders proved the candidate sets were plate-only (neighbouring low clusters identified as strap tips were excluded). 50,724 -> 49,942 faces; static verify re-run VERIFY_OK; gate renders re-inspected clean."
+ }
+}
