@@ -1122,6 +1122,63 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 13 — Stationary support abstention recovery: leg S, a supporting-opposition leg on the abstention gate for both trigger classes (FAILED, not a Regression)
+
+Optional `StationarySupportAbstentionRecoveryMemory` is identical to
+the graded singleton candidate in every element — acting model,
+extended signal, retained archive, archive concordance, joint
+recovery test, recovery model, the full three-leg authority
+condition, the minority branch in full INCLUDING the inverted
+minority model and leg W on the minority branch, leg T on both
+recovery branches, leg N and leg D on the regular branch, leg
+P ≥ 0.70, leg R and leg C on partial abstention triggers, and the
+full / retained-partial abstention classes with the widened class
+removed; the SINGLE changed element is leg S: the abstention
+branch fires only if supporting_opposed_count >= 1
+(support_threshold 1, was null records-only) — full gate leg P AND
+leg S, partial gate leg P AND (leg R OR leg C) AND leg S — under a
+protocol frozen before implementation (new cohorts 532003-family /
+533001-family, now INSPECTED). **Graded Failed, NOT a Regression,
+under the protocol's own definitions (PRIMARY criterion 19 PASSes
+on BOTH cohorts — but as a carried profile with a
+stationary-support null result, cap NOT MET; the Failed clause
+triggers on the additional cohort several times over — criteria
+18/5 FAIL there on sub-condition (d) alone, criterion 1 FAILs
+there, criteria 17/4/2 FAIL there, criterion 7 PASSes both; no
+Regression clause triggers — pooled onset harm 146/184 below
+recent8 247/269, control successes at exact recent8 parity on
+both, k=32 successes 65/60 above the recent8 − 4 lines of 61/58,
+suite + transfer pass).** The stationary story must be stated
+plainly: leg S's designed population did not occur on these draws
+— development drew exactly ONE control trigger (532039 k=8
+partial, supporting 2, taken identically) and additional drew
+NONE, so the candidate's control line is identical to the
+decisive baseline's on both cohorts (dev 119/105/16 vs recent8
+119/121/0; add 118/122/0, identical to recent8 in full) and the
+stationary hypothesis remains untested, not refuted. Where leg S
+WAS exercised — at switch onset — it was purely a cost: 7
+disarmings (dev 4, add 3, all zero-support, each converting a
+decisive abstention 0/0 into a recent8 action at exactly
+recent8's own scores, six at 0/16), pooled onset harm +62 dev /
++48 add vs decisive for +2 / +0 successes; development's B1
+TAKEN falls 5/6 → 2/6 (criterion 9 FAILs development, criterion
+11 FAILs development on its B1 side), additional's B1 holds only
+at the floor 3/6, and additional's one B2 disarming (+16 harm)
+pushes its B2 harm past the ceiling (criterion 1(c)). Criteria
+19/6, 3, and 7 pass both; criteria 18/5, 17/4, 2, and 1 pass
+development and fail additional (the 18/5, 17/4, and 2 failures
+carried identical to the decisive baseline; frozen_A /
+cumulative both-axes return-A dominance holds on both cohorts
+again). Leg T disarmed zero states for the sixth consecutive
+cycle. Next limitation selected: P1 first-switch (B1) onset
+engagement under the support-gated abstention classes —
+criterion 9 fails development entirely through leg S's B1
+disarmings, on NEW cohorts under a NEW protocol. Learner
+acquisition actions zero; external TRAIN actor harm published
+in full in the report.
+[Complete preregistration, results and limitations](docs/STATIONARY_SUPPORT_ABSTENTION_RECOVERY.md).
+
+
 ### November 12 — Newest singleton release recovery: leg D, a newest-singleton acting-corroboration release path on the regular recovery branch (FAILED / REGRESSION, stationary clause)
 
 Optional `NewestSingletonReleaseRecoveryMemory` is identical to

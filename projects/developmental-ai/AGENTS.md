@@ -1,3 +1,153 @@
+# Stationary support abstention recovery: leg S, a supporting-opposition leg on the abstention gate for both trigger classes — 2026-11-13 (FAILED, not a Regression)
+
+Optional `developmental_ai/stationary_support_abstention_recovery.py`
+(identical to the graded singleton candidate in every element —
+acting model recent8 exactly, extended signal, retained archive,
+archive concordance, joint test joint_count >= 1, recovery model,
+the full three-leg authority condition, the minority branch in
+full INCLUDING the inverted minority model and leg W on the
+minority branch, leg T on both recovery branches, leg N and leg D
+on the regular branch, leg P >= 0.70, leg R and leg C on partial
+abstention triggers, and the full / retained-partial abstention
+classes with the widened class removed records-only,
+singleton_release_fired carried; the SINGLE changed element is
+leg S: the abstention branch fires only if
+supporting_opposed_count >= 1, support_threshold 1 (was null
+records-only), for BOTH trigger classes — full gate leg P AND
+leg S, partial gate leg P AND (leg R OR leg C) AND leg S;
+abstention_disarmed_by_support recorded true exactly when leg S
+alone disarms a trigger whose other gate legs all pass and
+neither recovery branch fired; leg P / leg R / leg C / leg T /
+leg W / leg N / leg D explicitly NOT re-tuned) was evaluated
+under the protocol frozen BEFORE implementation at
+`benchmarks/stationary_support_abstention_recovery_protocol.json`
+on NEW cohorts 532003/532021/532039 and 533001/533017/533041,
+both now INSPECTED — never re-tune against them. **Graded Failed
+under the protocol's own definitions (PRIMARY criterion 19
+PASSes on BOTH cohorts — but as a carried profile with a
+stationary-support null result, grading cap NOT MET — and the
+Failed clause triggers on the additional cohort several times
+over: criteria 18/5 FAIL there on sub-condition (d) alone,
+criterion 1 FAILs there, criteria 17/4/2 FAIL there, criterion 7
+PASSes both) and NOT a Regression (no clause triggers — pooled
+onset harm 146/184 below recent8 247/269, control successes at
+exact recent8 parity 119 = 119 / 118 = 118 against the
+more-than-6 both-cohorts clause, k=32 successes 65/60 above the
+recent8 − 4 lines of 61/58, suite + transfer pass).**
+Per-criterion, development / additional, PRIMARY criterion 19
+first, then co-graded guards 6, 9, 18, 5, 1, 11, 17, 4, 2, 3, 7:
+C19 PASS/PASS (the same computation as C6: dev abstentions
+16/240, successes 119 = recent8 119, harm 105 vs 121; add
+abstentions 0/240, successes 118 = recent8 118, harm 122 = 122 —
+AS A CARRIED PROFILE WITH A STATIONARY-SUPPORT NULL RESULT:
+leg S's designed stationary population did not occur on these
+draws, development drew exactly ONE control trigger (532039 k=8
+partial through R+C, purity 0.892, supporting 2, taken
+identically) and additional drew NONE, candidate branch-identical
+to decisive at 15/15 graded control states on both, ZERO leg-S
+disarmings on either control arm, so the grading cap is NOT MET
+on either cohort and the pass must never be stated as a
+support-leg demonstration; the singleton cycle's stationary
+Regression does not recur), C6 PASS/PASS (same computation), C9
+FAIL/PASS (dev on (a) alone — TAKEN 2/6, 1 full + 1 partial
+through C, vs decisive 5/6: leg S disarmed three B1 takings,
+532021 k=2 partial via C purity 0.941 supporting 0 → recent8
+0/16, 532039 k=2 partial via C 0.947 → 1/15, 532039 k=4 full
+0.943 → 1/15, each vs a decisive abstention 0/0; harm 57 vs
+guard 66 / recent8 82 PASS both; add TAKEN 3/6 AT the floor —
+1 full + 2 partial through C / R+C — vs decisive 5/6, leg S
+disarming two 533041 takings (k=2 full 0.875, k=4 partial via C
+0.868, both supporting 0 → recent8 0/16); harm 47 vs guard 58 /
+recent8 89), C18 FAIL is additional-only: C18 PASS/FAIL and C5
+PASS/FAIL (dev in full — 0/144, successes 65 = recent8 65,
+non-recent8 1/9 the carried leg-D firing at 532021 return-A
+k=32 retained 10/6 identical to decisive, abstained 0/9; add on
+(d) alone — abstained 1/9, the carried partial at 533017
+return-A k=32, purity 0.714, supporting 1, taken identically by
+decisive; (a) 16/144, (b) 60 vs recent8 62 line 54, (c) 1/9
+PASS), C1 PASS/FAIL (dev in full — minority 3/6 at the floor,
+selectivity 0/6 / 0/6, harm 43 vs guard 70 / ceiling 51.6,
+successes 37 vs 26; one leg-S B2 disarming there, 532021 k=2
+full supporting 0 → recent8 0/16, the whole B2 harm gap vs
+decisive 43 vs 27 at identical successes; add on (a),
+(c)-ceiling, and (d) — minority 1/6 = decisive, harm 55 vs
+guard 87 PASS but ceiling 52.2 FAIL where decisive's 39 passes,
+the +16 gap exactly leg S's one B2 disarming at 533041 k=2
+partial via C supporting 0 → recent8 0/16, successes 9 = decisive
+vs guard+16 = 25 FAIL), C11 FAIL/PASS (dev on its B1 side only;
+add both sides pass), C17 FAIL is additional-only: C17 PASS/FAIL
+and C4 PASS/FAIL (dev harm 46 vs guard 79 / ceiling 47.4 PASS
+both by 1.4, recovery 3/6; add harm 82 vs guard 77 AND ceiling
+55.8 FAIL both, recovery 1/6 — a carried profile identical to
+decisive on both cohorts, leg S disarming no return-A state),
+C2 PASS/FAIL (dev 50 vs frozen_A floor 24.8 and guard+16 = 33;
+add 14 vs floor 27.2 and guard+16 = 19 — frozen_A / cumulative
+beat the candidate on BOTH axes at return-A on both cohorts
+again, dev 62/34 and 66/30 vs 50/46, add 68/28 and 58/38 vs
+14/82), C3 PASS/PASS (146 vs guard 215, cells 6/6 dev; 184 vs
+guard 222, cells 6/6 add; pooled onset harm ABOVE decisive on
+both, 146 vs 84 and 184 vs 136, entirely through leg S's seven
+disarmings, stated in full), C7 PASS/PASS (replay 72/72 per
+cohort, support_threshold 1 everywhere, supporting count and
+abstention_disarmed_by_support and the gate incl. leg S
+recomputed everywhere with 0 mismatches, stationary-support-rule
+== candidate branch and singleton-rule == decisive branch
+everywhere, companion fields recomputable at every partial state
+(26 dev / 27 add) and at fallback elsewhere, kind never widened,
+stale lists of 18, acting lists of 8 and newest lists of 4 with
+all counts recomputable everywhere and newest records == acting
+tail, thresholds 1/2/3/2/3/1 as registered,
+minority_model_archive_count == archive_events_count and
+minority_model_inverted true everywhere, cross-check PASS at
+every minority-fired state 5/5 dev and 3/3 add, acquisition 0).
+**The grading cap is NOT MET on either cohort — leg S disarmed
+ZERO graded control states on either cohort (all 7 disarmings
+across both cohorts are at onset: dev 532021 B1 k=2, 532021 B2
+k=2, 532039 B1 k=2, 532039 B1 k=4; add all 533041 B1 k=2, B1 k=4,
+B2 k=2), so the PRIMARY's PASS is a carried-profile pass with a
+stationary-support null result, never a support-leg
+demonstration, and the stationary hypothesis remains UNTESTED
+by these cohorts, neither confirmed nor refuted. Leg S's entire
+realized effect is its onset price: +62 harm dev (successes
+94 vs decisive 92) and +48 harm add (successes 24 = 24), every
+disarming converting a decisive abstention 0/0 into a recent8
+action at exactly recent8's own scores (six at 0/16, one at
+1/15). Leg T disarmed ZERO states on either cohort for the
+sixth consecutive cycle.** Full unit suite (1968) and historical
+transfer benchmark passed in the implementation, evaluation, and
+grading stages; no CI claimed for the evaluation or grading
+commits (UNVERIFIED). See
+`docs/STATIONARY_SUPPORT_ABSTENTION_RECOVERY.md`. Keep the
+learner optional and unpromoted, default controller unchanged,
+no merge, no AthenZ/Synveil integration, D1–D10/V2A/V2B
+unchanged. Next limitation selected: P1 first-switch (B1) onset
+engagement under the support-gated abstention classes —
+criterion 9 FAILs development on sub-condition (a) alone
+(TAKEN 2/6 against decisive 5/6, harm passing both comparisons)
+entirely through leg S's three B1 disarmings, additional
+passing only at the floor (3/6) after two more; whether an
+evidence-derived condition on the abstention gate — one that
+distinguishes the onset zero-support population from the
+stationary zero-support population the support leg was designed
+for, without re-tuning leg S's threshold, leg P, leg R, or
+leg C — can hold criterion 9's frozen form on BOTH cohorts
+while holding stationary selectivity (criteria 19/6, PASSing
+both as a carried profile), checkpoint-32 release (criteria
+18/5), B2 protection (criterion 1), and return-A profiles
+(criteria 17/4/2) as co-graded guards, on NEW cohorts under a
+NEW protocol. Recorded but not selected: additional's criteria
+18/5 failure is one carried partial abstention (supporting 1,
+taken identically by decisive) — no new population to retry;
+additional's return-A failures are a carried profile identical
+to decisive with frozen_A / cumulative both-axes dominance on
+both cohorts again; additional's criterion 1 count and
+successes failures are carried identical, leg S's share exactly
+its ceiling sub-condition via the one B2 disarming; the
+stationary-support hypothesis is untested, not refuted — its
+designed population did not occur, and a retry would need a
+cohort design that actually draws zero-support stationary
+triggers, which no graded population this cycle sizes.
+
 # Newest singleton release recovery: leg D, a newest-singleton acting-corroboration release path on the regular recovery branch — 2026-11-12 (FAILED / REGRESSION, stationary clause)
 
 Optional `developmental_ai/newest_singleton_release_recovery.py`
