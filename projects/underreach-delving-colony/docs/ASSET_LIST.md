@@ -19,7 +19,7 @@ terrain is dressing and kit pieces per band.
 | Asset | Spec | Status |
 |---|---|---|
 | Delver (base colonist) | Rigged biped; idle/walk/run + mine swing, carry walk, tend, eat, sleep (lying), downed (lying), rescue-carry | ✅ catalogued 2026-11-11 (arm-separation-gated A-pose rebuild; clips idle/walk/run/bounce) and in frontend use — snow-goblin stand-in retired |
-| The Frontier Bearer (player) | Rigged biped with the great lantern; idle/walk/run + plant-light, carve swing | ⬜ (co-op: up to 4 tint variants) |
+| The Frontier Bearer (player) | Rigged biped with the great lantern; idle/walk/run + plant-light, carve swing | ✅ catalogued 2026-11-13 as frontier-bearer (clips idle/walk/run/plant/swing; arm-separation gates passed) — not yet in frontend use: no player-avatar slot exists (co-op tint variants still ⬜) |
 | Miner kit — pickaxe + helmet lamp | Hand/back props, attachable | ⬜ |
 | Hauler kit — carry sack / ore basket | Back prop | ⬜ |
 | Farmer kit — sickle + pouch | Hand/belt props | ⬜ |
