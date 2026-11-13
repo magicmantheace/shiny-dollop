@@ -110,7 +110,8 @@ class CatalogDataTests(unittest.TestCase):
                                           "farmer-pouch",
                                           "herbalist-herb-bundle",
                                           "herbalist-satchel",
-                                          "spore-mask"})
+                                          "spore-mask",
+                                          "harness-and-rope"})
         self.assertEqual(summaries["ember-dragon"]["bone_count"], 14)
         self.assertEqual(summaries["moth-hart"]["bone_count"], 21)
         self.assertEqual(summaries["toasty"]["bone_count"], 11)
