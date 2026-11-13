@@ -1,0 +1,79 @@
+{
+ "entry_version": 1,
+ "name": "Quiet Gear Arm Wraps",
+ "slug": "quiet-gear-arm-wraps",
+ "source_concept": "media-generation-underreach-quiet-gear-arm-wrap-0-8f65d3cc-b020-4359-9c2c-1d922b3af6cd.webp",
+ "asset_file": "quiet-gear-arm-wraps.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "d2186ec01e549cd2bc3435829b9acffca065ed41d1f1fac463a28ad9ec6219f8",
+ "bytes": 12129032,
+ "counts": {
+  "verts": 27027,
+  "faces": 53704,
+  "raw_mesh_verts": 350819,
+  "raw_mesh_faces": 447598
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "runner": {
+    "name": "quiet-gear-arm-wraps_shape",
+    "exit_code": 0,
+    "seconds": 502.95,
+    "baseline_vram_mib": 2658,
+    "peak_vram_mib": 9026,
+    "peak_delta_mib": 6368,
+    "vram_after_exit_mib": 2583,
+    "n_samples": 1076,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"quiet-gear-arm-wraps_shape\", \"exit_code\": 0, \"seconds\": 502.95, \"baseline_vram_mib\": 2658, \"peak_vram_mib\": 9026, \"peak_delta_mib\": 6368, \"vram_after_exit_mib\": 2583, \"n_samples\": 1076}\r\n"
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 223831,
+    "faces": 447598,
+    "load_s": 111.99,
+    "inference_s": 367.71,
+    "total_s": 479.75,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\quiet-gear-arm-wraps\\shape.glb"
+   }
+  },
+  "texture_stage": {
+   "runner": {
+    "name": "quiet-gear-arm-wraps_texture",
+    "exit_code": 0,
+    "seconds": 550.05,
+    "baseline_vram_mib": 2605,
+    "peak_vram_mib": 11879,
+    "peak_delta_mib": 9274,
+    "vram_after_exit_mib": 2309,
+    "n_samples": 1174,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"quiet-gear-arm-wraps_texture\", \"exit_code\": 0, \"seconds\": 550.05, \"baseline_vram_mib\": 2605, \"peak_vram_mib\": 11879, \"peak_delta_mib\": 9274, \"vram_after_exit_mib\": 2309, \"n_samples\": 1174}\r\n"
+   },
+   "stats": {
+    "stage": "texture",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+    "verts": 350819,
+    "faces": 447598,
+    "load_s": 107.97,
+    "texture_s": 415.02,
+    "total_s": 523.67,
+    "torch_peak_mib": 9881.1,
+    "output": "D:\\asset-forge-lab\\out\\gab\\quiet-gear-arm-wraps\\textured.glb"
+   }
+  }
+ }
+}
