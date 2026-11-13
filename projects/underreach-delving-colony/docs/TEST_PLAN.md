@@ -283,3 +283,29 @@ A scripted Shallows colony: camp chamber, shaft, tunnel, ore face.
   before any frame budget claim.
 - The dedicated gloam-lurker asset once it is built (not yet in the
   builder catalog); the ember-dragon stands in until then.
+
+## Gloam rat frontend swap (verified 2026-11-13, VM headless)
+
+- The dedicated gloam-rat asset (builder catalog sha256
+  `aec00e60646e…`, branch `game-asset-builder/underreach-assets`
+  @ `a5a93d5`) is copied byte-for-byte to
+  `frontend/assets/gloam-rat.glb` (hash matches the catalog).
+  Critter rendering in `main.gd` is now kind-aware: GloamRat
+  critters instantiate `RAT_SCENE` at target height 0.5;
+  DeepLurker keeps `CRITTER_SCENE` at 1.05. No sim change (the
+  bridge view already carried each critter's `kind`).
+- Leg-separation gate passed in the builder before cataloguing
+  (posed renders of rest and the idle/walk/run/bite apexes —
+  legs separate with daylight in every shipped pose).
+- Godot load test: the rat scene instantiates headless with all
+  four clips (bite / idle / run / walk). Rig facing verified
+  against the gloam-lurker's armature convention (head −Y) in
+  Blender, so the frontend's movement-facing behaves the same.
+- `godot --headless -- --underreach-verify` after the swap
+  prints the identical pass line: `UNDERREACH_VERIFY_PASS
+  goods=20 delvers=5 floor_instances=15 tick=4000`.
+- Sim untouched: `cargo test` 25/25 and the `scenario` binary
+  run repeated after the swap, clean to tick 6000.
+- **Not verified:** a gloam rat sighted in frame on the owner's
+  PC, and name-label legibility / layer switching on PC — the
+  outstanding on-PC visual pass items.

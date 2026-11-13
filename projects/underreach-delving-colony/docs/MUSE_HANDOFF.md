@@ -162,6 +162,17 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   windowed on the owner's PC against a live cross-compiled sim
   bridge: `UNDERREACH_VERIFY_PASS` on Windows with identical
   numbers and zero script errors. Details in `docs/TEST_PLAN.md`.
+- **Gloam rat (2026-11-13):** the builder lane catalogued the
+  gloam rat (catalog sha `aec00e60646e…`; clips idle/walk/run +
+  the new quadruped `bite` signature; leg-separation posed gate
+  passed at the owner's bar). Critter rendering in the frontend
+  is now kind-aware: GloamRat critters render with the dedicated
+  rat asset at a smaller target height, DeepLurker unchanged.
+  Headless verify passes identically; a Godot load test
+  instantiates the rat with all four clips. Still unverified:
+  a rat sighted in frame on the owner's PC, name-label
+  legibility, and layer switching on PC. Provenance in
+  `frontend/README.md`, numbers in `docs/TEST_PLAN.md`.
 - **CONFLICT RECORDED 2026-11-12, RESOLVED 2026-11-12 (rule 3):**
   the capture redo reported the 3D viewport pitch black in every
   frame despite a live sim. A same-day diagnosis pass on the

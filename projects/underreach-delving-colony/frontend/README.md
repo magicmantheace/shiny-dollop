@@ -52,7 +52,8 @@ the pipeline is the art source, per the owner's direction:
 | `assets/delver.glb` | the delvers (dedicated asset) | `7ab7262b7eeb5716c23bd0494f133a7674a0f858cd4a839bd80c8ca7e8b7edc4` |
 | `assets/lantern.glb` | lantern prop (Tier 1) | `5dffb6360730c30d9a0a3c928afd89f5f9148c4a1ecf732b8ffbc71f426cf900` |
 | `assets/cot.glb` | delver beds | `67e070f2012f416f96b202fe0cb419255b5f57a72b83053f916ba22ca1659ef7` |
-| `assets/gloam-lurker.glb` | critters (dedicated asset) | `f0c881cb9bd39e0b2223f3d20be45fd46e18fd220de64ae4ed7d9ce05d8ff4c3` |
+| `assets/gloam-lurker.glb` | DeepLurker critters (dedicated asset) | `f0c881cb9bd39e0b2223f3d20be45fd46e18fd220de64ae4ed7d9ce05d8ff4c3` |
+| `assets/gloam-rat.glb` | GloamRat critters (dedicated asset) | `aec00e60646eefefbfe9bb7b30e33645cc6141bdb087ea341b0777dc66f11488` |
 | `assets/ember-dragon.glb` | former critter stand-in (unused) | `2837c6b2969f0bf6…` |
 | `assets/treasure-chest.glb` | the stockpile | `2b6e51cc0d8273e3…` |
 | `assets/mushroom-cluster.glb` | farm plots | `6e607ffdaeed58c7…` |
@@ -63,7 +64,11 @@ catalog on branch `game-asset-builder/underreach-assets` @
 `5642dce` (`outputs/<slug>/<slug>.glb` in that worktree), copied
 byte-for-byte — the frontend copies hash to the catalog values
 above. The gloam-lurker followed on 2026-11-12 from the same
-branch @ `328bca3`, copied the same way.
+branch @ `328bca3`, copied the same way. The gloam-rat followed
+on 2026-11-13 from the same branch @ `a5a93d5`, copied the same
+way; critter rendering is kind-aware since then (`RAT_SCENE` for
+GloamRat at a smaller target height, `CRITTER_SCENE` for
+DeepLurker).
 
 The dedicated **delver** replaced the snow-goblin stand-in on
 2026-11-11 (`DELVER_SCENE` in `main.gd`). It is the
@@ -74,7 +79,11 @@ critter asset landed on 2026-11-12 (`CRITTER_SCENE` now points at
 it; the ember-dragon stand-in is retired, file kept unused). It
 passed the builder's quadruped leg-separation gates — concept
 preflight and posed renders of every shipped clip (idle / walk /
-run / shiver) — before cataloguing.
+run / shiver) — before cataloguing. The **gloam-rat** landed on
+2026-11-13 with the builder's new quadruped `bite` signature
+clip (idle / walk / run / bite); it passed the same
+leg-separation posed gate at the owner's bar before cataloguing,
+and a Godot load test instantiates it with all four clips.
 Lanterns now render the builder's Tier-1 lantern prop; the actual
 light still comes from an `OmniLight3D` per lantern, with a small
 emissive marker at the flame point (the prop is untextured

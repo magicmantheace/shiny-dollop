@@ -53,10 +53,13 @@ sickness, crafted masks, a herbalist, fungal oil, and oil-burning
 tier-2 lanterns; S4 added the Godot 4 frontend over the sim core.
 On 2026-11-11 the frontend's delver visual became the builder's
 dedicated delver asset (arm-separation-gated build), with the
-builder's lantern and cot props swapped in as well — verified
-headless for load and logic; the rendered appearance is still
-unverified, pending an on-PC visual pass. No frame or performance
-claims exist — nothing has run on owner hardware.
+builder's lantern and cot props swapped in as well. The
+gloam-lurker critter asset followed on 2026-11-12, and the
+gloam-rat on 2026-11-13 — critter rendering is kind-aware since
+then. An on-PC pass on 2026-11-12 ran the frontend windowed on
+the owner's PC (`UNDERREACH_VERIFY_PASS`, zero script errors;
+see `docs/TEST_PLAN.md`). No frame or performance claims exist —
+no frame-time measurement has been taken on owner hardware.
 
 ## Layout
 

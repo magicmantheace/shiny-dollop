@@ -33,7 +33,7 @@ terrain is dressing and kit pieces per band.
 
 | Asset | Spec | Status |
 |---|---|---|
-| Gloam rat | Rigged quadruped, small; idle/walk/run + bite lunge | ⬜ (sim kind exists) |
+| Gloam rat | Rigged quadruped, small; idle/walk/run + bite lunge | ✅ catalogued 2026-11-13 as gloam-rat (clips idle/walk/run/bite — bite is a new builder signature; leg-separation gates passed) and in frontend use — critter rendering is kind-aware since 2026-11-13 |
 | Deep lurker | Rigged quadruped, large; idle/walk/run + lunge | ✅ catalogued 2026-11-12 as gloam-lurker (clips idle/walk/run/shiver; leg-separation gates passed) and in frontend use — ember-dragon stand-in retired |
 | Shallows starter creature | Small cave beast, quadruped | ⬜ design TBD |
 | Fungal ambusher | Spore-hulk quadruped; burst-from-ground signature | ⬜ design TBD |

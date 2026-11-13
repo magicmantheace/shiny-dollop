@@ -13,9 +13,13 @@ extends Node3D
 ## replaced the snow-goblin stand-in on 2026-11-11; the dedicated
 ## gloam-lurker critter asset replaced the ember-dragon stand-in on
 ## 2026-11-12 (CRITTER_SCENE below; the dragon file is kept, unused).
+## Critter models are kind-aware since 2026-11-13: GloamRat critters
+## render with the dedicated gloam-rat asset (RAT_SCENE, smaller
+## target height); DeepLurker keeps CRITTER_SCENE.
 
 const DELVER_SCENE := "res://assets/delver.glb"
 const CRITTER_SCENE := "res://assets/gloam-lurker.glb"
+const RAT_SCENE := "res://assets/gloam-rat.glb"
 const CHEST_SCENE := "res://assets/treasure-chest.glb"
 const SHROOM_SCENE := "res://assets/mushroom-cluster.glb"
 const LANTERN_SCENE := "res://assets/lantern.glb"
@@ -431,7 +435,11 @@ func sync_entities() -> void:
 		var id := int(c["id"])
 		seen_c[id] = true
 		if not critter_nodes.has(id):
-			var node := instantiate_scaled(CRITTER_SCENE, 1.05)
+			var node: Node3D
+			if String(c.get("kind", "")) == "GloamRat":
+				node = instantiate_scaled(RAT_SCENE, 0.5)
+			else:
+				node = instantiate_scaled(CRITTER_SCENE, 1.05)
 			tint_dark(node)
 			add_child(node)
 			node.position = cell_to_world(c["pos"])
