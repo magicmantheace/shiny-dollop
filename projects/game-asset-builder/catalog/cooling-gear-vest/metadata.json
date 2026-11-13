@@ -1,0 +1,67 @@
+{
+ "entry_version": 1,
+ "name": "Cooling Gear Vest",
+ "slug": "cooling-gear-vest",
+ "source_concept": "media-generation-underreach-cooling-gear-vest-r-0-f0e8083c-8b68-4b40-bb89-f7f965258ed6.webp",
+ "asset_file": "cooling-gear-vest.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "a08014fa778d110a7f0bd3d01c24862f966198521aea7ed0ace7c6bcad49f34d",
+ "bytes": 12473288,
+ "counts": {
+  "verts": 29988,
+  "faces": 59982,
+  "raw_mesh_verts": 1341866,
+  "raw_mesh_faces": 1743206
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "runner": {
+    "name": "cooling-gear-vest_shape",
+    "exit_code": 0,
+    "seconds": 523.24,
+    "baseline_vram_mib": 2558,
+    "peak_vram_mib": 9028,
+    "peak_delta_mib": 6470,
+    "vram_after_exit_mib": 2585,
+    "n_samples": 1120,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"cooling-gear-vest_shape\", \"exit_code\": 0, \"seconds\": 523.24, \"baseline_vram_mib\": 2558, \"peak_vram_mib\": 9028, \"peak_delta_mib\": 6470, \"vram_after_exit_mib\": 2585, \"n_samples\": 1120}\r\n"
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 871537,
+    "faces": 1743218,
+    "load_s": 110.56,
+    "inference_s": 368.19,
+    "total_s": 479.05,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\cooling-gear-vest\\shape.glb"
+   }
+  },
+  "texture_stage": {
+   "stage": "texture",
+   "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+   "verts": 1341866,
+   "faces": 1743218,
+   "load_s": 105.37,
+   "texture_s": 5415.29,
+   "total_s": 5521.76,
+   "torch_peak_mib": 9929.6,
+   "job_state": "done",
+   "adopted_from_lab": true,
+   "note": "bridge job cap expired during fetch; stage completed on PC, result adopted from lab and hash-verified (textured.glb sha256 14f8b0327ce4767d0ed2eca1f2b2cd4f8343d71d31871d91822beec15cfe9b46, 53751488 bytes); bridge seconds 5547.5; longest texture bake of the queue so far (5415.29 s on 1743218 faces; coolant-tube geometry); aliveness CPU-verified mid-bake"
+  }
+ }
+}
