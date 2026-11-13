@@ -1,0 +1,67 @@
+{
+ "entry_version": 1,
+ "name": "Quiet Gear Boot Wraps",
+ "slug": "quiet-gear-boot-wraps",
+ "source_concept": "media-generation-underreach-quiet-gear-boot-wra-0-cc6d2bc0-55b6-406e-bee8-90fb32f53bcd.webp",
+ "asset_file": "quiet-gear-boot-wraps.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "34b0a84e1d5249a1f5cc2e9039b3d8ba3c58d092cf5bff2cbe9df85fe182a638",
+ "bytes": 13151632,
+ "counts": {
+  "verts": 29998,
+  "faces": 59771,
+  "raw_mesh_verts": 1419308,
+  "raw_mesh_faces": 1858470
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "runner": {
+    "name": "quiet-gear-boot-wraps_shape",
+    "exit_code": 0,
+    "seconds": 511.27,
+    "baseline_vram_mib": 2598,
+    "peak_vram_mib": 9053,
+    "peak_delta_mib": 6455,
+    "vram_after_exit_mib": 2610,
+    "n_samples": 1095,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"quiet-gear-boot-wraps_shape\", \"exit_code\": 0, \"seconds\": 511.27, \"baseline_vram_mib\": 2598, \"peak_vram_mib\": 9053, \"peak_delta_mib\": 6455, \"vram_after_exit_mib\": 2610, \"n_samples\": 1095}\r\n"
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 929209,
+    "faces": 1858474,
+    "load_s": 118.46,
+    "inference_s": 367.59,
+    "total_s": 486.32,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\quiet-gear-boot-wraps\\shape.glb"
+   }
+  },
+  "texture_stage": {
+   "stage": "texture",
+   "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+   "verts": 1419308,
+   "faces": 1858474,
+   "load_s": 105.65,
+   "texture_s": 1956.58,
+   "total_s": 2063.61,
+   "torch_peak_mib": 9933.7,
+   "job_state": "done",
+   "adopted_from_lab": true,
+   "note": "bridge job cap expired during fetch; stage completed on PC, result adopted from lab and hash-verified (textured.glb sha256 14928d5f6cf49a7e62a6aa0a9e7d1eab5313a7b6b922261a31f6b38bd8512fbe, 57384580 bytes); bridge seconds 2089.4"
+  }
+ }
+}
