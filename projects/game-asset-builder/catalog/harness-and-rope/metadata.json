@@ -1,0 +1,67 @@
+{
+ "entry_version": 1,
+ "name": "Harness And Rope",
+ "slug": "harness-and-rope",
+ "source_concept": "media-generation-underreach-harness-rope-refere-0-4dee0999-d540-4203-a13d-35be1e9e5d66.webp",
+ "asset_file": "harness-and-rope.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "c88cebdfeaf3a16f79576e9ab43796886a19de5eb0e98352ca3f446722c20a31",
+ "bytes": 11923212,
+ "counts": {
+  "verts": 29943,
+  "faces": 59255,
+  "raw_mesh_verts": 883340,
+  "raw_mesh_faces": 1148068
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "runner": {
+    "name": "harness-and-rope_shape",
+    "exit_code": 0,
+    "seconds": 512.09,
+    "baseline_vram_mib": 2490,
+    "peak_vram_mib": 9160,
+    "peak_delta_mib": 6670,
+    "vram_after_exit_mib": 2717,
+    "n_samples": 1094,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"harness-and-rope_shape\", \"exit_code\": 0, \"seconds\": 512.09, \"baseline_vram_mib\": 2490, \"peak_vram_mib\": 9160, \"peak_delta_mib\": 6670, \"vram_after_exit_mib\": 2717, \"n_samples\": 1094}\r\n"
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 573964,
+    "faces": 1148074,
+    "load_s": 114.47,
+    "inference_s": 371.52,
+    "total_s": 486.13,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\harness-and-rope\\shape.glb"
+   }
+  },
+  "texture_stage": {
+   "stage": "texture",
+   "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+   "verts": 883340,
+   "faces": 1148074,
+   "load_s": 105.91,
+   "texture_s": 5263.97,
+   "total_s": 5370.89,
+   "torch_peak_mib": 9907.3,
+   "job_state": "done",
+   "adopted_from_lab": true,
+   "note": "bridge job cap expired during fetch; stage completed on PC, result adopted from lab and hash-verified (textured.glb sha256 35163fa3577ee78ecbcee164dcb9d8b3072e4fae9ff660ea53dad538f82ca364, 36968016 bytes); bridge seconds 5397.53; longest texture bake of the queue so far (5263.97 s on 1148074 faces)"
+  }
+ }
+}
