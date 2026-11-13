@@ -21,7 +21,7 @@ terrain is dressing and kit pieces per band.
 | Delver (base colonist) | Rigged biped; idle/walk/run + mine swing, carry walk, tend, eat, sleep (lying), downed (lying), rescue-carry | ✅ catalogued 2026-11-11 (arm-separation-gated A-pose rebuild; clips idle/walk/run/bounce) and in frontend use — snow-goblin stand-in retired |
 | The Frontier Bearer (player) | Rigged biped with the great lantern; idle/walk/run + plant-light, carve swing | ✅ catalogued 2026-11-13 as frontier-bearer (clips idle/walk/run/plant/swing; arm-separation gates passed) — not yet in frontend use: no player-avatar slot exists (co-op tint variants still ⬜) |
 | Miner kit — pickaxe + helmet lamp | Hand/back props, attachable | ✅ catalogued 2026-11-13 (`miner-pickaxe` aaba8c8e…, `miner-helmet-lamp` 389dded4…; unrigged props, no frontend equipment slot yet) |
-| Hauler kit — carry sack / ore basket | Back prop | ⬜ |
+| Hauler kit — carry sack / ore basket | Back prop | ✅ catalogued 2026-11-13 (`hauler-ore-basket` 076c73f4…; built as the ore-basket form, unrigged prop, no frontend equipment slot yet) |
 | Farmer kit — sickle + pouch | Hand/belt props | ⬜ |
 | Herbalist kit — herb bundle + satchel | Hand/shoulder props | ⬜ |
 | Spore mask | Worn face prop (equipped visual for the S5 gate) | ⬜ |
