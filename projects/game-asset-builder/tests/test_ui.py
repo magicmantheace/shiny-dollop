@@ -105,7 +105,9 @@ class CatalogDataTests(unittest.TestCase):
                                           "frontier-bearer",
                                           "miner-pickaxe",
                                           "miner-helmet-lamp",
-                                          "hauler-ore-basket"})
+                                          "hauler-ore-basket",
+                                          "farmer-sickle",
+                                          "farmer-pouch"})
         self.assertEqual(summaries["ember-dragon"]["bone_count"], 14)
         self.assertEqual(summaries["moth-hart"]["bone_count"], 21)
         self.assertEqual(summaries["toasty"]["bone_count"], 11)
