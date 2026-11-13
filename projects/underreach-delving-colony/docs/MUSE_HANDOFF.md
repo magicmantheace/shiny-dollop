@@ -169,10 +169,17 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   is now kind-aware: GloamRat critters render with the dedicated
   rat asset at a smaller target height, DeepLurker unchanged.
   Headless verify passes identically; a Godot load test
-  instantiates the rat with all four clips. Still unverified:
-  a rat sighted in frame on the owner's PC, name-label
-  legibility, and layer switching on PC. Provenance in
-  `frontend/README.md`, numbers in `docs/TEST_PLAN.md`.
+  instantiates the rat with all four clips. On-PC pass the
+  same day: Windows verify PASS with identical numbers and
+  the game ran windowed and live (colony rendering correctly;
+  a deep lurker's spawn-and-burn was recorded in the ledger
+  during the session). Still unverified: a critter sighted in
+  frame, name-label legibility at gameplay zoom, and layer
+  switching on PC — all three need HUD interaction, and
+  bridge input clicks do not reach Godot's HUD buttons on
+  the owner's 4K / 250%-scaled desktop (documented in
+  `docs/TEST_PLAN.md`). Provenance in `frontend/README.md`,
+  numbers in `docs/TEST_PLAN.md`.
 - **CONFLICT RECORDED 2026-11-12, RESOLVED 2026-11-12 (rule 3):**
   the capture redo reported the 3D viewport pitch black in every
   frame despite a live sim. A same-day diagnosis pass on the

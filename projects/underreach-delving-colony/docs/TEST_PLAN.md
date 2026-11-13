@@ -306,6 +306,28 @@ A scripted Shallows colony: camp chamber, shaft, tunnel, ore face.
   goods=20 delvers=5 floor_instances=15 tick=4000`.
 - Sim untouched: `cargo test` 25/25 and the `scenario` binary
   run repeated after the swap, clean to tick 6000.
-- **Not verified:** a gloam rat sighted in frame on the owner's
-  PC, and name-label legibility / layer switching on PC — the
-  outstanding on-PC visual pass items.
+- **On-PC pass (2026-11-13, staging
+  `D:\bridge-work\underreach-visual\` updated with the new
+  frontend; staged rat GLB hash = catalog sha):** Windows
+  headless import + verify prints the identical
+  `UNDERREACH_VERIFY_PASS goods=20 delvers=5 floor_instances=15
+  tick=4000`. The game then ran windowed and live on the
+  owner's PC (RTX 3060): the colony renders correctly (entry
+  camp, cots, stockpile chest, lantern light, delvers, HUD,
+  ledger), ticking in real time with the colony growing from
+  3 to 5 delvers; critters PROVEN to spawn in this build — the
+  ledger recorded "[2118] a deep lurker burned away in the
+  light" during the session.
+- **Not verified:** a critter sighted in frame, name-label
+  legibility at gameplay zoom, and layer switching on PC.
+  Critters render only on their current layer, labels are too
+  small to judge at the default camera distance, and both
+  checks need HUD interaction: bridge `/v1/input` clicks do
+  not reach Godot's HUD buttons on this 4K / 250%-scaled
+  desktop (logical, physical, and grid click attempts all
+  failed to toggle Pause; root cause unresolved — likely a
+  DPI-virtualization mismatch between the session helper's
+  SendInput space and Godot's DWM-virtualized window), and
+  camera zoom is mouse-wheel-only (the input API has no wheel
+  action). The live view JSON (`user://out.json`) was read
+  throughout the session and matched the HUD.
