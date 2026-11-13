@@ -1026,3 +1026,28 @@ in 615 s on the first post-reboot dispatch):
     Failed build preserved in outputs/mandrake-toddler/
     before-hires-fix/; iteration record (15-hires → 18-fill)
     in the builder goal's hidden_files/mandrake-zoneban/.
+  - Ember Owl-Cat arm-gate rebuild (2026-11-13): raised-wing
+    concept preflight PASS 0.4579 (down-wing plan capped at
+    0.3799). Texture recovered from the lab after a detached
+    stage (exit 0, 2,381 s; sha-verified 246e0672…). Rig:
+    P3-SAM 3 parts, heat rejected (torso wing/arm share
+    0.7787); distance fallback failed the posed gate
+    (headturn slice bands, smeared heart). Post-rig repairs:
+    ground-disc island deleted (5,528 verts); smooth
+    geodesic-attenuated analytic weight rebuild above
+    z=0.40H (neck wing/arm share 0.82 → 0.33, head dominance
+    0.44 → 0.83); head-weight ramp below the neck. Two
+    hard-zone variants were tried first and FAILED the gate
+    (field discontinuities tear under yaw) — the smooth
+    field is the verified route. **Posed gate PASS at the
+    owner's bar: 15 renders inspected (rest f/s/b/top,
+    headturn f19/f38/f58 + top, idle, walk f/s, run,
+    stress) — shipped clips clean, wings separated with
+    daylight, no disc; wing-membrane stretch only in the
+    beyond-spec 2.2 rad stress fold. Catalogued sha
+    4a2cf2d7…, catalog-verify MATCH; suite 144/144.**
+    Cold re-import verify: 14 bones, 14 groups, coverage
+    1.0, ground z 0.0 at rest and at the headturn apex.
+    Fallback build in outputs/ember-owl-cat/
+    fallback-pipeline-rig/. Not verified: Godot playback
+    (unchanged).

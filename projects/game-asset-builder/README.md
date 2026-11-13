@@ -387,3 +387,27 @@ deployed to the campfire wallpaper the same day** (both PC
 copies hash-verified, Lively re-applied). Suite 144/144
 (9 new zone-ban tests). The failed rig's artifacts are kept in
 `outputs/snow-goblin/before-zoneban/`.
+
+### Ember Owl-Cat — raised-wing redesign: SHIPPED (2026-11-13)
+
+The down-wing bodyplan could not pass the concept gate (best
+0.3799 of nine vs the 0.4 bar), so the redesign raises the wings
+into a V beside the head — preflight PASS 0.4579. The pipeline's
+own rig failed the posed gate (heat rejected at torso wing/arm
+share 0.7787; the distance fallback tore the neck/chest in the
+headturn and smeared the heart emblem), and a ground-disc island
+from the mesh stage was hiding under the feet. Post-rig repairs
+on the recovered, hash-verified texture (paint exit 0, 2,381 s):
+disc island deleted (5,528 verts); a smooth analytic weight
+rebuild above z=0.40H (inverse bone-segment distance, appendage
+bones attenuated by geodesic distance from the appendage core —
+neck wing/arm share 0.82 → 0.33, head dominance 0.44 → 0.83);
+head weight ramped to zero below the neck. Two hard-zone repair
+variants failed the gate first — on a compact body, any
+discontinuity in the weight field is a tear line under rotation;
+the smooth field is what passed. **Posed gate PASS at the owner's
+bar (15 renders inspected; shipped clips clean; wing-membrane
+stretch only in the beyond-spec 2.2 rad stress fold).
+Catalogued: sha 4a2cf2d7…, catalog-verify MATCH; suite 144/144.**
+With this, all six audited wallpaper creatures pass the
+arm-separation gate. Full record: `docs/MUSE_HANDOFF.md`.

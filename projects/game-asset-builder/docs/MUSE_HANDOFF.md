@@ -1065,3 +1065,47 @@ Catalogue on this branch only — no wallpaper deployment in this run.
   outputs/mandrake-toddler/before-hires-fix/; working
   record in the builder goal's hidden_files/mandrake-zoneban/
   (folders 15-hires, 16-snap, 17-armsnap, 18-fill).
+
+- **Ember Owl-Cat arm-gate fix COMPLETE 2026-11-13**
+  (catalog sha 4a2cf2d7…, catalog-verify MATCH, suite
+  144/144). The down-wing bodyplan was a dead end at the
+  concept gate (best daylight 0.3799 over 9 attempts vs the
+  0.4 bar), so the redesign raised the wings into a V beside
+  the head: concept preflight PASS 0.4579. Shape was genuine
+  (sha cdcc13d5…); the first texture dispatch produced a
+  Frankenstein (the pipeline catalogued the PREVIOUS build's
+  textured.glb — the stale-fetch trap; rejected with renders
+  + hashes, record in the builder goal's hidden_files/
+  owlcat-raised5-recovery-state.md). Paint re-ran on the
+  raised shape (exit 0, 2,381 s; bridge job hit its tracking
+  cap and the result was recovered from the lab,
+  hash-verified 246e0672…). P3-SAM returned only 3 leg-
+  dominated parts, heat was rejected (torso wing/arm share
+  0.7787), and the distance fallback failed the posed gate:
+  headturn tore the neck/chest into slice bands and smeared
+  the heart emblem. Three repair rounds on the rig, each
+  judged by the 15-render gate: (1) hard zone forcing +
+  exemption islands — FAILED, the discontinuities themselves
+  tore (head sheared into strips); (2) pure-head head zone —
+  worse (cheek verts exempted to wing bones split the face);
+  (3) WINNING route — one smooth field: above z=0.40H the
+  weights are inverse bone-segment distance with appendage
+  bones attenuated by GEODESIC distance from the appendage
+  core (neck wing/arm share 0.82 → 0.33, head dominance
+  0.44 → 0.83), plus a smooth head-weight ramp to zero
+  below the neck that removed a residual chest spike.
+  Also deleted a ground-disc island the mesh stage had
+  generated under the feet (5,528 verts, one loose
+  component). Final gate PASS at the owner's bar: rest/
+  idle/walk/run/headturn (apex frames f19/f38/f58 + top)
+  inspected — head turns level and whole, heart crisp,
+  wings raised with daylight along their length, no disc;
+  the only artifact is wing-membrane stretch in the
+  beyond-spec 2.2 rad stress fold. Lessons: on compact
+  bodies, weight-field SMOOTHNESS beats zone correctness —
+  any hard boundary in the field is a tear line under
+  rotation; and a mesh-stage ground disc can hide inside a
+  rigged GLB (check the component list / lowest verts).
+  Fallback build preserved in outputs/ember-owl-cat/
+  fallback-pipeline-rig/; fix scripts in the coordinator's
+  scratch (fix_owlcat_weights6.py, delete_disc.py).
