@@ -1,0 +1,27 @@
+{
+ "assets_sha256": "5aafb1b82d928e7228d205225fb17a251e43086b41d6a1df1cf427cc566000d0",
+ "deb_bytes": 67863124,
+ "deb_packages": 54,
+ "glibc": "baseline project glibc (distribution libc pruned)",
+ "marker": "SYNVEIL_DISTRO_GRAPHICS_STAGED_NOT_BOOTED",
+ "mesa_version": "25.0.7-2+deb13u1",
+ "payload_bytes": 220473743,
+ "payload_files": 97,
+ "payload_files_copied": 97,
+ "required_present": [
+  "egl_mesa",
+  "glx_mesa",
+  "lavapipe_icd",
+  "lavapipe_icd_json",
+  "swrast_gallium",
+  "vulkan_loader"
+ ],
+ "schema": "synveil.distro-graphics-stage/v1",
+ "scope": "software rendering only (llvmpipe/lavapipe); hardware Vulkan ICDs pruned; gallium sealed whole (Mesa 25 unified libgallium) with only the swrast/kms_swrast entry points; Direct3D itself (DXVK/vkd3d) not included \u2014 this payload is its prerequisite (ADR 0027)",
+ "snapshot": "20261024T000000Z",
+ "software_drivers": {
+  "opengl": "llvmpipe (swrast gallium driver, Mesa)",
+  "vulkan": "lavapipe (libvulkan_lvp.so, Mesa)"
+ },
+ "target": "x86_64-synveil-linux-gnu"
+}

@@ -1,0 +1,499 @@
+{
+ "build": {
+  "browser_stage_validation_sha256": "0ea7e7f5830c117534f17f87046aca218b42eb3989da65d72ecd943b4d8817ec",
+  "browser_test_ca_sha256": "68eeb3bf063cf6397851d703ae26132c617b5536453a9c13401fa6e7fe4e9d61",
+  "chromium_version": "156.0.8078.47-1~deb13u1",
+  "disk_sha256": "7737d9ad02f2a698e9dcde577d9066a4feb169bb0678b89d12b31a1cd3556a77",
+  "generations": {
+   "1": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+   "2": "08680a3627ea6ceee5a05292e33e6dbdb74ad5cccd497846012256dcc5527b4e",
+   "3": "1de546490899c3512db791d3943e862556c240ed79107aede3037380f4aa57d0"
+  },
+  "source_commit": "11155998322c86749add1fd9ec14683eb9cdc8e8"
+ },
+ "demonstrated": false,
+ "fixture": {
+  "big_size": 469762048,
+  "payload2_sha256": "0ff70fe7d33e993b31093516d24046b4ae9803d1c879c3229a4cc826f6c68bc1",
+  "payload_sha256": "3b7f6569e01e04e5e970cd34dbfe9ac0fb3b107631b4aa51aae1d97430cc4f1d",
+  "payload_size": 262144,
+  "start_url": "https://test.synveil.invalid:8443/"
+ },
+ "gate": {
+  "failures": [
+   "server_log: missing \u2014 no endpoint evidence",
+   "B0: SYNVEIL_NETWORK_READY not seen",
+   "B0: start page never rendered",
+   "B0: server saw no GET / for the first login",
+   "B1: payload bytes on DATA do not match the fixture digest",
+   "B1: in-guest digest of payload does not match the fixture digest",
+   "B1: payload size wrong on DATA",
+   "B1: browser profile missing or download directory not the persistent home",
+   "B1: only 0 sandboxed renderer records (need 1) \u2014 a renderer in the session's own user namespace or without seccomp is NOT a sandbox",
+   "B2: the second payload fetch never happened",
+   "B2: the colliding download was not preserved as 'payload (1).bin' with the fixture digest \u2014 Chromium uniquifies rather than overwriting",
+   "B2: the original payload changed after the collision \u2014 a silent overwrite occurred",
+   "B3: the big payload was never requested",
+   "B3: browser did not survive the failed download",
+   "B4: no refused handshake at the bad endpoint \u2014 the browser may never have attempted it",
+   "B4: good page still shown after bad-TLS navigation",
+   "B4: Back did not restore the good page",
+   "B5: page did not load again after cold reboot",
+   "B5: payload bytes on DATA do not match the fixture digest",
+   "B5: in-guest digest of payload does not match the fixture digest",
+   "B5: payload size wrong on DATA",
+   "B5: browser profile missing or download directory not the persistent home",
+   "B5: files window never listed payload.bin \u2014 graphical file access unproven",
+   "B6: control record does not confirm generation 2",
+   "B6: page loads missing around the update",
+   "B6: payload bytes on DATA do not match the fixture digest",
+   "B6: in-guest digest of payload does not match the fixture digest",
+   "B6: payload size wrong on DATA",
+   "B6: payload2 bytes on DATA do not match the fixture digest",
+   "B6: in-guest digest of payload2 does not match the fixture digest",
+   "B6: payload2 size wrong on DATA",
+   "B6: browser profile missing or download directory not the persistent home",
+   "B6: files window never listed payload2.bin",
+   "B7: page loads missing around the rollback",
+   "B7: payload bytes on DATA do not match the fixture digest",
+   "B7: in-guest digest of payload does not match the fixture digest",
+   "B7: payload size wrong on DATA",
+   "B7: payload2 bytes on DATA do not match the fixture digest",
+   "B7: in-guest digest of payload2 does not match the fixture digest",
+   "B7: payload2 size wrong on DATA",
+   "B7: browser profile missing or download directory not the persistent home",
+   "B7: only 0 sandboxed renderer records (need 3) \u2014 a renderer in the session's own user namespace or without seccomp is NOT a sandbox",
+   "B1: browser session log missing",
+   "B5: browser session log missing",
+   "B6: browser session log missing",
+   "B7: browser session log missing"
+  ],
+  "validated": false
+ },
+ "physical_boot_validated": false,
+ "results": {
+  "B0": {
+   "at": 1794543752.477,
+   "enrolled": true,
+   "network_ready": false,
+   "page_proof": false
+  },
+  "B1": {
+   "artifacts": {
+    "big_partial_size": 0,
+    "big_size": 0,
+    "browser_started_count": 0,
+    "control": {
+     "confirmed": {
+      "bytes": 262194176,
+      "generation_id": "synveil-gen-v1",
+      "min_reader_state_format": 1,
+      "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+      "slot": "A",
+      "state_format": 1,
+      "version": 1
+     },
+     "history": [
+      {
+       "action": "provision",
+       "at": 1794543515,
+       "result": "confirmed",
+       "slot": "A",
+       "version": 1
+      }
+     ],
+     "schema": "synveil.ab-control/v2",
+     "slots": {
+      "A": {
+       "bytes": 262194176,
+       "generation_id": "synveil-gen-v1",
+       "min_reader_state_format": 1,
+       "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+       "slot": "A",
+       "state_format": 1,
+       "version": 1
+      },
+      "B": null
+     },
+     "trial": null
+    },
+    "credential_sha256": "c5835eac139f0460f6ac5da3cfe41ecdedc8ab8c885cd545fd6fa52411da4963",
+    "downloads_listing": [],
+    "files_entry_lines": 0,
+    "files_payload2_scans": 0,
+    "files_payload_scans": 0,
+    "known_file": null,
+    "netlog_attempted_hosts": [],
+    "netlog_dns_hosts": [],
+    "netlog_files": 0,
+    "netlog_sockets": [],
+    "payload1_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload1_size": 0,
+    "payload2_guest_sha256": null,
+    "payload2_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload2_size": 0,
+    "payload_guest_sha256": null,
+    "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload_size": 0,
+    "pref_sha256": null,
+    "pref_text": null,
+    "profile_preferences": "",
+    "sandbox_status": ""
+   },
+   "at": 1794543752.477,
+   "download_started": false
+  },
+  "B2": {
+   "artifacts": {
+    "big_partial_size": 0,
+    "big_size": 0,
+    "browser_started_count": 0,
+    "control": {
+     "confirmed": {
+      "bytes": 262194176,
+      "generation_id": "synveil-gen-v1",
+      "min_reader_state_format": 1,
+      "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+      "slot": "A",
+      "state_format": 1,
+      "version": 1
+     },
+     "history": [
+      {
+       "action": "provision",
+       "at": 1794543515,
+       "result": "confirmed",
+       "slot": "A",
+       "version": 1
+      }
+     ],
+     "schema": "synveil.ab-control/v2",
+     "slots": {
+      "A": {
+       "bytes": 262194176,
+       "generation_id": "synveil-gen-v1",
+       "min_reader_state_format": 1,
+       "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+       "slot": "A",
+       "state_format": 1,
+       "version": 1
+      },
+      "B": null
+     },
+     "trial": null
+    },
+    "credential_sha256": "c5835eac139f0460f6ac5da3cfe41ecdedc8ab8c885cd545fd6fa52411da4963",
+    "downloads_listing": [],
+    "files_entry_lines": 0,
+    "files_payload2_scans": 0,
+    "files_payload_scans": 0,
+    "known_file": null,
+    "netlog_attempted_hosts": [],
+    "netlog_dns_hosts": [],
+    "netlog_files": 0,
+    "netlog_sockets": [],
+    "payload1_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload1_size": 0,
+    "payload2_guest_sha256": null,
+    "payload2_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload2_size": 0,
+    "payload_guest_sha256": null,
+    "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload_size": 0,
+    "pref_sha256": null,
+    "pref_text": null,
+    "profile_preferences": "",
+    "sandbox_status": ""
+   },
+   "at": 1794543752.477,
+   "payload_sha256_after": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "second_download": false
+  },
+  "B3": {
+   "artifacts": {
+    "big_partial_size": 0,
+    "big_size": 0,
+    "browser_started_count": 0,
+    "control": {
+     "confirmed": {
+      "bytes": 262194176,
+      "generation_id": "synveil-gen-v1",
+      "min_reader_state_format": 1,
+      "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+      "slot": "A",
+      "state_format": 1,
+      "version": 1
+     },
+     "history": [
+      {
+       "action": "provision",
+       "at": 1794543515,
+       "result": "confirmed",
+       "slot": "A",
+       "version": 1
+      }
+     ],
+     "schema": "synveil.ab-control/v2",
+     "slots": {
+      "A": {
+       "bytes": 262194176,
+       "generation_id": "synveil-gen-v1",
+       "min_reader_state_format": 1,
+       "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+       "slot": "A",
+       "state_format": 1,
+       "version": 1
+      },
+      "B": null
+     },
+     "trial": null
+    },
+    "credential_sha256": "c5835eac139f0460f6ac5da3cfe41ecdedc8ab8c885cd545fd6fa52411da4963",
+    "downloads_listing": [],
+    "files_entry_lines": 0,
+    "files_payload2_scans": 0,
+    "files_payload_scans": 0,
+    "known_file": null,
+    "netlog_attempted_hosts": [],
+    "netlog_dns_hosts": [],
+    "netlog_files": 0,
+    "netlog_sockets": [],
+    "payload1_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload1_size": 0,
+    "payload2_guest_sha256": null,
+    "payload2_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload2_size": 0,
+    "payload_guest_sha256": null,
+    "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload_size": 0,
+    "pref_sha256": null,
+    "pref_text": null,
+    "profile_preferences": "",
+    "sandbox_status": ""
+   },
+   "at": 1794543752.477,
+   "browser_alive_after": false
+  },
+  "B4": {
+   "at": 1794543752.477,
+   "back_restored": false,
+   "page_left": false
+  },
+  "B5": {
+   "artifacts": {
+    "big_partial_size": 0,
+    "big_size": 0,
+    "browser_started_count": 0,
+    "control": {
+     "confirmed": {
+      "bytes": 262194176,
+      "generation_id": "synveil-gen-v1",
+      "min_reader_state_format": 1,
+      "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+      "slot": "A",
+      "state_format": 1,
+      "version": 1
+     },
+     "history": [
+      {
+       "action": "provision",
+       "at": 1794543515,
+       "result": "confirmed",
+       "slot": "A",
+       "version": 1
+      }
+     ],
+     "schema": "synveil.ab-control/v2",
+     "slots": {
+      "A": {
+       "bytes": 262194176,
+       "generation_id": "synveil-gen-v1",
+       "min_reader_state_format": 1,
+       "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+       "slot": "A",
+       "state_format": 1,
+       "version": 1
+      },
+      "B": null
+     },
+     "trial": null
+    },
+    "credential_sha256": "c5835eac139f0460f6ac5da3cfe41ecdedc8ab8c885cd545fd6fa52411da4963",
+    "downloads_listing": [],
+    "files_entry_lines": 0,
+    "files_payload2_scans": 0,
+    "files_payload_scans": 0,
+    "known_file": null,
+    "netlog_attempted_hosts": [],
+    "netlog_dns_hosts": [],
+    "netlog_files": 0,
+    "netlog_sockets": [],
+    "payload1_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload1_size": 0,
+    "payload2_guest_sha256": null,
+    "payload2_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload2_size": 0,
+    "payload_guest_sha256": null,
+    "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload_size": 0,
+    "pref_sha256": null,
+    "pref_text": null,
+    "profile_preferences": "",
+    "sandbox_status": ""
+   },
+   "at": 1794543752.477,
+   "network_ready_again": false,
+   "page_proof": false
+  },
+  "B6": {
+   "artifacts": {
+    "big_partial_size": 0,
+    "big_size": 0,
+    "browser_started_count": 0,
+    "control": {
+     "confirmed": {
+      "bytes": 262194176,
+      "generation_id": "synveil-gen-v1",
+      "min_reader_state_format": 1,
+      "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+      "slot": "A",
+      "state_format": 1,
+      "version": 1
+     },
+     "history": [
+      {
+       "action": "provision",
+       "at": 1794543515,
+       "result": "confirmed",
+       "slot": "A",
+       "version": 1
+      }
+     ],
+     "schema": "synveil.ab-control/v2",
+     "slots": {
+      "A": {
+       "bytes": 262194176,
+       "generation_id": "synveil-gen-v1",
+       "min_reader_state_format": 1,
+       "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+       "slot": "A",
+       "state_format": 1,
+       "version": 1
+      },
+      "B": null
+     },
+     "trial": null
+    },
+    "credential_sha256": "c5835eac139f0460f6ac5da3cfe41ecdedc8ab8c885cd545fd6fa52411da4963",
+    "downloads_listing": [],
+    "files_entry_lines": 0,
+    "files_payload2_scans": 0,
+    "files_payload_scans": 0,
+    "known_file": null,
+    "netlog_attempted_hosts": [],
+    "netlog_dns_hosts": [],
+    "netlog_files": 0,
+    "netlog_sockets": [],
+    "payload1_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload1_size": 0,
+    "payload2_guest_sha256": null,
+    "payload2_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload2_size": 0,
+    "payload_guest_sha256": null,
+    "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload_size": 0,
+    "pref_sha256": null,
+    "pref_text": null,
+    "profile_preferences": "",
+    "sandbox_status": ""
+   },
+   "at": 1794544072.389,
+   "download_started": false,
+   "healthy": false,
+   "page_proof": false,
+   "staged": false
+  },
+  "B7": {
+   "artifacts": {
+    "big_partial_size": 0,
+    "big_size": 0,
+    "browser_started_count": 0,
+    "control": {
+     "confirmed": {
+      "bytes": 262194176,
+      "generation_id": "synveil-gen-v1",
+      "min_reader_state_format": 1,
+      "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+      "slot": "A",
+      "state_format": 1,
+      "version": 1
+     },
+     "history": [
+      {
+       "action": "provision",
+       "at": 1794543515,
+       "result": "confirmed",
+       "slot": "A",
+       "version": 1
+      }
+     ],
+     "schema": "synveil.ab-control/v2",
+     "slots": {
+      "A": {
+       "bytes": 262194176,
+       "generation_id": "synveil-gen-v1",
+       "min_reader_state_format": 1,
+       "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+       "slot": "A",
+       "state_format": 1,
+       "version": 1
+      },
+      "B": null
+     },
+     "trial": null
+    },
+    "credential_sha256": "c5835eac139f0460f6ac5da3cfe41ecdedc8ab8c885cd545fd6fa52411da4963",
+    "downloads_listing": [],
+    "files_entry_lines": 0,
+    "files_payload2_scans": 0,
+    "files_payload_scans": 0,
+    "known_file": null,
+    "netlog_attempted_hosts": [],
+    "netlog_dns_hosts": [],
+    "netlog_files": 0,
+    "netlog_sockets": [],
+    "payload1_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload1_size": 0,
+    "payload2_guest_sha256": null,
+    "payload2_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload2_size": 0,
+    "payload_guest_sha256": null,
+    "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload_size": 0,
+    "pref_sha256": null,
+    "pref_text": null,
+    "profile_preferences": "",
+    "sandbox_status": ""
+   },
+   "at": 1794544406.96,
+   "healthy": false,
+   "page_proof": false,
+   "rollback_armed": false
+  },
+  "build": {
+   "browser_test_ca_sha256": "68eeb3bf063cf6397851d703ae26132c617b5536453a9c13401fa6e7fe4e9d61"
+  },
+  "server_log": [],
+  "tls": {
+   "ca_sha256": "68eeb3bf063cf6397851d703ae26132c617b5536453a9c13401fa6e7fe4e9d61"
+  }
+ },
+ "schema": "synveil.browser-qemu-proof/v1",
+ "tls_fixture": {
+  "bad_port": 8444,
+  "ca_sha256": "68eeb3bf063cf6397851d703ae26132c617b5536453a9c13401fa6e7fe4e9d61",
+  "good_port": 8443,
+  "host_ip": "10.0.2.2",
+  "host_name": "test.synveil.invalid"
+ }
+}

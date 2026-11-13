@@ -1,0 +1,681 @@
+{
+ "build": {
+  "browser_stage_validation_sha256": "0ea7e7f5830c117534f17f87046aca218b42eb3989da65d72ecd943b4d8817ec",
+  "browser_test_ca_sha256": "68eeb3bf063cf6397851d703ae26132c617b5536453a9c13401fa6e7fe4e9d61",
+  "chromium_version": "156.0.8078.47-1~deb13u1",
+  "disk_sha256": "7737d9ad02f2a698e9dcde577d9066a4feb169bb0678b89d12b31a1cd3556a77",
+  "generations": {
+   "1": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+   "2": "08680a3627ea6ceee5a05292e33e6dbdb74ad5cccd497846012256dcc5527b4e",
+   "3": "1de546490899c3512db791d3943e862556c240ed79107aede3037380f4aa57d0"
+  },
+  "source_commit": "11155998322c86749add1fd9ec14683eb9cdc8e8"
+ },
+ "demonstrated": false,
+ "fixture": {
+  "big_size": 469762048,
+  "payload2_sha256": "0ff70fe7d33e993b31093516d24046b4ae9803d1c879c3229a4cc826f6c68bc1",
+  "payload_sha256": "3b7f6569e01e04e5e970cd34dbfe9ac0fb3b107631b4aa51aae1d97430cc4f1d",
+  "payload_size": 262144,
+  "start_url": "https://test.synveil.invalid:8443/"
+ },
+ "gate": {
+  "failures": [
+   "server_log: missing \u2014 no endpoint evidence",
+   "B0: start page never rendered",
+   "B0: server saw no GET / for the first login",
+   "B1: payload bytes on DATA do not match the fixture digest",
+   "B1: in-guest digest of payload does not match the fixture digest",
+   "B1: payload size wrong on DATA",
+   "B2: the second payload fetch never happened",
+   "B2: the colliding download was not preserved as 'payload (1).bin' with the fixture digest \u2014 Chromium uniquifies rather than overwriting",
+   "B2: the original payload changed after the collision \u2014 a silent overwrite occurred",
+   "B3: the big payload was never requested",
+   "B3: browser did not survive the failed download",
+   "B4: no refused handshake at the bad endpoint \u2014 the browser may never have attempted it",
+   "B4: good page still shown after bad-TLS navigation",
+   "B4: Back did not restore the good page",
+   "B5: page did not load again after cold reboot",
+   "B5: payload bytes on DATA do not match the fixture digest",
+   "B5: in-guest digest of payload does not match the fixture digest",
+   "B5: payload size wrong on DATA",
+   "B5: files window never listed payload.bin \u2014 graphical file access unproven",
+   "B6: control record does not confirm generation 2",
+   "B6: page loads missing around the update",
+   "B6: payload bytes on DATA do not match the fixture digest",
+   "B6: in-guest digest of payload does not match the fixture digest",
+   "B6: payload size wrong on DATA",
+   "B6: payload2 bytes on DATA do not match the fixture digest",
+   "B6: in-guest digest of payload2 does not match the fixture digest",
+   "B6: payload2 size wrong on DATA",
+   "B6: files window never listed payload2.bin",
+   "B7: page loads missing around the rollback",
+   "B7: payload bytes on DATA do not match the fixture digest",
+   "B7: in-guest digest of payload does not match the fixture digest",
+   "B7: payload size wrong on DATA",
+   "B7: payload2 bytes on DATA do not match the fixture digest",
+   "B7: in-guest digest of payload2 does not match the fixture digest",
+   "B7: payload2 size wrong on DATA",
+   "B7: only 1 sandboxed renderer records (need 3) \u2014 a renderer in the session's own user namespace or without seccomp is NOT a sandbox"
+  ],
+  "validated": false
+ },
+ "physical_boot_validated": false,
+ "results": {
+  "B0": {
+   "at": 1794542055.263,
+   "enrolled": true,
+   "network_ready": true,
+   "page_proof": false
+  },
+  "B1": {
+   "artifacts": {
+    "big_partial_size": 0,
+    "big_size": 0,
+    "browser_started_count": 1,
+    "control": {
+     "confirmed": {
+      "bytes": 262194176,
+      "generation_id": "synveil-gen-v1",
+      "min_reader_state_format": 1,
+      "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+      "slot": "A",
+      "state_format": 1,
+      "version": 1
+     },
+     "history": [
+      {
+       "action": "provision",
+       "at": 1794541709,
+       "result": "confirmed",
+       "slot": "A",
+       "version": 1
+      }
+     ],
+     "schema": "synveil.ab-control/v2",
+     "slots": {
+      "A": {
+       "bytes": 262194176,
+       "generation_id": "synveil-gen-v1",
+       "min_reader_state_format": 1,
+       "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+       "slot": "A",
+       "state_format": 1,
+       "version": 1
+      },
+      "B": null
+     },
+     "trial": null
+    },
+    "credential_sha256": "e51837e67db65de6844d226be9c6bff32cdc5004e2bfef8c8a2ce36319143108",
+    "downloads_listing": [],
+    "files_entry_lines": 6,
+    "files_payload2_scans": 0,
+    "files_payload_scans": 0,
+    "known_file": null,
+    "netlog_attempted_hosts": [
+     "accounts.google.com",
+     "optimizationguide-pa.googleapis.com",
+     "update.googleapis.com"
+    ],
+    "netlog_dns_hosts": [
+     "accounts.google.com",
+     "optimizationguide-pa.googleapis.com",
+     "update.googleapis.com"
+    ],
+    "netlog_files": 1,
+    "netlog_sockets": [
+     "10.0.2.3:53",
+     "[2001:4860:4860::8888]:443",
+     "[fec0::5054:ff:fe12:3456]:33289",
+     "[fec0::5054:ff:fe12:3456]:35081",
+     "[fec0::5054:ff:fe12:3456]:35658",
+     "[fec0::5054:ff:fe12:3456]:37720",
+     "[fec0::5054:ff:fe12:3456]:37733",
+     "[fec0::5054:ff:fe12:3456]:39065",
+     "[fec0::5054:ff:fe12:3456]:40287",
+     "[fec0::5054:ff:fe12:3456]:40413",
+     "[fec0::5054:ff:fe12:3456]:41733",
+     "[fec0::5054:ff:fe12:3456]:41842",
+     "[fec0::5054:ff:fe12:3456]:42114",
+     "[fec0::5054:ff:fe12:3456]:42427",
+     "[fec0::5054:ff:fe12:3456]:42500",
+     "[fec0::5054:ff:fe12:3456]:45913",
+     "[fec0::5054:ff:fe12:3456]:50242",
+     "[fec0::5054:ff:fe12:3456]:50548",
+     "[fec0::5054:ff:fe12:3456]:54643",
+     "[fec0::5054:ff:fe12:3456]:54753",
+     "[fec0::5054:ff:fe12:3456]:55812",
+     "[fec0::5054:ff:fe12:3456]:57825",
+     "[fec0::5054:ff:fe12:3456]:60906"
+    ],
+    "payload1_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload1_size": 0,
+    "payload2_guest_sha256": null,
+    "payload2_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload2_size": 0,
+    "payload_guest_sha256": null,
+    "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload_size": 0,
+    "pref_sha256": null,
+    "pref_text": null,
+    "profile_preferences": "{\"accessibility\":{\"captions\":{\"headless_caption_enabled\":false}},\"account_tracker_service_last_update\":\"13439015398073567\",\"apps\":{\"shortcuts_arch\":\"\",\"shortcuts_os_version\":\"\",\"shortcuts_version\":0},\"autocomplete\":{\"retention_policy_last_version\":156},\"autofill\":{\"ai_last_version_deduped\":156,\"autofill_ai\":{\"opt_in_status\":{}},\"last_version_deduped\":156},\"bookmark\":{\"storage_computation_last_update\":\"13439015396779193\"},\"browser\":{\"check_default_browser\":false,\"window_placement\":{\"bottom\":790,\"left\":10,\"maximized\":false,\"right\":1060,\"top\":10,\"work_area_bottom\":800,\"work_area_left\":0,\"work_area_right\":1280,\"work_area_top\":0}},\"commerce_daily_metrics_last_update_time\":\"13439015392857658\",\"default_apps_install_state\":2,\"domain_diversity\":{\"last_reporting_timestamp\":\"13439015392792230\",\"last_reporting_timestamp_v4\":\"13439015392793148\"},\"download\":{\"default_directory\":\"/home/synveil/Downloads\",\"directory_upgrade\":true,\"prompt_for_download\":false},\"dual_layer_user_pref_store\":{\"user_selected_sync_types\":[]},\"enterprise_profile_guid\":\"363079a2-3463-4b43-be72-8130a1021477\",\"extensions\":{\"alerts\":{\"initialized\":true},\"chrome_url_overrides\":{},\"last_chrome_version\":\"156.0.8078.47\",\"settings\":{\"mhjfbmdgcfjbbpaeojofohoefgiehjai\":{\"account_extension_type\":0,\"active_permissions\":{\"api\":[\"contentSettings\",\"fileSystem\",\"fileSystem.write\",\"metricsPrivate\",\"tabs\",\"resourcesPrivate\",\"pdfViewerPrivate\"],\"explicit_host\":[\"chrome://resources/*\",\"chrome://webui-test/*\"],\"manifest_permissions\":[],\"scriptable_host\":[]},\"commands\":{},\"content_settings\":[],\"creation_flags\":1,\"disable_reasons\":[],\"events\":[],\"first_install_time\":\"13439015379881806\",\"from_webstore\":false,\"incognito_content_settings\":[],\"incognito_preferences\":{},\"last_loaded_browser_version\":\"156.0.8078.47\",\"last_update_time\":\"13439015379881806\",\"location\":5,\"manifest\":{\"content_security_policy\":\"script-src 'self' blob: filesystem: chrome://resources chrome://webui-test; object-src * blob: externalfile: file: filesystem: data:\",\"description\":\"\",\"incognito\":\"split\",\"key\":\"MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDN6hM0rsDYGbzQPQfOygqlRtQgKUXMfnSjhIBL7LnReAVBEd7ZmKtyN2qmSasMl4HZpMhVe2rPWVVwBDl6iyNE/Kok6E6v6V3vCLGsOpQAuuNVye/3QxzIldzG/jQAdWZiyXReRVapOhZtLjGfywCvlWq7Sl/e3sbc0vWybSDI2QIDAQAB\",\"manifest_version\":2,\"mime_types\":[\"application/pdf\",\"text/pdf\"],\"mime_types_handler\":\"index.html\",\"name\":\"Chromium PDF Viewer\",\"offline_enabled\":true,\"permissions\":[\"chrome://resources/\",\"chrome://webui-test/\",\"contentSettings\",\"metricsPrivate\",\"pdfViewerPrivate\",\"resourcesPrivate\",\"tabs\",{\"fileSystem\":[\"write\"]}],\"version\":\"1\"},\"path\":\"/usr/lib/chromium/resources/pdf\",\"preferences\":{},\"regular_only_preferences\":{},\"was_installed_by_default\":false,\"was_installed_by_oem\":false}}},\"gaia_cookie\":{\"periodic_report_time_2\":\"13439015376969473\"},\"gcm\":{\"product_category_for_subtypes\":\"org.chromium.linux\"},\"google\":{\"services\":{\"signin_scoped_device_id\":\"f00cca3f-ef8b-49bf-898f-38639b8ba7b5\"}},\"in_product_help\":{\"recent_session_enabled_time\":\"13439015381108170\",\"recent_session_start_times\":[\"13439015381108170\"],\"session_last_active_time\":\"13439015381108170\",\"session_number\":2,\"session_start_time\":\"13439015381108170\"},\"intl\":{\"selected_languages\":\"en-US,en\"},\"media\":{\"engagement\":{\"schema_version\":5}},\"media_router\":{\"receiver_id_hash_token\":\"EypCEMBbTu+uz1XvasY2tZeWWXPbJykrN9amiYItainIUx2hVTKyU168EY2gD/VZN/e8EFO9VmeOAh+KSWxpPg==\"},\"ntp\":{\"num_personal_suggestions\":1},\"optimization_guide\":{\"hintsfetcher\":{\"hosts_successfully_fetched\":{}},\"previously_registered_optimization_types\":{\"ABOUT_THIS_SITE\":true,\"AUTOFILL_ACTOR_IFRAME_ORIGIN_ALLOWLIST\":true,\"DIGITAL_CREDENTIALS_LOW_FRICTION\":true,\"GLIC_ACTION_PAGE_BLOCK\":true,\"HISTORY_CLUSTERS\":true,\"LENS_OVERLAY_EDU_ACTION_CHIP_ALLOWLIST\":true,\"LENS_OVERLAY_EDU_ACTION_CHIP_BLOCKLIST\":true,\"LOADING_PREDICTOR\":true,\"MERCHANT_TRUST_SIGNALS_V2\":true,\"PRICE_TRACKING\":true,\"SAVED_TAB_GROUP\":true,\"V8_COMPILE_HINTS\":true}},\"password_manager\":{\"account_store_backup_password_cleaning_last_timestamp\":\"13439015435291791\",\"account_store_migrated_to_os_crypt_async\":true,\"on_device_encryption_state_passkey_last_reported_bucket\":4,\"on_device_encryption_state_passkey_last_reporting_time\":\"13439015408763157\",\"on_device_encryption_state_password_last_reported_bucket\":4,\"on_device_encryption_state_password_last_reporting_time\":\"13439015408768068\",\"profile_store_backup_password_cleaning_last_timestamp\":\"13439015435263256\",\"profile_store_migrated_to_os_crypt_async\":true},\"privacy_sandbox\":{\"first_party_sets_data_access_allowed_initialized\":true,\"first_party_sets_enabled\":false},\"profile\":{\"avatar_index\":26,\"background_password_check\":{\"check_fri_weight\":9,\"check_interval\":\"864000000000\",\"check_mon_weight\":4,\"check_sat_weight\":4,\"check_sun_weight\":4,\"check_thu_weight\":9,\"check_tue_weight\":9,\"check_wed_weight\":9,\"next_check_time\":\"13439217469065314\"},\"content_settings\":{\"exceptions\":{\"abusive_notification_permissions\":{},\"access_to_get_all_screens_media_in_session\":{},\"anti_abuse\":{},\"app_banner\":{},\"ar\":{},\"are_suspicious_notifications_allowlisted_by_user\":{},\"auto_picture_in_picture\":{},\"auto_select_certificate\":{},\"automatic_downloads\":{},\"automatic_fullscreen\":{},\"autoplay\":{},\"background_sync\":{},\"bluetooth_chooser_data\":{},\"bluetooth_guard\":{},\"bluetooth_scanning\":{},\"camera_pan_tilt_zoom\":{},\"captured_surface_control\":{},\"client_hints\":{},\"clipboard\":{},\"controlled_frame\":{},\"cookie_controls_metadata\":{},\"cookies\":{},\"direct_sockets\":{},\"display_media_system_audio\":{},\"disruptive_notification_permissions\":{},\"durable_storage\":{},\"fedcm_idp_registration\":{},\"fedcm_idp_signin\":{},\"fedcm_share\":{},\"file_system_access_chooser_data\":{},\"file_system_access_extended_permission\":{},\"file_system_access_restore_permission\":{},\"file_system_last_picked_directory\":{},\"file_system_read_guard\":{},\"file_system_write_guard\":{},\"formfill_metadata\":{},\"geolocation\":{},\"geolocation_with_options\":{},\"hand_tracking\":{},\"has_migrated_local_network_access\":true,\"hid_chooser_data\":{},\"hid_guard\":{},\"http_allowed\":{},\"https_enforced\":{},\"idle_detection\":{},\"images\":{},\"important_site_info\":{},\"initialized_translations\":{},\"inline_cue_menu\":{},\"intent_picker_auto_display\":{},\"javascript\":{},\"javascript_jit\":{},\"javascript_optimizer\":{},\"keyboard_lock\":{},\"legacy_cookie_access\":{},\"legacy_cookie_scope\":{},\"local_fonts\":{},\"local_network\":{},\"local_network_access\":{},\"loopback_network\":{},\"media_engagement\":{},\"media_stream_camera\":{},\"media_stream_mic\":{},\"midi_sysex\":{},\"mixed_script\":{},\"nfc_devices\":{},\"notification_interactions\":{},\"notification_permission_review\":{},\"notifications\":{},\"ondevice_languages_downloaded\":{},\"password_protection\":{},\"payment_handler\":{},\"permission_actions_history\":{},\"permission_autoblocking_data\":{},\"permission_autorevocation_data\":{},\"pointer_lock\":{},\"popups\":{},\"protocol_handler\":{},\"reduced_accept_language\":{},\"safe_browsing_url_check_data\":{},\"sensors\":{},\"serial_chooser_data\":{},\"serial_guard\":{},\"site_engagement\":{\"chrome://omnibox-popup.top-chrome/,*\":{\"last_modified\":\"13439015401291463\",\"setting\":{\"lastEngagementTime\":1.3439015401290668e+16,\"lastShortcutLaunchTime\":0.0,\"pointsAddedToday\":4.5,\"rawScore\":4.5}}},\"sound\":{},\"speaker_selection\":{},\"ssl_cert_decisions\":{},\"storage_access\":{},\"sub_apps_without_prompts\":{},\"subresource_filter\":{},\"subresource_filter_data\":{},\"suspicious_notification_ids\":{},\"suspicious_notification_show_original\":{},\"suspicious_site_warning_data\":{},\"top_level_storage_access\":{},\"unused_site_permissions\":{},\"usb_chooser_data\":{},\"usb_guard\":{},\"vr\":{},\"web_app_installation\":{},\"webid_api\":{},\"webid_auto_reauthn\":{},\"window_placement\":{}},\"pref_version\":1},\"creation_time\":\"13439015354086423\",\"default_content_setting_values\":{\"has_migrated_local_network_access\":true},\"exit_type\":\"Crashed\",\"last_engagement_time\":\"13439015401290668\",\"last_time_obsolete_http_credentials_removed\":1794541835.269264,\"last_time_password_store_metrics_reported\":1794541808.661227,\"managed\":{\"locally_parent_approved_extensions\":{},\"locally_parent_approved_extensions_migration_state\":1},\"managed_user_id\":\"\",\"name\":\"Your Chromium\",\"password_hash_data_list\":[],\"were_old_google_logins_removed\":true},\"profile_network_context_service\":{\"http_cache_finch_experiment_groups\":\"None None None None\"},\"protection\":{\"macs\":{\"account_values\":{\"browser\":{\"show_home_button\":\"F6B8688079AA4C4657C3FEDCF3311348C99CB4907EEC8560CC323E4F37D1EA41\",\"show_home_button_encrypted_hash\":\"djEwotRkFT2vHnhhCIA/V+DRZrZjLnP+b+0VwSGjql5xrXDmPtBAfaZbFURGViRnbnec\"},\"extensions\":{\"ui\":{\"developer_mode\":\"C4B515ABCB16541C88B522387A89F47E24F150FF18A7256BF19EE2C0896D7555\",\"developer_mode_encrypted_hash\":\"djEwnGn4HyLm571QCCeecs4XAyIbPpI4sjZ8ckF6sff8BGbQEywtWeDm4qpSwJqGYOvN\"}},\"homepage\":\"0F156BE8FFEDBF22CC2E394D6BD8DDD392F953D0F397958C64EFA57087182457\",\"homepage_encrypted_hash\":\"djEwez6wt5PtkfTxuN+U9KVU6gUa9/33imjLLrtlo3LT0Y1d/stHX2XjJEWHwpeLGZY1\",\"homepage_is_newtabpage\":\"BAF0DE42A6FEAC5EF6500592AEC92B79DC055C1E352B0F7BAC0BB6E72ECE67D3\",\"homepage_is_newtabpage_encrypted_hash\":\"djEwNuiyCSZBdqhV7ESdO8yuXbA1NHRVLQ2svfo+ZK5oaIry2f9Cx4rce+mIbAEw7G0P\",\"session\":{\"restore_on_startup\":\"81940185F7F78D0317AB3741FA4A283985C31DB3BF95D3A4DDD4CD78FC5021F1\",\"restore_on_startup_encrypted_hash\":\"djEwFEzg0id00W34Gz2o0K8gX+KMNet+dXfslTgHKA9xnZMI4OplF+GZvcpGWGX5hEYJ\",\"startup_urls\":\"B41DC391D323AEB2C5465D75AB79284F9F6620BEF161110DE35202261FF03449\",\"startup_urls_encrypted_hash\":\"djEwghL6jSVRi8mLaRGAB/JzS+xXBtxjeESAqUdFS7oORXVQ1jXID0VGOoaLWOgIcbzO\"}},\"browser\":{\"show_home_button\":\"904452986128BBEE5A7B1FFB8F342100C3150E3D9FD76C4105DF33EB021E22FD\",\"show_home_button_encrypted_hash\":\"djEwZQf6ZGWEvWHWC8sI8mCrY+eDy3+KjdSoiNhRlSr4DUlpnk7IhTF6IsAy9eiga5Lg\"},\"default_search_provider_data\":{\"template_url_data\":\"575D258E47F940C6887685ABA99A5839CBFE4BA30863349DFE0D0C375AAB8816\",\"template_url_data_encrypted_hash\":\"djEwzkpvA9+swWTDV77WN7hWEwIE+/MvksCTQp4rKgJsLjCiagQhCIMUK3mxnliviILf\"},\"enterprise_signin\":{\"policy_recovery_token\":\"7D3124ECAF7E96407EB65EAF5A43B02C7EE5F2D4A9FA38A9F371F9E1B74D6383\",\"policy_recovery_token_encrypted_hash\":\"djEwntGC63MNa+3FPXvwkgoSZGXvXYrVoevkgw7qmK06Zwt7RdLbwPV3QCnGv8fsmfLO\"},\"extensions\":{\"install\":{\"initiallist\":\"721565429F6DB8F08CC129E8B4A99021CECE263598EA7CF847C99A2133F23581\",\"initiallist_encrypted_hash\":\"djEwkHeWi9EY4quXPiJOJHKkiaZv/Yduf0mGmHL+hm4bMgHCoBktkuispsBkSEGGppg3\",\"initialprovidername\":\"89DB3C44559AC7E75E930F08876F726C91D84C2D8D4D0A9DB7DA59DB15FA76D1\",\"initialprovidername_encrypted_hash\":\"djEwn2R+8PGjEAKtAZe3ZdaoPoPlRUrGh6V/o9KiENuI/3AtKFJq5/M1WhPIlSo2Q+lT\"},\"settings\":{\"mhjfbmdgcfjbbpaeojofohoefgiehjai\":\"5DD81A833F704CC9CFFD4DB414BD434F0181E04139DFE445999D65FDCFBDBD4C\"},\"settings_encrypted_hash\":{\"mhjfbmdgcfjbbpaeojofohoefgiehjai\":\"djEwuXANFd9Ju69tc+8bQZVJcP3o4ie8LQIqeX9uX16XJ2x0mikIsRMHxJQ2snEKGMen\"},\"ui\":{\"developer_mode\":\"55A29C051727FCAC1BDA847CCDE40838B2068CFA589E88819EA9FB17E4BD7320\",\"developer_mode_encrypted_hash\":\"djEwuSLe9IdmBUATWBHHs7zsIrMSzx7pZ6JTHR8otknIBz+qN2MkhgBcyaDLS6rEKzM/\"}},\"google\":{\"services\":{\"account_id\":\"E5B4CD7C5FA271A47D07D462465AFD63DBF6A8CDFAFEF4839D13F8F552131486\",\"account_id_encrypted_hash\":\"djEws5EOag2fZGfyxpqHcku8joB6KwiFyWcmiFR/aVXfXX6OvP/bjwC8JQV6CzNTKMMu\",\"last_signed_in_username\":\"82DB8D884695C643C31778B7B50DBB376848E2F81B5A1AECDA34FD448CECD10D\",\"last_signed_in_username_encrypted_hash\":\"djEwxOmun3qSdHJMQzaJrU+kjwQLP+13cHAn1VOQvoQtqSk/p/pGFhbaSzbJpX4wwHgm\",\"last_username\":\"24FCEF9BF7DF12A2935BE143E58951E09DBAA1D3E0E24430C0FF93009F5D6AFD\",\"last_username_encrypted_hash\":\"djEwUrwWTlb71Rdn7Dja+dvU5v0mcEbu5mgSO71viEUKKH+f/HHPQ9PpahcBiBCBPv8C\"}},\"homepage\":\"B1E9FE8108A84F532486D13AAC43C0AFDA16D3DFC9EB2F743AEE11F89F2F163E\",\"homepage_encrypted_hash\":\"djEwXI82V8JtaVjhjBoUbIx22Ija6Nvw5Jh2xACB85WXz7fITVJD3wclEv4HEI0zZpr/\",\"homepage_is_newtabpage\":\"3680F776D17E3C099431BAF5381FAB9BCC0C2C70FEA4C74D12324BC94A207119\",\"homepage_is_newtabpage_encrypted_hash\":\"djEw25d7Roo6fA2vNKU5847ct9Ggqv6D6fTH6ndRlxrc0z/rsPA4asUmxGpQS8docKYR\",\"media\":{\"storage_id_salt\":\"E1848263E6199A89D48A7FDF168364BF0F31246A18227F3D149D4088C7F4D667\",\"storage_id_salt_encrypted_hash\":\"djEwmus7A6SiHO78MEjfL8UH7gPMKzNqfXxuxeOCVs7oMQHvhcUctFVQ/H+biDlrSfmN\"},\"pinned_tabs\":\"5FF265371BB528ED630092A900058C08217611AB525D4C12B41C44C008BAC799\",\"pinned_tabs_encrypted_hash\":\"djEwrI/SY+iwVmRCtzCcz7vvvY6ZHUVsx2j/4nnxc+BZPvzNQjU7mqUCFL4/rzMbh5B0\",\"prefs\":{\"preference_reset_time\":\"95C909F3D0669D5931907B455F099C510E7770D9F0BA6FF13E4C76101B44F757\",\"preference_reset_time_encrypted_hash\":\"djEwyqoM/JGpKiFlXV3eoINFUv2ETBFL4NGU4ieOBHK8c6NFWgNZelQ+eaT90ssc6IS/\"},\"safebrowsing\":{\"incidents_sent\":\"569707D9A4676B72F48BE92B740BE3EF895419C8A646F1AE1BA70BD9C3B41845\",\"incidents_sent_encrypted_hash\":\"djEwMiMAX53T1art8hiNWR2KtJtvDx/Ug453nMjIrrEJhrKvzT9/gP0n1oArCPjd05vR\"},\"schedule_to_flush_to_disk\":\"0C01098667045BC6A1329F6F8E43E59235431525C50A5F95F37ACC029FE8917A\",\"schedule_to_flush_to_disk_encrypted_hash\":\"djEwqUr3O4jps1VvWjtflBEgOyqJiBnBmW/nvHQ9gomrRE6tPLlLWCz2g67HJAHYVPYB\",\"search_provider_overrides\":\"1E1EBA3A4DC28A23BEFCF6ED5D71CE71E9814DD587A305F6B14F72E834AF75DD\",\"search_provider_overrides_encrypted_hash\":\"djEw/O1Fo7yxiDwDA9NaOfk9W7zGcLAU6L2CmXC9ayuNndZIrEps+rHLBu4+De+BVFES\",\"session\":{\"restore_on_startup\":\"F9BD26F5D1AA6AB5258754888529CB2A82AE68D1703BCC2A97DEAEE5DDDA190E\",\"restore_on_startup_encrypted_hash\":\"djEw9KqVM3yzw2hBpRQs9cgmZz1EepB9mkNSYLmMWTe+s949xVxZNzKTFwIKzQYpLzqG\",\"startup_urls\":\"8BB8DBC1D7CA5C58F821C38254FB2B9C874F8EE9B9905B57DE48C731C6C91837\",\"startup_urls_encrypted_hash\":\"djEwQZx2i/wNzOqRtH3q8zoq3uvH2GfwPEM4MJtVt+cymnLfCjxp2xQeLnhTdFdNMrtB\"}},\"super_encrypted_hash\":\"djEwwjwDLgN/xVs63uHuKrim9KoN9UAOl2AVaDKHB7D3Pkj5zY79lkNyT02kG41deW4d\"},\"safebrowsing\":{\"event_timestamps\":{},\"metrics_last_log_time\":\"13439015381\",\"scout_reporting_enabled_when_deprecated\":false},\"safety_hub\":{\"unused_site_permissions_revocation\":{\"migration_completed\":true}},\"saved_tab_groups\":{\"did_enable_shared_tab_groups_in_last_session\":false,\"specifics_to_data_migration\":true},\"schedule_to_flush_to_disk\":\"13439015396589680\",\"segmentation_platform\":{\"client_result_prefs\":\"ClIKDXNob3BwaW5nX3VzZXISQQo2DQAAAAAQ8qGX3enW7xcaJAocChoNAAAAPxIMU2hvcHBpbmdVc2VyGgVPdGhlchIEEAIYBCADEKjYqt3p1u8X\",\"device_switcher_util\":{\"result\":{\"labels\":[\"NotSynced\"]}},\"last_db_compaction_time\":\"13438915199000000\",\"uma_in_sql_start_time\":\"13439015378564490\"},\"sessions\":{\"event_log\":[{\"crashed\":false,\"time\":\"13439015377971739\",\"type\":0}],\"session_data_status\":1},\"signin\":{\"account_preview_data_last_update\":\"13439015378148311\",\"accounts_metadata_dict\":{},\"allowed\":true,\"avatar_button_promo_dict\":{\"AvatarButtonSigninPromoLastShownTime\":\"13439015402150683\",\"AvatarButtonSigninPromoShownCount\":1}},\"spellcheck\":{\"dictionaries\":[\"en-US\"],\"dictionary\":\"\"},\"sync\":{\"data_type_status_for_sync_to_signin\":{\"account_setting\":false,\"ai_thread\":false,\"app_list\":false,\"app_settings\":false,\"apps\":false,\"arc_package\":false,\"autofill\":false,\"autofill_entity_suppression\":false,\"autofill_profiles\":false,\"autofill_valuable\":false,\"autofill_valuable_metadata\":false,\"autofill_wallet\":false,\"autofill_wallet_credential\":false,\"autofill_wallet_metadata\":false,\"autofill_wallet_usage\":false,\"bookmarks\":false,\"collaboration_group\":false,\"contact_info\":false,\"contextual_task\":false,\"cookies\":false,\"device_info\":false,\"dictionary\":false,\"encrypted_tab_context_container\":false,\"encrypted_tab_context_item\":false,\"extension_settings\":false,\"extensions\":false,\"gemini_thread\":false,\"history\":false,\"history_delete_directives\":false,\"incoming_password_sharing_invitation\":false,\"journey\":false,\"managed_user_settings\":false,\"nigori\":false,\"notebook\":false,\"os_preferences\":false,\"os_priority_preferences\":false,\"outgoing_password_sharing_invitation\":false,\"passwords\":false,\"preferences\":false,\"printers\":false,\"printers_authorization_servers\":false,\"priority_preferences\":false,\"product_comparison\":false,\"reading_list\":false,\"saved_tab_group\":false,\"search_engines\":false,\"security_events\":false,\"send_tab_to_self\":false,\"sessions\":false,\"shared_comment\":false,\"shared_tab_group_account_data\":false,\"shared_tab_group_data\":false,\"sharing_message\":false,\"skill\":false,\"themes\":false,\"themes_android\":false,\"themes_ios\":false,\"user_consent\":false,\"user_events\":false,\"web_apps\":false,\"webauthn_credential\":false,\"wifi_configurations\":false,\"workspace_desk\":false},\"encryption_bootstrap_token_per_account_migration_done\":true,\"feature_status_for_sync_to_signin\":5,\"sync_to_signin_migration_state\":2},\"syncing_theme_prefs_migrated_to_non_syncing\":true,\"toolbar\":{\"pinned_cast_migration_complete\":true,\"pinned_chrome_labs_migration_complete\":true},\"total_passwords_available_for_account\":0,\"total_passwords_available_for_profile\":0,\"vertical_tabs\":{\"collapsed_state\":false,\"uncollapsed_width\":240},\"web_apps\":{\"did_migrate_default_chrome_apps\":[\"MigrateDefaultChromeAppToWebAppsGSuite\",\"MigrateDefaultChromeAppToWebAppsNonGSuite\"],\"last_preinstall_synchronize_version\":\"156\"}}",
+    "sandbox_status": "SYNVEIL_SANDBOX_RENDERER user_ns=user:[4026532363] session_user_ns=user:[4026531837] seccomp=2 pid=1227\n"
+   },
+   "at": 1794542055.263,
+   "download_started": false
+  },
+  "B2": {
+   "artifacts": {
+    "big_partial_size": 0,
+    "big_size": 0,
+    "browser_started_count": 1,
+    "control": {
+     "confirmed": {
+      "bytes": 262194176,
+      "generation_id": "synveil-gen-v1",
+      "min_reader_state_format": 1,
+      "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+      "slot": "A",
+      "state_format": 1,
+      "version": 1
+     },
+     "history": [
+      {
+       "action": "provision",
+       "at": 1794541709,
+       "result": "confirmed",
+       "slot": "A",
+       "version": 1
+      }
+     ],
+     "schema": "synveil.ab-control/v2",
+     "slots": {
+      "A": {
+       "bytes": 262194176,
+       "generation_id": "synveil-gen-v1",
+       "min_reader_state_format": 1,
+       "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+       "slot": "A",
+       "state_format": 1,
+       "version": 1
+      },
+      "B": null
+     },
+     "trial": null
+    },
+    "credential_sha256": "e51837e67db65de6844d226be9c6bff32cdc5004e2bfef8c8a2ce36319143108",
+    "downloads_listing": [],
+    "files_entry_lines": 6,
+    "files_payload2_scans": 0,
+    "files_payload_scans": 0,
+    "known_file": null,
+    "netlog_attempted_hosts": [
+     "accounts.google.com",
+     "optimizationguide-pa.googleapis.com",
+     "update.googleapis.com"
+    ],
+    "netlog_dns_hosts": [
+     "accounts.google.com",
+     "optimizationguide-pa.googleapis.com",
+     "update.googleapis.com"
+    ],
+    "netlog_files": 1,
+    "netlog_sockets": [
+     "10.0.2.3:53",
+     "[2001:4860:4860::8888]:443",
+     "[fec0::5054:ff:fe12:3456]:33289",
+     "[fec0::5054:ff:fe12:3456]:35081",
+     "[fec0::5054:ff:fe12:3456]:35658",
+     "[fec0::5054:ff:fe12:3456]:37720",
+     "[fec0::5054:ff:fe12:3456]:37733",
+     "[fec0::5054:ff:fe12:3456]:39065",
+     "[fec0::5054:ff:fe12:3456]:40287",
+     "[fec0::5054:ff:fe12:3456]:40413",
+     "[fec0::5054:ff:fe12:3456]:41733",
+     "[fec0::5054:ff:fe12:3456]:41842",
+     "[fec0::5054:ff:fe12:3456]:42114",
+     "[fec0::5054:ff:fe12:3456]:42427",
+     "[fec0::5054:ff:fe12:3456]:42500",
+     "[fec0::5054:ff:fe12:3456]:45913",
+     "[fec0::5054:ff:fe12:3456]:50242",
+     "[fec0::5054:ff:fe12:3456]:50548",
+     "[fec0::5054:ff:fe12:3456]:54643",
+     "[fec0::5054:ff:fe12:3456]:54753",
+     "[fec0::5054:ff:fe12:3456]:55812",
+     "[fec0::5054:ff:fe12:3456]:57825",
+     "[fec0::5054:ff:fe12:3456]:60906"
+    ],
+    "payload1_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload1_size": 0,
+    "payload2_guest_sha256": null,
+    "payload2_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload2_size": 0,
+    "payload_guest_sha256": null,
+    "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload_size": 0,
+    "pref_sha256": null,
+    "pref_text": null,
+    "profile_preferences": "{\"accessibility\":{\"captions\":{\"headless_caption_enabled\":false}},\"account_tracker_service_last_update\":\"13439015398073567\",\"apps\":{\"shortcuts_arch\":\"\",\"shortcuts_os_version\":\"\",\"shortcuts_version\":0},\"autocomplete\":{\"retention_policy_last_version\":156},\"autofill\":{\"ai_last_version_deduped\":156,\"autofill_ai\":{\"opt_in_status\":{}},\"last_version_deduped\":156},\"bookmark\":{\"storage_computation_last_update\":\"13439015396779193\"},\"browser\":{\"check_default_browser\":false,\"window_placement\":{\"bottom\":790,\"left\":10,\"maximized\":false,\"right\":1060,\"top\":10,\"work_area_bottom\":800,\"work_area_left\":0,\"work_area_right\":1280,\"work_area_top\":0}},\"commerce_daily_metrics_last_update_time\":\"13439015392857658\",\"default_apps_install_state\":2,\"domain_diversity\":{\"last_reporting_timestamp\":\"13439015392792230\",\"last_reporting_timestamp_v4\":\"13439015392793148\"},\"download\":{\"default_directory\":\"/home/synveil/Downloads\",\"directory_upgrade\":true,\"prompt_for_download\":false},\"dual_layer_user_pref_store\":{\"user_selected_sync_types\":[]},\"enterprise_profile_guid\":\"363079a2-3463-4b43-be72-8130a1021477\",\"extensions\":{\"alerts\":{\"initialized\":true},\"chrome_url_overrides\":{},\"last_chrome_version\":\"156.0.8078.47\",\"settings\":{\"mhjfbmdgcfjbbpaeojofohoefgiehjai\":{\"account_extension_type\":0,\"active_permissions\":{\"api\":[\"contentSettings\",\"fileSystem\",\"fileSystem.write\",\"metricsPrivate\",\"tabs\",\"resourcesPrivate\",\"pdfViewerPrivate\"],\"explicit_host\":[\"chrome://resources/*\",\"chrome://webui-test/*\"],\"manifest_permissions\":[],\"scriptable_host\":[]},\"commands\":{},\"content_settings\":[],\"creation_flags\":1,\"disable_reasons\":[],\"events\":[],\"first_install_time\":\"13439015379881806\",\"from_webstore\":false,\"incognito_content_settings\":[],\"incognito_preferences\":{},\"last_loaded_browser_version\":\"156.0.8078.47\",\"last_update_time\":\"13439015379881806\",\"location\":5,\"manifest\":{\"content_security_policy\":\"script-src 'self' blob: filesystem: chrome://resources chrome://webui-test; object-src * blob: externalfile: file: filesystem: data:\",\"description\":\"\",\"incognito\":\"split\",\"key\":\"MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDN6hM0rsDYGbzQPQfOygqlRtQgKUXMfnSjhIBL7LnReAVBEd7ZmKtyN2qmSasMl4HZpMhVe2rPWVVwBDl6iyNE/Kok6E6v6V3vCLGsOpQAuuNVye/3QxzIldzG/jQAdWZiyXReRVapOhZtLjGfywCvlWq7Sl/e3sbc0vWybSDI2QIDAQAB\",\"manifest_version\":2,\"mime_types\":[\"application/pdf\",\"text/pdf\"],\"mime_types_handler\":\"index.html\",\"name\":\"Chromium PDF Viewer\",\"offline_enabled\":true,\"permissions\":[\"chrome://resources/\",\"chrome://webui-test/\",\"contentSettings\",\"metricsPrivate\",\"pdfViewerPrivate\",\"resourcesPrivate\",\"tabs\",{\"fileSystem\":[\"write\"]}],\"version\":\"1\"},\"path\":\"/usr/lib/chromium/resources/pdf\",\"preferences\":{},\"regular_only_preferences\":{},\"was_installed_by_default\":false,\"was_installed_by_oem\":false}}},\"gaia_cookie\":{\"periodic_report_time_2\":\"13439015376969473\"},\"gcm\":{\"product_category_for_subtypes\":\"org.chromium.linux\"},\"google\":{\"services\":{\"signin_scoped_device_id\":\"f00cca3f-ef8b-49bf-898f-38639b8ba7b5\"}},\"in_product_help\":{\"recent_session_enabled_time\":\"13439015381108170\",\"recent_session_start_times\":[\"13439015381108170\"],\"session_last_active_time\":\"13439015381108170\",\"session_number\":2,\"session_start_time\":\"13439015381108170\"},\"intl\":{\"selected_languages\":\"en-US,en\"},\"media\":{\"engagement\":{\"schema_version\":5}},\"media_router\":{\"receiver_id_hash_token\":\"EypCEMBbTu+uz1XvasY2tZeWWXPbJykrN9amiYItainIUx2hVTKyU168EY2gD/VZN/e8EFO9VmeOAh+KSWxpPg==\"},\"ntp\":{\"num_personal_suggestions\":1},\"optimization_guide\":{\"hintsfetcher\":{\"hosts_successfully_fetched\":{}},\"previously_registered_optimization_types\":{\"ABOUT_THIS_SITE\":true,\"AUTOFILL_ACTOR_IFRAME_ORIGIN_ALLOWLIST\":true,\"DIGITAL_CREDENTIALS_LOW_FRICTION\":true,\"GLIC_ACTION_PAGE_BLOCK\":true,\"HISTORY_CLUSTERS\":true,\"LENS_OVERLAY_EDU_ACTION_CHIP_ALLOWLIST\":true,\"LENS_OVERLAY_EDU_ACTION_CHIP_BLOCKLIST\":true,\"LOADING_PREDICTOR\":true,\"MERCHANT_TRUST_SIGNALS_V2\":true,\"PRICE_TRACKING\":true,\"SAVED_TAB_GROUP\":true,\"V8_COMPILE_HINTS\":true}},\"password_manager\":{\"account_store_backup_password_cleaning_last_timestamp\":\"13439015435291791\",\"account_store_migrated_to_os_crypt_async\":true,\"on_device_encryption_state_passkey_last_reported_bucket\":4,\"on_device_encryption_state_passkey_last_reporting_time\":\"13439015408763157\",\"on_device_encryption_state_password_last_reported_bucket\":4,\"on_device_encryption_state_password_last_reporting_time\":\"13439015408768068\",\"profile_store_backup_password_cleaning_last_timestamp\":\"13439015435263256\",\"profile_store_migrated_to_os_crypt_async\":true},\"privacy_sandbox\":{\"first_party_sets_data_access_allowed_initialized\":true,\"first_party_sets_enabled\":false},\"profile\":{\"avatar_index\":26,\"background_password_check\":{\"check_fri_weight\":9,\"check_interval\":\"864000000000\",\"check_mon_weight\":4,\"check_sat_weight\":4,\"check_sun_weight\":4,\"check_thu_weight\":9,\"check_tue_weight\":9,\"check_wed_weight\":9,\"next_check_time\":\"13439217469065314\"},\"content_settings\":{\"exceptions\":{\"abusive_notification_permissions\":{},\"access_to_get_all_screens_media_in_session\":{},\"anti_abuse\":{},\"app_banner\":{},\"ar\":{},\"are_suspicious_notifications_allowlisted_by_user\":{},\"auto_picture_in_picture\":{},\"auto_select_certificate\":{},\"automatic_downloads\":{},\"automatic_fullscreen\":{},\"autoplay\":{},\"background_sync\":{},\"bluetooth_chooser_data\":{},\"bluetooth_guard\":{},\"bluetooth_scanning\":{},\"camera_pan_tilt_zoom\":{},\"captured_surface_control\":{},\"client_hints\":{},\"clipboard\":{},\"controlled_frame\":{},\"cookie_controls_metadata\":{},\"cookies\":{},\"direct_sockets\":{},\"display_media_system_audio\":{},\"disruptive_notification_permissions\":{},\"durable_storage\":{},\"fedcm_idp_registration\":{},\"fedcm_idp_signin\":{},\"fedcm_share\":{},\"file_system_access_chooser_data\":{},\"file_system_access_extended_permission\":{},\"file_system_access_restore_permission\":{},\"file_system_last_picked_directory\":{},\"file_system_read_guard\":{},\"file_system_write_guard\":{},\"formfill_metadata\":{},\"geolocation\":{},\"geolocation_with_options\":{},\"hand_tracking\":{},\"has_migrated_local_network_access\":true,\"hid_chooser_data\":{},\"hid_guard\":{},\"http_allowed\":{},\"https_enforced\":{},\"idle_detection\":{},\"images\":{},\"important_site_info\":{},\"initialized_translations\":{},\"inline_cue_menu\":{},\"intent_picker_auto_display\":{},\"javascript\":{},\"javascript_jit\":{},\"javascript_optimizer\":{},\"keyboard_lock\":{},\"legacy_cookie_access\":{},\"legacy_cookie_scope\":{},\"local_fonts\":{},\"local_network\":{},\"local_network_access\":{},\"loopback_network\":{},\"media_engagement\":{},\"media_stream_camera\":{},\"media_stream_mic\":{},\"midi_sysex\":{},\"mixed_script\":{},\"nfc_devices\":{},\"notification_interactions\":{},\"notification_permission_review\":{},\"notifications\":{},\"ondevice_languages_downloaded\":{},\"password_protection\":{},\"payment_handler\":{},\"permission_actions_history\":{},\"permission_autoblocking_data\":{},\"permission_autorevocation_data\":{},\"pointer_lock\":{},\"popups\":{},\"protocol_handler\":{},\"reduced_accept_language\":{},\"safe_browsing_url_check_data\":{},\"sensors\":{},\"serial_chooser_data\":{},\"serial_guard\":{},\"site_engagement\":{\"chrome://omnibox-popup.top-chrome/,*\":{\"last_modified\":\"13439015401291463\",\"setting\":{\"lastEngagementTime\":1.3439015401290668e+16,\"lastShortcutLaunchTime\":0.0,\"pointsAddedToday\":4.5,\"rawScore\":4.5}}},\"sound\":{},\"speaker_selection\":{},\"ssl_cert_decisions\":{},\"storage_access\":{},\"sub_apps_without_prompts\":{},\"subresource_filter\":{},\"subresource_filter_data\":{},\"suspicious_notification_ids\":{},\"suspicious_notification_show_original\":{},\"suspicious_site_warning_data\":{},\"top_level_storage_access\":{},\"unused_site_permissions\":{},\"usb_chooser_data\":{},\"usb_guard\":{},\"vr\":{},\"web_app_installation\":{},\"webid_api\":{},\"webid_auto_reauthn\":{},\"window_placement\":{}},\"pref_version\":1},\"creation_time\":\"13439015354086423\",\"default_content_setting_values\":{\"has_migrated_local_network_access\":true},\"exit_type\":\"Crashed\",\"last_engagement_time\":\"13439015401290668\",\"last_time_obsolete_http_credentials_removed\":1794541835.269264,\"last_time_password_store_metrics_reported\":1794541808.661227,\"managed\":{\"locally_parent_approved_extensions\":{},\"locally_parent_approved_extensions_migration_state\":1},\"managed_user_id\":\"\",\"name\":\"Your Chromium\",\"password_hash_data_list\":[],\"were_old_google_logins_removed\":true},\"profile_network_context_service\":{\"http_cache_finch_experiment_groups\":\"None None None None\"},\"protection\":{\"macs\":{\"account_values\":{\"browser\":{\"show_home_button\":\"F6B8688079AA4C4657C3FEDCF3311348C99CB4907EEC8560CC323E4F37D1EA41\",\"show_home_button_encrypted_hash\":\"djEwotRkFT2vHnhhCIA/V+DRZrZjLnP+b+0VwSGjql5xrXDmPtBAfaZbFURGViRnbnec\"},\"extensions\":{\"ui\":{\"developer_mode\":\"C4B515ABCB16541C88B522387A89F47E24F150FF18A7256BF19EE2C0896D7555\",\"developer_mode_encrypted_hash\":\"djEwnGn4HyLm571QCCeecs4XAyIbPpI4sjZ8ckF6sff8BGbQEywtWeDm4qpSwJqGYOvN\"}},\"homepage\":\"0F156BE8FFEDBF22CC2E394D6BD8DDD392F953D0F397958C64EFA57087182457\",\"homepage_encrypted_hash\":\"djEwez6wt5PtkfTxuN+U9KVU6gUa9/33imjLLrtlo3LT0Y1d/stHX2XjJEWHwpeLGZY1\",\"homepage_is_newtabpage\":\"BAF0DE42A6FEAC5EF6500592AEC92B79DC055C1E352B0F7BAC0BB6E72ECE67D3\",\"homepage_is_newtabpage_encrypted_hash\":\"djEwNuiyCSZBdqhV7ESdO8yuXbA1NHRVLQ2svfo+ZK5oaIry2f9Cx4rce+mIbAEw7G0P\",\"session\":{\"restore_on_startup\":\"81940185F7F78D0317AB3741FA4A283985C31DB3BF95D3A4DDD4CD78FC5021F1\",\"restore_on_startup_encrypted_hash\":\"djEwFEzg0id00W34Gz2o0K8gX+KMNet+dXfslTgHKA9xnZMI4OplF+GZvcpGWGX5hEYJ\",\"startup_urls\":\"B41DC391D323AEB2C5465D75AB79284F9F6620BEF161110DE35202261FF03449\",\"startup_urls_encrypted_hash\":\"djEwghL6jSVRi8mLaRGAB/JzS+xXBtxjeESAqUdFS7oORXVQ1jXID0VGOoaLWOgIcbzO\"}},\"browser\":{\"show_home_button\":\"904452986128BBEE5A7B1FFB8F342100C3150E3D9FD76C4105DF33EB021E22FD\",\"show_home_button_encrypted_hash\":\"djEwZQf6ZGWEvWHWC8sI8mCrY+eDy3+KjdSoiNhRlSr4DUlpnk7IhTF6IsAy9eiga5Lg\"},\"default_search_provider_data\":{\"template_url_data\":\"575D258E47F940C6887685ABA99A5839CBFE4BA30863349DFE0D0C375AAB8816\",\"template_url_data_encrypted_hash\":\"djEwzkpvA9+swWTDV77WN7hWEwIE+/MvksCTQp4rKgJsLjCiagQhCIMUK3mxnliviILf\"},\"enterprise_signin\":{\"policy_recovery_token\":\"7D3124ECAF7E96407EB65EAF5A43B02C7EE5F2D4A9FA38A9F371F9E1B74D6383\",\"policy_recovery_token_encrypted_hash\":\"djEwntGC63MNa+3FPXvwkgoSZGXvXYrVoevkgw7qmK06Zwt7RdLbwPV3QCnGv8fsmfLO\"},\"extensions\":{\"install\":{\"initiallist\":\"721565429F6DB8F08CC129E8B4A99021CECE263598EA7CF847C99A2133F23581\",\"initiallist_encrypted_hash\":\"djEwkHeWi9EY4quXPiJOJHKkiaZv/Yduf0mGmHL+hm4bMgHCoBktkuispsBkSEGGppg3\",\"initialprovidername\":\"89DB3C44559AC7E75E930F08876F726C91D84C2D8D4D0A9DB7DA59DB15FA76D1\",\"initialprovidername_encrypted_hash\":\"djEwn2R+8PGjEAKtAZe3ZdaoPoPlRUrGh6V/o9KiENuI/3AtKFJq5/M1WhPIlSo2Q+lT\"},\"settings\":{\"mhjfbmdgcfjbbpaeojofohoefgiehjai\":\"5DD81A833F704CC9CFFD4DB414BD434F0181E04139DFE445999D65FDCFBDBD4C\"},\"settings_encrypted_hash\":{\"mhjfbmdgcfjbbpaeojofohoefgiehjai\":\"djEwuXANFd9Ju69tc+8bQZVJcP3o4ie8LQIqeX9uX16XJ2x0mikIsRMHxJQ2snEKGMen\"},\"ui\":{\"developer_mode\":\"55A29C051727FCAC1BDA847CCDE40838B2068CFA589E88819EA9FB17E4BD7320\",\"developer_mode_encrypted_hash\":\"djEwuSLe9IdmBUATWBHHs7zsIrMSzx7pZ6JTHR8otknIBz+qN2MkhgBcyaDLS6rEKzM/\"}},\"google\":{\"services\":{\"account_id\":\"E5B4CD7C5FA271A47D07D462465AFD63DBF6A8CDFAFEF4839D13F8F552131486\",\"account_id_encrypted_hash\":\"djEws5EOag2fZGfyxpqHcku8joB6KwiFyWcmiFR/aVXfXX6OvP/bjwC8JQV6CzNTKMMu\",\"last_signed_in_username\":\"82DB8D884695C643C31778B7B50DBB376848E2F81B5A1AECDA34FD448CECD10D\",\"last_signed_in_username_encrypted_hash\":\"djEwxOmun3qSdHJMQzaJrU+kjwQLP+13cHAn1VOQvoQtqSk/p/pGFhbaSzbJpX4wwHgm\",\"last_username\":\"24FCEF9BF7DF12A2935BE143E58951E09DBAA1D3E0E24430C0FF93009F5D6AFD\",\"last_username_encrypted_hash\":\"djEwUrwWTlb71Rdn7Dja+dvU5v0mcEbu5mgSO71viEUKKH+f/HHPQ9PpahcBiBCBPv8C\"}},\"homepage\":\"B1E9FE8108A84F532486D13AAC43C0AFDA16D3DFC9EB2F743AEE11F89F2F163E\",\"homepage_encrypted_hash\":\"djEwXI82V8JtaVjhjBoUbIx22Ija6Nvw5Jh2xACB85WXz7fITVJD3wclEv4HEI0zZpr/\",\"homepage_is_newtabpage\":\"3680F776D17E3C099431BAF5381FAB9BCC0C2C70FEA4C74D12324BC94A207119\",\"homepage_is_newtabpage_encrypted_hash\":\"djEw25d7Roo6fA2vNKU5847ct9Ggqv6D6fTH6ndRlxrc0z/rsPA4asUmxGpQS8docKYR\",\"media\":{\"storage_id_salt\":\"E1848263E6199A89D48A7FDF168364BF0F31246A18227F3D149D4088C7F4D667\",\"storage_id_salt_encrypted_hash\":\"djEwmus7A6SiHO78MEjfL8UH7gPMKzNqfXxuxeOCVs7oMQHvhcUctFVQ/H+biDlrSfmN\"},\"pinned_tabs\":\"5FF265371BB528ED630092A900058C08217611AB525D4C12B41C44C008BAC799\",\"pinned_tabs_encrypted_hash\":\"djEwrI/SY+iwVmRCtzCcz7vvvY6ZHUVsx2j/4nnxc+BZPvzNQjU7mqUCFL4/rzMbh5B0\",\"prefs\":{\"preference_reset_time\":\"95C909F3D0669D5931907B455F099C510E7770D9F0BA6FF13E4C76101B44F757\",\"preference_reset_time_encrypted_hash\":\"djEwyqoM/JGpKiFlXV3eoINFUv2ETBFL4NGU4ieOBHK8c6NFWgNZelQ+eaT90ssc6IS/\"},\"safebrowsing\":{\"incidents_sent\":\"569707D9A4676B72F48BE92B740BE3EF895419C8A646F1AE1BA70BD9C3B41845\",\"incidents_sent_encrypted_hash\":\"djEwMiMAX53T1art8hiNWR2KtJtvDx/Ug453nMjIrrEJhrKvzT9/gP0n1oArCPjd05vR\"},\"schedule_to_flush_to_disk\":\"0C01098667045BC6A1329F6F8E43E59235431525C50A5F95F37ACC029FE8917A\",\"schedule_to_flush_to_disk_encrypted_hash\":\"djEwqUr3O4jps1VvWjtflBEgOyqJiBnBmW/nvHQ9gomrRE6tPLlLWCz2g67HJAHYVPYB\",\"search_provider_overrides\":\"1E1EBA3A4DC28A23BEFCF6ED5D71CE71E9814DD587A305F6B14F72E834AF75DD\",\"search_provider_overrides_encrypted_hash\":\"djEw/O1Fo7yxiDwDA9NaOfk9W7zGcLAU6L2CmXC9ayuNndZIrEps+rHLBu4+De+BVFES\",\"session\":{\"restore_on_startup\":\"F9BD26F5D1AA6AB5258754888529CB2A82AE68D1703BCC2A97DEAEE5DDDA190E\",\"restore_on_startup_encrypted_hash\":\"djEw9KqVM3yzw2hBpRQs9cgmZz1EepB9mkNSYLmMWTe+s949xVxZNzKTFwIKzQYpLzqG\",\"startup_urls\":\"8BB8DBC1D7CA5C58F821C38254FB2B9C874F8EE9B9905B57DE48C731C6C91837\",\"startup_urls_encrypted_hash\":\"djEwQZx2i/wNzOqRtH3q8zoq3uvH2GfwPEM4MJtVt+cymnLfCjxp2xQeLnhTdFdNMrtB\"}},\"super_encrypted_hash\":\"djEwwjwDLgN/xVs63uHuKrim9KoN9UAOl2AVaDKHB7D3Pkj5zY79lkNyT02kG41deW4d\"},\"safebrowsing\":{\"event_timestamps\":{},\"metrics_last_log_time\":\"13439015381\",\"scout_reporting_enabled_when_deprecated\":false},\"safety_hub\":{\"unused_site_permissions_revocation\":{\"migration_completed\":true}},\"saved_tab_groups\":{\"did_enable_shared_tab_groups_in_last_session\":false,\"specifics_to_data_migration\":true},\"schedule_to_flush_to_disk\":\"13439015396589680\",\"segmentation_platform\":{\"client_result_prefs\":\"ClIKDXNob3BwaW5nX3VzZXISQQo2DQAAAAAQ8qGX3enW7xcaJAocChoNAAAAPxIMU2hvcHBpbmdVc2VyGgVPdGhlchIEEAIYBCADEKjYqt3p1u8X\",\"device_switcher_util\":{\"result\":{\"labels\":[\"NotSynced\"]}},\"last_db_compaction_time\":\"13438915199000000\",\"uma_in_sql_start_time\":\"13439015378564490\"},\"sessions\":{\"event_log\":[{\"crashed\":false,\"time\":\"13439015377971739\",\"type\":0}],\"session_data_status\":1},\"signin\":{\"account_preview_data_last_update\":\"13439015378148311\",\"accounts_metadata_dict\":{},\"allowed\":true,\"avatar_button_promo_dict\":{\"AvatarButtonSigninPromoLastShownTime\":\"13439015402150683\",\"AvatarButtonSigninPromoShownCount\":1}},\"spellcheck\":{\"dictionaries\":[\"en-US\"],\"dictionary\":\"\"},\"sync\":{\"data_type_status_for_sync_to_signin\":{\"account_setting\":false,\"ai_thread\":false,\"app_list\":false,\"app_settings\":false,\"apps\":false,\"arc_package\":false,\"autofill\":false,\"autofill_entity_suppression\":false,\"autofill_profiles\":false,\"autofill_valuable\":false,\"autofill_valuable_metadata\":false,\"autofill_wallet\":false,\"autofill_wallet_credential\":false,\"autofill_wallet_metadata\":false,\"autofill_wallet_usage\":false,\"bookmarks\":false,\"collaboration_group\":false,\"contact_info\":false,\"contextual_task\":false,\"cookies\":false,\"device_info\":false,\"dictionary\":false,\"encrypted_tab_context_container\":false,\"encrypted_tab_context_item\":false,\"extension_settings\":false,\"extensions\":false,\"gemini_thread\":false,\"history\":false,\"history_delete_directives\":false,\"incoming_password_sharing_invitation\":false,\"journey\":false,\"managed_user_settings\":false,\"nigori\":false,\"notebook\":false,\"os_preferences\":false,\"os_priority_preferences\":false,\"outgoing_password_sharing_invitation\":false,\"passwords\":false,\"preferences\":false,\"printers\":false,\"printers_authorization_servers\":false,\"priority_preferences\":false,\"product_comparison\":false,\"reading_list\":false,\"saved_tab_group\":false,\"search_engines\":false,\"security_events\":false,\"send_tab_to_self\":false,\"sessions\":false,\"shared_comment\":false,\"shared_tab_group_account_data\":false,\"shared_tab_group_data\":false,\"sharing_message\":false,\"skill\":false,\"themes\":false,\"themes_android\":false,\"themes_ios\":false,\"user_consent\":false,\"user_events\":false,\"web_apps\":false,\"webauthn_credential\":false,\"wifi_configurations\":false,\"workspace_desk\":false},\"encryption_bootstrap_token_per_account_migration_done\":true,\"feature_status_for_sync_to_signin\":5,\"sync_to_signin_migration_state\":2},\"syncing_theme_prefs_migrated_to_non_syncing\":true,\"toolbar\":{\"pinned_cast_migration_complete\":true,\"pinned_chrome_labs_migration_complete\":true},\"total_passwords_available_for_account\":0,\"total_passwords_available_for_profile\":0,\"vertical_tabs\":{\"collapsed_state\":false,\"uncollapsed_width\":240},\"web_apps\":{\"did_migrate_default_chrome_apps\":[\"MigrateDefaultChromeAppToWebAppsGSuite\",\"MigrateDefaultChromeAppToWebAppsNonGSuite\"],\"last_preinstall_synchronize_version\":\"156\"}}",
+    "sandbox_status": "SYNVEIL_SANDBOX_RENDERER user_ns=user:[4026532363] session_user_ns=user:[4026531837] seccomp=2 pid=1227\n"
+   },
+   "at": 1794542055.263,
+   "payload_sha256_after": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "second_download": false
+  },
+  "B3": {
+   "artifacts": {
+    "big_partial_size": 0,
+    "big_size": 0,
+    "browser_started_count": 1,
+    "control": {
+     "confirmed": {
+      "bytes": 262194176,
+      "generation_id": "synveil-gen-v1",
+      "min_reader_state_format": 1,
+      "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+      "slot": "A",
+      "state_format": 1,
+      "version": 1
+     },
+     "history": [
+      {
+       "action": "provision",
+       "at": 1794541709,
+       "result": "confirmed",
+       "slot": "A",
+       "version": 1
+      }
+     ],
+     "schema": "synveil.ab-control/v2",
+     "slots": {
+      "A": {
+       "bytes": 262194176,
+       "generation_id": "synveil-gen-v1",
+       "min_reader_state_format": 1,
+       "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+       "slot": "A",
+       "state_format": 1,
+       "version": 1
+      },
+      "B": null
+     },
+     "trial": null
+    },
+    "credential_sha256": "e51837e67db65de6844d226be9c6bff32cdc5004e2bfef8c8a2ce36319143108",
+    "downloads_listing": [],
+    "files_entry_lines": 6,
+    "files_payload2_scans": 0,
+    "files_payload_scans": 0,
+    "known_file": null,
+    "netlog_attempted_hosts": [
+     "accounts.google.com",
+     "optimizationguide-pa.googleapis.com",
+     "update.googleapis.com"
+    ],
+    "netlog_dns_hosts": [
+     "accounts.google.com",
+     "optimizationguide-pa.googleapis.com",
+     "update.googleapis.com"
+    ],
+    "netlog_files": 1,
+    "netlog_sockets": [
+     "10.0.2.3:53",
+     "[2001:4860:4860::8888]:443",
+     "[fec0::5054:ff:fe12:3456]:33289",
+     "[fec0::5054:ff:fe12:3456]:35081",
+     "[fec0::5054:ff:fe12:3456]:35658",
+     "[fec0::5054:ff:fe12:3456]:37720",
+     "[fec0::5054:ff:fe12:3456]:37733",
+     "[fec0::5054:ff:fe12:3456]:39065",
+     "[fec0::5054:ff:fe12:3456]:40287",
+     "[fec0::5054:ff:fe12:3456]:40413",
+     "[fec0::5054:ff:fe12:3456]:41733",
+     "[fec0::5054:ff:fe12:3456]:41842",
+     "[fec0::5054:ff:fe12:3456]:42114",
+     "[fec0::5054:ff:fe12:3456]:42427",
+     "[fec0::5054:ff:fe12:3456]:42500",
+     "[fec0::5054:ff:fe12:3456]:45913",
+     "[fec0::5054:ff:fe12:3456]:50242",
+     "[fec0::5054:ff:fe12:3456]:50548",
+     "[fec0::5054:ff:fe12:3456]:54643",
+     "[fec0::5054:ff:fe12:3456]:54753",
+     "[fec0::5054:ff:fe12:3456]:55812",
+     "[fec0::5054:ff:fe12:3456]:57825",
+     "[fec0::5054:ff:fe12:3456]:60906"
+    ],
+    "payload1_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload1_size": 0,
+    "payload2_guest_sha256": null,
+    "payload2_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload2_size": 0,
+    "payload_guest_sha256": null,
+    "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload_size": 0,
+    "pref_sha256": null,
+    "pref_text": null,
+    "profile_preferences": "{\"accessibility\":{\"captions\":{\"headless_caption_enabled\":false}},\"account_tracker_service_last_update\":\"13439015398073567\",\"apps\":{\"shortcuts_arch\":\"\",\"shortcuts_os_version\":\"\",\"shortcuts_version\":0},\"autocomplete\":{\"retention_policy_last_version\":156},\"autofill\":{\"ai_last_version_deduped\":156,\"autofill_ai\":{\"opt_in_status\":{}},\"last_version_deduped\":156},\"bookmark\":{\"storage_computation_last_update\":\"13439015396779193\"},\"browser\":{\"check_default_browser\":false,\"window_placement\":{\"bottom\":790,\"left\":10,\"maximized\":false,\"right\":1060,\"top\":10,\"work_area_bottom\":800,\"work_area_left\":0,\"work_area_right\":1280,\"work_area_top\":0}},\"commerce_daily_metrics_last_update_time\":\"13439015392857658\",\"default_apps_install_state\":2,\"domain_diversity\":{\"last_reporting_timestamp\":\"13439015392792230\",\"last_reporting_timestamp_v4\":\"13439015392793148\"},\"download\":{\"default_directory\":\"/home/synveil/Downloads\",\"directory_upgrade\":true,\"prompt_for_download\":false},\"dual_layer_user_pref_store\":{\"user_selected_sync_types\":[]},\"enterprise_profile_guid\":\"363079a2-3463-4b43-be72-8130a1021477\",\"extensions\":{\"alerts\":{\"initialized\":true},\"chrome_url_overrides\":{},\"last_chrome_version\":\"156.0.8078.47\",\"settings\":{\"mhjfbmdgcfjbbpaeojofohoefgiehjai\":{\"account_extension_type\":0,\"active_permissions\":{\"api\":[\"contentSettings\",\"fileSystem\",\"fileSystem.write\",\"metricsPrivate\",\"tabs\",\"resourcesPrivate\",\"pdfViewerPrivate\"],\"explicit_host\":[\"chrome://resources/*\",\"chrome://webui-test/*\"],\"manifest_permissions\":[],\"scriptable_host\":[]},\"commands\":{},\"content_settings\":[],\"creation_flags\":1,\"disable_reasons\":[],\"events\":[],\"first_install_time\":\"13439015379881806\",\"from_webstore\":false,\"incognito_content_settings\":[],\"incognito_preferences\":{},\"last_loaded_browser_version\":\"156.0.8078.47\",\"last_update_time\":\"13439015379881806\",\"location\":5,\"manifest\":{\"content_security_policy\":\"script-src 'self' blob: filesystem: chrome://resources chrome://webui-test; object-src * blob: externalfile: file: filesystem: data:\",\"description\":\"\",\"incognito\":\"split\",\"key\":\"MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDN6hM0rsDYGbzQPQfOygqlRtQgKUXMfnSjhIBL7LnReAVBEd7ZmKtyN2qmSasMl4HZpMhVe2rPWVVwBDl6iyNE/Kok6E6v6V3vCLGsOpQAuuNVye/3QxzIldzG/jQAdWZiyXReRVapOhZtLjGfywCvlWq7Sl/e3sbc0vWybSDI2QIDAQAB\",\"manifest_version\":2,\"mime_types\":[\"application/pdf\",\"text/pdf\"],\"mime_types_handler\":\"index.html\",\"name\":\"Chromium PDF Viewer\",\"offline_enabled\":true,\"permissions\":[\"chrome://resources/\",\"chrome://webui-test/\",\"contentSettings\",\"metricsPrivate\",\"pdfViewerPrivate\",\"resourcesPrivate\",\"tabs\",{\"fileSystem\":[\"write\"]}],\"version\":\"1\"},\"path\":\"/usr/lib/chromium/resources/pdf\",\"preferences\":{},\"regular_only_preferences\":{},\"was_installed_by_default\":false,\"was_installed_by_oem\":false}}},\"gaia_cookie\":{\"periodic_report_time_2\":\"13439015376969473\"},\"gcm\":{\"product_category_for_subtypes\":\"org.chromium.linux\"},\"google\":{\"services\":{\"signin_scoped_device_id\":\"f00cca3f-ef8b-49bf-898f-38639b8ba7b5\"}},\"in_product_help\":{\"recent_session_enabled_time\":\"13439015381108170\",\"recent_session_start_times\":[\"13439015381108170\"],\"session_last_active_time\":\"13439015381108170\",\"session_number\":2,\"session_start_time\":\"13439015381108170\"},\"intl\":{\"selected_languages\":\"en-US,en\"},\"media\":{\"engagement\":{\"schema_version\":5}},\"media_router\":{\"receiver_id_hash_token\":\"EypCEMBbTu+uz1XvasY2tZeWWXPbJykrN9amiYItainIUx2hVTKyU168EY2gD/VZN/e8EFO9VmeOAh+KSWxpPg==\"},\"ntp\":{\"num_personal_suggestions\":1},\"optimization_guide\":{\"hintsfetcher\":{\"hosts_successfully_fetched\":{}},\"previously_registered_optimization_types\":{\"ABOUT_THIS_SITE\":true,\"AUTOFILL_ACTOR_IFRAME_ORIGIN_ALLOWLIST\":true,\"DIGITAL_CREDENTIALS_LOW_FRICTION\":true,\"GLIC_ACTION_PAGE_BLOCK\":true,\"HISTORY_CLUSTERS\":true,\"LENS_OVERLAY_EDU_ACTION_CHIP_ALLOWLIST\":true,\"LENS_OVERLAY_EDU_ACTION_CHIP_BLOCKLIST\":true,\"LOADING_PREDICTOR\":true,\"MERCHANT_TRUST_SIGNALS_V2\":true,\"PRICE_TRACKING\":true,\"SAVED_TAB_GROUP\":true,\"V8_COMPILE_HINTS\":true}},\"password_manager\":{\"account_store_backup_password_cleaning_last_timestamp\":\"13439015435291791\",\"account_store_migrated_to_os_crypt_async\":true,\"on_device_encryption_state_passkey_last_reported_bucket\":4,\"on_device_encryption_state_passkey_last_reporting_time\":\"13439015408763157\",\"on_device_encryption_state_password_last_reported_bucket\":4,\"on_device_encryption_state_password_last_reporting_time\":\"13439015408768068\",\"profile_store_backup_password_cleaning_last_timestamp\":\"13439015435263256\",\"profile_store_migrated_to_os_crypt_async\":true},\"privacy_sandbox\":{\"first_party_sets_data_access_allowed_initialized\":true,\"first_party_sets_enabled\":false},\"profile\":{\"avatar_index\":26,\"background_password_check\":{\"check_fri_weight\":9,\"check_interval\":\"864000000000\",\"check_mon_weight\":4,\"check_sat_weight\":4,\"check_sun_weight\":4,\"check_thu_weight\":9,\"check_tue_weight\":9,\"check_wed_weight\":9,\"next_check_time\":\"13439217469065314\"},\"content_settings\":{\"exceptions\":{\"abusive_notification_permissions\":{},\"access_to_get_all_screens_media_in_session\":{},\"anti_abuse\":{},\"app_banner\":{},\"ar\":{},\"are_suspicious_notifications_allowlisted_by_user\":{},\"auto_picture_in_picture\":{},\"auto_select_certificate\":{},\"automatic_downloads\":{},\"automatic_fullscreen\":{},\"autoplay\":{},\"background_sync\":{},\"bluetooth_chooser_data\":{},\"bluetooth_guard\":{},\"bluetooth_scanning\":{},\"camera_pan_tilt_zoom\":{},\"captured_surface_control\":{},\"client_hints\":{},\"clipboard\":{},\"controlled_frame\":{},\"cookie_controls_metadata\":{},\"cookies\":{},\"direct_sockets\":{},\"display_media_system_audio\":{},\"disruptive_notification_permissions\":{},\"durable_storage\":{},\"fedcm_idp_registration\":{},\"fedcm_idp_signin\":{},\"fedcm_share\":{},\"file_system_access_chooser_data\":{},\"file_system_access_extended_permission\":{},\"file_system_access_restore_permission\":{},\"file_system_last_picked_directory\":{},\"file_system_read_guard\":{},\"file_system_write_guard\":{},\"formfill_metadata\":{},\"geolocation\":{},\"geolocation_with_options\":{},\"hand_tracking\":{},\"has_migrated_local_network_access\":true,\"hid_chooser_data\":{},\"hid_guard\":{},\"http_allowed\":{},\"https_enforced\":{},\"idle_detection\":{},\"images\":{},\"important_site_info\":{},\"initialized_translations\":{},\"inline_cue_menu\":{},\"intent_picker_auto_display\":{},\"javascript\":{},\"javascript_jit\":{},\"javascript_optimizer\":{},\"keyboard_lock\":{},\"legacy_cookie_access\":{},\"legacy_cookie_scope\":{},\"local_fonts\":{},\"local_network\":{},\"local_network_access\":{},\"loopback_network\":{},\"media_engagement\":{},\"media_stream_camera\":{},\"media_stream_mic\":{},\"midi_sysex\":{},\"mixed_script\":{},\"nfc_devices\":{},\"notification_interactions\":{},\"notification_permission_review\":{},\"notifications\":{},\"ondevice_languages_downloaded\":{},\"password_protection\":{},\"payment_handler\":{},\"permission_actions_history\":{},\"permission_autoblocking_data\":{},\"permission_autorevocation_data\":{},\"pointer_lock\":{},\"popups\":{},\"protocol_handler\":{},\"reduced_accept_language\":{},\"safe_browsing_url_check_data\":{},\"sensors\":{},\"serial_chooser_data\":{},\"serial_guard\":{},\"site_engagement\":{\"chrome://omnibox-popup.top-chrome/,*\":{\"last_modified\":\"13439015401291463\",\"setting\":{\"lastEngagementTime\":1.3439015401290668e+16,\"lastShortcutLaunchTime\":0.0,\"pointsAddedToday\":4.5,\"rawScore\":4.5}}},\"sound\":{},\"speaker_selection\":{},\"ssl_cert_decisions\":{},\"storage_access\":{},\"sub_apps_without_prompts\":{},\"subresource_filter\":{},\"subresource_filter_data\":{},\"suspicious_notification_ids\":{},\"suspicious_notification_show_original\":{},\"suspicious_site_warning_data\":{},\"top_level_storage_access\":{},\"unused_site_permissions\":{},\"usb_chooser_data\":{},\"usb_guard\":{},\"vr\":{},\"web_app_installation\":{},\"webid_api\":{},\"webid_auto_reauthn\":{},\"window_placement\":{}},\"pref_version\":1},\"creation_time\":\"13439015354086423\",\"default_content_setting_values\":{\"has_migrated_local_network_access\":true},\"exit_type\":\"Crashed\",\"last_engagement_time\":\"13439015401290668\",\"last_time_obsolete_http_credentials_removed\":1794541835.269264,\"last_time_password_store_metrics_reported\":1794541808.661227,\"managed\":{\"locally_parent_approved_extensions\":{},\"locally_parent_approved_extensions_migration_state\":1},\"managed_user_id\":\"\",\"name\":\"Your Chromium\",\"password_hash_data_list\":[],\"were_old_google_logins_removed\":true},\"profile_network_context_service\":{\"http_cache_finch_experiment_groups\":\"None None None None\"},\"protection\":{\"macs\":{\"account_values\":{\"browser\":{\"show_home_button\":\"F6B8688079AA4C4657C3FEDCF3311348C99CB4907EEC8560CC323E4F37D1EA41\",\"show_home_button_encrypted_hash\":\"djEwotRkFT2vHnhhCIA/V+DRZrZjLnP+b+0VwSGjql5xrXDmPtBAfaZbFURGViRnbnec\"},\"extensions\":{\"ui\":{\"developer_mode\":\"C4B515ABCB16541C88B522387A89F47E24F150FF18A7256BF19EE2C0896D7555\",\"developer_mode_encrypted_hash\":\"djEwnGn4HyLm571QCCeecs4XAyIbPpI4sjZ8ckF6sff8BGbQEywtWeDm4qpSwJqGYOvN\"}},\"homepage\":\"0F156BE8FFEDBF22CC2E394D6BD8DDD392F953D0F397958C64EFA57087182457\",\"homepage_encrypted_hash\":\"djEwez6wt5PtkfTxuN+U9KVU6gUa9/33imjLLrtlo3LT0Y1d/stHX2XjJEWHwpeLGZY1\",\"homepage_is_newtabpage\":\"BAF0DE42A6FEAC5EF6500592AEC92B79DC055C1E352B0F7BAC0BB6E72ECE67D3\",\"homepage_is_newtabpage_encrypted_hash\":\"djEwNuiyCSZBdqhV7ESdO8yuXbA1NHRVLQ2svfo+ZK5oaIry2f9Cx4rce+mIbAEw7G0P\",\"session\":{\"restore_on_startup\":\"81940185F7F78D0317AB3741FA4A283985C31DB3BF95D3A4DDD4CD78FC5021F1\",\"restore_on_startup_encrypted_hash\":\"djEwFEzg0id00W34Gz2o0K8gX+KMNet+dXfslTgHKA9xnZMI4OplF+GZvcpGWGX5hEYJ\",\"startup_urls\":\"B41DC391D323AEB2C5465D75AB79284F9F6620BEF161110DE35202261FF03449\",\"startup_urls_encrypted_hash\":\"djEwghL6jSVRi8mLaRGAB/JzS+xXBtxjeESAqUdFS7oORXVQ1jXID0VGOoaLWOgIcbzO\"}},\"browser\":{\"show_home_button\":\"904452986128BBEE5A7B1FFB8F342100C3150E3D9FD76C4105DF33EB021E22FD\",\"show_home_button_encrypted_hash\":\"djEwZQf6ZGWEvWHWC8sI8mCrY+eDy3+KjdSoiNhRlSr4DUlpnk7IhTF6IsAy9eiga5Lg\"},\"default_search_provider_data\":{\"template_url_data\":\"575D258E47F940C6887685ABA99A5839CBFE4BA30863349DFE0D0C375AAB8816\",\"template_url_data_encrypted_hash\":\"djEwzkpvA9+swWTDV77WN7hWEwIE+/MvksCTQp4rKgJsLjCiagQhCIMUK3mxnliviILf\"},\"enterprise_signin\":{\"policy_recovery_token\":\"7D3124ECAF7E96407EB65EAF5A43B02C7EE5F2D4A9FA38A9F371F9E1B74D6383\",\"policy_recovery_token_encrypted_hash\":\"djEwntGC63MNa+3FPXvwkgoSZGXvXYrVoevkgw7qmK06Zwt7RdLbwPV3QCnGv8fsmfLO\"},\"extensions\":{\"install\":{\"initiallist\":\"721565429F6DB8F08CC129E8B4A99021CECE263598EA7CF847C99A2133F23581\",\"initiallist_encrypted_hash\":\"djEwkHeWi9EY4quXPiJOJHKkiaZv/Yduf0mGmHL+hm4bMgHCoBktkuispsBkSEGGppg3\",\"initialprovidername\":\"89DB3C44559AC7E75E930F08876F726C91D84C2D8D4D0A9DB7DA59DB15FA76D1\",\"initialprovidername_encrypted_hash\":\"djEwn2R+8PGjEAKtAZe3ZdaoPoPlRUrGh6V/o9KiENuI/3AtKFJq5/M1WhPIlSo2Q+lT\"},\"settings\":{\"mhjfbmdgcfjbbpaeojofohoefgiehjai\":\"5DD81A833F704CC9CFFD4DB414BD434F0181E04139DFE445999D65FDCFBDBD4C\"},\"settings_encrypted_hash\":{\"mhjfbmdgcfjbbpaeojofohoefgiehjai\":\"djEwuXANFd9Ju69tc+8bQZVJcP3o4ie8LQIqeX9uX16XJ2x0mikIsRMHxJQ2snEKGMen\"},\"ui\":{\"developer_mode\":\"55A29C051727FCAC1BDA847CCDE40838B2068CFA589E88819EA9FB17E4BD7320\",\"developer_mode_encrypted_hash\":\"djEwuSLe9IdmBUATWBHHs7zsIrMSzx7pZ6JTHR8otknIBz+qN2MkhgBcyaDLS6rEKzM/\"}},\"google\":{\"services\":{\"account_id\":\"E5B4CD7C5FA271A47D07D462465AFD63DBF6A8CDFAFEF4839D13F8F552131486\",\"account_id_encrypted_hash\":\"djEws5EOag2fZGfyxpqHcku8joB6KwiFyWcmiFR/aVXfXX6OvP/bjwC8JQV6CzNTKMMu\",\"last_signed_in_username\":\"82DB8D884695C643C31778B7B50DBB376848E2F81B5A1AECDA34FD448CECD10D\",\"last_signed_in_username_encrypted_hash\":\"djEwxOmun3qSdHJMQzaJrU+kjwQLP+13cHAn1VOQvoQtqSk/p/pGFhbaSzbJpX4wwHgm\",\"last_username\":\"24FCEF9BF7DF12A2935BE143E58951E09DBAA1D3E0E24430C0FF93009F5D6AFD\",\"last_username_encrypted_hash\":\"djEwUrwWTlb71Rdn7Dja+dvU5v0mcEbu5mgSO71viEUKKH+f/HHPQ9PpahcBiBCBPv8C\"}},\"homepage\":\"B1E9FE8108A84F532486D13AAC43C0AFDA16D3DFC9EB2F743AEE11F89F2F163E\",\"homepage_encrypted_hash\":\"djEwXI82V8JtaVjhjBoUbIx22Ija6Nvw5Jh2xACB85WXz7fITVJD3wclEv4HEI0zZpr/\",\"homepage_is_newtabpage\":\"3680F776D17E3C099431BAF5381FAB9BCC0C2C70FEA4C74D12324BC94A207119\",\"homepage_is_newtabpage_encrypted_hash\":\"djEw25d7Roo6fA2vNKU5847ct9Ggqv6D6fTH6ndRlxrc0z/rsPA4asUmxGpQS8docKYR\",\"media\":{\"storage_id_salt\":\"E1848263E6199A89D48A7FDF168364BF0F31246A18227F3D149D4088C7F4D667\",\"storage_id_salt_encrypted_hash\":\"djEwmus7A6SiHO78MEjfL8UH7gPMKzNqfXxuxeOCVs7oMQHvhcUctFVQ/H+biDlrSfmN\"},\"pinned_tabs\":\"5FF265371BB528ED630092A900058C08217611AB525D4C12B41C44C008BAC799\",\"pinned_tabs_encrypted_hash\":\"djEwrI/SY+iwVmRCtzCcz7vvvY6ZHUVsx2j/4nnxc+BZPvzNQjU7mqUCFL4/rzMbh5B0\",\"prefs\":{\"preference_reset_time\":\"95C909F3D0669D5931907B455F099C510E7770D9F0BA6FF13E4C76101B44F757\",\"preference_reset_time_encrypted_hash\":\"djEwyqoM/JGpKiFlXV3eoINFUv2ETBFL4NGU4ieOBHK8c6NFWgNZelQ+eaT90ssc6IS/\"},\"safebrowsing\":{\"incidents_sent\":\"569707D9A4676B72F48BE92B740BE3EF895419C8A646F1AE1BA70BD9C3B41845\",\"incidents_sent_encrypted_hash\":\"djEwMiMAX53T1art8hiNWR2KtJtvDx/Ug453nMjIrrEJhrKvzT9/gP0n1oArCPjd05vR\"},\"schedule_to_flush_to_disk\":\"0C01098667045BC6A1329F6F8E43E59235431525C50A5F95F37ACC029FE8917A\",\"schedule_to_flush_to_disk_encrypted_hash\":\"djEwqUr3O4jps1VvWjtflBEgOyqJiBnBmW/nvHQ9gomrRE6tPLlLWCz2g67HJAHYVPYB\",\"search_provider_overrides\":\"1E1EBA3A4DC28A23BEFCF6ED5D71CE71E9814DD587A305F6B14F72E834AF75DD\",\"search_provider_overrides_encrypted_hash\":\"djEw/O1Fo7yxiDwDA9NaOfk9W7zGcLAU6L2CmXC9ayuNndZIrEps+rHLBu4+De+BVFES\",\"session\":{\"restore_on_startup\":\"F9BD26F5D1AA6AB5258754888529CB2A82AE68D1703BCC2A97DEAEE5DDDA190E\",\"restore_on_startup_encrypted_hash\":\"djEw9KqVM3yzw2hBpRQs9cgmZz1EepB9mkNSYLmMWTe+s949xVxZNzKTFwIKzQYpLzqG\",\"startup_urls\":\"8BB8DBC1D7CA5C58F821C38254FB2B9C874F8EE9B9905B57DE48C731C6C91837\",\"startup_urls_encrypted_hash\":\"djEwQZx2i/wNzOqRtH3q8zoq3uvH2GfwPEM4MJtVt+cymnLfCjxp2xQeLnhTdFdNMrtB\"}},\"super_encrypted_hash\":\"djEwwjwDLgN/xVs63uHuKrim9KoN9UAOl2AVaDKHB7D3Pkj5zY79lkNyT02kG41deW4d\"},\"safebrowsing\":{\"event_timestamps\":{},\"metrics_last_log_time\":\"13439015381\",\"scout_reporting_enabled_when_deprecated\":false},\"safety_hub\":{\"unused_site_permissions_revocation\":{\"migration_completed\":true}},\"saved_tab_groups\":{\"did_enable_shared_tab_groups_in_last_session\":false,\"specifics_to_data_migration\":true},\"schedule_to_flush_to_disk\":\"13439015396589680\",\"segmentation_platform\":{\"client_result_prefs\":\"ClIKDXNob3BwaW5nX3VzZXISQQo2DQAAAAAQ8qGX3enW7xcaJAocChoNAAAAPxIMU2hvcHBpbmdVc2VyGgVPdGhlchIEEAIYBCADEKjYqt3p1u8X\",\"device_switcher_util\":{\"result\":{\"labels\":[\"NotSynced\"]}},\"last_db_compaction_time\":\"13438915199000000\",\"uma_in_sql_start_time\":\"13439015378564490\"},\"sessions\":{\"event_log\":[{\"crashed\":false,\"time\":\"13439015377971739\",\"type\":0}],\"session_data_status\":1},\"signin\":{\"account_preview_data_last_update\":\"13439015378148311\",\"accounts_metadata_dict\":{},\"allowed\":true,\"avatar_button_promo_dict\":{\"AvatarButtonSigninPromoLastShownTime\":\"13439015402150683\",\"AvatarButtonSigninPromoShownCount\":1}},\"spellcheck\":{\"dictionaries\":[\"en-US\"],\"dictionary\":\"\"},\"sync\":{\"data_type_status_for_sync_to_signin\":{\"account_setting\":false,\"ai_thread\":false,\"app_list\":false,\"app_settings\":false,\"apps\":false,\"arc_package\":false,\"autofill\":false,\"autofill_entity_suppression\":false,\"autofill_profiles\":false,\"autofill_valuable\":false,\"autofill_valuable_metadata\":false,\"autofill_wallet\":false,\"autofill_wallet_credential\":false,\"autofill_wallet_metadata\":false,\"autofill_wallet_usage\":false,\"bookmarks\":false,\"collaboration_group\":false,\"contact_info\":false,\"contextual_task\":false,\"cookies\":false,\"device_info\":false,\"dictionary\":false,\"encrypted_tab_context_container\":false,\"encrypted_tab_context_item\":false,\"extension_settings\":false,\"extensions\":false,\"gemini_thread\":false,\"history\":false,\"history_delete_directives\":false,\"incoming_password_sharing_invitation\":false,\"journey\":false,\"managed_user_settings\":false,\"nigori\":false,\"notebook\":false,\"os_preferences\":false,\"os_priority_preferences\":false,\"outgoing_password_sharing_invitation\":false,\"passwords\":false,\"preferences\":false,\"printers\":false,\"printers_authorization_servers\":false,\"priority_preferences\":false,\"product_comparison\":false,\"reading_list\":false,\"saved_tab_group\":false,\"search_engines\":false,\"security_events\":false,\"send_tab_to_self\":false,\"sessions\":false,\"shared_comment\":false,\"shared_tab_group_account_data\":false,\"shared_tab_group_data\":false,\"sharing_message\":false,\"skill\":false,\"themes\":false,\"themes_android\":false,\"themes_ios\":false,\"user_consent\":false,\"user_events\":false,\"web_apps\":false,\"webauthn_credential\":false,\"wifi_configurations\":false,\"workspace_desk\":false},\"encryption_bootstrap_token_per_account_migration_done\":true,\"feature_status_for_sync_to_signin\":5,\"sync_to_signin_migration_state\":2},\"syncing_theme_prefs_migrated_to_non_syncing\":true,\"toolbar\":{\"pinned_cast_migration_complete\":true,\"pinned_chrome_labs_migration_complete\":true},\"total_passwords_available_for_account\":0,\"total_passwords_available_for_profile\":0,\"vertical_tabs\":{\"collapsed_state\":false,\"uncollapsed_width\":240},\"web_apps\":{\"did_migrate_default_chrome_apps\":[\"MigrateDefaultChromeAppToWebAppsGSuite\",\"MigrateDefaultChromeAppToWebAppsNonGSuite\"],\"last_preinstall_synchronize_version\":\"156\"}}",
+    "sandbox_status": "SYNVEIL_SANDBOX_RENDERER user_ns=user:[4026532363] session_user_ns=user:[4026531837] seccomp=2 pid=1227\n"
+   },
+   "at": 1794542055.263,
+   "browser_alive_after": false
+  },
+  "B4": {
+   "at": 1794542055.263,
+   "back_restored": false,
+   "page_left": false
+  },
+  "B5": {
+   "artifacts": {
+    "big_partial_size": 0,
+    "big_size": 0,
+    "browser_started_count": 1,
+    "control": {
+     "confirmed": {
+      "bytes": 262194176,
+      "generation_id": "synveil-gen-v1",
+      "min_reader_state_format": 1,
+      "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+      "slot": "A",
+      "state_format": 1,
+      "version": 1
+     },
+     "history": [
+      {
+       "action": "provision",
+       "at": 1794541709,
+       "result": "confirmed",
+       "slot": "A",
+       "version": 1
+      }
+     ],
+     "schema": "synveil.ab-control/v2",
+     "slots": {
+      "A": {
+       "bytes": 262194176,
+       "generation_id": "synveil-gen-v1",
+       "min_reader_state_format": 1,
+       "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+       "slot": "A",
+       "state_format": 1,
+       "version": 1
+      },
+      "B": null
+     },
+     "trial": null
+    },
+    "credential_sha256": "e51837e67db65de6844d226be9c6bff32cdc5004e2bfef8c8a2ce36319143108",
+    "downloads_listing": [],
+    "files_entry_lines": 6,
+    "files_payload2_scans": 0,
+    "files_payload_scans": 0,
+    "known_file": null,
+    "netlog_attempted_hosts": [
+     "accounts.google.com",
+     "optimizationguide-pa.googleapis.com",
+     "update.googleapis.com"
+    ],
+    "netlog_dns_hosts": [
+     "accounts.google.com",
+     "optimizationguide-pa.googleapis.com",
+     "update.googleapis.com"
+    ],
+    "netlog_files": 1,
+    "netlog_sockets": [
+     "10.0.2.3:53",
+     "[2001:4860:4860::8888]:443",
+     "[fec0::5054:ff:fe12:3456]:33289",
+     "[fec0::5054:ff:fe12:3456]:35081",
+     "[fec0::5054:ff:fe12:3456]:35658",
+     "[fec0::5054:ff:fe12:3456]:37720",
+     "[fec0::5054:ff:fe12:3456]:37733",
+     "[fec0::5054:ff:fe12:3456]:39065",
+     "[fec0::5054:ff:fe12:3456]:40287",
+     "[fec0::5054:ff:fe12:3456]:40413",
+     "[fec0::5054:ff:fe12:3456]:41733",
+     "[fec0::5054:ff:fe12:3456]:41842",
+     "[fec0::5054:ff:fe12:3456]:42114",
+     "[fec0::5054:ff:fe12:3456]:42427",
+     "[fec0::5054:ff:fe12:3456]:42500",
+     "[fec0::5054:ff:fe12:3456]:45913",
+     "[fec0::5054:ff:fe12:3456]:50242",
+     "[fec0::5054:ff:fe12:3456]:50548",
+     "[fec0::5054:ff:fe12:3456]:54643",
+     "[fec0::5054:ff:fe12:3456]:54753",
+     "[fec0::5054:ff:fe12:3456]:55812",
+     "[fec0::5054:ff:fe12:3456]:57825",
+     "[fec0::5054:ff:fe12:3456]:60906"
+    ],
+    "payload1_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload1_size": 0,
+    "payload2_guest_sha256": null,
+    "payload2_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload2_size": 0,
+    "payload_guest_sha256": null,
+    "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload_size": 0,
+    "pref_sha256": null,
+    "pref_text": null,
+    "profile_preferences": "{\"accessibility\":{\"captions\":{\"headless_caption_enabled\":false}},\"account_tracker_service_last_update\":\"13439015398073567\",\"apps\":{\"shortcuts_arch\":\"\",\"shortcuts_os_version\":\"\",\"shortcuts_version\":0},\"autocomplete\":{\"retention_policy_last_version\":156},\"autofill\":{\"ai_last_version_deduped\":156,\"autofill_ai\":{\"opt_in_status\":{}},\"last_version_deduped\":156},\"bookmark\":{\"storage_computation_last_update\":\"13439015396779193\"},\"browser\":{\"check_default_browser\":false,\"window_placement\":{\"bottom\":790,\"left\":10,\"maximized\":false,\"right\":1060,\"top\":10,\"work_area_bottom\":800,\"work_area_left\":0,\"work_area_right\":1280,\"work_area_top\":0}},\"commerce_daily_metrics_last_update_time\":\"13439015392857658\",\"default_apps_install_state\":2,\"domain_diversity\":{\"last_reporting_timestamp\":\"13439015392792230\",\"last_reporting_timestamp_v4\":\"13439015392793148\"},\"download\":{\"default_directory\":\"/home/synveil/Downloads\",\"directory_upgrade\":true,\"prompt_for_download\":false},\"dual_layer_user_pref_store\":{\"user_selected_sync_types\":[]},\"enterprise_profile_guid\":\"363079a2-3463-4b43-be72-8130a1021477\",\"extensions\":{\"alerts\":{\"initialized\":true},\"chrome_url_overrides\":{},\"last_chrome_version\":\"156.0.8078.47\",\"settings\":{\"mhjfbmdgcfjbbpaeojofohoefgiehjai\":{\"account_extension_type\":0,\"active_permissions\":{\"api\":[\"contentSettings\",\"fileSystem\",\"fileSystem.write\",\"metricsPrivate\",\"tabs\",\"resourcesPrivate\",\"pdfViewerPrivate\"],\"explicit_host\":[\"chrome://resources/*\",\"chrome://webui-test/*\"],\"manifest_permissions\":[],\"scriptable_host\":[]},\"commands\":{},\"content_settings\":[],\"creation_flags\":1,\"disable_reasons\":[],\"events\":[],\"first_install_time\":\"13439015379881806\",\"from_webstore\":false,\"incognito_content_settings\":[],\"incognito_preferences\":{},\"last_loaded_browser_version\":\"156.0.8078.47\",\"last_update_time\":\"13439015379881806\",\"location\":5,\"manifest\":{\"content_security_policy\":\"script-src 'self' blob: filesystem: chrome://resources chrome://webui-test; object-src * blob: externalfile: file: filesystem: data:\",\"description\":\"\",\"incognito\":\"split\",\"key\":\"MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDN6hM0rsDYGbzQPQfOygqlRtQgKUXMfnSjhIBL7LnReAVBEd7ZmKtyN2qmSasMl4HZpMhVe2rPWVVwBDl6iyNE/Kok6E6v6V3vCLGsOpQAuuNVye/3QxzIldzG/jQAdWZiyXReRVapOhZtLjGfywCvlWq7Sl/e3sbc0vWybSDI2QIDAQAB\",\"manifest_version\":2,\"mime_types\":[\"application/pdf\",\"text/pdf\"],\"mime_types_handler\":\"index.html\",\"name\":\"Chromium PDF Viewer\",\"offline_enabled\":true,\"permissions\":[\"chrome://resources/\",\"chrome://webui-test/\",\"contentSettings\",\"metricsPrivate\",\"pdfViewerPrivate\",\"resourcesPrivate\",\"tabs\",{\"fileSystem\":[\"write\"]}],\"version\":\"1\"},\"path\":\"/usr/lib/chromium/resources/pdf\",\"preferences\":{},\"regular_only_preferences\":{},\"was_installed_by_default\":false,\"was_installed_by_oem\":false}}},\"gaia_cookie\":{\"periodic_report_time_2\":\"13439015376969473\"},\"gcm\":{\"product_category_for_subtypes\":\"org.chromium.linux\"},\"google\":{\"services\":{\"signin_scoped_device_id\":\"f00cca3f-ef8b-49bf-898f-38639b8ba7b5\"}},\"in_product_help\":{\"recent_session_enabled_time\":\"13439015381108170\",\"recent_session_start_times\":[\"13439015381108170\"],\"session_last_active_time\":\"13439015381108170\",\"session_number\":2,\"session_start_time\":\"13439015381108170\"},\"intl\":{\"selected_languages\":\"en-US,en\"},\"media\":{\"engagement\":{\"schema_version\":5}},\"media_router\":{\"receiver_id_hash_token\":\"EypCEMBbTu+uz1XvasY2tZeWWXPbJykrN9amiYItainIUx2hVTKyU168EY2gD/VZN/e8EFO9VmeOAh+KSWxpPg==\"},\"ntp\":{\"num_personal_suggestions\":1},\"optimization_guide\":{\"hintsfetcher\":{\"hosts_successfully_fetched\":{}},\"previously_registered_optimization_types\":{\"ABOUT_THIS_SITE\":true,\"AUTOFILL_ACTOR_IFRAME_ORIGIN_ALLOWLIST\":true,\"DIGITAL_CREDENTIALS_LOW_FRICTION\":true,\"GLIC_ACTION_PAGE_BLOCK\":true,\"HISTORY_CLUSTERS\":true,\"LENS_OVERLAY_EDU_ACTION_CHIP_ALLOWLIST\":true,\"LENS_OVERLAY_EDU_ACTION_CHIP_BLOCKLIST\":true,\"LOADING_PREDICTOR\":true,\"MERCHANT_TRUST_SIGNALS_V2\":true,\"PRICE_TRACKING\":true,\"SAVED_TAB_GROUP\":true,\"V8_COMPILE_HINTS\":true}},\"password_manager\":{\"account_store_backup_password_cleaning_last_timestamp\":\"13439015435291791\",\"account_store_migrated_to_os_crypt_async\":true,\"on_device_encryption_state_passkey_last_reported_bucket\":4,\"on_device_encryption_state_passkey_last_reporting_time\":\"13439015408763157\",\"on_device_encryption_state_password_last_reported_bucket\":4,\"on_device_encryption_state_password_last_reporting_time\":\"13439015408768068\",\"profile_store_backup_password_cleaning_last_timestamp\":\"13439015435263256\",\"profile_store_migrated_to_os_crypt_async\":true},\"privacy_sandbox\":{\"first_party_sets_data_access_allowed_initialized\":true,\"first_party_sets_enabled\":false},\"profile\":{\"avatar_index\":26,\"background_password_check\":{\"check_fri_weight\":9,\"check_interval\":\"864000000000\",\"check_mon_weight\":4,\"check_sat_weight\":4,\"check_sun_weight\":4,\"check_thu_weight\":9,\"check_tue_weight\":9,\"check_wed_weight\":9,\"next_check_time\":\"13439217469065314\"},\"content_settings\":{\"exceptions\":{\"abusive_notification_permissions\":{},\"access_to_get_all_screens_media_in_session\":{},\"anti_abuse\":{},\"app_banner\":{},\"ar\":{},\"are_suspicious_notifications_allowlisted_by_user\":{},\"auto_picture_in_picture\":{},\"auto_select_certificate\":{},\"automatic_downloads\":{},\"automatic_fullscreen\":{},\"autoplay\":{},\"background_sync\":{},\"bluetooth_chooser_data\":{},\"bluetooth_guard\":{},\"bluetooth_scanning\":{},\"camera_pan_tilt_zoom\":{},\"captured_surface_control\":{},\"client_hints\":{},\"clipboard\":{},\"controlled_frame\":{},\"cookie_controls_metadata\":{},\"cookies\":{},\"direct_sockets\":{},\"display_media_system_audio\":{},\"disruptive_notification_permissions\":{},\"durable_storage\":{},\"fedcm_idp_registration\":{},\"fedcm_idp_signin\":{},\"fedcm_share\":{},\"file_system_access_chooser_data\":{},\"file_system_access_extended_permission\":{},\"file_system_access_restore_permission\":{},\"file_system_last_picked_directory\":{},\"file_system_read_guard\":{},\"file_system_write_guard\":{},\"formfill_metadata\":{},\"geolocation\":{},\"geolocation_with_options\":{},\"hand_tracking\":{},\"has_migrated_local_network_access\":true,\"hid_chooser_data\":{},\"hid_guard\":{},\"http_allowed\":{},\"https_enforced\":{},\"idle_detection\":{},\"images\":{},\"important_site_info\":{},\"initialized_translations\":{},\"inline_cue_menu\":{},\"intent_picker_auto_display\":{},\"javascript\":{},\"javascript_jit\":{},\"javascript_optimizer\":{},\"keyboard_lock\":{},\"legacy_cookie_access\":{},\"legacy_cookie_scope\":{},\"local_fonts\":{},\"local_network\":{},\"local_network_access\":{},\"loopback_network\":{},\"media_engagement\":{},\"media_stream_camera\":{},\"media_stream_mic\":{},\"midi_sysex\":{},\"mixed_script\":{},\"nfc_devices\":{},\"notification_interactions\":{},\"notification_permission_review\":{},\"notifications\":{},\"ondevice_languages_downloaded\":{},\"password_protection\":{},\"payment_handler\":{},\"permission_actions_history\":{},\"permission_autoblocking_data\":{},\"permission_autorevocation_data\":{},\"pointer_lock\":{},\"popups\":{},\"protocol_handler\":{},\"reduced_accept_language\":{},\"safe_browsing_url_check_data\":{},\"sensors\":{},\"serial_chooser_data\":{},\"serial_guard\":{},\"site_engagement\":{\"chrome://omnibox-popup.top-chrome/,*\":{\"last_modified\":\"13439015401291463\",\"setting\":{\"lastEngagementTime\":1.3439015401290668e+16,\"lastShortcutLaunchTime\":0.0,\"pointsAddedToday\":4.5,\"rawScore\":4.5}}},\"sound\":{},\"speaker_selection\":{},\"ssl_cert_decisions\":{},\"storage_access\":{},\"sub_apps_without_prompts\":{},\"subresource_filter\":{},\"subresource_filter_data\":{},\"suspicious_notification_ids\":{},\"suspicious_notification_show_original\":{},\"suspicious_site_warning_data\":{},\"top_level_storage_access\":{},\"unused_site_permissions\":{},\"usb_chooser_data\":{},\"usb_guard\":{},\"vr\":{},\"web_app_installation\":{},\"webid_api\":{},\"webid_auto_reauthn\":{},\"window_placement\":{}},\"pref_version\":1},\"creation_time\":\"13439015354086423\",\"default_content_setting_values\":{\"has_migrated_local_network_access\":true},\"exit_type\":\"Crashed\",\"last_engagement_time\":\"13439015401290668\",\"last_time_obsolete_http_credentials_removed\":1794541835.269264,\"last_time_password_store_metrics_reported\":1794541808.661227,\"managed\":{\"locally_parent_approved_extensions\":{},\"locally_parent_approved_extensions_migration_state\":1},\"managed_user_id\":\"\",\"name\":\"Your Chromium\",\"password_hash_data_list\":[],\"were_old_google_logins_removed\":true},\"profile_network_context_service\":{\"http_cache_finch_experiment_groups\":\"None None None None\"},\"protection\":{\"macs\":{\"account_values\":{\"browser\":{\"show_home_button\":\"F6B8688079AA4C4657C3FEDCF3311348C99CB4907EEC8560CC323E4F37D1EA41\",\"show_home_button_encrypted_hash\":\"djEwotRkFT2vHnhhCIA/V+DRZrZjLnP+b+0VwSGjql5xrXDmPtBAfaZbFURGViRnbnec\"},\"extensions\":{\"ui\":{\"developer_mode\":\"C4B515ABCB16541C88B522387A89F47E24F150FF18A7256BF19EE2C0896D7555\",\"developer_mode_encrypted_hash\":\"djEwnGn4HyLm571QCCeecs4XAyIbPpI4sjZ8ckF6sff8BGbQEywtWeDm4qpSwJqGYOvN\"}},\"homepage\":\"0F156BE8FFEDBF22CC2E394D6BD8DDD392F953D0F397958C64EFA57087182457\",\"homepage_encrypted_hash\":\"djEwez6wt5PtkfTxuN+U9KVU6gUa9/33imjLLrtlo3LT0Y1d/stHX2XjJEWHwpeLGZY1\",\"homepage_is_newtabpage\":\"BAF0DE42A6FEAC5EF6500592AEC92B79DC055C1E352B0F7BAC0BB6E72ECE67D3\",\"homepage_is_newtabpage_encrypted_hash\":\"djEwNuiyCSZBdqhV7ESdO8yuXbA1NHRVLQ2svfo+ZK5oaIry2f9Cx4rce+mIbAEw7G0P\",\"session\":{\"restore_on_startup\":\"81940185F7F78D0317AB3741FA4A283985C31DB3BF95D3A4DDD4CD78FC5021F1\",\"restore_on_startup_encrypted_hash\":\"djEwFEzg0id00W34Gz2o0K8gX+KMNet+dXfslTgHKA9xnZMI4OplF+GZvcpGWGX5hEYJ\",\"startup_urls\":\"B41DC391D323AEB2C5465D75AB79284F9F6620BEF161110DE35202261FF03449\",\"startup_urls_encrypted_hash\":\"djEwghL6jSVRi8mLaRGAB/JzS+xXBtxjeESAqUdFS7oORXVQ1jXID0VGOoaLWOgIcbzO\"}},\"browser\":{\"show_home_button\":\"904452986128BBEE5A7B1FFB8F342100C3150E3D9FD76C4105DF33EB021E22FD\",\"show_home_button_encrypted_hash\":\"djEwZQf6ZGWEvWHWC8sI8mCrY+eDy3+KjdSoiNhRlSr4DUlpnk7IhTF6IsAy9eiga5Lg\"},\"default_search_provider_data\":{\"template_url_data\":\"575D258E47F940C6887685ABA99A5839CBFE4BA30863349DFE0D0C375AAB8816\",\"template_url_data_encrypted_hash\":\"djEwzkpvA9+swWTDV77WN7hWEwIE+/MvksCTQp4rKgJsLjCiagQhCIMUK3mxnliviILf\"},\"enterprise_signin\":{\"policy_recovery_token\":\"7D3124ECAF7E96407EB65EAF5A43B02C7EE5F2D4A9FA38A9F371F9E1B74D6383\",\"policy_recovery_token_encrypted_hash\":\"djEwntGC63MNa+3FPXvwkgoSZGXvXYrVoevkgw7qmK06Zwt7RdLbwPV3QCnGv8fsmfLO\"},\"extensions\":{\"install\":{\"initiallist\":\"721565429F6DB8F08CC129E8B4A99021CECE263598EA7CF847C99A2133F23581\",\"initiallist_encrypted_hash\":\"djEwkHeWi9EY4quXPiJOJHKkiaZv/Yduf0mGmHL+hm4bMgHCoBktkuispsBkSEGGppg3\",\"initialprovidername\":\"89DB3C44559AC7E75E930F08876F726C91D84C2D8D4D0A9DB7DA59DB15FA76D1\",\"initialprovidername_encrypted_hash\":\"djEwn2R+8PGjEAKtAZe3ZdaoPoPlRUrGh6V/o9KiENuI/3AtKFJq5/M1WhPIlSo2Q+lT\"},\"settings\":{\"mhjfbmdgcfjbbpaeojofohoefgiehjai\":\"5DD81A833F704CC9CFFD4DB414BD434F0181E04139DFE445999D65FDCFBDBD4C\"},\"settings_encrypted_hash\":{\"mhjfbmdgcfjbbpaeojofohoefgiehjai\":\"djEwuXANFd9Ju69tc+8bQZVJcP3o4ie8LQIqeX9uX16XJ2x0mikIsRMHxJQ2snEKGMen\"},\"ui\":{\"developer_mode\":\"55A29C051727FCAC1BDA847CCDE40838B2068CFA589E88819EA9FB17E4BD7320\",\"developer_mode_encrypted_hash\":\"djEwuSLe9IdmBUATWBHHs7zsIrMSzx7pZ6JTHR8otknIBz+qN2MkhgBcyaDLS6rEKzM/\"}},\"google\":{\"services\":{\"account_id\":\"E5B4CD7C5FA271A47D07D462465AFD63DBF6A8CDFAFEF4839D13F8F552131486\",\"account_id_encrypted_hash\":\"djEws5EOag2fZGfyxpqHcku8joB6KwiFyWcmiFR/aVXfXX6OvP/bjwC8JQV6CzNTKMMu\",\"last_signed_in_username\":\"82DB8D884695C643C31778B7B50DBB376848E2F81B5A1AECDA34FD448CECD10D\",\"last_signed_in_username_encrypted_hash\":\"djEwxOmun3qSdHJMQzaJrU+kjwQLP+13cHAn1VOQvoQtqSk/p/pGFhbaSzbJpX4wwHgm\",\"last_username\":\"24FCEF9BF7DF12A2935BE143E58951E09DBAA1D3E0E24430C0FF93009F5D6AFD\",\"last_username_encrypted_hash\":\"djEwUrwWTlb71Rdn7Dja+dvU5v0mcEbu5mgSO71viEUKKH+f/HHPQ9PpahcBiBCBPv8C\"}},\"homepage\":\"B1E9FE8108A84F532486D13AAC43C0AFDA16D3DFC9EB2F743AEE11F89F2F163E\",\"homepage_encrypted_hash\":\"djEwXI82V8JtaVjhjBoUbIx22Ija6Nvw5Jh2xACB85WXz7fITVJD3wclEv4HEI0zZpr/\",\"homepage_is_newtabpage\":\"3680F776D17E3C099431BAF5381FAB9BCC0C2C70FEA4C74D12324BC94A207119\",\"homepage_is_newtabpage_encrypted_hash\":\"djEw25d7Roo6fA2vNKU5847ct9Ggqv6D6fTH6ndRlxrc0z/rsPA4asUmxGpQS8docKYR\",\"media\":{\"storage_id_salt\":\"E1848263E6199A89D48A7FDF168364BF0F31246A18227F3D149D4088C7F4D667\",\"storage_id_salt_encrypted_hash\":\"djEwmus7A6SiHO78MEjfL8UH7gPMKzNqfXxuxeOCVs7oMQHvhcUctFVQ/H+biDlrSfmN\"},\"pinned_tabs\":\"5FF265371BB528ED630092A900058C08217611AB525D4C12B41C44C008BAC799\",\"pinned_tabs_encrypted_hash\":\"djEwrI/SY+iwVmRCtzCcz7vvvY6ZHUVsx2j/4nnxc+BZPvzNQjU7mqUCFL4/rzMbh5B0\",\"prefs\":{\"preference_reset_time\":\"95C909F3D0669D5931907B455F099C510E7770D9F0BA6FF13E4C76101B44F757\",\"preference_reset_time_encrypted_hash\":\"djEwyqoM/JGpKiFlXV3eoINFUv2ETBFL4NGU4ieOBHK8c6NFWgNZelQ+eaT90ssc6IS/\"},\"safebrowsing\":{\"incidents_sent\":\"569707D9A4676B72F48BE92B740BE3EF895419C8A646F1AE1BA70BD9C3B41845\",\"incidents_sent_encrypted_hash\":\"djEwMiMAX53T1art8hiNWR2KtJtvDx/Ug453nMjIrrEJhrKvzT9/gP0n1oArCPjd05vR\"},\"schedule_to_flush_to_disk\":\"0C01098667045BC6A1329F6F8E43E59235431525C50A5F95F37ACC029FE8917A\",\"schedule_to_flush_to_disk_encrypted_hash\":\"djEwqUr3O4jps1VvWjtflBEgOyqJiBnBmW/nvHQ9gomrRE6tPLlLWCz2g67HJAHYVPYB\",\"search_provider_overrides\":\"1E1EBA3A4DC28A23BEFCF6ED5D71CE71E9814DD587A305F6B14F72E834AF75DD\",\"search_provider_overrides_encrypted_hash\":\"djEw/O1Fo7yxiDwDA9NaOfk9W7zGcLAU6L2CmXC9ayuNndZIrEps+rHLBu4+De+BVFES\",\"session\":{\"restore_on_startup\":\"F9BD26F5D1AA6AB5258754888529CB2A82AE68D1703BCC2A97DEAEE5DDDA190E\",\"restore_on_startup_encrypted_hash\":\"djEw9KqVM3yzw2hBpRQs9cgmZz1EepB9mkNSYLmMWTe+s949xVxZNzKTFwIKzQYpLzqG\",\"startup_urls\":\"8BB8DBC1D7CA5C58F821C38254FB2B9C874F8EE9B9905B57DE48C731C6C91837\",\"startup_urls_encrypted_hash\":\"djEwQZx2i/wNzOqRtH3q8zoq3uvH2GfwPEM4MJtVt+cymnLfCjxp2xQeLnhTdFdNMrtB\"}},\"super_encrypted_hash\":\"djEwwjwDLgN/xVs63uHuKrim9KoN9UAOl2AVaDKHB7D3Pkj5zY79lkNyT02kG41deW4d\"},\"safebrowsing\":{\"event_timestamps\":{},\"metrics_last_log_time\":\"13439015381\",\"scout_reporting_enabled_when_deprecated\":false},\"safety_hub\":{\"unused_site_permissions_revocation\":{\"migration_completed\":true}},\"saved_tab_groups\":{\"did_enable_shared_tab_groups_in_last_session\":false,\"specifics_to_data_migration\":true},\"schedule_to_flush_to_disk\":\"13439015396589680\",\"segmentation_platform\":{\"client_result_prefs\":\"ClIKDXNob3BwaW5nX3VzZXISQQo2DQAAAAAQ8qGX3enW7xcaJAocChoNAAAAPxIMU2hvcHBpbmdVc2VyGgVPdGhlchIEEAIYBCADEKjYqt3p1u8X\",\"device_switcher_util\":{\"result\":{\"labels\":[\"NotSynced\"]}},\"last_db_compaction_time\":\"13438915199000000\",\"uma_in_sql_start_time\":\"13439015378564490\"},\"sessions\":{\"event_log\":[{\"crashed\":false,\"time\":\"13439015377971739\",\"type\":0}],\"session_data_status\":1},\"signin\":{\"account_preview_data_last_update\":\"13439015378148311\",\"accounts_metadata_dict\":{},\"allowed\":true,\"avatar_button_promo_dict\":{\"AvatarButtonSigninPromoLastShownTime\":\"13439015402150683\",\"AvatarButtonSigninPromoShownCount\":1}},\"spellcheck\":{\"dictionaries\":[\"en-US\"],\"dictionary\":\"\"},\"sync\":{\"data_type_status_for_sync_to_signin\":{\"account_setting\":false,\"ai_thread\":false,\"app_list\":false,\"app_settings\":false,\"apps\":false,\"arc_package\":false,\"autofill\":false,\"autofill_entity_suppression\":false,\"autofill_profiles\":false,\"autofill_valuable\":false,\"autofill_valuable_metadata\":false,\"autofill_wallet\":false,\"autofill_wallet_credential\":false,\"autofill_wallet_metadata\":false,\"autofill_wallet_usage\":false,\"bookmarks\":false,\"collaboration_group\":false,\"contact_info\":false,\"contextual_task\":false,\"cookies\":false,\"device_info\":false,\"dictionary\":false,\"encrypted_tab_context_container\":false,\"encrypted_tab_context_item\":false,\"extension_settings\":false,\"extensions\":false,\"gemini_thread\":false,\"history\":false,\"history_delete_directives\":false,\"incoming_password_sharing_invitation\":false,\"journey\":false,\"managed_user_settings\":false,\"nigori\":false,\"notebook\":false,\"os_preferences\":false,\"os_priority_preferences\":false,\"outgoing_password_sharing_invitation\":false,\"passwords\":false,\"preferences\":false,\"printers\":false,\"printers_authorization_servers\":false,\"priority_preferences\":false,\"product_comparison\":false,\"reading_list\":false,\"saved_tab_group\":false,\"search_engines\":false,\"security_events\":false,\"send_tab_to_self\":false,\"sessions\":false,\"shared_comment\":false,\"shared_tab_group_account_data\":false,\"shared_tab_group_data\":false,\"sharing_message\":false,\"skill\":false,\"themes\":false,\"themes_android\":false,\"themes_ios\":false,\"user_consent\":false,\"user_events\":false,\"web_apps\":false,\"webauthn_credential\":false,\"wifi_configurations\":false,\"workspace_desk\":false},\"encryption_bootstrap_token_per_account_migration_done\":true,\"feature_status_for_sync_to_signin\":5,\"sync_to_signin_migration_state\":2},\"syncing_theme_prefs_migrated_to_non_syncing\":true,\"toolbar\":{\"pinned_cast_migration_complete\":true,\"pinned_chrome_labs_migration_complete\":true},\"total_passwords_available_for_account\":0,\"total_passwords_available_for_profile\":0,\"vertical_tabs\":{\"collapsed_state\":false,\"uncollapsed_width\":240},\"web_apps\":{\"did_migrate_default_chrome_apps\":[\"MigrateDefaultChromeAppToWebAppsGSuite\",\"MigrateDefaultChromeAppToWebAppsNonGSuite\"],\"last_preinstall_synchronize_version\":\"156\"}}",
+    "sandbox_status": "SYNVEIL_SANDBOX_RENDERER user_ns=user:[4026532363] session_user_ns=user:[4026531837] seccomp=2 pid=1227\n"
+   },
+   "at": 1794542055.263,
+   "network_ready_again": false,
+   "page_proof": false
+  },
+  "B6": {
+   "artifacts": {
+    "big_partial_size": 0,
+    "big_size": 0,
+    "browser_started_count": 1,
+    "control": {
+     "confirmed": {
+      "bytes": 262194176,
+      "generation_id": "synveil-gen-v1",
+      "min_reader_state_format": 1,
+      "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+      "slot": "A",
+      "state_format": 1,
+      "version": 1
+     },
+     "history": [
+      {
+       "action": "provision",
+       "at": 1794541709,
+       "result": "confirmed",
+       "slot": "A",
+       "version": 1
+      }
+     ],
+     "schema": "synveil.ab-control/v2",
+     "slots": {
+      "A": {
+       "bytes": 262194176,
+       "generation_id": "synveil-gen-v1",
+       "min_reader_state_format": 1,
+       "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+       "slot": "A",
+       "state_format": 1,
+       "version": 1
+      },
+      "B": null
+     },
+     "trial": null
+    },
+    "credential_sha256": "e51837e67db65de6844d226be9c6bff32cdc5004e2bfef8c8a2ce36319143108",
+    "downloads_listing": [],
+    "files_entry_lines": 6,
+    "files_payload2_scans": 0,
+    "files_payload_scans": 0,
+    "known_file": null,
+    "netlog_attempted_hosts": [
+     "accounts.google.com",
+     "optimizationguide-pa.googleapis.com",
+     "update.googleapis.com"
+    ],
+    "netlog_dns_hosts": [
+     "accounts.google.com",
+     "optimizationguide-pa.googleapis.com",
+     "update.googleapis.com"
+    ],
+    "netlog_files": 1,
+    "netlog_sockets": [
+     "10.0.2.3:53",
+     "[2001:4860:4860::8888]:443",
+     "[fec0::5054:ff:fe12:3456]:33289",
+     "[fec0::5054:ff:fe12:3456]:35081",
+     "[fec0::5054:ff:fe12:3456]:35658",
+     "[fec0::5054:ff:fe12:3456]:37720",
+     "[fec0::5054:ff:fe12:3456]:37733",
+     "[fec0::5054:ff:fe12:3456]:39065",
+     "[fec0::5054:ff:fe12:3456]:40287",
+     "[fec0::5054:ff:fe12:3456]:40413",
+     "[fec0::5054:ff:fe12:3456]:41733",
+     "[fec0::5054:ff:fe12:3456]:41842",
+     "[fec0::5054:ff:fe12:3456]:42114",
+     "[fec0::5054:ff:fe12:3456]:42427",
+     "[fec0::5054:ff:fe12:3456]:42500",
+     "[fec0::5054:ff:fe12:3456]:45913",
+     "[fec0::5054:ff:fe12:3456]:50242",
+     "[fec0::5054:ff:fe12:3456]:50548",
+     "[fec0::5054:ff:fe12:3456]:54643",
+     "[fec0::5054:ff:fe12:3456]:54753",
+     "[fec0::5054:ff:fe12:3456]:55812",
+     "[fec0::5054:ff:fe12:3456]:57825",
+     "[fec0::5054:ff:fe12:3456]:60906"
+    ],
+    "payload1_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload1_size": 0,
+    "payload2_guest_sha256": null,
+    "payload2_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload2_size": 0,
+    "payload_guest_sha256": null,
+    "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload_size": 0,
+    "pref_sha256": null,
+    "pref_text": null,
+    "profile_preferences": "{\"accessibility\":{\"captions\":{\"headless_caption_enabled\":false}},\"account_tracker_service_last_update\":\"13439015398073567\",\"apps\":{\"shortcuts_arch\":\"\",\"shortcuts_os_version\":\"\",\"shortcuts_version\":0},\"autocomplete\":{\"retention_policy_last_version\":156},\"autofill\":{\"ai_last_version_deduped\":156,\"autofill_ai\":{\"opt_in_status\":{}},\"last_version_deduped\":156},\"bookmark\":{\"storage_computation_last_update\":\"13439015396779193\"},\"browser\":{\"check_default_browser\":false,\"window_placement\":{\"bottom\":790,\"left\":10,\"maximized\":false,\"right\":1060,\"top\":10,\"work_area_bottom\":800,\"work_area_left\":0,\"work_area_right\":1280,\"work_area_top\":0}},\"commerce_daily_metrics_last_update_time\":\"13439015392857658\",\"default_apps_install_state\":2,\"domain_diversity\":{\"last_reporting_timestamp\":\"13439015392792230\",\"last_reporting_timestamp_v4\":\"13439015392793148\"},\"download\":{\"default_directory\":\"/home/synveil/Downloads\",\"directory_upgrade\":true,\"prompt_for_download\":false},\"dual_layer_user_pref_store\":{\"user_selected_sync_types\":[]},\"enterprise_profile_guid\":\"363079a2-3463-4b43-be72-8130a1021477\",\"extensions\":{\"alerts\":{\"initialized\":true},\"chrome_url_overrides\":{},\"last_chrome_version\":\"156.0.8078.47\",\"settings\":{\"mhjfbmdgcfjbbpaeojofohoefgiehjai\":{\"account_extension_type\":0,\"active_permissions\":{\"api\":[\"contentSettings\",\"fileSystem\",\"fileSystem.write\",\"metricsPrivate\",\"tabs\",\"resourcesPrivate\",\"pdfViewerPrivate\"],\"explicit_host\":[\"chrome://resources/*\",\"chrome://webui-test/*\"],\"manifest_permissions\":[],\"scriptable_host\":[]},\"commands\":{},\"content_settings\":[],\"creation_flags\":1,\"disable_reasons\":[],\"events\":[],\"first_install_time\":\"13439015379881806\",\"from_webstore\":false,\"incognito_content_settings\":[],\"incognito_preferences\":{},\"last_loaded_browser_version\":\"156.0.8078.47\",\"last_update_time\":\"13439015379881806\",\"location\":5,\"manifest\":{\"content_security_policy\":\"script-src 'self' blob: filesystem: chrome://resources chrome://webui-test; object-src * blob: externalfile: file: filesystem: data:\",\"description\":\"\",\"incognito\":\"split\",\"key\":\"MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDN6hM0rsDYGbzQPQfOygqlRtQgKUXMfnSjhIBL7LnReAVBEd7ZmKtyN2qmSasMl4HZpMhVe2rPWVVwBDl6iyNE/Kok6E6v6V3vCLGsOpQAuuNVye/3QxzIldzG/jQAdWZiyXReRVapOhZtLjGfywCvlWq7Sl/e3sbc0vWybSDI2QIDAQAB\",\"manifest_version\":2,\"mime_types\":[\"application/pdf\",\"text/pdf\"],\"mime_types_handler\":\"index.html\",\"name\":\"Chromium PDF Viewer\",\"offline_enabled\":true,\"permissions\":[\"chrome://resources/\",\"chrome://webui-test/\",\"contentSettings\",\"metricsPrivate\",\"pdfViewerPrivate\",\"resourcesPrivate\",\"tabs\",{\"fileSystem\":[\"write\"]}],\"version\":\"1\"},\"path\":\"/usr/lib/chromium/resources/pdf\",\"preferences\":{},\"regular_only_preferences\":{},\"was_installed_by_default\":false,\"was_installed_by_oem\":false}}},\"gaia_cookie\":{\"periodic_report_time_2\":\"13439015376969473\"},\"gcm\":{\"product_category_for_subtypes\":\"org.chromium.linux\"},\"google\":{\"services\":{\"signin_scoped_device_id\":\"f00cca3f-ef8b-49bf-898f-38639b8ba7b5\"}},\"in_product_help\":{\"recent_session_enabled_time\":\"13439015381108170\",\"recent_session_start_times\":[\"13439015381108170\"],\"session_last_active_time\":\"13439015381108170\",\"session_number\":2,\"session_start_time\":\"13439015381108170\"},\"intl\":{\"selected_languages\":\"en-US,en\"},\"media\":{\"engagement\":{\"schema_version\":5}},\"media_router\":{\"receiver_id_hash_token\":\"EypCEMBbTu+uz1XvasY2tZeWWXPbJykrN9amiYItainIUx2hVTKyU168EY2gD/VZN/e8EFO9VmeOAh+KSWxpPg==\"},\"ntp\":{\"num_personal_suggestions\":1},\"optimization_guide\":{\"hintsfetcher\":{\"hosts_successfully_fetched\":{}},\"previously_registered_optimization_types\":{\"ABOUT_THIS_SITE\":true,\"AUTOFILL_ACTOR_IFRAME_ORIGIN_ALLOWLIST\":true,\"DIGITAL_CREDENTIALS_LOW_FRICTION\":true,\"GLIC_ACTION_PAGE_BLOCK\":true,\"HISTORY_CLUSTERS\":true,\"LENS_OVERLAY_EDU_ACTION_CHIP_ALLOWLIST\":true,\"LENS_OVERLAY_EDU_ACTION_CHIP_BLOCKLIST\":true,\"LOADING_PREDICTOR\":true,\"MERCHANT_TRUST_SIGNALS_V2\":true,\"PRICE_TRACKING\":true,\"SAVED_TAB_GROUP\":true,\"V8_COMPILE_HINTS\":true}},\"password_manager\":{\"account_store_backup_password_cleaning_last_timestamp\":\"13439015435291791\",\"account_store_migrated_to_os_crypt_async\":true,\"on_device_encryption_state_passkey_last_reported_bucket\":4,\"on_device_encryption_state_passkey_last_reporting_time\":\"13439015408763157\",\"on_device_encryption_state_password_last_reported_bucket\":4,\"on_device_encryption_state_password_last_reporting_time\":\"13439015408768068\",\"profile_store_backup_password_cleaning_last_timestamp\":\"13439015435263256\",\"profile_store_migrated_to_os_crypt_async\":true},\"privacy_sandbox\":{\"first_party_sets_data_access_allowed_initialized\":true,\"first_party_sets_enabled\":false},\"profile\":{\"avatar_index\":26,\"background_password_check\":{\"check_fri_weight\":9,\"check_interval\":\"864000000000\",\"check_mon_weight\":4,\"check_sat_weight\":4,\"check_sun_weight\":4,\"check_thu_weight\":9,\"check_tue_weight\":9,\"check_wed_weight\":9,\"next_check_time\":\"13439217469065314\"},\"content_settings\":{\"exceptions\":{\"abusive_notification_permissions\":{},\"access_to_get_all_screens_media_in_session\":{},\"anti_abuse\":{},\"app_banner\":{},\"ar\":{},\"are_suspicious_notifications_allowlisted_by_user\":{},\"auto_picture_in_picture\":{},\"auto_select_certificate\":{},\"automatic_downloads\":{},\"automatic_fullscreen\":{},\"autoplay\":{},\"background_sync\":{},\"bluetooth_chooser_data\":{},\"bluetooth_guard\":{},\"bluetooth_scanning\":{},\"camera_pan_tilt_zoom\":{},\"captured_surface_control\":{},\"client_hints\":{},\"clipboard\":{},\"controlled_frame\":{},\"cookie_controls_metadata\":{},\"cookies\":{},\"direct_sockets\":{},\"display_media_system_audio\":{},\"disruptive_notification_permissions\":{},\"durable_storage\":{},\"fedcm_idp_registration\":{},\"fedcm_idp_signin\":{},\"fedcm_share\":{},\"file_system_access_chooser_data\":{},\"file_system_access_extended_permission\":{},\"file_system_access_restore_permission\":{},\"file_system_last_picked_directory\":{},\"file_system_read_guard\":{},\"file_system_write_guard\":{},\"formfill_metadata\":{},\"geolocation\":{},\"geolocation_with_options\":{},\"hand_tracking\":{},\"has_migrated_local_network_access\":true,\"hid_chooser_data\":{},\"hid_guard\":{},\"http_allowed\":{},\"https_enforced\":{},\"idle_detection\":{},\"images\":{},\"important_site_info\":{},\"initialized_translations\":{},\"inline_cue_menu\":{},\"intent_picker_auto_display\":{},\"javascript\":{},\"javascript_jit\":{},\"javascript_optimizer\":{},\"keyboard_lock\":{},\"legacy_cookie_access\":{},\"legacy_cookie_scope\":{},\"local_fonts\":{},\"local_network\":{},\"local_network_access\":{},\"loopback_network\":{},\"media_engagement\":{},\"media_stream_camera\":{},\"media_stream_mic\":{},\"midi_sysex\":{},\"mixed_script\":{},\"nfc_devices\":{},\"notification_interactions\":{},\"notification_permission_review\":{},\"notifications\":{},\"ondevice_languages_downloaded\":{},\"password_protection\":{},\"payment_handler\":{},\"permission_actions_history\":{},\"permission_autoblocking_data\":{},\"permission_autorevocation_data\":{},\"pointer_lock\":{},\"popups\":{},\"protocol_handler\":{},\"reduced_accept_language\":{},\"safe_browsing_url_check_data\":{},\"sensors\":{},\"serial_chooser_data\":{},\"serial_guard\":{},\"site_engagement\":{\"chrome://omnibox-popup.top-chrome/,*\":{\"last_modified\":\"13439015401291463\",\"setting\":{\"lastEngagementTime\":1.3439015401290668e+16,\"lastShortcutLaunchTime\":0.0,\"pointsAddedToday\":4.5,\"rawScore\":4.5}}},\"sound\":{},\"speaker_selection\":{},\"ssl_cert_decisions\":{},\"storage_access\":{},\"sub_apps_without_prompts\":{},\"subresource_filter\":{},\"subresource_filter_data\":{},\"suspicious_notification_ids\":{},\"suspicious_notification_show_original\":{},\"suspicious_site_warning_data\":{},\"top_level_storage_access\":{},\"unused_site_permissions\":{},\"usb_chooser_data\":{},\"usb_guard\":{},\"vr\":{},\"web_app_installation\":{},\"webid_api\":{},\"webid_auto_reauthn\":{},\"window_placement\":{}},\"pref_version\":1},\"creation_time\":\"13439015354086423\",\"default_content_setting_values\":{\"has_migrated_local_network_access\":true},\"exit_type\":\"Crashed\",\"last_engagement_time\":\"13439015401290668\",\"last_time_obsolete_http_credentials_removed\":1794541835.269264,\"last_time_password_store_metrics_reported\":1794541808.661227,\"managed\":{\"locally_parent_approved_extensions\":{},\"locally_parent_approved_extensions_migration_state\":1},\"managed_user_id\":\"\",\"name\":\"Your Chromium\",\"password_hash_data_list\":[],\"were_old_google_logins_removed\":true},\"profile_network_context_service\":{\"http_cache_finch_experiment_groups\":\"None None None None\"},\"protection\":{\"macs\":{\"account_values\":{\"browser\":{\"show_home_button\":\"F6B8688079AA4C4657C3FEDCF3311348C99CB4907EEC8560CC323E4F37D1EA41\",\"show_home_button_encrypted_hash\":\"djEwotRkFT2vHnhhCIA/V+DRZrZjLnP+b+0VwSGjql5xrXDmPtBAfaZbFURGViRnbnec\"},\"extensions\":{\"ui\":{\"developer_mode\":\"C4B515ABCB16541C88B522387A89F47E24F150FF18A7256BF19EE2C0896D7555\",\"developer_mode_encrypted_hash\":\"djEwnGn4HyLm571QCCeecs4XAyIbPpI4sjZ8ckF6sff8BGbQEywtWeDm4qpSwJqGYOvN\"}},\"homepage\":\"0F156BE8FFEDBF22CC2E394D6BD8DDD392F953D0F397958C64EFA57087182457\",\"homepage_encrypted_hash\":\"djEwez6wt5PtkfTxuN+U9KVU6gUa9/33imjLLrtlo3LT0Y1d/stHX2XjJEWHwpeLGZY1\",\"homepage_is_newtabpage\":\"BAF0DE42A6FEAC5EF6500592AEC92B79DC055C1E352B0F7BAC0BB6E72ECE67D3\",\"homepage_is_newtabpage_encrypted_hash\":\"djEwNuiyCSZBdqhV7ESdO8yuXbA1NHRVLQ2svfo+ZK5oaIry2f9Cx4rce+mIbAEw7G0P\",\"session\":{\"restore_on_startup\":\"81940185F7F78D0317AB3741FA4A283985C31DB3BF95D3A4DDD4CD78FC5021F1\",\"restore_on_startup_encrypted_hash\":\"djEwFEzg0id00W34Gz2o0K8gX+KMNet+dXfslTgHKA9xnZMI4OplF+GZvcpGWGX5hEYJ\",\"startup_urls\":\"B41DC391D323AEB2C5465D75AB79284F9F6620BEF161110DE35202261FF03449\",\"startup_urls_encrypted_hash\":\"djEwghL6jSVRi8mLaRGAB/JzS+xXBtxjeESAqUdFS7oORXVQ1jXID0VGOoaLWOgIcbzO\"}},\"browser\":{\"show_home_button\":\"904452986128BBEE5A7B1FFB8F342100C3150E3D9FD76C4105DF33EB021E22FD\",\"show_home_button_encrypted_hash\":\"djEwZQf6ZGWEvWHWC8sI8mCrY+eDy3+KjdSoiNhRlSr4DUlpnk7IhTF6IsAy9eiga5Lg\"},\"default_search_provider_data\":{\"template_url_data\":\"575D258E47F940C6887685ABA99A5839CBFE4BA30863349DFE0D0C375AAB8816\",\"template_url_data_encrypted_hash\":\"djEwzkpvA9+swWTDV77WN7hWEwIE+/MvksCTQp4rKgJsLjCiagQhCIMUK3mxnliviILf\"},\"enterprise_signin\":{\"policy_recovery_token\":\"7D3124ECAF7E96407EB65EAF5A43B02C7EE5F2D4A9FA38A9F371F9E1B74D6383\",\"policy_recovery_token_encrypted_hash\":\"djEwntGC63MNa+3FPXvwkgoSZGXvXYrVoevkgw7qmK06Zwt7RdLbwPV3QCnGv8fsmfLO\"},\"extensions\":{\"install\":{\"initiallist\":\"721565429F6DB8F08CC129E8B4A99021CECE263598EA7CF847C99A2133F23581\",\"initiallist_encrypted_hash\":\"djEwkHeWi9EY4quXPiJOJHKkiaZv/Yduf0mGmHL+hm4bMgHCoBktkuispsBkSEGGppg3\",\"initialprovidername\":\"89DB3C44559AC7E75E930F08876F726C91D84C2D8D4D0A9DB7DA59DB15FA76D1\",\"initialprovidername_encrypted_hash\":\"djEwn2R+8PGjEAKtAZe3ZdaoPoPlRUrGh6V/o9KiENuI/3AtKFJq5/M1WhPIlSo2Q+lT\"},\"settings\":{\"mhjfbmdgcfjbbpaeojofohoefgiehjai\":\"5DD81A833F704CC9CFFD4DB414BD434F0181E04139DFE445999D65FDCFBDBD4C\"},\"settings_encrypted_hash\":{\"mhjfbmdgcfjbbpaeojofohoefgiehjai\":\"djEwuXANFd9Ju69tc+8bQZVJcP3o4ie8LQIqeX9uX16XJ2x0mikIsRMHxJQ2snEKGMen\"},\"ui\":{\"developer_mode\":\"55A29C051727FCAC1BDA847CCDE40838B2068CFA589E88819EA9FB17E4BD7320\",\"developer_mode_encrypted_hash\":\"djEwuSLe9IdmBUATWBHHs7zsIrMSzx7pZ6JTHR8otknIBz+qN2MkhgBcyaDLS6rEKzM/\"}},\"google\":{\"services\":{\"account_id\":\"E5B4CD7C5FA271A47D07D462465AFD63DBF6A8CDFAFEF4839D13F8F552131486\",\"account_id_encrypted_hash\":\"djEws5EOag2fZGfyxpqHcku8joB6KwiFyWcmiFR/aVXfXX6OvP/bjwC8JQV6CzNTKMMu\",\"last_signed_in_username\":\"82DB8D884695C643C31778B7B50DBB376848E2F81B5A1AECDA34FD448CECD10D\",\"last_signed_in_username_encrypted_hash\":\"djEwxOmun3qSdHJMQzaJrU+kjwQLP+13cHAn1VOQvoQtqSk/p/pGFhbaSzbJpX4wwHgm\",\"last_username\":\"24FCEF9BF7DF12A2935BE143E58951E09DBAA1D3E0E24430C0FF93009F5D6AFD\",\"last_username_encrypted_hash\":\"djEwUrwWTlb71Rdn7Dja+dvU5v0mcEbu5mgSO71viEUKKH+f/HHPQ9PpahcBiBCBPv8C\"}},\"homepage\":\"B1E9FE8108A84F532486D13AAC43C0AFDA16D3DFC9EB2F743AEE11F89F2F163E\",\"homepage_encrypted_hash\":\"djEwXI82V8JtaVjhjBoUbIx22Ija6Nvw5Jh2xACB85WXz7fITVJD3wclEv4HEI0zZpr/\",\"homepage_is_newtabpage\":\"3680F776D17E3C099431BAF5381FAB9BCC0C2C70FEA4C74D12324BC94A207119\",\"homepage_is_newtabpage_encrypted_hash\":\"djEw25d7Roo6fA2vNKU5847ct9Ggqv6D6fTH6ndRlxrc0z/rsPA4asUmxGpQS8docKYR\",\"media\":{\"storage_id_salt\":\"E1848263E6199A89D48A7FDF168364BF0F31246A18227F3D149D4088C7F4D667\",\"storage_id_salt_encrypted_hash\":\"djEwmus7A6SiHO78MEjfL8UH7gPMKzNqfXxuxeOCVs7oMQHvhcUctFVQ/H+biDlrSfmN\"},\"pinned_tabs\":\"5FF265371BB528ED630092A900058C08217611AB525D4C12B41C44C008BAC799\",\"pinned_tabs_encrypted_hash\":\"djEwrI/SY+iwVmRCtzCcz7vvvY6ZHUVsx2j/4nnxc+BZPvzNQjU7mqUCFL4/rzMbh5B0\",\"prefs\":{\"preference_reset_time\":\"95C909F3D0669D5931907B455F099C510E7770D9F0BA6FF13E4C76101B44F757\",\"preference_reset_time_encrypted_hash\":\"djEwyqoM/JGpKiFlXV3eoINFUv2ETBFL4NGU4ieOBHK8c6NFWgNZelQ+eaT90ssc6IS/\"},\"safebrowsing\":{\"incidents_sent\":\"569707D9A4676B72F48BE92B740BE3EF895419C8A646F1AE1BA70BD9C3B41845\",\"incidents_sent_encrypted_hash\":\"djEwMiMAX53T1art8hiNWR2KtJtvDx/Ug453nMjIrrEJhrKvzT9/gP0n1oArCPjd05vR\"},\"schedule_to_flush_to_disk\":\"0C01098667045BC6A1329F6F8E43E59235431525C50A5F95F37ACC029FE8917A\",\"schedule_to_flush_to_disk_encrypted_hash\":\"djEwqUr3O4jps1VvWjtflBEgOyqJiBnBmW/nvHQ9gomrRE6tPLlLWCz2g67HJAHYVPYB\",\"search_provider_overrides\":\"1E1EBA3A4DC28A23BEFCF6ED5D71CE71E9814DD587A305F6B14F72E834AF75DD\",\"search_provider_overrides_encrypted_hash\":\"djEw/O1Fo7yxiDwDA9NaOfk9W7zGcLAU6L2CmXC9ayuNndZIrEps+rHLBu4+De+BVFES\",\"session\":{\"restore_on_startup\":\"F9BD26F5D1AA6AB5258754888529CB2A82AE68D1703BCC2A97DEAEE5DDDA190E\",\"restore_on_startup_encrypted_hash\":\"djEw9KqVM3yzw2hBpRQs9cgmZz1EepB9mkNSYLmMWTe+s949xVxZNzKTFwIKzQYpLzqG\",\"startup_urls\":\"8BB8DBC1D7CA5C58F821C38254FB2B9C874F8EE9B9905B57DE48C731C6C91837\",\"startup_urls_encrypted_hash\":\"djEwQZx2i/wNzOqRtH3q8zoq3uvH2GfwPEM4MJtVt+cymnLfCjxp2xQeLnhTdFdNMrtB\"}},\"super_encrypted_hash\":\"djEwwjwDLgN/xVs63uHuKrim9KoN9UAOl2AVaDKHB7D3Pkj5zY79lkNyT02kG41deW4d\"},\"safebrowsing\":{\"event_timestamps\":{},\"metrics_last_log_time\":\"13439015381\",\"scout_reporting_enabled_when_deprecated\":false},\"safety_hub\":{\"unused_site_permissions_revocation\":{\"migration_completed\":true}},\"saved_tab_groups\":{\"did_enable_shared_tab_groups_in_last_session\":false,\"specifics_to_data_migration\":true},\"schedule_to_flush_to_disk\":\"13439015396589680\",\"segmentation_platform\":{\"client_result_prefs\":\"ClIKDXNob3BwaW5nX3VzZXISQQo2DQAAAAAQ8qGX3enW7xcaJAocChoNAAAAPxIMU2hvcHBpbmdVc2VyGgVPdGhlchIEEAIYBCADEKjYqt3p1u8X\",\"device_switcher_util\":{\"result\":{\"labels\":[\"NotSynced\"]}},\"last_db_compaction_time\":\"13438915199000000\",\"uma_in_sql_start_time\":\"13439015378564490\"},\"sessions\":{\"event_log\":[{\"crashed\":false,\"time\":\"13439015377971739\",\"type\":0}],\"session_data_status\":1},\"signin\":{\"account_preview_data_last_update\":\"13439015378148311\",\"accounts_metadata_dict\":{},\"allowed\":true,\"avatar_button_promo_dict\":{\"AvatarButtonSigninPromoLastShownTime\":\"13439015402150683\",\"AvatarButtonSigninPromoShownCount\":1}},\"spellcheck\":{\"dictionaries\":[\"en-US\"],\"dictionary\":\"\"},\"sync\":{\"data_type_status_for_sync_to_signin\":{\"account_setting\":false,\"ai_thread\":false,\"app_list\":false,\"app_settings\":false,\"apps\":false,\"arc_package\":false,\"autofill\":false,\"autofill_entity_suppression\":false,\"autofill_profiles\":false,\"autofill_valuable\":false,\"autofill_valuable_metadata\":false,\"autofill_wallet\":false,\"autofill_wallet_credential\":false,\"autofill_wallet_metadata\":false,\"autofill_wallet_usage\":false,\"bookmarks\":false,\"collaboration_group\":false,\"contact_info\":false,\"contextual_task\":false,\"cookies\":false,\"device_info\":false,\"dictionary\":false,\"encrypted_tab_context_container\":false,\"encrypted_tab_context_item\":false,\"extension_settings\":false,\"extensions\":false,\"gemini_thread\":false,\"history\":false,\"history_delete_directives\":false,\"incoming_password_sharing_invitation\":false,\"journey\":false,\"managed_user_settings\":false,\"nigori\":false,\"notebook\":false,\"os_preferences\":false,\"os_priority_preferences\":false,\"outgoing_password_sharing_invitation\":false,\"passwords\":false,\"preferences\":false,\"printers\":false,\"printers_authorization_servers\":false,\"priority_preferences\":false,\"product_comparison\":false,\"reading_list\":false,\"saved_tab_group\":false,\"search_engines\":false,\"security_events\":false,\"send_tab_to_self\":false,\"sessions\":false,\"shared_comment\":false,\"shared_tab_group_account_data\":false,\"shared_tab_group_data\":false,\"sharing_message\":false,\"skill\":false,\"themes\":false,\"themes_android\":false,\"themes_ios\":false,\"user_consent\":false,\"user_events\":false,\"web_apps\":false,\"webauthn_credential\":false,\"wifi_configurations\":false,\"workspace_desk\":false},\"encryption_bootstrap_token_per_account_migration_done\":true,\"feature_status_for_sync_to_signin\":5,\"sync_to_signin_migration_state\":2},\"syncing_theme_prefs_migrated_to_non_syncing\":true,\"toolbar\":{\"pinned_cast_migration_complete\":true,\"pinned_chrome_labs_migration_complete\":true},\"total_passwords_available_for_account\":0,\"total_passwords_available_for_profile\":0,\"vertical_tabs\":{\"collapsed_state\":false,\"uncollapsed_width\":240},\"web_apps\":{\"did_migrate_default_chrome_apps\":[\"MigrateDefaultChromeAppToWebAppsGSuite\",\"MigrateDefaultChromeAppToWebAppsNonGSuite\"],\"last_preinstall_synchronize_version\":\"156\"}}",
+    "sandbox_status": "SYNVEIL_SANDBOX_RENDERER user_ns=user:[4026532363] session_user_ns=user:[4026531837] seccomp=2 pid=1227\n"
+   },
+   "at": 1794542446.552,
+   "download_started": false,
+   "healthy": false,
+   "page_proof": false,
+   "staged": false
+  },
+  "B7": {
+   "artifacts": {
+    "big_partial_size": 0,
+    "big_size": 0,
+    "browser_started_count": 1,
+    "control": {
+     "confirmed": {
+      "bytes": 262194176,
+      "generation_id": "synveil-gen-v1",
+      "min_reader_state_format": 1,
+      "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+      "slot": "A",
+      "state_format": 1,
+      "version": 1
+     },
+     "history": [
+      {
+       "action": "provision",
+       "at": 1794541709,
+       "result": "confirmed",
+       "slot": "A",
+       "version": 1
+      }
+     ],
+     "schema": "synveil.ab-control/v2",
+     "slots": {
+      "A": {
+       "bytes": 262194176,
+       "generation_id": "synveil-gen-v1",
+       "min_reader_state_format": 1,
+       "sha256": "c1ff9b6805201d9529ab22771f1781e4173e15911281b9e3902bd947526946bc",
+       "slot": "A",
+       "state_format": 1,
+       "version": 1
+      },
+      "B": null
+     },
+     "trial": null
+    },
+    "credential_sha256": "e51837e67db65de6844d226be9c6bff32cdc5004e2bfef8c8a2ce36319143108",
+    "downloads_listing": [],
+    "files_entry_lines": 6,
+    "files_payload2_scans": 0,
+    "files_payload_scans": 0,
+    "known_file": null,
+    "netlog_attempted_hosts": [
+     "accounts.google.com",
+     "optimizationguide-pa.googleapis.com",
+     "update.googleapis.com"
+    ],
+    "netlog_dns_hosts": [
+     "accounts.google.com",
+     "optimizationguide-pa.googleapis.com",
+     "update.googleapis.com"
+    ],
+    "netlog_files": 1,
+    "netlog_sockets": [
+     "10.0.2.3:53",
+     "[2001:4860:4860::8888]:443",
+     "[fec0::5054:ff:fe12:3456]:33289",
+     "[fec0::5054:ff:fe12:3456]:35081",
+     "[fec0::5054:ff:fe12:3456]:35658",
+     "[fec0::5054:ff:fe12:3456]:37720",
+     "[fec0::5054:ff:fe12:3456]:37733",
+     "[fec0::5054:ff:fe12:3456]:39065",
+     "[fec0::5054:ff:fe12:3456]:40287",
+     "[fec0::5054:ff:fe12:3456]:40413",
+     "[fec0::5054:ff:fe12:3456]:41733",
+     "[fec0::5054:ff:fe12:3456]:41842",
+     "[fec0::5054:ff:fe12:3456]:42114",
+     "[fec0::5054:ff:fe12:3456]:42427",
+     "[fec0::5054:ff:fe12:3456]:42500",
+     "[fec0::5054:ff:fe12:3456]:45913",
+     "[fec0::5054:ff:fe12:3456]:50242",
+     "[fec0::5054:ff:fe12:3456]:50548",
+     "[fec0::5054:ff:fe12:3456]:54643",
+     "[fec0::5054:ff:fe12:3456]:54753",
+     "[fec0::5054:ff:fe12:3456]:55812",
+     "[fec0::5054:ff:fe12:3456]:57825",
+     "[fec0::5054:ff:fe12:3456]:60906"
+    ],
+    "payload1_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload1_size": 0,
+    "payload2_guest_sha256": null,
+    "payload2_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload2_size": 0,
+    "payload_guest_sha256": null,
+    "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payload_size": 0,
+    "pref_sha256": null,
+    "pref_text": null,
+    "profile_preferences": "{\"accessibility\":{\"captions\":{\"headless_caption_enabled\":false}},\"account_tracker_service_last_update\":\"13439015398073567\",\"apps\":{\"shortcuts_arch\":\"\",\"shortcuts_os_version\":\"\",\"shortcuts_version\":0},\"autocomplete\":{\"retention_policy_last_version\":156},\"autofill\":{\"ai_last_version_deduped\":156,\"autofill_ai\":{\"opt_in_status\":{}},\"last_version_deduped\":156},\"bookmark\":{\"storage_computation_last_update\":\"13439015396779193\"},\"browser\":{\"check_default_browser\":false,\"window_placement\":{\"bottom\":790,\"left\":10,\"maximized\":false,\"right\":1060,\"top\":10,\"work_area_bottom\":800,\"work_area_left\":0,\"work_area_right\":1280,\"work_area_top\":0}},\"commerce_daily_metrics_last_update_time\":\"13439015392857658\",\"default_apps_install_state\":2,\"domain_diversity\":{\"last_reporting_timestamp\":\"13439015392792230\",\"last_reporting_timestamp_v4\":\"13439015392793148\"},\"download\":{\"default_directory\":\"/home/synveil/Downloads\",\"directory_upgrade\":true,\"prompt_for_download\":false},\"dual_layer_user_pref_store\":{\"user_selected_sync_types\":[]},\"enterprise_profile_guid\":\"363079a2-3463-4b43-be72-8130a1021477\",\"extensions\":{\"alerts\":{\"initialized\":true},\"chrome_url_overrides\":{},\"last_chrome_version\":\"156.0.8078.47\",\"settings\":{\"mhjfbmdgcfjbbpaeojofohoefgiehjai\":{\"account_extension_type\":0,\"active_permissions\":{\"api\":[\"contentSettings\",\"fileSystem\",\"fileSystem.write\",\"metricsPrivate\",\"tabs\",\"resourcesPrivate\",\"pdfViewerPrivate\"],\"explicit_host\":[\"chrome://resources/*\",\"chrome://webui-test/*\"],\"manifest_permissions\":[],\"scriptable_host\":[]},\"commands\":{},\"content_settings\":[],\"creation_flags\":1,\"disable_reasons\":[],\"events\":[],\"first_install_time\":\"13439015379881806\",\"from_webstore\":false,\"incognito_content_settings\":[],\"incognito_preferences\":{},\"last_loaded_browser_version\":\"156.0.8078.47\",\"last_update_time\":\"13439015379881806\",\"location\":5,\"manifest\":{\"content_security_policy\":\"script-src 'self' blob: filesystem: chrome://resources chrome://webui-test; object-src * blob: externalfile: file: filesystem: data:\",\"description\":\"\",\"incognito\":\"split\",\"key\":\"MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDN6hM0rsDYGbzQPQfOygqlRtQgKUXMfnSjhIBL7LnReAVBEd7ZmKtyN2qmSasMl4HZpMhVe2rPWVVwBDl6iyNE/Kok6E6v6V3vCLGsOpQAuuNVye/3QxzIldzG/jQAdWZiyXReRVapOhZtLjGfywCvlWq7Sl/e3sbc0vWybSDI2QIDAQAB\",\"manifest_version\":2,\"mime_types\":[\"application/pdf\",\"text/pdf\"],\"mime_types_handler\":\"index.html\",\"name\":\"Chromium PDF Viewer\",\"offline_enabled\":true,\"permissions\":[\"chrome://resources/\",\"chrome://webui-test/\",\"contentSettings\",\"metricsPrivate\",\"pdfViewerPrivate\",\"resourcesPrivate\",\"tabs\",{\"fileSystem\":[\"write\"]}],\"version\":\"1\"},\"path\":\"/usr/lib/chromium/resources/pdf\",\"preferences\":{},\"regular_only_preferences\":{},\"was_installed_by_default\":false,\"was_installed_by_oem\":false}}},\"gaia_cookie\":{\"periodic_report_time_2\":\"13439015376969473\"},\"gcm\":{\"product_category_for_subtypes\":\"org.chromium.linux\"},\"google\":{\"services\":{\"signin_scoped_device_id\":\"f00cca3f-ef8b-49bf-898f-38639b8ba7b5\"}},\"in_product_help\":{\"recent_session_enabled_time\":\"13439015381108170\",\"recent_session_start_times\":[\"13439015381108170\"],\"session_last_active_time\":\"13439015381108170\",\"session_number\":2,\"session_start_time\":\"13439015381108170\"},\"intl\":{\"selected_languages\":\"en-US,en\"},\"media\":{\"engagement\":{\"schema_version\":5}},\"media_router\":{\"receiver_id_hash_token\":\"EypCEMBbTu+uz1XvasY2tZeWWXPbJykrN9amiYItainIUx2hVTKyU168EY2gD/VZN/e8EFO9VmeOAh+KSWxpPg==\"},\"ntp\":{\"num_personal_suggestions\":1},\"optimization_guide\":{\"hintsfetcher\":{\"hosts_successfully_fetched\":{}},\"previously_registered_optimization_types\":{\"ABOUT_THIS_SITE\":true,\"AUTOFILL_ACTOR_IFRAME_ORIGIN_ALLOWLIST\":true,\"DIGITAL_CREDENTIALS_LOW_FRICTION\":true,\"GLIC_ACTION_PAGE_BLOCK\":true,\"HISTORY_CLUSTERS\":true,\"LENS_OVERLAY_EDU_ACTION_CHIP_ALLOWLIST\":true,\"LENS_OVERLAY_EDU_ACTION_CHIP_BLOCKLIST\":true,\"LOADING_PREDICTOR\":true,\"MERCHANT_TRUST_SIGNALS_V2\":true,\"PRICE_TRACKING\":true,\"SAVED_TAB_GROUP\":true,\"V8_COMPILE_HINTS\":true}},\"password_manager\":{\"account_store_backup_password_cleaning_last_timestamp\":\"13439015435291791\",\"account_store_migrated_to_os_crypt_async\":true,\"on_device_encryption_state_passkey_last_reported_bucket\":4,\"on_device_encryption_state_passkey_last_reporting_time\":\"13439015408763157\",\"on_device_encryption_state_password_last_reported_bucket\":4,\"on_device_encryption_state_password_last_reporting_time\":\"13439015408768068\",\"profile_store_backup_password_cleaning_last_timestamp\":\"13439015435263256\",\"profile_store_migrated_to_os_crypt_async\":true},\"privacy_sandbox\":{\"first_party_sets_data_access_allowed_initialized\":true,\"first_party_sets_enabled\":false},\"profile\":{\"avatar_index\":26,\"background_password_check\":{\"check_fri_weight\":9,\"check_interval\":\"864000000000\",\"check_mon_weight\":4,\"check_sat_weight\":4,\"check_sun_weight\":4,\"check_thu_weight\":9,\"check_tue_weight\":9,\"check_wed_weight\":9,\"next_check_time\":\"13439217469065314\"},\"content_settings\":{\"exceptions\":{\"abusive_notification_permissions\":{},\"access_to_get_all_screens_media_in_session\":{},\"anti_abuse\":{},\"app_banner\":{},\"ar\":{},\"are_suspicious_notifications_allowlisted_by_user\":{},\"auto_picture_in_picture\":{},\"auto_select_certificate\":{},\"automatic_downloads\":{},\"automatic_fullscreen\":{},\"autoplay\":{},\"background_sync\":{},\"bluetooth_chooser_data\":{},\"bluetooth_guard\":{},\"bluetooth_scanning\":{},\"camera_pan_tilt_zoom\":{},\"captured_surface_control\":{},\"client_hints\":{},\"clipboard\":{},\"controlled_frame\":{},\"cookie_controls_metadata\":{},\"cookies\":{},\"direct_sockets\":{},\"display_media_system_audio\":{},\"disruptive_notification_permissions\":{},\"durable_storage\":{},\"fedcm_idp_registration\":{},\"fedcm_idp_signin\":{},\"fedcm_share\":{},\"file_system_access_chooser_data\":{},\"file_system_access_extended_permission\":{},\"file_system_access_restore_permission\":{},\"file_system_last_picked_directory\":{},\"file_system_read_guard\":{},\"file_system_write_guard\":{},\"formfill_metadata\":{},\"geolocation\":{},\"geolocation_with_options\":{},\"hand_tracking\":{},\"has_migrated_local_network_access\":true,\"hid_chooser_data\":{},\"hid_guard\":{},\"http_allowed\":{},\"https_enforced\":{},\"idle_detection\":{},\"images\":{},\"important_site_info\":{},\"initialized_translations\":{},\"inline_cue_menu\":{},\"intent_picker_auto_display\":{},\"javascript\":{},\"javascript_jit\":{},\"javascript_optimizer\":{},\"keyboard_lock\":{},\"legacy_cookie_access\":{},\"legacy_cookie_scope\":{},\"local_fonts\":{},\"local_network\":{},\"local_network_access\":{},\"loopback_network\":{},\"media_engagement\":{},\"media_stream_camera\":{},\"media_stream_mic\":{},\"midi_sysex\":{},\"mixed_script\":{},\"nfc_devices\":{},\"notification_interactions\":{},\"notification_permission_review\":{},\"notifications\":{},\"ondevice_languages_downloaded\":{},\"password_protection\":{},\"payment_handler\":{},\"permission_actions_history\":{},\"permission_autoblocking_data\":{},\"permission_autorevocation_data\":{},\"pointer_lock\":{},\"popups\":{},\"protocol_handler\":{},\"reduced_accept_language\":{},\"safe_browsing_url_check_data\":{},\"sensors\":{},\"serial_chooser_data\":{},\"serial_guard\":{},\"site_engagement\":{\"chrome://omnibox-popup.top-chrome/,*\":{\"last_modified\":\"13439015401291463\",\"setting\":{\"lastEngagementTime\":1.3439015401290668e+16,\"lastShortcutLaunchTime\":0.0,\"pointsAddedToday\":4.5,\"rawScore\":4.5}}},\"sound\":{},\"speaker_selection\":{},\"ssl_cert_decisions\":{},\"storage_access\":{},\"sub_apps_without_prompts\":{},\"subresource_filter\":{},\"subresource_filter_data\":{},\"suspicious_notification_ids\":{},\"suspicious_notification_show_original\":{},\"suspicious_site_warning_data\":{},\"top_level_storage_access\":{},\"unused_site_permissions\":{},\"usb_chooser_data\":{},\"usb_guard\":{},\"vr\":{},\"web_app_installation\":{},\"webid_api\":{},\"webid_auto_reauthn\":{},\"window_placement\":{}},\"pref_version\":1},\"creation_time\":\"13439015354086423\",\"default_content_setting_values\":{\"has_migrated_local_network_access\":true},\"exit_type\":\"Crashed\",\"last_engagement_time\":\"13439015401290668\",\"last_time_obsolete_http_credentials_removed\":1794541835.269264,\"last_time_password_store_metrics_reported\":1794541808.661227,\"managed\":{\"locally_parent_approved_extensions\":{},\"locally_parent_approved_extensions_migration_state\":1},\"managed_user_id\":\"\",\"name\":\"Your Chromium\",\"password_hash_data_list\":[],\"were_old_google_logins_removed\":true},\"profile_network_context_service\":{\"http_cache_finch_experiment_groups\":\"None None None None\"},\"protection\":{\"macs\":{\"account_values\":{\"browser\":{\"show_home_button\":\"F6B8688079AA4C4657C3FEDCF3311348C99CB4907EEC8560CC323E4F37D1EA41\",\"show_home_button_encrypted_hash\":\"djEwotRkFT2vHnhhCIA/V+DRZrZjLnP+b+0VwSGjql5xrXDmPtBAfaZbFURGViRnbnec\"},\"extensions\":{\"ui\":{\"developer_mode\":\"C4B515ABCB16541C88B522387A89F47E24F150FF18A7256BF19EE2C0896D7555\",\"developer_mode_encrypted_hash\":\"djEwnGn4HyLm571QCCeecs4XAyIbPpI4sjZ8ckF6sff8BGbQEywtWeDm4qpSwJqGYOvN\"}},\"homepage\":\"0F156BE8FFEDBF22CC2E394D6BD8DDD392F953D0F397958C64EFA57087182457\",\"homepage_encrypted_hash\":\"djEwez6wt5PtkfTxuN+U9KVU6gUa9/33imjLLrtlo3LT0Y1d/stHX2XjJEWHwpeLGZY1\",\"homepage_is_newtabpage\":\"BAF0DE42A6FEAC5EF6500592AEC92B79DC055C1E352B0F7BAC0BB6E72ECE67D3\",\"homepage_is_newtabpage_encrypted_hash\":\"djEwNuiyCSZBdqhV7ESdO8yuXbA1NHRVLQ2svfo+ZK5oaIry2f9Cx4rce+mIbAEw7G0P\",\"session\":{\"restore_on_startup\":\"81940185F7F78D0317AB3741FA4A283985C31DB3BF95D3A4DDD4CD78FC5021F1\",\"restore_on_startup_encrypted_hash\":\"djEwFEzg0id00W34Gz2o0K8gX+KMNet+dXfslTgHKA9xnZMI4OplF+GZvcpGWGX5hEYJ\",\"startup_urls\":\"B41DC391D323AEB2C5465D75AB79284F9F6620BEF161110DE35202261FF03449\",\"startup_urls_encrypted_hash\":\"djEwghL6jSVRi8mLaRGAB/JzS+xXBtxjeESAqUdFS7oORXVQ1jXID0VGOoaLWOgIcbzO\"}},\"browser\":{\"show_home_button\":\"904452986128BBEE5A7B1FFB8F342100C3150E3D9FD76C4105DF33EB021E22FD\",\"show_home_button_encrypted_hash\":\"djEwZQf6ZGWEvWHWC8sI8mCrY+eDy3+KjdSoiNhRlSr4DUlpnk7IhTF6IsAy9eiga5Lg\"},\"default_search_provider_data\":{\"template_url_data\":\"575D258E47F940C6887685ABA99A5839CBFE4BA30863349DFE0D0C375AAB8816\",\"template_url_data_encrypted_hash\":\"djEwzkpvA9+swWTDV77WN7hWEwIE+/MvksCTQp4rKgJsLjCiagQhCIMUK3mxnliviILf\"},\"enterprise_signin\":{\"policy_recovery_token\":\"7D3124ECAF7E96407EB65EAF5A43B02C7EE5F2D4A9FA38A9F371F9E1B74D6383\",\"policy_recovery_token_encrypted_hash\":\"djEwntGC63MNa+3FPXvwkgoSZGXvXYrVoevkgw7qmK06Zwt7RdLbwPV3QCnGv8fsmfLO\"},\"extensions\":{\"install\":{\"initiallist\":\"721565429F6DB8F08CC129E8B4A99021CECE263598EA7CF847C99A2133F23581\",\"initiallist_encrypted_hash\":\"djEwkHeWi9EY4quXPiJOJHKkiaZv/Yduf0mGmHL+hm4bMgHCoBktkuispsBkSEGGppg3\",\"initialprovidername\":\"89DB3C44559AC7E75E930F08876F726C91D84C2D8D4D0A9DB7DA59DB15FA76D1\",\"initialprovidername_encrypted_hash\":\"djEwn2R+8PGjEAKtAZe3ZdaoPoPlRUrGh6V/o9KiENuI/3AtKFJq5/M1WhPIlSo2Q+lT\"},\"settings\":{\"mhjfbmdgcfjbbpaeojofohoefgiehjai\":\"5DD81A833F704CC9CFFD4DB414BD434F0181E04139DFE445999D65FDCFBDBD4C\"},\"settings_encrypted_hash\":{\"mhjfbmdgcfjbbpaeojofohoefgiehjai\":\"djEwuXANFd9Ju69tc+8bQZVJcP3o4ie8LQIqeX9uX16XJ2x0mikIsRMHxJQ2snEKGMen\"},\"ui\":{\"developer_mode\":\"55A29C051727FCAC1BDA847CCDE40838B2068CFA589E88819EA9FB17E4BD7320\",\"developer_mode_encrypted_hash\":\"djEwuSLe9IdmBUATWBHHs7zsIrMSzx7pZ6JTHR8otknIBz+qN2MkhgBcyaDLS6rEKzM/\"}},\"google\":{\"services\":{\"account_id\":\"E5B4CD7C5FA271A47D07D462465AFD63DBF6A8CDFAFEF4839D13F8F552131486\",\"account_id_encrypted_hash\":\"djEws5EOag2fZGfyxpqHcku8joB6KwiFyWcmiFR/aVXfXX6OvP/bjwC8JQV6CzNTKMMu\",\"last_signed_in_username\":\"82DB8D884695C643C31778B7B50DBB376848E2F81B5A1AECDA34FD448CECD10D\",\"last_signed_in_username_encrypted_hash\":\"djEwxOmun3qSdHJMQzaJrU+kjwQLP+13cHAn1VOQvoQtqSk/p/pGFhbaSzbJpX4wwHgm\",\"last_username\":\"24FCEF9BF7DF12A2935BE143E58951E09DBAA1D3E0E24430C0FF93009F5D6AFD\",\"last_username_encrypted_hash\":\"djEwUrwWTlb71Rdn7Dja+dvU5v0mcEbu5mgSO71viEUKKH+f/HHPQ9PpahcBiBCBPv8C\"}},\"homepage\":\"B1E9FE8108A84F532486D13AAC43C0AFDA16D3DFC9EB2F743AEE11F89F2F163E\",\"homepage_encrypted_hash\":\"djEwXI82V8JtaVjhjBoUbIx22Ija6Nvw5Jh2xACB85WXz7fITVJD3wclEv4HEI0zZpr/\",\"homepage_is_newtabpage\":\"3680F776D17E3C099431BAF5381FAB9BCC0C2C70FEA4C74D12324BC94A207119\",\"homepage_is_newtabpage_encrypted_hash\":\"djEw25d7Roo6fA2vNKU5847ct9Ggqv6D6fTH6ndRlxrc0z/rsPA4asUmxGpQS8docKYR\",\"media\":{\"storage_id_salt\":\"E1848263E6199A89D48A7FDF168364BF0F31246A18227F3D149D4088C7F4D667\",\"storage_id_salt_encrypted_hash\":\"djEwmus7A6SiHO78MEjfL8UH7gPMKzNqfXxuxeOCVs7oMQHvhcUctFVQ/H+biDlrSfmN\"},\"pinned_tabs\":\"5FF265371BB528ED630092A900058C08217611AB525D4C12B41C44C008BAC799\",\"pinned_tabs_encrypted_hash\":\"djEwrI/SY+iwVmRCtzCcz7vvvY6ZHUVsx2j/4nnxc+BZPvzNQjU7mqUCFL4/rzMbh5B0\",\"prefs\":{\"preference_reset_time\":\"95C909F3D0669D5931907B455F099C510E7770D9F0BA6FF13E4C76101B44F757\",\"preference_reset_time_encrypted_hash\":\"djEwyqoM/JGpKiFlXV3eoINFUv2ETBFL4NGU4ieOBHK8c6NFWgNZelQ+eaT90ssc6IS/\"},\"safebrowsing\":{\"incidents_sent\":\"569707D9A4676B72F48BE92B740BE3EF895419C8A646F1AE1BA70BD9C3B41845\",\"incidents_sent_encrypted_hash\":\"djEwMiMAX53T1art8hiNWR2KtJtvDx/Ug453nMjIrrEJhrKvzT9/gP0n1oArCPjd05vR\"},\"schedule_to_flush_to_disk\":\"0C01098667045BC6A1329F6F8E43E59235431525C50A5F95F37ACC029FE8917A\",\"schedule_to_flush_to_disk_encrypted_hash\":\"djEwqUr3O4jps1VvWjtflBEgOyqJiBnBmW/nvHQ9gomrRE6tPLlLWCz2g67HJAHYVPYB\",\"search_provider_overrides\":\"1E1EBA3A4DC28A23BEFCF6ED5D71CE71E9814DD587A305F6B14F72E834AF75DD\",\"search_provider_overrides_encrypted_hash\":\"djEw/O1Fo7yxiDwDA9NaOfk9W7zGcLAU6L2CmXC9ayuNndZIrEps+rHLBu4+De+BVFES\",\"session\":{\"restore_on_startup\":\"F9BD26F5D1AA6AB5258754888529CB2A82AE68D1703BCC2A97DEAEE5DDDA190E\",\"restore_on_startup_encrypted_hash\":\"djEw9KqVM3yzw2hBpRQs9cgmZz1EepB9mkNSYLmMWTe+s949xVxZNzKTFwIKzQYpLzqG\",\"startup_urls\":\"8BB8DBC1D7CA5C58F821C38254FB2B9C874F8EE9B9905B57DE48C731C6C91837\",\"startup_urls_encrypted_hash\":\"djEwQZx2i/wNzOqRtH3q8zoq3uvH2GfwPEM4MJtVt+cymnLfCjxp2xQeLnhTdFdNMrtB\"}},\"super_encrypted_hash\":\"djEwwjwDLgN/xVs63uHuKrim9KoN9UAOl2AVaDKHB7D3Pkj5zY79lkNyT02kG41deW4d\"},\"safebrowsing\":{\"event_timestamps\":{},\"metrics_last_log_time\":\"13439015381\",\"scout_reporting_enabled_when_deprecated\":false},\"safety_hub\":{\"unused_site_permissions_revocation\":{\"migration_completed\":true}},\"saved_tab_groups\":{\"did_enable_shared_tab_groups_in_last_session\":false,\"specifics_to_data_migration\":true},\"schedule_to_flush_to_disk\":\"13439015396589680\",\"segmentation_platform\":{\"client_result_prefs\":\"ClIKDXNob3BwaW5nX3VzZXISQQo2DQAAAAAQ8qGX3enW7xcaJAocChoNAAAAPxIMU2hvcHBpbmdVc2VyGgVPdGhlchIEEAIYBCADEKjYqt3p1u8X\",\"device_switcher_util\":{\"result\":{\"labels\":[\"NotSynced\"]}},\"last_db_compaction_time\":\"13438915199000000\",\"uma_in_sql_start_time\":\"13439015378564490\"},\"sessions\":{\"event_log\":[{\"crashed\":false,\"time\":\"13439015377971739\",\"type\":0}],\"session_data_status\":1},\"signin\":{\"account_preview_data_last_update\":\"13439015378148311\",\"accounts_metadata_dict\":{},\"allowed\":true,\"avatar_button_promo_dict\":{\"AvatarButtonSigninPromoLastShownTime\":\"13439015402150683\",\"AvatarButtonSigninPromoShownCount\":1}},\"spellcheck\":{\"dictionaries\":[\"en-US\"],\"dictionary\":\"\"},\"sync\":{\"data_type_status_for_sync_to_signin\":{\"account_setting\":false,\"ai_thread\":false,\"app_list\":false,\"app_settings\":false,\"apps\":false,\"arc_package\":false,\"autofill\":false,\"autofill_entity_suppression\":false,\"autofill_profiles\":false,\"autofill_valuable\":false,\"autofill_valuable_metadata\":false,\"autofill_wallet\":false,\"autofill_wallet_credential\":false,\"autofill_wallet_metadata\":false,\"autofill_wallet_usage\":false,\"bookmarks\":false,\"collaboration_group\":false,\"contact_info\":false,\"contextual_task\":false,\"cookies\":false,\"device_info\":false,\"dictionary\":false,\"encrypted_tab_context_container\":false,\"encrypted_tab_context_item\":false,\"extension_settings\":false,\"extensions\":false,\"gemini_thread\":false,\"history\":false,\"history_delete_directives\":false,\"incoming_password_sharing_invitation\":false,\"journey\":false,\"managed_user_settings\":false,\"nigori\":false,\"notebook\":false,\"os_preferences\":false,\"os_priority_preferences\":false,\"outgoing_password_sharing_invitation\":false,\"passwords\":false,\"preferences\":false,\"printers\":false,\"printers_authorization_servers\":false,\"priority_preferences\":false,\"product_comparison\":false,\"reading_list\":false,\"saved_tab_group\":false,\"search_engines\":false,\"security_events\":false,\"send_tab_to_self\":false,\"sessions\":false,\"shared_comment\":false,\"shared_tab_group_account_data\":false,\"shared_tab_group_data\":false,\"sharing_message\":false,\"skill\":false,\"themes\":false,\"themes_android\":false,\"themes_ios\":false,\"user_consent\":false,\"user_events\":false,\"web_apps\":false,\"webauthn_credential\":false,\"wifi_configurations\":false,\"workspace_desk\":false},\"encryption_bootstrap_token_per_account_migration_done\":true,\"feature_status_for_sync_to_signin\":5,\"sync_to_signin_migration_state\":2},\"syncing_theme_prefs_migrated_to_non_syncing\":true,\"toolbar\":{\"pinned_cast_migration_complete\":true,\"pinned_chrome_labs_migration_complete\":true},\"total_passwords_available_for_account\":0,\"total_passwords_available_for_profile\":0,\"vertical_tabs\":{\"collapsed_state\":false,\"uncollapsed_width\":240},\"web_apps\":{\"did_migrate_default_chrome_apps\":[\"MigrateDefaultChromeAppToWebAppsGSuite\",\"MigrateDefaultChromeAppToWebAppsNonGSuite\"],\"last_preinstall_synchronize_version\":\"156\"}}",
+    "sandbox_status": "SYNVEIL_SANDBOX_RENDERER user_ns=user:[4026532363] session_user_ns=user:[4026531837] seccomp=2 pid=1227\n"
+   },
+   "at": 1794542860.096,
+   "healthy": false,
+   "page_proof": false,
+   "rollback_armed": false
+  },
+  "build": {
+   "browser_test_ca_sha256": "68eeb3bf063cf6397851d703ae26132c617b5536453a9c13401fa6e7fe4e9d61"
+  },
+  "server_log": [],
+  "tls": {
+   "ca_sha256": "68eeb3bf063cf6397851d703ae26132c617b5536453a9c13401fa6e7fe4e9d61"
+  }
+ },
+ "schema": "synveil.browser-qemu-proof/v1",
+ "tls_fixture": {
+  "bad_port": 8444,
+  "ca_sha256": "68eeb3bf063cf6397851d703ae26132c617b5536453a9c13401fa6e7fe4e9d61",
+  "good_port": 8443,
+  "host_ip": "10.0.2.2",
+  "host_name": "test.synveil.invalid"
+ }
+}

@@ -1494,3 +1494,64 @@ validation. The A/B update gate was not re-run: no
 joined-image source changed (frozen boot/update
 mechanisms untouched); the change is a payload weave
 into the proof image only.
+
+## Mesa/Vulkan fold-in onto the desktop branch (2026-11-12)
+
+The staging branch above was folded into
+`synveil/first-boot-desktop-muse` with
+`git merge --no-ff` (merge commit `1115599`; staging tip
+`7ba1f48` into desktop tip `1c79376`; merge-base
+`3ce1cf1`). Zero conflicts — the only overlapping file,
+`tools/qmp_input.py`, auto-merged with both sides
+verified present — and the diff (15 files, +1916/−25)
+touches only graphics / userspace / docs / tests: the
+ADR 0023 frozen zone is untouched, and a merge rather
+than a cherry-pick preserves the staging evidence's
+commit provenance.
+
+Everything was rebuilt from the folded tree and the
+full acceptance sweep re-run. The graphics stage seal
+is byte-identical to the staging worktree's (97 files,
+220,473,743 bytes; `stage_validation_sha256`
+`70309b05…`). The joined image (`4c72d9c3…`) carries
+component hashes identical to the polish image — the
+fold changes no joined-image userspace. Host tests:
+cargo 230 passed / 0 failed; qmp-input fixtures 16 OK.
+
+Gates on the folded images (QEMU/TCG): joined
+`SYNVEIL_NATIVE_JOINED_QEMU_ENROLL_LOGIN_WESTON_PASS`;
+shell `SYNVEIL_SHELL_QEMU_PASS` with the polish
+assertions; Wine `SYNVEIL_WINE_QEMU_PASS` on attempt 1
+with the in-guest probe re-verified — Vulkan device
+"llvmpipe (LLVM 19.1.7, 128 bits)", API 1.4.305,
+`GFX_VULKAN_OK devices=1 driver=lavapipe`, EGL 1.5,
+OpenGL 4.5 (Compatibility Profile) Mesa
+25.0.7-2+deb13u1, `GFX_PROBE_OK`; observe
+`SYNVEIL_OBSERVE_QEMU_PASS` (passed on the fourth run's
+second attempt — the earlier runs are recorded in the
+evidence bundle as a load-dependent harness flake, with
+the reasoning); audit v2 `SYNVEIL_AUDIT_V2_NATIVE_PASS`;
+and the A/B update gate the staging entry skipped:
+`SYNVEIL_AB_QEMU_PROOF_PASS`, all nine scenarios
+(S0–S7 incl. S6b) with zero gate violations, from a
+proof disk built at source `1115599` under the
+development publisher key.
+
+The browser/files gate is the one member of the sweep
+**not** re-demonstrated to completion on the folded
+lineage in this environment: its disk was rebuilt from
+the folded tree, two runs progressed through page
+proofs, downloads, staging and rollback before external
+termination (a host VM restart; an operator wrapper
+timeout), and two later runs failed on the harness's
+wall-clock waits under sustained host load while the
+guest-side serial and netlog evidence showed the image
+behaving correctly. Its last full pass remains the
+polish lineage's (2026-11-09, source `04d5ec4`,
+demonstrated). Full account, receipts for every gate
+(including the failed browser attempts), and the
+proven / not-proven split: `docs/validation/graphics-fold-1115599/`.
+The not-claimed list of the staging entry is unchanged:
+no Direct3D, no game or 3D workload, no 32-bit stack,
+no real-GPU behaviour or performance, no physical
+hardware validation.

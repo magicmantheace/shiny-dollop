@@ -1,0 +1,23 @@
+{
+  "schema": "synveil.shell-acceptance/v1",
+  "image_sha256": "4c72d9c3719f7639633e1804ba62c625dc17e22daab9ae0ab59a454a094a6403",
+  "source_commit": null,
+  "passed": true,
+  "physical_hardware_tested": false,
+  "notes": [
+    "desktop 1280x800 with demo window present",
+    "panel strip carries the shell token color",
+    "start glyph present (240 accent pixels)",
+    "2 task buttons on the strip: [(81, 226), (282, 389)]",
+    "demo task button carries its icon (100 blue px)",
+    "tray shows network present but down (34 danger px, no accent); update slot hidden (no agent on this image)",
+    "demo task button marked active at (81, 238)",
+    "task button click minimized the demo window",
+    "second task button click restored the demo window",
+    "start menu open with 2 app items",
+    "menu items carry drawn icons (terminal green, demo blue; no letter tiles)",
+    "menu item click closed the menu and launched a new terminal window (task button appeared)",
+    "start button toggles the menu open and closed",
+    "session ended; graphical login relocked"
+  ]
+}
