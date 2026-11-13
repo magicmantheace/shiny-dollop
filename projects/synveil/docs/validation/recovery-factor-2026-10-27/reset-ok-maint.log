@@ -1,0 +1,70 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x3,0x0)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x3,0x0)
+[    0.000000] Linux version 6.18.55-synveil (root@htch-runtime) (x86_64-synveil-linux-gnu-gcc (GCC) 16.2.0, GNU ld (GNU Binutils) 2.46.1) #5 SMP PREEMPT_DYNAMIC Wed Oct 28 00:11:43 UTC 2026
+[    0.000000] Command line: 
+[    0.000000] BIOS-provided physical RAM map:
+[    0.000000] BIOS-e820: [mem 0x0000000000000000-0x000000000009ffff] usable
+[    0.000000] BIOS-e820: [mem 0x0000000000100000-0x00000000007fffff] usable
+[    0.000000] BIOS-e820: [mem 0x0000000000800000-0x0000000000807fff] ACPI NVS
+[    0.000000] BIOS-e820: [mem 0x0000000000808000-0x000000000080afff] usable
+[    0.000000] BIOS-e820: [mem 0x000000000080b000-0x000000000080bfff] ACPI NVS
+[    0.000000] BIOS-e820: [mem 0x000000000080c000-0x000000000080ffff] usable
+[    0.000000] BIOS-e820: [mem 0x0000000000810000-0x00000000008fffff] ACPI NVS
+[    0.000000] BIOS-e820: [mem 0x0000000000900000-0x000000001e93efff] usable
+[    0.000000] BIOS-e820: [mem 0x000000001e93f000-0x000000001e9fffff] reserved
+[    0.000000] BIOS-e820: [mem 0x000000001ea00000-0x000000001f4ecfff] usable
+[    0.000000] BIOS-e820: [mem 0x000000001f4ed000-0x000000001f76cfff] reserved
+[    0.000000] BIOS-e820: [mem 0x000000001f76d000-0x000000001f77efff] ACPI data
+[    0.000000] BIOS-e820: [mem 0x000000001f77f000-0x000000001f7fefff] ACPI NVS
+[    0.000000] BIOS-e820: [mem 0x000000001f7ff000-0x000000001feebfff] usable
+[    0.000000] BIOS-e820: [mem 0x000000001feec000-0x000000001ff6ffff] reserved
+[    0.000000] BIOS-e820: [mem 0x000000001ff70000-0x000000001fffffff] ACPI NVS
+[    0.000000] BIOS-e820: [mem 0x00000000e0000000-0x00000000efffffff] reserved
+[    0.000000] BIOS-e820: [mem 0x00000000ffc00000-0x00000000ffffffff] reserved
+[    0.000000] BIOS-e820: [mem 0x000000fd00000000-0x000000ffffffffff] reserved
+[    0.000000] earlycon: uart0 at I/O port 0x3f8 (options '115200')
+[    0.000000] printk: legacy bootconsole [uart0] enabled
+[    0.098977] Kernel command line: console=ttyS0,115200n8 earlycon=uart,io,0x3f8,115200 rdinit=/init panic=-1 loglevel=6 synveil.recovery=maint
+[    0.801421] audit: type=2000 audit(1793146919.578:1): state=initialized audit_enabled=0 res=1
+[    0.833452] mtrr: your CPUs had inconsistent fixed MTRR settings
+[    0.833651] mtrr: your CPUs had inconsistent variable MTRR settings
+[    0.833776] mtrr: your CPUs had inconsistent MTRRdefType settings
+[    1.078421] SCSI subsystem initialized
+[    1.541171] VFS: Disk quotas dquot_6.6.0
+[    1.654324] Initialise system trusted keyrings
+[    1.666780] NFS: Registering the id_resolver key type
+[    1.667948] Key type id_resolver registered
+[    1.668088] Key type id_legacy registered
+[    1.869956] Key type asymmetric registered
+[    1.870733] Asymmetric key parser 'x509' registered
+[    2.268697] virtio_blk virtio1: [vda] 262144 512-byte logical blocks (134 MB/128 MiB)
+[    2.361959] virtio_blk virtio2: [vdb] 262144 512-byte logical blocks (134 MB/128 MiB)
+[    2.537684] amd_pstate: the _CPC object is not present in SBIOS or ACPI disabled
+[    2.585651] Key type dns_resolver registered
+[    2.634609] Loading compiled-in X.509 certificates
+[    2.666311] cfg80211: Loading compiled-in X.509 certificates for regulatory database
+[    2.684155] Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+[    2.685453] Loaded X.509 cert 'wens: 61c038651aabdcf94bd0ac7ff06c7248db18c600'
+[    2.691051] faux_driver regulatory: Direct firmware load for regulatory.db failed with error -2
+[    2.694246] Warning: unable to open an initial console.
+[synveil-init] starting bootstrap userspace
+SYNVEIL_STATE_READY
+SYNVEIL_RECOVERY_MAINT_V1
+SYNVEIL_RECOVERY_MAINT_PASSWORD_PROMPT
+SYNVEIL_RECOVERY_MAINT_AUTH_OK
+SYNVEIL_RECOVERY_MAINT_READY
+status
+SYNVEIL_RECOVERY_MAINT_STATUS_BEGIN
+SYNVEIL_RECOVERY_STATE_MOUNTED
+SYNVEIL_RECOVERY_MAINT_AB confirmed_slot=none confirmed_version=0
+SYNVEIL_RECOVERY_MAINT_AB trial=none
+SYNVEIL_RECOVERY_MAINT_AB_JSON {"available":{"attached":false},"booted_slot":null,"confirmed":null,"enabled":false,"health":{"check":null,"phase":"none"},"history":null,"publisher":null,"running":null,"slots":null,"trial":null}
+SYNVEIL_RECOVERY_MAINT_FACTOR state=revoked generation=2
+SYNVEIL_RECOVERY_MAINT_STATUS_END
+exit
+SYNVEIL_RECOVERY_MAINT_DONE
+SYNVEIL_SERIAL_RECOVERY_LOCKED
+printf '\n%s%s\n' SYNVEIL_ SERIAL_UNLOCK_BYPASS
+exec /bin/sh
+id; echo SYNVEIL_MAINT_PW''NED
+qemu-system-x86_64: terminating on signal 15 from pid 5790 (python3)

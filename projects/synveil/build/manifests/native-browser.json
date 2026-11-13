@@ -1,0 +1,1 @@
+{"netsurf":{"sha256":"495adf6b6614ce36fca6c605f7c321f9cb4a3df838043158122678ce2b3325b7","version":"3.10"},"recipe_builder":{"commit":"7fdeadb3b9f12f78e5fccca914d7fef47090ab9a","repository":"https://github.com/buildroot/buildroot.git","tag":"2026.08.1"},"schema":"synveil.native-browser/v1","target":"x86_64-synveil-linux-gnu"}

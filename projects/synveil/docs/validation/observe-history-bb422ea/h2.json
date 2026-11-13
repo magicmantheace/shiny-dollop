@@ -1,0 +1,132 @@
+{
+  "schema": "synveil.core/v1",
+  "id": "synctl-223",
+  "ok": true,
+  "result": {
+    "events": [
+      {
+        "component": "veil-core",
+        "event": "process_exited",
+        "fields": {
+          "process": {
+            "parent_pid": 210,
+            "pid": 216,
+            "start_time_ticks": 24394,
+            "system_ticks": 0,
+            "user_ticks": 0
+          }
+        },
+        "git_revision": "afd420474f44e7ae224de6800ad2b6cb4bd77d7f",
+        "pid": 215,
+        "schema": "synveil.observe-event/v1",
+        "sequence": 0,
+        "unix_time_ms": 1794093150880,
+        "version": "0.1.0-dev"
+      },
+      {
+        "component": "veil-core",
+        "event": "process_started",
+        "fields": {
+          "process": {
+            "parent_pid": 210,
+            "pid": 219,
+            "start_time_ticks": 25201,
+            "system_ticks": 0,
+            "user_ticks": 0
+          }
+        },
+        "git_revision": "afd420474f44e7ae224de6800ad2b6cb4bd77d7f",
+        "pid": 215,
+        "schema": "synveil.observe-event/v1",
+        "sequence": 1,
+        "unix_time_ms": 1794093150880,
+        "version": "0.1.0-dev"
+      },
+      {
+        "component": "veil-core",
+        "event": "process_started",
+        "fields": {
+          "process": {
+            "parent_pid": 210,
+            "pid": 220,
+            "start_time_ticks": 25201,
+            "system_ticks": 0,
+            "user_ticks": 0
+          }
+        },
+        "git_revision": "afd420474f44e7ae224de6800ad2b6cb4bd77d7f",
+        "pid": 215,
+        "schema": "synveil.observe-event/v1",
+        "sequence": 2,
+        "unix_time_ms": 1794093150880,
+        "version": "0.1.0-dev"
+      },
+      {
+        "component": "veil-core",
+        "event": "process_exited",
+        "fields": {
+          "process": {
+            "parent_pid": 210,
+            "pid": 219,
+            "start_time_ticks": 25201,
+            "system_ticks": 0,
+            "user_ticks": 0
+          }
+        },
+        "git_revision": "afd420474f44e7ae224de6800ad2b6cb4bd77d7f",
+        "pid": 215,
+        "schema": "synveil.observe-event/v1",
+        "sequence": 3,
+        "unix_time_ms": 1794093160915,
+        "version": "0.1.0-dev"
+      },
+      {
+        "component": "veil-core",
+        "event": "process_exited",
+        "fields": {
+          "process": {
+            "parent_pid": 210,
+            "pid": 220,
+            "start_time_ticks": 25201,
+            "system_ticks": 0,
+            "user_ticks": 0
+          }
+        },
+        "git_revision": "afd420474f44e7ae224de6800ad2b6cb4bd77d7f",
+        "pid": 215,
+        "schema": "synveil.observe-event/v1",
+        "sequence": 4,
+        "unix_time_ms": 1794093160915,
+        "version": "0.1.0-dev"
+      },
+      {
+        "component": "veil-core",
+        "event": "process_started",
+        "fields": {
+          "process": {
+            "parent_pid": 210,
+            "pid": 222,
+            "start_time_ticks": 26007,
+            "system_ticks": 0,
+            "user_ticks": 0
+          }
+        },
+        "git_revision": "afd420474f44e7ae224de6800ad2b6cb4bd77d7f",
+        "pid": 215,
+        "schema": "synveil.observe-event/v1",
+        "sequence": 5,
+        "unix_time_ms": 1794093160915,
+        "version": "0.1.0-dev"
+      }
+    ],
+    "sampler": {
+      "cadence_ms": 5000,
+      "dropped_events": 0,
+      "enabled": true,
+      "response_omitted_events": 0,
+      "retained_events": 6,
+      "ring_capacity": 1024
+    },
+    "schema": "synveil.observe-history/v1"
+  }
+}

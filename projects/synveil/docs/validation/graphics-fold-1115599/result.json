@@ -1,0 +1,32 @@
+{
+  "schema": "synveil.wine-acceptance/v1",
+  "image_sha256": "c31a9c9eab866db4baf54df972fbe2bf1dd130366996015bf4b53795cd3e33e5",
+  "wine_version": "10.0~repack-6",
+  "winewayland": {
+    "drv": "usr/lib/x86_64-linux-gnu/wine/x86_64-windows/winewayland.drv",
+    "present": true,
+    "unix": "usr/lib/x86_64-linux-gnu/wine/x86_64-unix/winewayland.so"
+  },
+  "passed": true,
+  "physical_hardware_tested": false,
+  "attempts": 1,
+  "notepad_rect": [
+    513,
+    61,
+    731,
+    498
+  ],
+  "task_buttons_before": 0,
+  "task_buttons_with_notepad": 4,
+  "typed_pixel_diff": 550,
+  "prefix_path": "/tmp/wineprefix.i2jOJy",
+  "graphics": {
+    "probe_ok": true,
+    "vulkan_device": "\"llvmpipe (LLVM 19.1.7, 128 bits)\" type=4 api=1.4.305",
+    "gl_renderer": "GFX_GL_OK vendor=\"Mesa\" renderer=\"llvmpipe (LLVM 19.1.7, 128 bits)\" version=\"4.5 (Compatibility Profile) Mesa 25.0.7-2+deb13u1\"",
+    "egl_vendor": "GFX_EGL_OK vendor=\"Mesa Project\" version=\"1.5\"",
+    "mesa_version": "25.0.7-2+deb13u1",
+    "scope": "payload staged + Vulkan/GL initialize in guest (software rendering); Direct3D and real-GPU behaviour not proven"
+  },
+  "failures": []
+}

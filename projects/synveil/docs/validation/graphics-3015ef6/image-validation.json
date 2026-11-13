@@ -1,0 +1,38 @@
+{
+  "schema": "synveil.wine-proof-build/v1",
+  "source_commit": "3015ef60933dfcd741542255ebbf6441651e44c2",
+  "stage_schema": "synveil.distro-wine-stage/v1",
+  "stage_validation_sha256": "9fa3c9ced610753e29dee7a262713978609cd24ee029e381b65d6462a320385a",
+  "wine_version": "10.0~repack-6",
+  "winewayland": {
+    "drv": "usr/lib/x86_64-linux-gnu/wine/x86_64-windows/winewayland.drv",
+    "present": true,
+    "unix": "usr/lib/x86_64-linux-gnu/wine/x86_64-unix/winewayland.so"
+  },
+  "payload_files": 554,
+  "payload_bytes": 320519830,
+  "assets_copied": 554,
+  "assets_identical_to_baseline": 0,
+  "link_closure_files_checked": 194,
+  "graphics": {
+    "stage_schema": "synveil.distro-graphics-stage/v1",
+    "stage_validation_sha256": "70309b05c1004861b913ebdd698d52b098ebfee764a9282394185713bfb66f74",
+    "mesa_version": "25.0.7-2+deb13u1",
+    "payload_files": 97,
+    "payload_bytes": 220473743,
+    "assets_copied": 61,
+    "assets_identical_to_baseline": 36,
+    "link_closure_files_checked": 29,
+    "software_drivers": {
+      "opengl": "llvmpipe (swrast gallium driver, Mesa)",
+      "vulkan": "lavapipe (libvulkan_lvp.so, Mesa)"
+    },
+    "probe": "usr/libexec/synveil/gfx-probe",
+    "decision": "ADR 0027 (owner, 2026-11-07)"
+  },
+  "image_sha256": "6c74bec9f6917019db05a530f1565a8b2ec48fd38f07e9cd29121a7006314c92",
+  "image_bytes": 1207959552,
+  "esp_size_mb": 1024,
+  "state_size_mb": 128,
+  "physical_boot_validated": false
+}

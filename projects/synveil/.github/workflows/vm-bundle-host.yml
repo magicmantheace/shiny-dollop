@@ -1,0 +1,41 @@
+name: QEMU VM bundle host checks
+
+on:
+  push:
+    branches: [phase2/native-core-bootstrap]
+    paths:
+      - build.sh
+      - tools/vm_bundle.py
+      - tools/auth_vm_bundle.py
+      - tools/initramfs_profile.py
+      - tools/state_disk.py
+      - tests/vm-bundle.py
+      - tests/auth-vm-bundle.py
+      - tests/initramfs-profile.py
+      - tests/smoke-auth-vm-bundle.py
+      - .github/workflows/vm-bundle-host.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+      - name: Test VM bundle integrity and non-overwrite contract
+        run: python3 tests/vm-bundle.py
+      - name: Test embedded initramfs and authenticated QEMU bundle isolation
+        run: |
+          python3 tests/initramfs-profile.py
+          python3 tests/auth-vm-bundle.py
+      - name: Check packaged-image guest smoke harness syntax
+        run: |
+          python3 -m py_compile tests/smoke-auth-vm-bundle.py
+          python3 tests/smoke-auth-vm-bundle.py --help
+
+      - name: Validate entrypoint syntax
+        run: bash -n build.sh

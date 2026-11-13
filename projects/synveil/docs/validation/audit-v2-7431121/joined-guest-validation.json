@@ -1,0 +1,14 @@
+{
+  "schema": "synveil.native-joined-guest/v1",
+  "source_commit": "743112180f5b37a35da8d6fe7db699231c87b01d",
+  "image_sha256": "97fb9c368e551963240740ee9ebc8d7063b9fb2cdac6d2a46a046f272bd24af3",
+  "enrollment_graphical": true,
+  "mismatched_confirmation_rejected": true,
+  "wrong_password_denied_after_cold_reboot": true,
+  "weston_desktop_after_login": true,
+  "pointer_move_resize_keyboard": true,
+  "session_end_relocks_login": true,
+  "state_on_image_provided_partition": true,
+  "separate_state_disk_used": false,
+  "physical_hardware_tested": false
+}

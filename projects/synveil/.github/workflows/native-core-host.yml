@@ -1,0 +1,172 @@
+name: Native core host checks
+
+on:
+  push:
+    branches:
+      - phase2/native-core-bootstrap
+      - development/audit-durability
+      - development/audit-rotation
+      - development/audit-failure-gates
+      - development/audit-enospc
+      - development/audit-lock-fixture
+      - development/audit-export
+      - development/audit-export-dirfd
+      - development/audit-ext4-exhaustion
+      - development/audit-abrupt-reboot
+      - development/audit-rollover-reboot
+      - development/audit-crash-evidence
+      - development/audit-archive-only
+      - development/audit-io-failures
+      - development/audit-fixture-contention
+      - development/audit-rotation-paths
+      - development/audit-process-crash
+      - development/audit-append-process-crash
+      - development/audit-retention-release
+      - development/audit-retention-process-crash
+      - development/audit-retention-cli-recovery
+      - development/audit-release-inspection
+      - development/audit-release-guest-crash
+      - development/audit-release-completion-reboot
+      - development/audit-sink-health
+      - development/observer-cpu-utilization
+      - development/observer-cpu-frequency
+      - development/observer-per-cpu-utilization
+      - development/observer-thermal
+      - development/observer-process-snapshot
+      - development/observer-energy
+      - development/login-idle-keyboard
+      - development/qmp-chord-hold
+      - development/archive-stream-integrity
+    paths:
+      - Cargo.toml
+      - Cargo.lock
+      - rust-toolchain.toml
+      - VERSION
+      - src/**
+      - build.sh
+      - build/manifests/rust-bootstrap.json
+      - tools/native_preflight.py
+      - tools/native_build.py
+      - tools/native_rustc_wrapper.py
+      - tests/native-preflight.py
+      - tests/native-build.py
+      - tools/package_native.py
+      - tools/auth_vm_bundle.py
+      - tools/archive_auth_vm.py
+      - tools/initramfs_profile.py
+      - tests/native-rootfs.py
+      - tests/native-startup.py
+      - tests/seat-supervisor.py
+      - tests/native-smoke.py
+      - tests/native-recovery.py
+      - tests/qemu-options.py
+      - build/scripts/qemu.sh
+      - tests/smoke-persistence.py
+      - tests/smoke-audit-crash.py
+      - tests/audit-crash-smoke.py
+      - tests/audit-release-cut.c
+      - tests/audit-release-cut.py
+      - tests/audit-release-crash-smoke.py
+      - tests/smoke-audit-release-crash.py
+      - tools/audit_fixture.py
+      - tests/system-generation.py
+      - tools/system_generation.py
+      - tests/native-protocol-probe.py
+      - tests/native-guest-fixture.py
+      - tests/auth-vm-bundle.py
+      - tools/auth_vm_bundle.py
+      - tools/initramfs_profile.py
+      - tests/graphical-login-fixture.py
+      - tests/graphical-onboard-fixture.py
+      - tests/smoke-graphical-onboard.py
+      - tests/smoke-graphical-login.py
+      - tests/protocol-probe.c
+      - tests/build-guest-fixture.py
+      - tests/smoke-recovery.py
+      - tests/smoke-boot.sh
+      - tests/qemu-lock.py
+      - tools/qmp_input.py
+      - tests/qmp-input.py
+      - tests/smoke-ui-preferences.py
+      - tests/ui-preferences-smoke-fixture.py
+      - tests/kernel-seed.py
+      - build/rootfs/**
+      - build/scripts/rootfs.sh
+      - .github/workflows/native-core-host.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-core-host-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out Synveil
+        uses: actions/checkout@v6
+
+      - name: Test native build prerequisite checks
+        run: |
+          python3 tests/native-preflight.py
+          python3 tests/native-build.py
+          python3 tests/native-rootfs.py
+          python3 tests/native-startup.py
+          python3 tests/seat-supervisor.py
+          python3 tests/native-smoke.py
+          python3 tests/native-recovery.py
+          python3 tests/qemu-options.py
+          python3 tests/audit-crash-smoke.py
+          python3 tests/audit-release-cut.py
+          python3 tests/audit-release-crash-smoke.py
+          python3 tests/system-generation.py
+          python3 tests/recovery-status.py
+          python3 tests/qemu-lock.py
+          python3 tests/qmp-input.py
+          python3 tests/ui-preferences-smoke-fixture.py
+          python3 tests/kernel-seed.py
+          python3 tests/native-protocol-probe.py
+          python3 tests/native-guest-fixture.py
+          python3 tests/serial-lock-smoke-fixture.py
+          python3 tests/auth-vm-bundle.py
+          python3 tests/graphical-login-fixture.py
+          python3 tests/graphical-onboard-fixture.py
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.99.0 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set 1.99.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Show committed dependency lock
+        run: |
+          test -f Cargo.lock
+          echo "----- BEGIN CARGO LOCK -----"
+          cat Cargo.lock
+          echo "----- END CARGO LOCK -----"
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Test workspace
+        run: cargo test --workspace --all-targets --locked
+
+      - name: Trace the built release CLI at all six interruption boundaries
+        run: python3 tests/audit-release-cut.py --native-binary target/debug/veil-audit
+
+      - name: Lint workspace
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Preserve generated lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-core-cargo-lock-${{ github.sha }}
+          path: Cargo.lock
+          if-no-files-found: error
+          retention-days: 7

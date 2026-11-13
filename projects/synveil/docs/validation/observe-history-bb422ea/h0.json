@@ -1,0 +1,17 @@
+{
+  "schema": "synveil.core/v1",
+  "id": "synctl-218",
+  "ok": true,
+  "result": {
+    "events": [],
+    "sampler": {
+      "cadence_ms": 5000,
+      "dropped_events": 0,
+      "enabled": true,
+      "response_omitted_events": 0,
+      "retained_events": 0,
+      "ring_capacity": 1024
+    },
+    "schema": "synveil.observe-history/v1"
+  }
+}

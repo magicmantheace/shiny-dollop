@@ -1,0 +1,353 @@
+name: Native target build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [phase2/native-core-bootstrap, development/audit-retention-release, development/audit-release-inspection, development/audit-release-guest-crash, development/audit-release-completion-reboot, development/audit-sink-health, development/observer-cpu-utilization, development/observer-cpu-frequency, development/observer-per-cpu-utilization, development/observer-thermal, development/observer-energy, development/observer-process-snapshot]
+    paths:
+      - Cargo.toml
+      - Cargo.lock
+      - VERSION
+      - src/**
+      - build.sh
+      - build/manifests/sources.json
+      - build/manifests/rust-bootstrap.json
+      - build/scripts/common.sh
+      - build/scripts/doctor.sh
+      - build/scripts/toolchain.sh
+      - build/scripts/rootfs.sh
+      - build/scripts/kernel.sh
+      - build/scripts/image.sh
+      - build/scripts/qemu.sh
+      - build/rootfs/**
+      - tools/state_disk.py
+      - tools/audit_fixture.py
+      - build/config/**
+      - tests/**
+      - tools/package_native.py
+      - tools/auth_vm_bundle.py
+      - tools/archive_auth_vm.py
+      - tools/initramfs_profile.py
+      - tools/build_manifest.py
+      - tools/native_preflight.py
+      - tools/native_build.py
+      - tools/native_rustc_wrapper.py
+      - tools/prepare_native_rust.py
+      - tools/source_lock.py
+      - .github/workflows/native-target-build.yml
+
+permissions:
+  contents: read
+
+# The full pinned toolchain and guest boots are expensive. Only the latest
+# development revision should consume an entire native target run.
+concurrency:
+  group: native-target-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile-and-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      SYNVEIL_JOBS: "4"
+      SYNVEIL_SOURCE_TRANSPORT: git
+
+    steps:
+      - name: Check out Synveil
+        uses: actions/checkout@v6
+
+      - name: Install bootstrap host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential bison flex texinfo gawk python3 xz-utils bzip2 cpio zstd \
+            dosfstools mtools gdisk e2fsprogs qemu-system-x86 ovmf \
+            libgmp-dev libmpfr-dev libmpc-dev libisl-dev libelf-dev libssl-dev bc rsync
+
+      - name: Validate build tooling
+        run: |
+          qemu-system-x86_64 -machine q35,help | grep -F 'i8042='
+          bash build.sh lint
+          python3 tests/native-preflight.py
+          python3 tests/native-build.py
+          python3 tests/native-rootfs.py
+          python3 tests/native-startup.py
+          python3 tests/seat-supervisor.py
+          python3 tests/native-smoke.py
+          python3 tests/native-recovery.py
+          python3 tests/audit-crash-smoke.py
+          python3 tests/audit-release-cut.py
+          python3 tests/audit-release-crash-smoke.py
+          python3 tests/recovery-status.py
+          python3 tests/qemu-lock.py
+          python3 tests/native-protocol-probe.py
+          python3 tests/native-guest-fixture.py
+          python3 tests/graphical-login-fixture.py
+          python3 tests/serial-console-policy.py
+          python3 tests/serial-lock-smoke-fixture.py
+
+      - name: Install and authenticate pinned Rust sources
+        run: |
+          python3 tools/prepare_native_rust.py
+
+      - name: Build isolated Synveil toolchain
+        run: |
+          mkdir -p out/logs
+          set -o pipefail
+          bash build.sh toolchain 2>&1 | tee out/logs/native-toolchain.log
+
+      - name: Compile and audit native binaries
+        run: |
+          set -o pipefail
+          bash build.sh native 2>&1 | tee out/logs/native-driver.log
+
+      - name: Show native artifact identity
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('out/native/build.json').read_text())
+          print(json.dumps({
+              'schema': data['schema'], 'git_commit': data['git_commit'],
+              'git_dirty': data['git_dirty'],
+              'artifacts': {name: {'sha256': item['sha256'], 'bytes': item['bytes']}
+                            for name, item in data['artifacts'].items()}
+          }, indent=2))
+          PY
+
+      - name: Build native rootfs and boot image
+        id: native_image
+        env:
+          SYNVEIL_NATIVE_ROOTFS: "1"
+          SYNVEIL_PERSISTENCE_ROOTFS: "1"
+          SYNVEIL_GRAPHICS_ROOTFS: "1"
+          SYNVEIL_DESKTOP_AUTOSTART: "1"
+          SYNVEIL_NETWORK_ROOTFS: "1"
+        run: |
+          set -o pipefail
+          bash build.sh rootfs 2>&1 | tee out/logs/native-rootfs.log
+          bash build.sh kernel 2>&1 | tee out/logs/native-kernel.log
+          bash build.sh image 2>&1 | tee out/logs/native-image.log
+          bash build.sh manifest
+
+      - name: Require native core status in QEMU
+        env:
+          SYNVEIL_SMOKE_TIMEOUT: "60"
+        run: bash build.sh native-smoke
+
+      - name: Verify structured read-only observer in guest
+        run: bash build.sh recovery-smoke --case observe --timeout 60
+
+      - name: Require recovery shell after core crash
+        run: bash build.sh recovery-smoke --timeout 60
+
+      - name: Restart core and retain recovery after restart exhaustion
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: bash build.sh recovery-smoke --case supervision --timeout 60
+
+      - name: Reject malformed IPC and retain healthy status in guest
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          bash build.sh guest-fixture --case protocol 2>&1 | tee out/logs/protocol-fixture.log
+
+      - name: Recover in guest with core binary absent
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          bash build.sh guest-fixture --case absent 2>&1 | tee out/logs/absent-fixture.log
+
+      - name: Prove isolated read-only recovery with core seat and desktop missing
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          bash build.sh guest-fixture --case recovery-status 2>&1 \
+            | tee out/logs/recovery-status-fixture.log
+
+      - name: Recover from absent or invalid QEMU state disk
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: |
+          bash build.sh recovery-smoke --case state-missing --timeout 60
+          bash build.sh recovery-smoke --case state-corrupt --timeout 60
+
+      - name: Require locked seat and no default password on ephemeral VM
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: bash build.sh recovery-smoke --case seat-locked --timeout 60
+
+      - name: Validate virtual framebuffer in headless QEMU
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        env:
+          SYNVEIL_QEMU_VIDEO: "1"
+          SYNVEIL_SMOKE_REQUIRE_DISPLAY: "1"
+          SYNVEIL_SMOKE_REQUIRE_INPUT: "1"
+          SYNVEIL_SMOKE_REQUIRE_VT: "1"
+          SYNVEIL_SMOKE_REQUIRE_DESKTOP: "1"
+        run: bash build.sh native-smoke
+
+      - name: Recover graphical menu after one crash with serial shell alive
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        env:
+          SYNVEIL_QEMU_VIDEO: "1"
+        run: bash build.sh recovery-smoke --case desktop --timeout 60
+
+      - name: Terminate the demo shell when the graphical launcher crashes
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: bash build.sh recovery-smoke --case desktop-terminal --timeout 60
+
+      - name: Verify non-root VT demo terminal identity in guest
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        env:
+          SYNVEIL_QEMU_VIDEO: "1"
+        run: bash build.sh recovery-smoke --case demo --timeout 60
+
+      - name: Validate opt-in QEMU DHCP configuration
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        env:
+          SYNVEIL_QEMU_NETWORK: "1"
+          SYNVEIL_SMOKE_REQUIRE_NETWORK: "1"
+        run: bash build.sh native-smoke
+
+      - name: Verify state survives two separate QEMU boots
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: |
+          bash build.sh state-disk --size-mib 128
+          bash build.sh persistence-smoke --timeout 60
+
+      - name: Preserve audit history through rollover capacity and incomplete tails
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: |
+          SYNVEIL_QEMU_STATE_DISK="$PWD/out/synveil-state.ext4" \
+            bash build.sh recovery-smoke --case audit-rotation --timeout 60
+
+      - name: Recover native audit after isolated exhaustion and read-only storage
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: bash build.sh recovery-smoke --case audit-enospc --timeout 60
+
+      - name: Recover audit appends and export after disposable ext4 exhaustion
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: bash build.sh recovery-smoke --case audit-ext4 --timeout 90
+
+      - name: Preserve acknowledged audit and snapshot after abrupt emulator stop
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: bash build.sh audit-crash-smoke --timeout 60
+
+      - name: Preserve completed rollover and both snapshots after abrupt stop
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: bash build.sh audit-crash-smoke --rollover --timeout 60
+
+      - name: Recover archive-only layout and preserve both journals after abrupt stop
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: bash build.sh audit-crash-smoke --archive-only --timeout 60
+
+      - name: Release copied audit archive after reboot without changing active history
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: bash build.sh audit-crash-smoke --rollover --release-archive --timeout 60
+
+      - name: Recover live archive release across six guest interruptions
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          bash build.sh guest-fixture --case audit-release-crash 2>&1 \
+            | tee out/logs/audit-release-crash-fixture.log
+
+      - name: One-time root-owned credential enrollment in QEMU state
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: |
+          SYNVEIL_QEMU_STATE_DISK="$PWD/out/synveil-state.ext4" \
+            bash build.sh recovery-smoke --case enroll --timeout 120
+          SYNVEIL_QEMU_STATE_DISK="$PWD/out/synveil-state.ext4" \
+            bash build.sh recovery-smoke --case enrolled-reboot --timeout 60
+
+      - name: Verify graphical settings load across separate QEMU boots
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: bash build.sh ui-preferences-smoke --timeout 60
+
+      - name: Revoke authenticated nonroot terminal on seat broker crash
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: |
+          bash build.sh state-disk --path "$PWD/out/seat-crash-state.ext4" --size-mib 128
+          SYNVEIL_QEMU_STATE_DISK="$PWD/out/seat-crash-state.ext4" \
+            bash build.sh recovery-smoke --case seat-crash --timeout 120
+
+      - name: Prove authenticated preview refuses unauthenticated root serial
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          bash build.sh guest-fixture --case graphical-locked 2>&1 \
+            | tee out/logs/graphical-serial-locked-fixture.log
+
+      - name: Authenticate via real framebuffer and revoke on GUI crash
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          bash build.sh guest-fixture --case graphical-login 2>&1 \
+            | tee out/logs/graphical-login-fixture.log
+
+      - name: Enroll first owner graphically with locked serial and reboot
+        id: onboarding_guest
+        if: ${{ !cancelled() && steps.native_image.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          bash build.sh guest-fixture --case graphical-onboard 2>&1 \
+            | tee out/logs/graphical-onboard-fixture.log
+
+      - name: Package validated authenticated VM without copying test credentials
+        id: authenticated_package
+        if: ${{ !cancelled() && steps.onboarding_guest.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          bash build.sh auth-vm-bundle --dest "$PWD/out/auth-vm" --size-mib 64
+          test -s out/auth-vm/synveil-x86_64.img
+          test -s out/auth-vm/validation.json
+          test -f out/auth-vm/synveil-state.ext4
+          test ! -e out/auth-vm/graphical-onboard-state.ext4
+          sh -n out/auth-vm/run-vm.sh
+
+      - name: Independently enroll and log in using packaged VM artifacts
+        id: packaged_guest
+        if: ${{ !cancelled() && steps.authenticated_package.outcome == 'success' }}
+        env:
+          SYNVEIL_QEMU_NETWORK: "0"
+          SYNVEIL_QEMU_DISPLAY: none
+          SYNVEIL_QEMU_VIDEO: "1"
+        run: |
+          # Exercise the packaged boot image with a throwaway copy of its
+          # blank state, preserving a credential-free distributable bundle.
+          python3 tests/smoke-auth-vm-bundle.py --bundle "$PWD/out/auth-vm" --timeout 105
+
+      - name: Archive only guest-tested authenticated VM with pristine state
+        id: authenticated_archive
+        if: ${{ !cancelled() && steps.packaged_guest.outcome == 'success' }}
+        run: |
+          mkdir -p out/downloads
+          python3 tools/archive_auth_vm.py --bundle "$PWD/out/auth-vm" \
+            --output "$PWD/out/downloads/synveil-auth-vm-${{ github.sha }}.tar.gz"
+          cd out/downloads
+          sha256sum "synveil-auth-vm-${{ github.sha }}.tar.gz" > SHA256SUMS
+
+      - name: Retain authenticated QEMU preview download
+        if: ${{ !cancelled() && steps.authenticated_archive.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: authenticated-qemu-preview-${{ github.sha }}
+          retention-days: 7
+          if-no-files-found: error
+          path: out/downloads/
+
+      - name: Preserve native build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-target-${{ github.sha }}
+          retention-days: 7
+          if-no-files-found: ignore
+          path: |
+            out/native/
+            out/logs/
+            out/manifests/
+            out/guest-fixtures/*/logs/
+            out/guest-fixtures/*/manifests/
+            build/toolchain/out/SYNVEIL-TOOLCHAIN
+            build/work/native/build-*/maps/
+            build/work/native/build-*/cargo-build.log

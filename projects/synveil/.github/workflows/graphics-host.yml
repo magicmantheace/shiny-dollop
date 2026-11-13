@@ -1,0 +1,71 @@
+name: Graphics diagnostic host checks
+
+on:
+  push:
+    branches: [phase2/native-core-bootstrap, development/login-idle-keyboard]
+    paths:
+      - src/veil-display/**
+      - tests/display-lifetime.c
+      - tests/display-keyboard-grab.c
+      - tests/desktop-lifetime.py
+      - tests/display-build.py
+      - tests/auth-vm-bundle.py
+      - tools/auth_vm_bundle.py
+      - tools/initramfs_profile.py
+      - tests/graphical-onboard-fixture.py
+      - tests/smoke-graphical-onboard.py
+      - tests/desktop-supervisor.py
+      - build/rootfs/start-desktop
+      - build/rootfs/mount-state
+      - tests/state-mount-safety.py
+      - tests/smoke-ui-preferences.py
+      - tests/ui-preferences-smoke-fixture.py
+      - tests/qmp-input.py
+      - tools/qmp_input.py
+      - tests/qemu-options.py
+      - tests/native-smoke.py
+      - tests/smoke-boot.sh
+      - build/scripts/qemu.sh
+      - .github/workflows/graphics-host.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: graphics-host-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+      - name: Compile framebuffer diagnostic and check memory bounds
+        run: python3 tests/display-build.py
+      - name: Test locked-serial first-user onboarding with fake QEMU
+        run: python3 tests/graphical-onboard-fixture.py
+      - name: Enforce private authenticated VM packaging contract
+        run: python3 tests/auth-vm-bundle.py
+      - name: Test two-boot UI smoke verdicts with fake QEMU
+        run: python3 tests/ui-preferences-smoke-fixture.py
+      - name: Validate typed QMP keyboard events with fake monitor
+        run: python3 tests/qmp-input.py
+      - name: Test state path safety without privileged mounts
+        run: python3 tests/state-mount-safety.py
+      - name: Test demo-terminal parent-death cleanup
+        run: python3 tests/desktop-lifetime.py
+      - name: Test bounded desktop crash recovery
+        run: python3 tests/desktop-supervisor.py
+      - name: Test QEMU device configuration
+        run: python3 tests/qemu-options.py
+      - name: Test serial boot and graphics smoke verdicts
+        run: python3 tests/native-smoke.py
+      - name: Validate launcher shell syntax
+        run: |
+          bash -n build/scripts/qemu.sh
+          bash -n tests/smoke-boot.sh
+          sh -n build/rootfs/start-desktop
+          sh -n build/rootfs/mount-state

@@ -1,0 +1,49 @@
+#!/bin/sh
+# SPDX-License-Identifier: MPL-2.0
+# Wine proof launcher (docs/WINDOWS_COMPAT_DESIGN.md proof
+# slice): runs the sealed distribution Wine's bundled
+# notepad.exe as the authenticated session user.
+#
+#   * WINEPREFIX is a fresh mktemp directory under /tmp
+#     (tmpfs): the proof proves execution, not persistence —
+#     real prefix storage is tied to the storage roadmap.
+#   * WINEARCH=win64: the sealed payload is win64-only (the
+#     i386-windows module tree is pruned at stage build).
+#   * The graphics driver is pinned to wayland in the fresh
+#     prefix's registry before notepad starts, so the proof
+#     exercises the winewayland.drv path deterministically
+#     rather than whichever driver the default order reaches.
+#   * WINEDLLOVERRIDES disables the Gecko/Mono installers:
+#     nothing is ever downloaded in the guest.
+#   * The payload's multiarch directory goes on
+#     LD_LIBRARY_PATH for this process tree only; the payload
+#     runs the baseline rootfs's own glibc (the distribution
+#     libc is pruned from the seal).
+PATH=/bin:/usr/bin
+export PATH
+
+if [ "$(id -u)" != 1000 ]; then
+    echo "wine-notepad: refused unexpected session identity"
+    exit 1
+fi
+
+WINE=/usr/lib/wine/wine64
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu
+export WINEARCH=win64
+export WINEDLLOVERRIDES="mscoree,mshtml="
+export WINEDEBUG=-all
+WINEPREFIX=$(mktemp -d /tmp/wineprefix.XXXXXX)
+export WINEPREFIX
+echo "$WINEPREFIX" > /var/tmp/wineprefix.path
+
+$WINE wineboot --init >/dev/null 2>&1
+# zlib1.dll is an out-of-tree import (Debian ships it via the
+# mingw runtime package, not as a Wine builtin): the loader
+# finds it in the module directory for loader-started
+# processes, but server-started processes (start.exe) search
+# the prefix's system32 only and fail without it there.
+# Present it in system32, as a Windows install would.
+cp /usr/lib/x86_64-linux-gnu/wine/x86_64-windows/zlib1.dll \
+   "$WINEPREFIX/drive_c/windows/system32/zlib1.dll" 2>/dev/null
+$WINE reg add 'HKCU\Software\Wine\Drivers' /v Graphics /d wayland /f >/dev/null 2>&1
+exec $WINE notepad.exe

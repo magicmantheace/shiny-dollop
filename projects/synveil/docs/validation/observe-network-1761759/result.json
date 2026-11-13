@@ -1,0 +1,13 @@
+{
+  "schema": "synveil.observe-acceptance/v1",
+  "image_sha256": "a159468398cfdc3e60e3c8cee4c86bf096976497449377db2b81dbc6d0a04164",
+  "passed": true,
+  "physical_hardware_tested": false,
+  "attempts": 1,
+  "pressure_status": {
+    "cpu": "ready",
+    "memory": "ready",
+    "io": "ready"
+  },
+  "failures": []
+}
