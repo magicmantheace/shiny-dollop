@@ -1,0 +1,80 @@
+{
+ "entry_version": 1,
+ "name": "Miner Pickaxe",
+ "slug": "miner-pickaxe",
+ "source_concept": "media-generation-underreach-miner-pickaxe-refer-0-3c70618a-80b5-4dcc-aa56-e074c0005806.webp",
+ "asset_file": "miner-pickaxe.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "aaba8c8e9c0762ef73b746c33e3de8db1ea2af49910d807b6e8bdaf1da437be5",
+ "bytes": 10471832,
+ "counts": {
+  "verts": 27001,
+  "faces": 53998,
+  "raw_mesh_verts": 174833,
+  "raw_mesh_faces": 229000
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "runner": {
+    "name": "miner-pickaxe_shape",
+    "exit_code": 0,
+    "seconds": 536.95,
+    "baseline_vram_mib": 2997,
+    "peak_vram_mib": 9246,
+    "peak_delta_mib": 6249,
+    "vram_after_exit_mib": 2804,
+    "n_samples": 1151,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"miner-pickaxe_shape\", \"exit_code\": 0, \"seconds\": 536.95, \"baseline_vram_mib\": 2997, \"peak_vram_mib\": 9246, \"peak_delta_mib\": 6249, \"vram_after_exit_mib\": 2804, \"n_samples\": 1151}\r\n"
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 114502,
+    "faces": 229000,
+    "load_s": 119.76,
+    "inference_s": 349.36,
+    "total_s": 469.16,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\miner-pickaxe\\shape.glb"
+   }
+  },
+  "texture_stage": {
+   "runner": {
+    "name": "miner-pickaxe_texture",
+    "exit_code": 0,
+    "seconds": 1219.88,
+    "baseline_vram_mib": 2804,
+    "peak_vram_mib": 11952,
+    "peak_delta_mib": 9148,
+    "vram_after_exit_mib": 1280,
+    "n_samples": 2610,
+    "job_state": "done",
+    "adopted_from_lab": true,
+    "note": "Bridge job hit its ~15 min tracking cap while the stage kept running on the PC; stage completed exit 0 and the result + textured.glb were adopted from the lab and hash-verified (textured.glb sha256 9ac5ec69ba9766f786d4a6870b359ef7597565f7292b98d1b1981e1a26c9427f)."
+   },
+   "stats": {
+    "stage": "texture",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+    "verts": 174833,
+    "faces": 229000,
+    "load_s": 106.8,
+    "texture_s": 1083.69,
+    "total_s": 1191.18,
+    "torch_peak_mib": 9872.7,
+    "output": "D:\\asset-forge-lab\\out\\gab\\miner-pickaxe\\textured.glb"
+   }
+  }
+ }
+}
