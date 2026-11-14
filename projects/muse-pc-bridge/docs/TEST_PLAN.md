@@ -425,25 +425,46 @@ PC during install verification.
   jobs with WinError 1920, and cmd / full-path jobs are the
   working route.**
 
-## Planned — v1.2 (spec only; none of these tests exist yet)
+### v1.2 suites (added 2026-11-13)
 
-Per `docs/V1_2_SPEC.md` §4, all required before the agent reports
-`1.2.0`:
+| File | Covers |
+| --- | --- |
+| `tests/test_v1_2_audit.py` (12) | `GET /v1/audit`: auth required (401 both ways); entries oldest-first from the agent's own log; `since` is at-or-after (an entry whose ts equals `since` is included); `next_since` paging over a dedicated core covers all entries with no duplicates and no loss (the cursor is the last ts + 0.5 ms and a page never splits a same-millisecond group); limit default/cap (<= 1000); non-numeric params → 400; **escape attempts (`?path=`, `?file=`, absolute paths) still return only the configured log — a planted marker file's content never appears**; `/v1/audit/tail` behavior preserved; **the read itself is audited** (a request entry with an "audit read" summary lands in the log); **token-absence regression (spec §2): the dummy token is seeded into an exec command — it appears in the job's stdout (output is not audit content) but in NEITHER the audit file NOR the endpoint output, while the exec entry itself remains present with the token masked to `***`**; client `audit()` paging method and the CLI `audit` subcommand printing one JSON object per line |
+| `tests/test_v1_2_uac.py` (29) | the static classifier: positive + negative cases per spec §1 family (msiexec, setup*.exe, .msi, Start-Process -Verb RunAs / runas, HKLM: vs HKCU, Program Files / %SystemRoot% vs user paths, net start\|stop and sc config\|create vs net use / sc query, machine-scope vs CurrentUser Set-ExecutionPolicy, dism/sfc/bcdedit vs lookalike words, schtasks /create + /RU SYSTEM vs a plain user task, pnputil /add-driver vs /enum-drivers; multiple reasons accumulate); `assess_uac` takes `consent_pending` from the monitor snapshot (stubbed both ways); over HTTP: the `uac` object rides on 202 and waited-200 exec responses, a likely command **executes by default** and reports likely, `require_no_uac` on a likely command returns **409 {error: uac_likely} and creates NO job** (job count unchanged; the refusal is audited with status 409), and a benign command with `require_no_uac` runs normally |
+| `tests/test_v1_2_queue.py` (20) | lifecycle over HTTP: submit → run → done with the queue audit trail (submitted/started/finished + exit code, all carrying the queue job id) and the underlying executor job's real output; **strictly sequential** (two sleep jobs' execution windows never overlap); script job runs when its pin matches; schema validation → 400s store nothing (escape path, bad hash, bad enums); auth required; client-library round trip. Policy: **hash mismatch refuses and never executes** (marker-file proof), including a script edited after submission; **skip-if-likely never executes** (marker proof) while run-anyway does; **require_no_uac on POST /v1/queue → 409 and the queue store is byte-identical afterwards**. Failure modes: exit-code failure records reason `exit_code`; **on_failure=stop halts the runner** (next job stays pending, `halted: true`) until resume; continue proceeds. Pause/cancel: API pause blocks starts and resume releases (PAUSED file present/absent as expected); **a PAUSED file dropped directly on disk also pauses** (the local kill switch) and its removal resumes; cancel-pending → failed/cancelled, re-cancel → 409, unknown → 404; **DELETE on a running job → 409, and cancelling it through /v1/jobs/<exec_job_id>/cancel lands it in failed/killed**. Direct-runner units: **restart recovery moves a planted running/ job to failed/core_restarted without executing it**; **waiting_uac grace expiry** (stub monitor reports a prompt throughout; grace 0.5 s → failed/uac_timeout, queue_waiting_uac audited); the runner thread starts and stops cleanly (no leaked thread) |
 
-- **UAC pre-flight**: classifier positive/negative cases per
-  heuristic family; `require_no_uac` returns 409 and executes
-  nothing.
-- **Audit read**: auth required; `since`/`limit` paging; the
-  token-absence regression (token seeded into a command appears in
-  neither the audit file nor the endpoint output); the endpoint
-  cannot be pointed at any file but the configured audit log.
-- **Queue runner**: submit → run → done; `on_failure` stop vs
-  continue; script hash-mismatch refusal; PAUSED blocks new starts
-  and resumes cleanly; restart recovery moves `running/` jobs to
-  `failed/core_restarted` (never silently re-runs);
-  `skip-if-likely` jobs never execute; `waiting_uac` grace expiry.
-- Full existing suite stays green; Windows smoke on the owner's PC
-  (non-elevated) before any production switch.
+## v1.2 verification — 2026-11-13 (Muse's Linux VM, Python 3.12)
+
+Built per `docs/V1_2_SPEC.md` §5 build order (audit read → UAC
+pre-flight → queue runner), one commit per item plus this docs/
+version commit, on branch `muse-pc-bridge/v1-2`. **Full suite:
+234 tests, OK (skipped=3)** — the 173-test v1.1 baseline plus 61
+new v1.2 tests; the 3 skips are the pre-existing platform ones.
+Per-item runs during development: audit 12 OK; UAC 29 OK (one
+classifier false positive found and fixed in development —
+`dism` matched inside `dism-notes`); queue 20 OK, repeated 3x
+after a FIFO tie-break fix (same-second submissions order by
+job-file write order, not random id).
+
+**One spec-driven behavior change beyond the three items:** the
+§2 token-absence regression failed against the pre-v1.2 code —
+a token seeded into a command was written into the audit log via
+command summaries (verified on the VM before the fix).
+`BridgeCore.audit()` now scrubs the exact configured token value
+from every audit line at write time, enforcing the §0 invariant
+("the token is never written to the audit log") that §2 asserts.
+Commands still execute verbatim; only the audit copy is masked.
+No audit entries are dropped, reordered, or otherwise redacted.
+
+**NOT verified — everything Windows-side.** The build was
+VM-only at the owner's direction (no PC contact of any kind):
+PowerShell/cmd queue jobs, the classifier against real installer
+command lines, the consent probe's interaction with the queue's
+waiting_uac path against a real prompt, and the runner under the
+SYSTEM boot core are all unproven. The spec §4 gate stands: a
+Windows smoke on the owner's PC (non-elevated) comes before any
+production switch, and the switch itself is the owner pressing
+go. Production still runs v1.1.
 
 ## What the tests cannot prove
 
@@ -504,6 +525,13 @@ These require the owner's PC and are **not** claimed by any VM test:
   501 for desktop routes before logon (no helper yet). The VM
   proves the proxy, whitelist, registry and audit mechanics with
   both servers on loopback; it cannot prove session behaviour.
+- **v1.2 on real Windows**: queue jobs under PowerShell/cmd, the
+  UAC classifier against real installer command lines, the
+  `waiting_uac` path against a genuine consent prompt (the VM
+  drives it with a stubbed monitor), the queue store on NTFS, and
+  the runner's behaviour inside the session-0 SYSTEM core across a
+  real reboot (recovery is suite-proven with a planted record
+  only). All v1.2 verification to date is POSIX/VM.
 
 ## Owner-PC verification checklist (part of install)
 

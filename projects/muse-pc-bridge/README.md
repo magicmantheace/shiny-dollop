@@ -64,8 +64,9 @@ and token to Muse **out-of-band** — never via git.
 | `agent/display_state.py` | pure signal→display-state mapping for the avatar (idle / working / session / connecting / celebrate / alert; an active UAC prompt maps to alert with label "Approval needed at PC") |
 | `agent/assets/avatar/` | avatar animation loops, one full-frame transparent GIF per display state |
 | `agent/bridge_update.py` | self-update mechanics (bundle verify, staged apply, rollback) |
+| `agent/queue_runner.py` | resident queue runner (v1.2): a thread in the agent draining `<state_dir>/queue/` — hash-pinned script jobs, PAUSED kill switch, skip-if-likely UAC policy, restart recovery that fails (never re-runs) interrupted jobs |
 | `agent/helpers/uia.ps1` | fixed UI Automation helper driven by the agent (JSON parameters only) |
-| `client/bridge_client.py` | Muse-side library + CLI (jobs, processes incl. `spawn-gui`, sessions, chunked files, screenshot/input/clipboard/uia, `wol`) |
+| `client/bridge_client.py` | Muse-side library + CLI (jobs, processes incl. `spawn-gui`, sessions, chunked files, screenshot/input/clipboard/uia, `wol`, `audit`, queue commands) |
 | `scripts/start-bridge.cmd` | start the agent in a visible console |
 | `scripts/start-bridge-service.cmd` | start the supervised agent (v1 service form) |
 | `scripts/start-bridge-gui.cmd` | start the avatar-display form (no console window) |
@@ -179,3 +180,18 @@ hash-pinned, pre-approved jobs while Muse is disconnected, with a
 local PAUSED kill switch and skip-if-likely UAC policy. Full design:
 `docs/V1_2_SPEC.md`. **Nothing is built or verified; this is planned
 work.** Production still runs v1.1.
+
+**Update (2026-11-13, later — v1.2 BUILT, agent `1.2.0`, branch
+`muse-pc-bridge/v1-2`):** all three items are implemented in the
+spec's build order, each with its tests: audit read (including a
+write-time scrub enforcing the "token never appears in the audit
+log" invariant — command summaries previously leaked a token that
+was seeded into a command), UAC pre-flight on `/v1/exec` and
+`/v1/queue` with the 409 `require_no_uac` refusal, and the resident
+queue runner. **Verified on Muse's Linux VM only: full suite 234
+tests, OK (3 skips).** **NOT deployed — production still runs
+v1.1**, and nothing about the owner's PC was touched during the
+build (the owner directed VM-only work). Windows behaviour is
+explicitly unverified: the §4 Windows smoke on the PC and the
+production switch remain owner-gated. See the 2026-11-13 v1.2
+entry in `docs/MUSE_HANDOFF.md`.

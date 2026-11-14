@@ -1,7 +1,12 @@
 # Muse PC Bridge — v1.2 spec
 
-**Status:** SPEC ONLY — authorized by the owner 2026-11-13 (voice call).
-Not built. Build order and gates are in §5.
+**Status:** BUILT on branch `muse-pc-bridge/v1-2` (2026-11-13) —
+all three items implemented in the §5 build order with their §4
+tests; full suite green on Muse's Linux VM (see
+`docs/MUSE_HANDOFF.md` and `docs/TEST_PLAN.md` for the run
+record). **NOT deployed: production still runs v1.1.** The Windows
+smoke on the owner's PC (non-elevated) and the production switch
+remain owner-gated, per §4.
 
 **Scope:** three owner-requested improvements on top of v1.1 (PR #47,
 merged 2026-11-12):

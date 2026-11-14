@@ -101,7 +101,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 AGENT_NAME = "muse-pc-bridge"
 MAX_GET_BYTES = 16 * 1024 * 1024          # whole-file /v1/file/get limit
 MAX_RANGE_BYTES = 64 * 1024 * 1024        # per-call range-read limit

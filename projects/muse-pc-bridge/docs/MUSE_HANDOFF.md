@@ -870,3 +870,80 @@ only, token never logged, audit non-negotiable, UAC stays the
 owner's click). Build order: audit read → UAC pre-flight → queue
 runner, on a future `muse-pc-bridge/v1-2` branch. **State: spec
 only — no code, no tests, nothing deployed; production runs v1.1.**
+
+## 2026-11-13 evening — v1.2 BUILT (branch `muse-pc-bridge/v1-2`), VM-verified, NOT deployed
+
+The owner authorized the build the same evening, explicitly
+VM-only while the PC is paused for gaming: **no PC contact of any
+kind — no deployment, no restart, no live-bridge test.** Agent
+version is now `1.2.0`. One commit per spec item, in the §5 build
+order:
+
+1. **Audit read (§2)** — `GET /v1/audit?since=&limit=`: entries
+   at/after a unix timestamp, oldest first, from the agent's own
+   configured audit file only (there is no path parameter — the
+   read cannot be aimed elsewhere; escape attempts are tested).
+   Limit defaults to 200, hard cap 1000; `next_since` paging is
+   lossless (cursor = last ts + 0.5 ms; a page never splits a
+   same-millisecond group). Reads are audited by the normal
+   request entry. `/v1/audit/tail` untouched. Client:
+   `BridgeClient.audit()` + CLI `audit` (one JSON object per
+   line, auto-paging).
+   **Token-invariant enforcement found necessary by the §2
+   regression:** seeding the token into a command DID write it
+   into the audit log via command summaries (demonstrated on the
+   VM against the pre-fix code). `BridgeCore.audit()` now scrubs
+   the exact configured token value from every line at write
+   time. The command executes verbatim; only the audit copy is
+   masked (`***`). No entries are dropped, reordered, or
+   otherwise redacted — this enforces the §0/§2 invariant rather
+   than weakening the log. (Flagged for the owner's review: if he
+   wants command summaries byte-verbatim even when they contain
+   the token, this is the one-line place to revisit.)
+2. **UAC pre-flight (§1)** — `uac_static_assessment()` covers
+   every spec family; `assess_uac()` adds live `consent_pending`
+   from the v1.1 monitor. `POST /v1/exec` responses (202 and
+   waited-200) carry `uac: {likely, reasons, consent_pending}`,
+   assessed before execution; `require_no_uac: true` + likely →
+   `409 {error: "uac_likely", uac: {...}}` with NO job created
+   (test counts jobs before/after). One false positive found and
+   fixed in development (`dism` matching inside `dism-notes`).
+3. **Resident queue runner (§3)** — `agent/queue_runner.py`, a
+   thread started by `create_server` for the main agent only (the
+   session helper shares the state dir but never runs one; no new
+   service/task/autostart). Store at `<state_dir>/queue/` —
+   `state_dir` IS the state root, so there is no state/state
+   nesting. Schema, hash-pinning (recomputed immediately before
+   execution; mismatch → `failed/script_hash_mismatch`, never
+   executes), sequential execution through the existing job
+   executor, PAUSED checked before every job (API toggles the
+   same file the owner can drop by hand; direct file changes are
+   observed and audited), `skip-if-likely` default, mid-run
+   consent → `waiting_uac` mark → `uac_timeout` after
+   `queue_uac_grace_s` (new config key, default 120), consent
+   never clicked, `on_failure` stop (halts until resume) vs
+   continue, restart recovery `running/` → `failed/
+   core_restarted` (never re-run), and a full audit trail
+   (queue_submitted/started/finished/failed/waiting_uac/paused/
+   resumed/cancelled, each carrying the queue job id). FIFO
+   detail: `submitted_at` is whole seconds per the spec schema,
+   so same-second submissions order by job-file write order
+   (mtime), not by random id — found by a flaky-test investigation
+   during the build. API: POST/GET/DELETE `/v1/queue[/<id>]`,
+   POST `/v1/queue/pause|resume`; a `require_no_uac` refusal on
+   submit stores nothing (verified byte-identical store). Client
+   methods + CLI (`queue`, `queue-exec`, `queue-cancel`,
+   `queue-pause`, `queue-resume`).
+
+**Verified (Muse's Linux VM, 2026-11-13):** full suite
+**234 tests, OK (skipped=3)** — 173 v1.1 baseline + 12 audit +
+29 UAC + 20 queue. Per-item focused runs green during
+development; the queue file repeated 3x after the FIFO fix.
+
+**NOT verified / not done:** everything Windows (PowerShell/cmd
+queue jobs, classifier vs real installer lines, waiting_uac
+against a real prompt, the runner under the SYSTEM core, NTFS
+store behavior); no PC contact was made at all. **Production
+still runs v1.1.** Remaining gates, unchanged from the spec:
+Windows smoke on the PC (non-elevated), then the production
+switch — both owner-gated.
