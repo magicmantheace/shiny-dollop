@@ -140,7 +140,8 @@ class Client:
     # ------------------------------------------------------------------
     def exec_submit(self, command: str, shell: str | None = None,
                     timeout_s: float | None = None, cwd: str | None = None,
-                    env: dict | None = None) -> dict:
+                    env: dict | None = None,
+                    require_no_uac: bool = False) -> dict:
         payload: dict = {"command": command}
         if shell:
             payload["shell"] = shell
@@ -150,6 +151,8 @@ class Client:
             payload["cwd"] = cwd
         if env:
             payload["env"] = env
+        if require_no_uac:
+            payload["require_no_uac"] = True
         return self.request("POST", "/v1/exec", payload)
 
     def job_get(self, job_id: str, stdout_offset: int = 0,
@@ -212,9 +215,11 @@ class Client:
     def exec_run(self, command: str, shell: str | None = None,
                  timeout_s: float | None = None, cwd: str | None = None,
                  env: dict | None = None,
-                 wait_timeout: float | None = None) -> dict:
+                 wait_timeout: float | None = None,
+                 require_no_uac: bool = False) -> dict:
         job = self.exec_submit(command, shell=shell, timeout_s=timeout_s,
-                               cwd=cwd, env=env)
+                               cwd=cwd, env=env,
+                               require_no_uac=require_no_uac)
         return self.job_wait(job["job_id"], timeout=wait_timeout)
 
     # ------------------------------------------------------------------

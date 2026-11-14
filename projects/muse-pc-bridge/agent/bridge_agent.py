@@ -693,6 +693,84 @@ def _uac_watch(core: "BridgeCore") -> None:
     core.uac.run()
 
 
+# ---------------------------------------------------------------------------
+# UAC pre-flight assessment (v1.2 §1)
+#
+# A submission is assessed BEFORE it executes: static heuristics over
+# the command/script text flag the operations that normally raise a
+# UAC consent prompt, and the live consent state from the v1.1
+# monitor says whether a prompt is already on screen. Heuristics
+# cannot prove a negative — "likely": false is advisory, never a
+# guarantee — so the default behaviour is unchanged (execute and
+# report); only an explicit "require_no_uac": true turns a likely
+# assessment into a 409 refusal that executes nothing.
+# ---------------------------------------------------------------------------
+
+def _rx(pattern: str) -> re.Pattern:
+    return re.compile(pattern, re.IGNORECASE)
+
+
+# (reason, pattern) — one entry per spec §1 heuristic family.
+_UAC_TEXT_RULES: list[tuple[str, re.Pattern]] = [
+    ("installer invocation (msiexec)",
+     _rx(r"\bmsiexec(?:\.exe)?\b")),
+    ("installer invocation (setup*.exe)",
+     _rx(r"\bsetup[\w.\-]*\.exe\b")),
+    ("installer package (.msi)",
+     _rx(r"\.msi\b")),
+    ("elevation via Start-Process -Verb RunAs / runas",
+     _rx(r"(?:start-process\b[^|;&\n]*-verb\s+[\"']?runas"
+         r"|\brunas(?:\.exe)?\b)")),
+    ("write under HKLM:",
+     _rx(r"(?:\bHKLM:|\bHKEY_LOCAL_MACHINE\b)")),
+    ("system location (Program Files / %SystemRoot%)",
+     _rx(r"(?:\bprogram files\b|%programfiles(?:\(x86\))?%|%systemroot%"
+         r"|%windir%)")),
+    ("service control (net start/stop)",
+     _rx(r"\bnet(?:\.exe)?\s+(?:start|stop)\b")),
+    ("service control (sc config/create)",
+     _rx(r"\bsc(?:\.exe)?\s+(?:config|create)\b")),
+    ("machine-scope Set-ExecutionPolicy",
+     _rx(r"set-executionpolicy\b[^|;&\n]*-scope\s+[\"']?localmachine\b")),
+    ("system servicing tool (dism/sfc/bcdedit)",
+     _rx(r"\b(?:dism|sfc|bcdedit)(?:\.exe)?(?![\w\-])")),
+    ("driver install (pnputil /add-driver)",
+     _rx(r"\bpnputil(?:\.exe)?\b[^|;&\n]*/add-driver\b")),
+]
+
+_UAC_SCHTASKS_RE = _rx(r"\bschtasks(?:\.exe)?\b")
+_UAC_CREATE_RE = _rx(r"/create\b")
+_UAC_RU_SYSTEM_RE = _rx(r"/ru\s+[\"']?system\b")
+
+
+def uac_static_assessment(text: str) -> tuple[bool, list[str]]:
+    """Static heuristic pass over command/script text.
+
+    Returns (likely, reasons) with one human-readable reason per
+    matched family. Pure and platform-independent so the contract
+    is fully testable off Windows.
+    """
+    text = text or ""
+    reasons = [reason for reason, pattern in _UAC_TEXT_RULES
+               if pattern.search(text)]
+    if (_UAC_SCHTASKS_RE.search(text) and _UAC_CREATE_RE.search(text)
+            and _UAC_RU_SYSTEM_RE.search(text)):
+        reasons.append("scheduled task as SYSTEM (schtasks /create /RU SYSTEM)")
+    return bool(reasons), reasons
+
+
+def assess_uac(core: "BridgeCore", text: str) -> dict:
+    """The full pre-flight object for a submission: static
+    likelihood + reasons, and the live consent state from the
+    core's UAC monitor (a prompt already on screen)."""
+    likely, reasons = uac_static_assessment(text)
+    return {
+        "likely": likely,
+        "reasons": reasons,
+        "consent_pending": bool(core.uac.snapshot().get("active")),
+    }
+
+
 def kill_tree(proc: subprocess.Popen) -> None:
     """Terminate a process and (POSIX) its process group."""
     try:
@@ -3051,6 +3129,15 @@ class BridgeHandler(BaseHTTPRequestHandler):
     # -- exec / jobs ---------------------------------------------------------------
     def _handle_exec_submit(self):
         payload = self._read_json_body()
+        # v1.2 §1: the UAC pre-flight assessment is computed BEFORE
+        # anything executes, and rides on the response either way.
+        uac = assess_uac(self.core, str(payload.get("command") or ""))
+        if payload.get("require_no_uac") and uac["likely"]:
+            # Refused: nothing is submitted, nothing executes. The
+            # refusal itself is a normal audited request (409).
+            return 409, {"error": "uac_likely", "uac": uac}, \
+                f"exec refused, UAC likely: " \
+                f"{str(payload.get('command') or '')[:500]}", {}
         job = submit_job(self.core, payload)
         wait_s = payload.get("wait_s")
         if payload.get("wait") is True:
@@ -3064,6 +3151,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             job.wait(max(0.0, wait_s))
             obj = job.output(0, 0, int(self.core.cfg["max_output_bytes"]))
             obj["waited"] = True
+            obj["uac"] = uac
             if job.state in ("done", "failed", "killed"):
                 out_b, _ = job.stdout.read(0, job.stdout.total)
                 audit_kw["exit_code"] = job.exit_code
@@ -3071,6 +3159,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             summary = f"exec[{job.shell}]: {job.command_summary} (job {job.id})"
             return 200, obj, summary, audit_kw
         obj = job.describe()
+        obj["uac"] = uac
         obj["note"] = "job submitted; poll GET /v1/jobs/{id}"
         return 202, obj, f"exec submit[{job.shell}]: {job.command_summary}", audit_kw
 
