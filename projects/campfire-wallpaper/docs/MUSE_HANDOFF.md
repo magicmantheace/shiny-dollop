@@ -432,3 +432,22 @@ and ember-owl-cat remain the ORIGINAL builds — the last two
 arm-gate violators; both need redesign work, owner's call.
 Deployed live 2026-11-12: both PC copies re-synced and
 hash-verified, Lively re-applied.
+
+## Obstacle-aware creature routing (2026-11-13)
+
+Creatures now route around the campfire and every solid prop
+instead of walking straight lines through them. Placement sites
+register obstacle circles — capsules for benches and fallen
+logs — into `OBSTACLES` (129 entries) using only values already
+computed there, so the seeded layout is byte-identical;
+`Creature.setTarget()` plans a per-trip route with `planRoute()`
+(start step-out + grid A* + `segBlocker()`-validated
+string-pulling; margin 0.30 + height × 0.15), and `update()`
+consumes the waypoints. Arrival/dwell/heading/bob behaviour and
+the `walk`-clip preference are unchanged; failed GLB loads still
+degrade to fewer creatures. Geometry battery: 540/540 trips
+clear at the test margin (full record in docs/TEST_PLAN.md).
+Headless fps unchanged (22 → 22 at both noon and sunset;
+indicative only, real-GPU still unmeasured). **Not deployed:**
+built and verified VM-only; the PC copies still run the previous
+build until the owner says to sync them.

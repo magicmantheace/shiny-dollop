@@ -893,6 +893,264 @@ const ridgeTex = makePaintedTexture(
     })));
 }
 
+/* ------------------------------------------------ obstacle routing */
+
+// Solid set dressing, registered as ground-plane circles while the
+// scene is built below (registration only reads the placements the
+// seeded layout already made — it consumes no layoutRand, so the
+// layout itself is unchanged). Creature trips are planned around
+// these so nobody walks through the fire, a bench, or a boulder.
+// Soft dressing (grass, ferns, mushrooms) is not registered:
+// brushing through foliage reads fine.
+const OBSTACLES = [];
+function addObstacle(x, z, r) { OBSTACLES.push({ x, z, r }); }
+// A long prop (bench seat, fallen log) as a row of circles along its
+// axis, spaced at most r apart so the row has no gaps.
+function addCapsule(x, z, dirX, dirZ, len, r) {
+  const n = Math.max(2, Math.ceil(len / r) + 1);
+  for (let i = 0; i < n; i++) {
+    const off = -len / 2 + (len * i) / (n - 1);
+    addObstacle(x + dirX * off, z + dirZ * off, r);
+  }
+}
+
+// The blocking obstacle on segment (ax,az)->(bx,bz), nearest along
+// the segment, or null. An obstacle blocks when its expanded circle
+// (r + margin) cuts the open segment. Obstacles whose expanded
+// circle contains the segment start are skipped (the traveller is
+// already inside that one's margin and walking out); on the final
+// leg, obstacles containing the segment end are skipped too (the
+// destination itself sits inside their margin, so the last steps
+// home are allowed).
+function segBlocker(ax, az, bx, bz, margin, isFinalLeg) {
+  const abx = bx - ax, abz = bz - az;
+  const l2 = abx * abx + abz * abz;
+  let best = null, bestT = Infinity;
+  for (const o of OBSTACLES) {
+    const R = o.r + margin;
+    if (Math.hypot(o.x - ax, o.z - az) < R) continue;
+    if (isFinalLeg && Math.hypot(o.x - bx, o.z - bz) < R) continue;
+    let t = l2 > 0 ? ((o.x - ax) * abx + (o.z - az) * abz) / l2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const cx = ax + abx * t, cz = az + abz * t;
+    if (Math.hypot(o.x - cx, o.z - cz) < R && t < bestT) {
+      best = o; bestT = t;
+    }
+  }
+  return best;
+}
+
+// Plan a trip from (ax,az) to (bx,bz) around OBSTACLES, returning
+// the waypoints to visit, destination last. The planner works in
+// plain XZ numbers (no THREE types) in three steps:
+//   1. If the start sits inside an obstacle's expanded circle,
+//      step radially out of it first (that first leg is legal —
+//      the traveller is already inside that one's margin).
+//   2. A* over a coarse grid spanning the play area. A cell whose
+//      centre falls inside an expanded circle is hard-blocked; a
+//      cell inside a further 0.36 ring around one is soft —
+//      passable at 6x cost — so a start or goal hemmed in by other
+//      props' margins still has a way out. Obstacles containing
+//      the destination are not stamped at all: a trip is allowed
+//      to end inside them.
+//   3. String-pulling: from each kept point, jump to the farthest
+//      grid-path point that segBlocker() proves clear, so routes
+//      stay short and near-straight in open ground while every
+//      emitted leg is exactly validated against every obstacle.
+// A greedy shoulder-detour planner was tried first and failed the
+// geometry battery in docs/TEST_PLAN.md wherever expanded circles
+// overlap — the woodpile / chopping-block cluster beside the fire
+// spots: there is no passage between overlapping circles, and
+// locally chosen shoulders kept re-entering the union. The grid
+// sees the union as one blob and routes around it. Planning runs
+// once per trip (a few ms), so the steady-state cost is zero; if
+// no grid path exists, fall back to heading straight rather than
+// ever looping.
+const ROUTE_CELL = 0.5;               // grid pitch, world units
+const ROUTE_HALF = 38;                // grid covers [-38, 38]^2
+const ROUTE_N = Math.round((ROUTE_HALF * 2) / ROUTE_CELL);
+
+function routeCellIndex(x, z) {
+  const ix = Math.max(0, Math.min(ROUTE_N - 1,
+    Math.floor((x + ROUTE_HALF) / ROUTE_CELL)));
+  const iz = Math.max(0, Math.min(ROUTE_N - 1,
+    Math.floor((z + ROUTE_HALF) / ROUTE_CELL)));
+  return iz * ROUTE_N + ix;
+}
+
+function routeCellCentre(ci) {
+  return {
+    x: -ROUTE_HALF + (ci % ROUTE_N + 0.5) * ROUTE_CELL,
+    z: -ROUTE_HALF + (Math.floor(ci / ROUTE_N) + 0.5) * ROUTE_CELL,
+  };
+}
+
+// Push a point radially out of every expanded circle containing
+// it. Used for trip starts: a creature can spawn (or finish a
+// dwell) inside a prop's margin, and the grid search needs a
+// start that is not walled in by that prop's own blocked cells.
+function projectOutOfObstacles(x, z, margin) {
+  let px = x, pz = z;
+  for (let k = 0; k < 8; k++) {
+    let moved = false;
+    for (const p of OBSTACLES) {
+      const dx = px - p.x, dz = pz - p.z;
+      const d = Math.hypot(dx, dz), R = p.r + margin;
+      if (d < R) {
+        if (d > 1e-6) {
+          px = p.x + dx * (R + 0.05) / d;
+          pz = p.z + dz * (R + 0.05) / d;
+        } else {
+          px = p.x + R + 0.05;
+        }
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  return { x: px, z: pz };
+}
+
+// Stamp the obstacle field into a grid: 0 free, 1 soft (inside an
+// inflated margin ring), 2 hard (inside an expanded circle).
+function buildRouteGrid(margin, bx, bz) {
+  const grid = new Uint8Array(ROUTE_N * ROUTE_N);
+  for (const o of OBSTACLES) {
+    const R = o.r + margin;
+    if (Math.hypot(bx - o.x, bz - o.z) < R) continue;   // holds dest
+    const Ri = R + 0.36;
+    const x0 = Math.max(0, Math.floor((o.x - Ri + ROUTE_HALF) / ROUTE_CELL));
+    const x1 = Math.min(ROUTE_N - 1, Math.floor((o.x + Ri + ROUTE_HALF) / ROUTE_CELL));
+    const z0 = Math.max(0, Math.floor((o.z - Ri + ROUTE_HALF) / ROUTE_CELL));
+    const z1 = Math.min(ROUTE_N - 1, Math.floor((o.z + Ri + ROUTE_HALF) / ROUTE_CELL));
+    for (let iz = z0; iz <= z1; iz++) {
+      for (let ix = x0; ix <= x1; ix++) {
+        const d = Math.hypot(-ROUTE_HALF + (ix + 0.5) * ROUTE_CELL - o.x,
+          -ROUTE_HALF + (iz + 0.5) * ROUTE_CELL - o.z);
+        const v = d < R ? 2 : (d < Ri ? 1 : 0);
+        const ci = iz * ROUTE_N + ix;
+        if (v > grid[ci]) grid[ci] = v;
+      }
+    }
+  }
+  return grid;
+}
+
+// A* over the route grid (8-connected, no cutting hard corners,
+// soft cells cost 6x). Returns the cell path, start and goal
+// included, or null when the goal cannot be reached.
+function gridAStar(grid, s, g) {
+  const size = ROUTE_N * ROUTE_N;
+  const gScore = new Float64Array(size).fill(Infinity);
+  const came = new Int32Array(size).fill(-1);
+  const closed = new Uint8Array(size);
+  const gx = g % ROUTE_N, gz = Math.floor(g / ROUTE_N);
+  const heapF = [], heapI = [];
+  function heapPush(f, i) {
+    heapF.push(f); heapI.push(i);
+    let c = heapF.length - 1;
+    while (c > 0) {
+      const p = (c - 1) >> 1;
+      if (heapF[p] <= heapF[c]) break;
+      const tf = heapF[p]; heapF[p] = heapF[c]; heapF[c] = tf;
+      const ti = heapI[p]; heapI[p] = heapI[c]; heapI[c] = ti;
+      c = p;
+    }
+  }
+  function heapPop() {
+    const top = heapI[0];
+    const lf = heapF.pop(), li = heapI.pop();
+    if (heapF.length) {
+      heapF[0] = lf; heapI[0] = li;
+      let c = 0;
+      for (;;) {
+        const l = c * 2 + 1, r = l + 1;
+        let m = c;
+        if (l < heapF.length && heapF[l] < heapF[m]) m = l;
+        if (r < heapF.length && heapF[r] < heapF[m]) m = r;
+        if (m === c) break;
+        const tf = heapF[m]; heapF[m] = heapF[c]; heapF[c] = tf;
+        const ti = heapI[m]; heapI[m] = heapI[c]; heapI[c] = ti;
+        c = m;
+      }
+    }
+    return top;
+  }
+  const DIRS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1],
+    [1, 1, Math.SQRT2], [1, -1, Math.SQRT2],
+    [-1, 1, Math.SQRT2], [-1, -1, Math.SQRT2]];
+  gScore[s] = 0;
+  heapPush(Math.hypot((s % ROUTE_N) - gx, Math.floor(s / ROUTE_N) - gz), s);
+  while (heapI.length) {
+    const cur = heapPop();
+    if (closed[cur]) continue;
+    closed[cur] = 1;
+    if (cur === g) {
+      const path = [];
+      for (let c = g; c !== -1; c = came[c]) path.push(c);
+      return path.reverse();
+    }
+    const cx = cur % ROUTE_N, cz = Math.floor(cur / ROUTE_N);
+    for (const [dx, dz, w] of DIRS) {
+      const nx = cx + dx, nz = cz + dz;
+      if (nx < 0 || nz < 0 || nx >= ROUTE_N || nz >= ROUTE_N) continue;
+      const ni = nz * ROUTE_N + nx;
+      if (closed[ni]) continue;
+      if (grid[ni] === 2 && ni !== g) continue;
+      if (dx && dz) {                    // no cutting hard corners
+        const o1 = cz * ROUTE_N + nx, o2 = nz * ROUTE_N + cx;
+        if ((grid[o1] === 2 && o1 !== g) || (grid[o2] === 2 && o2 !== g)) {
+          continue;
+        }
+      }
+      const ng = gScore[cur] + w * (grid[ni] === 1 ? 6 : 1);
+      if (ng < gScore[ni]) {
+        gScore[ni] = ng;
+        came[ni] = cur;
+        heapPush(ng + Math.hypot(nx - gx, nz - gz), ni);
+      }
+    }
+  }
+  return null;
+}
+
+function planRoute(ax, az, bx, bz, margin) {
+  const start = projectOutOfObstacles(ax, az, margin);
+  const grid = buildRouteGrid(margin, bx, bz);
+  const s = routeCellIndex(start.x, start.z);
+  const g = routeCellIndex(bx, bz);
+  grid[s] = 0; grid[g] = 0;
+  const cells = gridAStar(grid, s, g);
+  if (!cells) return [{ x: bx, z: bz }];
+  const pts = [{ x: start.x, z: start.z }];
+  for (const ci of cells) {
+    const c = routeCellCentre(ci);
+    const last = pts[pts.length - 1];
+    if (Math.hypot(c.x - last.x, c.z - last.z) > 0.01) pts.push(c);
+  }
+  const dest = { x: bx, z: bz };
+  const tail = pts[pts.length - 1];
+  if (Math.hypot(dest.x - tail.x, dest.z - tail.z) > 0.01) pts.push(dest);
+  else pts[pts.length - 1] = dest;
+  const out = [];
+  if (start.x !== ax || start.z !== az) out.push({ x: start.x, z: start.z });
+  let cur = pts[0], curIdx = 0;
+  while (curIdx < pts.length - 1) {
+    let advanced = false;
+    for (let j = pts.length - 1; j > curIdx; j--) {
+      if (!segBlocker(cur.x, cur.z, pts[j].x, pts[j].z, margin,
+        j === pts.length - 1)) {
+        out.push(pts[j]); cur = pts[j]; curIdx = j; advanced = true;
+        break;
+      }
+    }
+    // No visible next point (degenerate squeeze): take the next
+    // grid point anyway so the trip always makes progress.
+    if (!advanced) { curIdx++; out.push(pts[curIdx]); cur = pts[curIdx]; }
+  }
+  return out;
+}
+
 /* Builder environment pack (Game Asset Builder, 2026-11-10): the
    procedural dressing registers its placements here; once the
    catalogued GLBs load, placeBuilderPack() swaps them in at the same
@@ -937,6 +1195,7 @@ const builderPack = { pending: 0, done: false };
     tree.add(fol);
     tree.rotation.y = layoutRand() * Math.PI * 2;
     place(tree, x, z);
+    addObstacle(x, z, 0.35);
     BUILDER_SWAPS.meshes.push({ obj: tree, kind: 'pine' });
   }
   for (let i = 0; i < 18; i++) {           // rocks
@@ -947,6 +1206,7 @@ const builderPack = { pending: 0, done: false };
     rock.rotation.set(layoutRand() * 3, layoutRand() * 3, layoutRand() * 3);
     place(rock, x, z);
     rock.position.y -= s * 0.25;
+    addObstacle(x, z, s * 0.9);
     BUILDER_SWAPS.meshes.push({ obj: rock, kind: 'rock' });
   }
   for (let i = 0; i < 14; i++) {           // bushes
@@ -956,6 +1216,7 @@ const builderPack = { pending: 0, done: false };
     bush.scale.set(s, s * 0.62, s);
     place(bush, x, z);
     bush.position.y += s * 0.25;
+    addObstacle(x, z, s * 0.8);
     BUILDER_SWAPS.meshes.push({ obj: bush, kind: 'bush' });
   }
 }
@@ -1112,6 +1373,7 @@ function updateDressing(t, dt) {
     oak.position.set(-10.5, groundH(-10.5, -5.5), -5.5);
     oak.rotation.y = 0.7;
     scene.add(oak);
+    addObstacle(-10.5, -5.5, 0.55);
     // Tall pine, right mid-field.
     const pine = new THREE.Group();
     const ptrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.2, 2.2, 10), barkMat);
@@ -1125,6 +1387,7 @@ function updateDressing(t, dt) {
     pine.add(pfol);
     pine.position.set(11, groundH(11, -7.5) - 0.1, -7.5);
     scene.add(pine);
+    addObstacle(11, -7.5, 0.45);
     // Dead snag, back-left — bare trunk, two branch stubs.
     const snag = new THREE.Group();
     const strunk = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.17, 3.4, 9),
@@ -1141,6 +1404,7 @@ function updateDressing(t, dt) {
     snag.position.set(-16, groundH(-16, 8), 8);
     snag.rotation.z = 0.05;
     scene.add(snag);
+    addObstacle(-16, 8, 0.3);
   }
 
   /* Grass tufts: instanced seven-blade cones — 950 spread through
@@ -1251,6 +1515,7 @@ function updateDressing(t, dt) {
       bush.position.set(x, groundH(x, z) + s * 0.25, z);
       bush.rotation.y = layoutRand() * Math.PI * 2;
       scene.add(bush);
+      addObstacle(x, z, s * 0.8);
       BUILDER_SWAPS.meshes.push({ obj: bush, kind: 'bush' });
       if (i < 7) {
         for (let k = 0; k < 9; k++) {
@@ -1391,6 +1656,7 @@ function updateDressing(t, dt) {
       g.position.set(x, groundH(x, z), z);
       g.rotation.y = a;
       scene.add(g);
+      addCapsule(x, z, Math.cos(a), -Math.sin(a), 1.7, 0.32);
     }
     bench(1.75, 3.5);
     bench(-1.75, 3.5);
@@ -1399,6 +1665,7 @@ function updateDressing(t, dt) {
       const stump = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 0.48, 12), logMats);
       stump.position.set(x, groundH(x, z) + 0.24, z);
       scene.add(stump);
+      addObstacle(x, z, 0.38);
       BUILDER_SWAPS.meshes.push({ obj: stump, kind: 'stump' });
     }
     const pile = new THREE.Group();
@@ -1413,9 +1680,11 @@ function updateDressing(t, dt) {
     pile.position.set(4.7, groundH(4.7, 2.1), 2.1);
     pile.rotation.y = -0.5;
     scene.add(pile);
+    addObstacle(4.7, 2.1, 0.7);
     const block = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 0.5, 12), logMats);
     block.position.set(3.9, groundH(3.9, 3.3) + 0.25, 3.3);
     scene.add(block);
+    addObstacle(3.9, 3.3, 0.38);
     BUILDER_SWAPS.meshes.push({ obj: block, kind: 'stump' });
     const split = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.5, 10), logMats);
     split.position.set(3.9, groundH(3.9, 3.3) + 0.72, 3.3);
@@ -1588,6 +1857,7 @@ function updateDressing(t, dt) {
       dummy.scale.set(s, s * (0.55 + layoutRand() * 0.4), s * (0.7 + layoutRand() * 0.5));
       dummy.updateMatrix();
       rocks.setMatrixAt(placed, dummy.matrix);
+      addObstacle(x, z, s * 0.85);
       tint.copy(layoutRand() < 0.4 ? mossy : grey)
         .multiplyScalar(0.8 + layoutRand() * 0.4);
       rocks.setColorAt(placed, tint);
@@ -1619,6 +1889,7 @@ function updateDressing(t, dt) {
       g.rotation.y = rotY;
       scene.add(g);
       BUILDER_SWAPS.meshes.push({ obj: g, kind: 'log', len });
+      addCapsule(x, z, Math.cos(rotY), -Math.sin(rotY), len, 0.3);
     }
     fallenLog(-8.2, 5.5, 0.9, 2.6);
     fallenLog(10.5, -2.5, -0.6, 2.2);
@@ -1661,6 +1932,9 @@ function updateDressing(t, dt) {
 /* ----------------------------------------------------------- campfire */
 
 const FIRE_POS = new THREE.Vector3(0, 0, 0);
+// The pit itself is the one obstacle nobody may cross: stone ring
+// outer edge ~1.06, registered a touch wider.
+addObstacle(0, 0, 1.18);
 let fireLight, glowDisc, bounceLight;
 const flameSystems = [];
 // AAA experiment stage 2: the shader flame's per-plane uniforms
@@ -2007,6 +2281,9 @@ function loadTemplate(cfg) {
 
 // Treasure chest: static set dressing near the fire, no clips.
 function placeChest() {
+  // Registered unconditionally: if the GLB fails to load, a small
+  // phantom keep-out where it would have stood is harmless.
+  addObstacle(-3.3, 2.3, 0.55);
   loader.load('assets/treasure-chest.glb', (gltf) => {
     sharpenTextures(gltf.scene);
     gltf.scene.traverse((o) => {
@@ -2221,6 +2498,7 @@ class Creature {
 
     this.state = startState;                 // enter | dwell | leave
     this.target = new THREE.Vector3();
+    this.route = [];                         // planned waypoints, target last
     this.dwellLeft = 0;
     this.signatureIn = rand(5, 11);
     this.yaw = this.group.rotation.y;
@@ -2256,6 +2534,11 @@ class Creature {
   setTarget(v) {
     this.target.copy(v);
     this.target.y = 0;
+    // Plan around the registered obstacles, once per trip; the
+    // margin scales gently with the creature's size.
+    const pos = this.group.position;
+    const margin = 0.30 + this.cfg.height * 0.15;
+    this.route = planRoute(pos.x, pos.z, v.x, v.z, margin);
   }
 
   enterDwell() {
@@ -2282,10 +2565,20 @@ class Creature {
     const pos = this.group.position;
 
     if (this.state === 'enter' || this.state === 'leave') {
-      const dx = this.target.x - pos.x, dz = this.target.z - pos.z;
+      // Follow the planned route: intermediate detour waypoints are
+      // consumed as they are reached; only the final point carries
+      // the state's arrival behaviour.
+      if (!this.route.length) this.setTarget(this.target);
+      while (this.route.length > 1 &&
+             Math.hypot(this.route[0].x - pos.x,
+                        this.route[0].z - pos.z) <= 0.4) {
+        this.route.shift();
+      }
+      const goal = this.route[0];
+      const dx = goal.x - pos.x, dz = goal.z - pos.z;
       const dist = Math.hypot(dx, dz);
       const arriveAt = this.state === 'enter' ? 0.12 : 1.2;
-      if (dist <= arriveAt) {
+      if (this.route.length === 1 && dist <= arriveAt) {
         if (this.state === 'enter') { this.enterDwell(); }
         else return false;
       } else {
@@ -2455,6 +2748,7 @@ window.addEventListener('resize', () => {
 // &time=<epoch ms | ISO> to freeze the sun/moon at a chosen instant.
 if (PAGE_PARAMS.has('harness')) {
   window.__scene = scene;
+  window.__campfireRoute = { planRoute, obstacles: OBSTACLES };
   window.__campfireStep = (steps, dt) => {
     for (let i = 0; i < steps; i++) {
       perfNow += dt * 1000;

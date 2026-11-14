@@ -609,3 +609,60 @@ by the gated harness capture above.)
   (`D:\wallpapers\campfire-wallpaper` and the Lively Library
   copy) and hash-verified on the PC; Lively re-applied via the
   library UI; live desktop screenshot checked after re-apply.
+
+## Obstacle-aware creature routing (2026-11-13)
+
+- Creatures no longer walk in straight lines through the fire
+  and props. Every placed prop with a solid footprint registers
+  an obstacle circle (capsules for the benches and fallen logs)
+  in `OBSTACLES` — 129 entries — at its existing placement site.
+  Registration only reads already-computed positions and scales,
+  so the seeded `layoutRand` stream and the scene layout are
+  unchanged (the diff touches no `layoutRand` call). Grass,
+  ferns, and mushrooms stay unregistered: soft dressing reads
+  fine walked through.
+- `setTarget()` now plans a route per trip with `planRoute()`
+  (per-creature margin = 0.30 + height × 0.15): a radial step-out
+  if the start sits inside an expanded circle, A* over a
+  0.5-unit grid (cells inside an expanded circle hard-blocked,
+  a 0.36 margin ring passable at 6× cost), then string-pulling
+  in which every emitted leg is validated by `segBlocker()`.
+  Planning runs once per trip (~1.3 ms in the Node harness), so
+  steady-state cost is zero. `update()` walks the waypoints;
+  arrival distances, dwell, heading, hop/bounce bob, and the
+  `walk`-clip preference are unchanged.
+- **Geometry check** (`run_route_check.mjs` in the verification
+  harness dir; page loaded with `?harness=1`, planner read from
+  `window.__campfireRoute`): spawn rings r=30 and r=15 every 10°
+  × all 5 fire spots, plus all 5 spots × exit ring r=36 every
+  10° = 540 trips at margin 0.45. Assertions per trip: every
+  planned segment keeps ≥ obstacle.r + margin − 0.02 from every
+  obstacle centre (skipping obstacles containing the segment
+  start, and on the final leg the destination), route length
+  ≤ 1.8× the straight distance, ≤ 16 waypoints. **Result:
+  540 passed, 0 failed; worst clearance +0.0002 above the
+  expanded radius; longest route 1.737× straight; most
+  waypoints 6.** The same battery at the smallest creature
+  margin (0.42) also passes 540/540. At the largest (0.525)
+  clearance still always holds, but 5 of 540 synthetic trips
+  take a longer detour (up to 2.12×) around the enlarged
+  keep-outs — a longer walk, never a clip through a prop.
+- A greedy shoulder-detour planner was implemented first and
+  failed this battery (157/540) wherever expanded circles
+  overlap: there is no passage between the woodpile's and the
+  chopping block's keep-outs, and locally chosen shoulders kept
+  re-entering the union. It was replaced by the grid planner,
+  not patched over; the assertions were not weakened.
+- **Frame cost.** `run_sky.mjs` before/after at identical
+  times: noon (2026-11-13T19:10:00Z) 22 fps → 22 fps; sunset
+  (2026-11-13T23:35:00Z) 22 fps → 22 fps; creatures present and
+  console clean in all four runs. Screenshots
+  `routing-{before,after}-{noon,sunset}.png` in the verification
+  harness dir; the after shots were eyeballed — scene layout
+  unchanged, creatures at their fire spots, none in the fire.
+  These numbers are headless SwiftShader on the build VM and
+  are indicative only; real-GPU frame cost remains unmeasured,
+  the standing caveat.
+- Not deployed: this pass was VM-only by instruction; the PC
+  copies still run the previous build until the owner says to
+  sync them.
