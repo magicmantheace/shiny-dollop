@@ -41,6 +41,10 @@ Tailscale IP, and exposes a JSON API:
   POST /v1/file/move                  move/rename within or across roots
   POST /v1/file/delete                delete a file or (recursive) directory
   GET  /v1/audit/tail?n=<count>       last audit entries (v1 hardening)
+  GET  /v1/audit?since=&limit=        audit entries at/after a unix
+                                      timestamp, oldest first, paged
+                                      via next_since (v1.2; reads ONLY
+                                      the agent's own audit file)
   GET  /v1/update/status              staged-update state
   POST /v1/update/stage               stage a release bundle for the supervisor
 
@@ -906,6 +910,20 @@ def _audit_file_lock(audit_path: Path):
                 pass
 
 
+def _audit_entry_epoch(entry: dict) -> float | None:
+    """Unix timestamp of an audit entry's ISO ``ts`` field, or None
+    when the field is missing or unparseable (foreign lines in the
+    log are not bridge entries and carry no trustworthy time)."""
+    ts = entry.get("ts")
+    if not isinstance(ts, str):
+        return None
+    try:
+        return datetime.fromisoformat(
+            ts.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
 class BridgeCore:
     def __init__(self, cfg: dict):
         self.cfg = cfg
@@ -1007,6 +1025,16 @@ class BridgeCore:
         record = {"ts": utc_now_iso()}
         record.update(entry)
         line = json.dumps(record, ensure_ascii=False)
+        if self.token:
+            # Invariant (spec §0/§2): the token is NEVER written to
+            # the audit log. Command summaries are audit content, so
+            # a command that happens to contain the token string
+            # (e.g. a test echoing it) would otherwise leak the
+            # credential into the log — and, via GET /v1/audit, back
+            # out over the API. Scrub the exact token value from
+            # every line at write time; the command still executes
+            # verbatim, only the audit copy is masked.
+            line = line.replace(self.token, "***")
         try:
             with self._audit_lock:
                 # The session helper appends to this same log (in
@@ -1073,6 +1101,59 @@ class BridgeCore:
             except json.JSONDecodeError:
                 out.append({"raw": line})
         return out
+
+    def audit_read(self, since: float | None = None,
+                   limit: int = 200) -> dict:
+        """Entries at/after ``since`` (unix ts), oldest first (v1.2 §2).
+
+        Reads ONLY this core's configured audit file — the path is
+        never request-supplied, so the endpoint cannot be pointed at
+        any other file. ``limit`` defaults to 200 and is hard-capped
+        at 1000. When more entries remain, the result's
+        ``next_since`` is a cursor strictly past the last returned
+        entry (audit timestamps are millisecond-resolution, so the
+        cursor is the last timestamp + 0.5 ms: it can never repeat
+        the boundary entry, and a page never splits a group of
+        entries sharing one millisecond — such a group is returned
+        whole, slightly over the limit, rather than losing its tail
+        behind the cursor). Pass it back as ``since`` to page.
+        Read-only: nothing here truncates, rotates, or rewrites the
+        log (rotation stays where it has always been: in audit()).
+        """
+        limit = max(1, min(int(limit), 1000))
+        try:
+            lines = self.audit_path.read_text(
+                encoding="utf-8").splitlines()
+        except OSError:
+            return {"entries": [], "count": 0, "next_since": None}
+        entries: list[dict] = []
+        last_ts: float | None = None
+        more = False
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(entry, dict):
+                continue
+            ts = _audit_entry_epoch(entry)
+            if since is not None and (ts is None or ts < since):
+                continue
+            if len(entries) >= limit and not (ts is not None
+                                              and ts == last_ts):
+                more = True
+                break
+            entries.append(entry)
+            if ts is not None:
+                last_ts = ts
+        next_since = None
+        if more and last_ts is not None:
+            next_since = last_ts + 0.0005
+        return {"entries": entries, "count": len(entries),
+                "next_since": next_since}
 
     def log_start(self) -> None:
         self.audit({
@@ -2718,6 +2799,22 @@ class BridgeHandler(BaseHTTPRequestHandler):
             entries = core.audit_tail(n)
             return 200, {"entries": entries, "count": len(entries)}, \
                 f"audit tail ({len(entries)})", {}
+        if method == "GET" and route == "/v1/audit":
+            # v1.2 §2: read access to the agent's OWN audit file.
+            # No path parameter exists by design — the file read is
+            # always core.audit_path, so the request cannot be aimed
+            # at any other file. The read itself is audited by the
+            # generic request entry written in _dispatch.
+            qs = parse_qs(parsed.query)
+            since_raw = qs.get("since", [None])[0]
+            limit_raw = qs.get("limit", ["200"])[0]
+            try:
+                since = float(since_raw) if since_raw else None
+                limit = int(limit_raw)
+            except (TypeError, ValueError):
+                raise ValueError("since/limit must be numbers")
+            result = core.audit_read(since, limit)
+            return 200, result, f"audit read ({result['count']} entries)", {}
         if method == "GET" and route == "/v1/update/status":
             import bridge_update
             obj = bridge_update.update_status(core.state_dir)

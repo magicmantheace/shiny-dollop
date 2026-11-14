@@ -29,6 +29,7 @@ clipboard, uia, audit-tail, update):
   bridge_client.py screenshot <local-path> [--format png|bmp]
   bridge_client.py clipboard-get | clipboard-set <text>
   bridge_client.py audit-tail [n]
+  bridge_client.py audit [--since TS] [--limit N]
   bridge_client.py update-status
 """
 
@@ -118,6 +119,14 @@ class Client:
 
     def audit_tail(self, n: int = 50) -> dict:
         return self.request("GET", f"/v1/audit/tail?n={int(n)}")
+
+    def audit(self, since: float | None = None,
+              limit: int | None = None) -> dict:
+        """One page of audit entries at/after ``since`` (unix ts),
+        oldest first (v1.2). Follow ``next_since`` in the result to
+        page; it is None when the page reaches the end of the log."""
+        return self.request("GET", "/v1/audit" + self._qs(
+            {"since": since, "limit": limit}))
 
     def update_status(self) -> dict:
         return self.request("GET", "/v1/update/status")
@@ -569,6 +578,12 @@ def main(argv: list[str] | None = None) -> int:
 
     p_tail = sub.add_parser("audit-tail", help="tail the agent audit log")
     p_tail.add_argument("n", nargs="?", type=int, default=50)
+    p_audit = sub.add_parser(
+        "audit", help="read audit entries (one JSON object per line)")
+    p_audit.add_argument("--since", type=float, default=None,
+                         help="unix timestamp; entries at/after it")
+    p_audit.add_argument("--limit", type=int, default=200,
+                         help="page size (agent caps at 1000)")
     sub.add_parser("update-status", help="self-update status")
 
     args = parser.parse_args(argv)
@@ -654,6 +669,15 @@ def main(argv: list[str] | None = None) -> int:
             print_json(client.uia(args.uia_action, **params))
         elif args.command == "audit-tail":
             print_json(client.audit_tail(args.n))
+        elif args.command == "audit":
+            since = args.since
+            while True:
+                page = client.audit(since=since, limit=args.limit)
+                for entry in page.get("entries", []):
+                    print(json.dumps(entry, ensure_ascii=False))
+                since = page.get("next_since")
+                if since is None:
+                    break
         elif args.command == "update-status":
             print_json(client.update_status())
         return 0
