@@ -1,3 +1,148 @@
+# Partial-scoped support abstention recovery: leg S scoped to the partial trigger class — 2026-11-14 (FAILED, not a Regression)
+
+Optional `developmental_ai/partial_scoped_support_abstention_recovery.py`
+(identical to the graded stationary-support candidate in every element —
+acting model recent8 exactly, extended signal, retained archive,
+archive concordance, joint test joint_count >= 1, recovery model,
+the full three-leg authority condition, the minority branch in
+full INCLUDING the inverted minority model and leg W on the
+minority branch, leg T on both recovery branches, leg N and leg D
+on the regular branch, leg P >= 0.70, leg R and leg C on partial
+abstention triggers, and the full / retained-partial abstention
+classes with the widened class removed records-only,
+singleton_release_fired carried, support_threshold 1 carried; the
+SINGLE changed element is the SCOPING of leg S to the partial
+trigger class — full gate leg P alone, exactly the graded
+singleton candidate's full gate; partial gate leg P AND (leg R OR
+leg C) AND leg S unchanged; abstention_disarmed_by_support live
+for partial triggers only, false at full states by construction;
+no new numeric value and no new decision-record field; leg P /
+leg R / leg C / leg T / leg W / leg N / leg D explicitly NOT
+re-tuned) was evaluated under the protocol frozen BEFORE
+implementation at
+`benchmarks/partial_scoped_support_abstention_recovery_protocol.json`
+on NEW cohorts 542003/542021/542039 and 543001/543017/543041,
+both now INSPECTED — never re-tune against them. **Graded Failed
+under the protocol's own definitions (PRIMARY criterion 20 FAILs
+on BOTH cohorts — development on sub-condition (a) on both its
+halves, TAKEN 1/6 with the one taking full and non-full credit 0,
+harm 76 = guard 76 and < recent8 84 passing both comparisons;
+additional on the non-full half of (a) alone, TAKEN 3/6 at the
+count floor but ALL FULL, non-full credit 0, harm 47 = guard 47
+and < recent8 72 — and the Failed clause triggers on the
+additional cohort several times over: criteria 20, 9, 1, 11, 17,
+4, and 2 FAIL there, criterion 7 PASSes both) and NOT a
+Regression (no clause triggers — pooled onset harm 207/174 below
+recent8 258/247, control successes at exact recent8 parity
+128 = 128 / 130 = 130, k=32 successes 62/78 above the recent8 − 4
+lines of 52/71, suite + transfer pass).** Per-criterion,
+development / additional, PRIMARY criterion 20 first, then
+co-graded guards 9, 19, 6, 18, 5, 1, 11, 17, 4, 2, 3, 7:
+C20 FAIL/FAIL (the same computation as C9), C9 FAIL/FAIL, C19
+PASS/PASS and C6 PASS/PASS (the same computation — abstentions
+0/240 both, successes and harm at EXACT recent8 parity on both,
+all 15 graded control states per cohort recent8 under candidate,
+decisive, and recent8 alike, ZERO taken control abstentions on
+either cohort), C18 PASS/PASS and C5 PASS/PASS (abstentions
+0/144, successes 62 vs 56 and 78 vs 75, non-recent8 1/9 both —
+the carried leg-N retained firings at 542003 / 543001 return-A
+k=32, identical under the decisive baseline — abstained 0/9
+both), C1 FAIL/FAIL (dev on (a), (c), and (d) — minority 1/6,
+selectivity 0/6 / 0/6 PASS, harm 83 vs guard 80 AND ceiling 52.2
+FAIL both halves, successes 13 vs guard+16 = 16; add on (a),
+(c)-ceiling, and (d) — minority 2/6, harm 57 vs guard 81 PASS but
+ceiling 48.6 FAIL, successes 23 vs 31; carried identical to the
+decisive baseline on both), C11 FAIL/FAIL (on its B1 side only,
+both), C17 PASS/FAIL and C4 PASS/FAIL (dev harm 48 vs guard 71 /
+ceiling 52.2 PASS both; add harm 70 vs guard 79 PASS but ceiling
+56.4 FAIL — carried identical both), C2 PASS/FAIL (dev 48 vs
+frozen_A floor 24.8 and guard+16 = 25; add 26 vs floor 29.6 FAIL
+on (a) alone — frozen_A / cumulative beat the candidate on BOTH
+axes at return-A on both cohorts again, dev 62/34 and 68/28 vs
+48/48, add 74/22 and 56/40 vs 26/70), C3 PASS/PASS (207 vs guard
+227, cells 6/6 dev; 174 vs guard 207, cells 6/6 add), C7
+PASS/PASS (replay 72/72 per cohort, support_threshold 1
+everywhere, supporting count recomputable everywhere,
+abstention_disarmed_by_support recomputed exactly under its
+SCOPED formula — true ONLY at partial triggers, exactly 6 states
+dev and 2 add across all checkpoints, every one shared with the
+decisive baseline — scoped gate recomputed exactly everywhere
+(full: leg P alone; partial: leg P AND (leg R OR leg C) AND leg
+S), partial-scoped-rule == candidate branch and
+stationary-support-rule == decisive branch everywhere, companion
+fields recomputable at every partial state (25 dev / 29 add) and
+at fallback elsewhere, kind never widened, stale lists of 18,
+acting lists of 8 and newest lists of 4 with all counts
+recomputable everywhere and newest records == acting tail,
+thresholds as registered, singleton_release_fired and the
+recovery_fired leg-N-or-leg-D composition recomputed everywhere
+with 0 mismatches, minority_model_archive_count ==
+archive_events_count and minority_model_inverted true
+everywhere, cross-check PASS at every minority-fired state 4/4
+dev and 6/6 add, acquisition 0). **BOTH grading caps are NOT
+MET: (i) ZERO restored full zero-support B1 takings on either
+cohort — the candidate is branch- and score-identical to the
+decisive baseline at all 72 checkpoints on BOTH cohorts (0/72
+score diffs, zero branch diffs), because the scoping's designed
+population did not occur: only TWO full zero-support states
+occur at any checkpoint across both cohorts (dev 542003
+return-A k=2, pre-empted by a recovery firing; add 543041 B2
+k=32, abstention authority unarmed), so no gated full
+zero-support trigger was drawn; and (ii) the one partial
+zero-support control disarming (dev 542021 control k=4, partial
+through leg C, purity 0.818, supporting 0, recent8 7/9) is shared
+identically with the decisive baseline, which did NOT abstain
+there — no graded control state has the decisive baseline
+abstaining on a partial zero-support trigger while the candidate
+acts. The scoping hypothesis is UNTESTED by these cohorts,
+neither confirmed nor refuted, exactly as pre-registered as a
+possible failure mode; every PASS above is a carried-profile
+pass. The partial class contributes ZERO taken B1 states on
+either cohort (three partial B1 triggers per cohort: dev 542003
+k=2 blocked by both legs R and C, 542021 k=2 and 542039 k=2
+disarmed by leg S through leg C at supporting 0; add 543001 k=2
+blocked by both legs at supporting 1, 543001 k=4 and 543017 k=2
+disarmed by leg S through leg C at supporting 0 — all shared
+identically with the decisive baseline). Leg T's staleness flag
+was recorded at exactly one state across both cohorts (dev
+542021 return-A k=16, on an abstained state taken identically by
+the decisive baseline); it released no checkpoint-32 routing and
+changed no branch or score anywhere.** Full unit suite (2100)
+and historical transfer benchmark passed in the implementation,
+evaluation, and grading stages; no CI claimed for the evaluation
+or grading commits (UNVERIFIED). See
+`docs/PARTIAL_SCOPED_SUPPORT_ABSTENTION_RECOVERY.md`. Keep the
+learner optional and unpromoted, default controller unchanged,
+no merge, no AthenZ/Synveil integration, D1–D10/V2A/V2B
+unchanged. Next limitation selected: P1 first-switch (B1) onset
+engagement — the partial (non-full) class's contribution under
+the support-gated abstention classes — criterion 20/9 FAILs on
+BOTH cohorts on sub-condition (a) with harm passing both
+comparisons on both, and the partial class contributes zero
+taken B1 states on either cohort despite three partial B1
+triggers drawn per cohort; whether an evidence-derived
+condition on the partial abstention class — one that gives the
+partial class a taken B1 population without re-tuning leg S's
+threshold, leg P, leg R, or leg C, and without reopening the
+full class the scoping restored — can hold criterion 9's frozen
+form on BOTH cohorts while holding stationary selectivity
+(criteria 19/6), checkpoint-32 release (criteria 18/5), B2
+protection (criterion 1), and return-A profiles (criteria
+17/4/2) as co-graded guards, on NEW cohorts under a NEW
+protocol. Recorded but not selected: B2 protection FAILs on
+both cohorts as well — a carried draw identical to the decisive
+baseline on a branch the scoping does not touch, carried as a
+co-graded guard; additional's return-A failures are carried
+identical with frozen_A / cumulative both-axes dominance on
+both cohorts again; stationary selectivity passes both at exact
+parity with zero control abstentions drawn — no stationary
+population to retry; checkpoint-32 release passes both on
+carried leg-N firings — no release population to retry; the
+scoping hypothesis is untested, not refuted — a retry would
+need a cohort design that actually draws gated full
+zero-support triggers, which no graded population this cycle
+sizes.
+
 # Stationary support abstention recovery: leg S, a supporting-opposition leg on the abstention gate for both trigger classes — 2026-11-13 (FAILED, not a Regression)
 
 Optional `developmental_ai/stationary_support_abstention_recovery.py`

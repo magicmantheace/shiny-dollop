@@ -1122,6 +1122,68 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 14 — Partial-scoped support abstention recovery: leg S scoped to the partial trigger class (FAILED, not a Regression)
+
+Optional `PartialScopedSupportAbstentionRecoveryMemory` is identical to
+the graded stationary-support candidate in every element — acting model,
+extended signal, retained archive, archive concordance, joint recovery
+test, recovery model, the full three-leg authority condition, the
+minority branch in full INCLUDING the inverted minority model and leg W
+on the minority branch, leg T on both recovery branches, leg N and leg
+D on the regular branch, leg P ≥ 0.70, leg R and leg C on partial
+abstention triggers, and the full / retained-partial abstention classes
+with the widened class removed; the SINGLE changed element is the
+scoping of leg S to the partial trigger class: the full gate is leg P
+alone (exactly the graded singleton form), the partial gate stays leg P
+AND (leg R OR leg C) AND leg S at support_threshold 1, and
+abstention_disarmed_by_support is live for partial triggers only —
+under a protocol frozen before implementation (new cohorts 542003-family
+/ 543001-family, now INSPECTED). **Graded Failed, NOT a Regression,
+under the protocol's own definitions (PRIMARY criterion 20 FAILs on
+BOTH cohorts — development on count AND non-full, TAKEN 1/6 with the one
+taking full; additional on the non-full sub-condition alone, TAKEN 3/6
+all full — with harm passing both comparisons on both, 76 = guard 76
+and < recent8 84 development, 47 = guard 47 and < recent8 72 additional;
+the Failed clause triggers on the additional cohort several times over
+— criteria 20, 9, 1, 11, 17, 4, and 2 FAIL there, criterion 7 PASSes
+both; no Regression clause triggers — pooled onset harm 207/174 below
+recent8 258/247, control successes at exact recent8 parity on both,
+k=32 successes 62/78 above the recent8 − 4 lines of 52/71, suite +
+transfer pass).** The scoping story must be stated plainly: **the
+candidate is branch- and score-identical to the decisive
+stationary-support baseline at all 72 checkpoints on BOTH cohorts** —
+the scoping's designed population did not occur on these draws (only
+two full zero-support states at any checkpoint across both cohorts,
+542003 return-A k=2 pre-empted by a recovery firing and 543041 B2 k=32
+with abstention authority unarmed, so no gated full zero-support
+trigger was drawn), **both grading caps are NOT MET** (zero restored
+full zero-support B1 takings; the one partial zero-support control
+disarming, development 542021 control k=4 through leg C at supporting
+0, is shared identically with the decisive baseline, which also fell
+through to recent8 there), and the scoping hypothesis remains
+UNTESTED by these cohorts, neither confirmed nor refuted, exactly as
+pre-registered as a possible failure mode. The partial class
+contributes ZERO taken B1 states on either cohort (three partial B1
+triggers per cohort: two per cohort disarmed by leg S through leg C at
+supporting 0, shared identically with the decisive baseline; one per
+cohort blocked by both leg R and leg C). Criteria 19/6, 18/5, and 3
+pass both (19/6 at exact recent8 parity with zero control abstentions
+drawn; 18/5 on carried leg-N firings); criterion 1 fails both
+(minority 1/6 development on (a), (c), and (d); 2/6 additional on (a),
+the (c) ceiling, and (d) — carried identical to the decisive baseline);
+criteria 17/4 and 2 pass development and fail additional (the ceiling
+and the frozen_A floor, carried identical; frozen_A / cumulative
+both-axes return-A dominance holds on both cohorts again). Leg T's
+staleness flag was recorded at exactly one state across both cohorts
+(development 542021 return-A k=16, on an abstained state) and changed
+no branch or score anywhere. Next limitation selected: P1 first-switch
+(B1) onset engagement — the partial (non-full) class's contribution
+under the support-gated abstention classes, on NEW cohorts under a NEW
+protocol. Learner acquisition actions zero; external TRAIN actor harm
+published in full in the report.
+[Complete preregistration, results and limitations](docs/PARTIAL_SCOPED_SUPPORT_ABSTENTION_RECOVERY.md).
+
+
 ### November 13 — Stationary support abstention recovery: leg S, a supporting-opposition leg on the abstention gate for both trigger classes (FAILED, not a Regression)
 
 Optional `StationarySupportAbstentionRecoveryMemory` is identical to
