@@ -1,0 +1,68 @@
+{
+ "entry_version": 1,
+ "name": "Fungal Oil Lantern",
+ "slug": "fungal-oil-lantern",
+ "source_concept": "media-generation-underreach-fungal-oil-lantern-0-b194bf62-a7ed-4222-9866-943a8df07df3.webp",
+ "asset_file": "fungal-oil-lantern.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "aebb0ea65d559dacdf353b263258e5189590d7bb75b1eb4c78bf643186cefa8b",
+ "bytes": 11388488,
+ "counts": {
+  "verts": 29979,
+  "faces": 59812,
+  "raw_mesh_verts": 414162,
+  "raw_mesh_faces": 535884
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "runner": {
+    "name": "fungal-oil-lantern_shape",
+    "exit_code": 0,
+    "seconds": 484.55,
+    "baseline_vram_mib": 2823,
+    "peak_vram_mib": 9239,
+    "peak_delta_mib": 6416,
+    "vram_after_exit_mib": 2797,
+    "n_samples": 1033,
+    "job_state": "done",
+    "adopted_from_lab": true
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 267904,
+    "faces": 535892,
+    "load_s": 116.02,
+    "inference_s": 344.48,
+    "total_s": 460.56,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\fungal-oil-lantern\\shape.glb"
+   },
+   "note": "run-1 client was killed by a VM runtime restart (SIGTERM; client log empty) while the shape job was in flight; the job completed detached on the PC; result and GLB adopted from the lab (shape.glb sha256 b22b53b6ff59df370bde1891f0c630f9fcdbebd16d05392cf5785780721ac22b, 9646340 bytes, download-verified against the bridge-side hash)"
+  },
+  "texture_stage": {
+   "stage": "texture",
+   "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+   "verts": 414162,
+   "faces": 535892,
+   "load_s": 104.97,
+   "texture_s": 1291.74,
+   "total_s": 1397.49,
+   "torch_peak_mib": 9884.3,
+   "job_state": "done",
+   "adopted_from_lab": true,
+   "note": "bridge job cap expired during fetch; stage completed on PC, result adopted from lab and hash-verified (textured.glb sha256 aac825eff163b33e1130989e41fedbd4cd04079672c8d9746897201aaea10f92, 19643272 bytes); bridge seconds 1423.51"
+  }
+ }
+}
