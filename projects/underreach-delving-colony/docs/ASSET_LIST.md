@@ -27,7 +27,7 @@ terrain is dressing and kit pieces per band.
 | Spore mask | Worn face prop (equipped visual for the S5 gate) | ✅ catalogued 2026-11-13 (`spore-mask` adf3774f…; unrigged prop, no frontend equipment slot yet) |
 | Harness + rope | Worn prop (Crystal Dark gate) | ✅ catalogued 2026-11-13 (`harness-and-rope` c88cebdf…; unrigged prop, no frontend equipment slot yet) |
 | Quiet gear — padded wraps | Worn prop set (Crystal Dark gate) | ✅ catalogued 2026-11-13 (`quiet-gear-boot-wraps` 34b0a84e…, `quiet-gear-arm-wraps` d2186ec0…; unrigged props, no frontend equipment slot yet) |
-| Cooling gear — insulated suit pieces | Worn prop set (Magma gate) | ⬜ |
+| Cooling gear — insulated suit pieces | Worn prop set (Magma gate) | ✅ catalogued 2026-11-13 (`cooling-gear-vest` a08014fa…, `cooling-gear-gauntlets` 5a954120…; unrigged props, no frontend equipment slot yet) |
 
 ## 2. Creatures
 
