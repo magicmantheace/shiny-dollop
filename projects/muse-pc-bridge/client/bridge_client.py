@@ -223,6 +223,49 @@ class Client:
         return self.job_wait(job["job_id"], timeout=wait_timeout)
 
     # ------------------------------------------------------------------
+    # Resident queue (v1.2)
+    # ------------------------------------------------------------------
+    def queue_submit(self, payload: dict) -> dict:
+        """Submit a job to the agent's resident queue. See the agent's
+        queue_runner.validate_queue_payload for the schema; the
+        response is the stored record, including the pre-flight
+        "uac" assessment."""
+        return self.request("POST", "/v1/queue", payload)
+
+    def queue_submit_exec(self, command: str, shell: str | None = None,
+                          timeout_s: float | None = None,
+                          uac_policy: str | None = None,
+                          on_failure: str | None = None,
+                          note: str | None = None,
+                          require_no_uac: bool = False) -> dict:
+        payload: dict = {"kind": "exec", "command": command}
+        if shell:
+            payload["shell"] = shell
+        if timeout_s is not None:
+            payload["timeout_s"] = timeout_s
+        if uac_policy:
+            payload["uac_policy"] = uac_policy
+        if on_failure:
+            payload["on_failure"] = on_failure
+        if note:
+            payload["note"] = note
+        if require_no_uac:
+            payload["require_no_uac"] = True
+        return self.queue_submit(payload)
+
+    def queue_list(self) -> dict:
+        return self.request("GET", "/v1/queue")
+
+    def queue_cancel(self, queue_id: str) -> dict:
+        return self.request("DELETE", f"/v1/queue/{queue_id}")
+
+    def queue_pause(self) -> dict:
+        return self.request("POST", "/v1/queue/pause", {})
+
+    def queue_resume(self) -> dict:
+        return self.request("POST", "/v1/queue/resume", {})
+
+    # ------------------------------------------------------------------
     # Wake-on-LAN
     # ------------------------------------------------------------------
     def wol(self, mac: str, broadcast: str | None = None,
@@ -581,6 +624,27 @@ def main(argv: list[str] | None = None) -> int:
     p_uia.add_argument("params", nargs="?", default="{}",
                        help="JSON object of extra parameters")
 
+    sub.add_parser("queue", help="resident queue: counts + job summaries")
+    p_qexec = sub.add_parser(
+        "queue-exec", help="submit a command to the resident queue")
+    p_qexec.add_argument("--shell", choices=["powershell", "cmd", "posix"],
+                         default=None)
+    p_qexec.add_argument("--timeout", type=float, default=None,
+                         help="job timeout in seconds (agent-side)")
+    p_qexec.add_argument("--uac-policy",
+                         choices=["skip-if-likely", "run-anyway"],
+                         default=None)
+    p_qexec.add_argument("--on-failure", choices=["stop", "continue"],
+                         default=None)
+    p_qexec.add_argument("--note", default=None)
+    p_qexec.add_argument("queue_command", nargs=argparse.REMAINDER,
+                         help="the command line to queue")
+    p_qcancel = sub.add_parser("queue-cancel",
+                               help="cancel a PENDING queued job")
+    p_qcancel.add_argument("queue_id")
+    sub.add_parser("queue-pause", help="pause the resident queue")
+    sub.add_parser("queue-resume", help="resume the resident queue")
+
     p_tail = sub.add_parser("audit-tail", help="tail the agent audit log")
     p_tail.add_argument("n", nargs="?", type=int, default=50)
     p_audit = sub.add_parser(
@@ -612,6 +676,21 @@ def main(argv: list[str] | None = None) -> int:
             print_json(result)
             code = result.get("exit_code")
             return 0 if code == 0 else 1
+        elif args.command == "queue":
+            print_json(client.queue_list())
+        elif args.command == "queue-exec":
+            if not args.queue_command:
+                parser.error("queue-exec requires a command")
+            print_json(client.queue_submit_exec(
+                " ".join(args.queue_command), shell=args.shell,
+                timeout_s=args.timeout, uac_policy=args.uac_policy,
+                on_failure=args.on_failure, note=args.note))
+        elif args.command == "queue-cancel":
+            print_json(client.queue_cancel(args.queue_id))
+        elif args.command == "queue-pause":
+            print_json(client.queue_pause())
+        elif args.command == "queue-resume":
+            print_json(client.queue_resume())
         elif args.command == "jobs":
             print_json(client.jobs_list())
         elif args.command == "job":

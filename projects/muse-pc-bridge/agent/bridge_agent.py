@@ -47,6 +47,12 @@ Tailscale IP, and exposes a JSON API:
                                       the agent's own audit file)
   GET  /v1/update/status              staged-update state
   POST /v1/update/stage               stage a release bundle for the supervisor
+  POST /v1/queue                      submit a job to the resident
+                                      queue (v1.2; pre-flight stored)
+  GET  /v1/queue                      queue counts + job summaries
+  DELETE /v1/queue/{id}               cancel a PENDING queued job
+  POST /v1/queue/pause                pause the queue runner (PAUSED)
+  POST /v1/queue/resume               resume the queue runner
 
 Every /v1/* request requires `Authorization: Bearer <token>`. Every
 request — including auth failures — is appended to a JSONL audit log.
@@ -123,6 +129,7 @@ DEFAULT_CONFIG = {
     "session_broker": True,              # proxy desktop routes to the
                                          # interactive session helper
     "uac_poll_interval_s": 2.0,          # UAC consent prompt polling
+    "queue_uac_grace_s": 120,            # v1.2 queue: mid-run UAC grace
     "auth_fail_limit": 5,                  # failures inside the window ...
     "auth_fail_window_s": 60,              # ... trigger a temporary block
     "auth_block_s": 30,
@@ -1059,6 +1066,10 @@ class BridgeCore:
         # UAC consent-prompt monitor (polled by a thread started in
         # create_server; inert off Windows).
         self.uac = UacMonitor(self)
+        # Resident queue runner (v1.2 §3): attached by create_server
+        # for the main agent only — the session helper never runs
+        # one. None until then; the /v1/queue routes answer 501.
+        self.queue_runner = None
         # True when this core belongs to the interactive session
         # helper (agent/session_helper.py) rather than the main
         # agent: helpers serve desktop routes directly and never
@@ -2744,6 +2755,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         upload_match = re.fullmatch(
             r"/v1/file/upload/([0-9a-f]+)(?:/(complete))?", route)
         chunk_match = re.fullmatch(r"/v1/file/upload/([0-9a-f]+)/(\d+)", route)
+        queue_match = re.fullmatch(r"/v1/queue/([0-9a-f]+)", route)
 
         # -- interactive-session broker (desktop routes) ----------------
         # Screenshot / input / UIA / clipboard act on the interactive
@@ -2900,6 +2912,16 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return 200, obj, "update status", {}
         if method == "POST" and route == "/v1/update/stage":
             return self._handle_update_stage()
+        if method == "POST" and route == "/v1/queue":
+            return self._handle_queue_submit()
+        if method == "GET" and route == "/v1/queue":
+            return self._handle_queue_list()
+        if method == "DELETE" and queue_match:
+            return self._handle_queue_cancel(queue_match.group(1))
+        if method == "POST" and route == "/v1/queue/pause":
+            return self._handle_queue_pause(True)
+        if method == "POST" and route == "/v1/queue/resume":
+            return self._handle_queue_pause(False)
         return 404, {"error": "not found"}, "no route", {}
 
     # -- session broker ---------------------------------------------------
@@ -3696,6 +3718,73 @@ class BridgeHandler(BaseHTTPRequestHandler):
             install_root=install_root, state_dir=self.core.state_dir)
         return 201, obj, f"update staged {version}", {}
 
+    # -- resident queue (v1.2 §3) ----------------------------------------------
+    _QUEUE_UNAVAILABLE = (
+        501, {"error": "the queue runner is not running in this "
+                       "process"},
+        "queue unavailable (no runner)", {})
+
+    def _handle_queue_submit(self):
+        import queue_runner
+        runner = getattr(self.core, "queue_runner", None)
+        if runner is None:
+            return self._QUEUE_UNAVAILABLE
+        payload = self._read_json_body()
+        # Validation + the §1 pre-flight assessment happen before
+        # anything is stored; the assessment is stored in the record.
+        record = queue_runner.validate_queue_payload(self.core, payload)
+        uac = record["uac"]
+        if payload.get("require_no_uac") and uac["likely"]:
+            # Refused BEFORE storing: no runnable pending job exists.
+            return 409, {"error": "uac_likely", "uac": uac}, \
+                f"queue submit refused, UAC likely ({record['kind']})", {}
+        runner.submit(record)
+        return 202, dict(record), \
+            f"queue submit[{record['kind']}] job {record['id']}", \
+            {"extra": {"queue_job_id": record["id"]}}
+
+    def _handle_queue_list(self):
+        runner = getattr(self.core, "queue_runner", None)
+        if runner is None:
+            return self._QUEUE_UNAVAILABLE
+        obj = runner.status()
+        counts = obj["counts"]
+        summary = "queue status (" + ", ".join(
+            f"{k}={v}" for k, v in counts.items()) + ")"
+        return 200, obj, summary, {}
+
+    def _handle_queue_cancel(self, qid: str):
+        runner = getattr(self.core, "queue_runner", None)
+        if runner is None:
+            return self._QUEUE_UNAVAILABLE
+        outcome, record = runner.cancel(qid)
+        if outcome == "cancelled":
+            return 200, {"id": qid, "cancelled": True, "state": "failed",
+                         "reason": "cancelled"}, \
+                f"queue job {qid} cancelled", \
+                {"extra": {"queue_job_id": qid}}
+        if outcome == "missing":
+            return 404, {"error": f"no such queue job: {qid}"}, \
+                f"queue job {qid} cancel (missing)", {}
+        # Only pending jobs cancel here; a running job is cancelled
+        # through the existing /v1/jobs/{exec_job_id}/cancel path.
+        return 409, {"error": f"queue job is {outcome}, not pending",
+                     "state": outcome}, \
+            f"queue job {qid} cancel refused ({outcome})", \
+            {"extra": {"queue_job_id": qid}}
+
+    def _handle_queue_pause(self, paused: bool):
+        runner = getattr(self.core, "queue_runner", None)
+        if runner is None:
+            return self._QUEUE_UNAVAILABLE
+        if paused:
+            runner.set_paused(True)
+        else:
+            runner.resume()
+        return 200, {"paused": runner.is_paused(),
+                     "halted": runner.halted}, \
+            f"queue {'paused' if paused else 'resumed'} (api)", {}
+
 
 def _session_reaper(core: BridgeCore) -> None:
     """Close interactive sessions idle past the configured timeout."""
@@ -3726,6 +3815,15 @@ def create_server(cfg: dict) -> ThreadingHTTPServer:
         # second UAC watch: one prompt would be audited twice.
         threading.Thread(target=_uac_watch, args=(core,), daemon=True,
                          name="uac-watch").start()
+        # Resident queue runner (v1.2 §3): a thread in this process,
+        # started with the core and covered by the supervisor's
+        # restart semantics like everything else here. The helper
+        # never runs one — it shares this core's state dir and the
+        # queue belongs to the main agent alone.
+        import queue_runner
+        runner = queue_runner.QueueRunner(core)
+        core.queue_runner = runner
+        runner.start()
     return server
 
 
