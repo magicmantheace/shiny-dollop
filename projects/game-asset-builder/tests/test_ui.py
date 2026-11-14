@@ -115,7 +115,8 @@ class CatalogDataTests(unittest.TestCase):
                                           "quiet-gear-boot-wraps",
                                           "quiet-gear-arm-wraps",
                                           "cooling-gear-vest",
-                                          "cooling-gear-gauntlets"})
+                                          "cooling-gear-gauntlets",
+                                          "torch-on-a-stand"})
         self.assertEqual(summaries["ember-dragon"]["bone_count"], 14)
         self.assertEqual(summaries["moth-hart"]["bone_count"], 21)
         self.assertEqual(summaries["toasty"]["bone_count"], 11)
