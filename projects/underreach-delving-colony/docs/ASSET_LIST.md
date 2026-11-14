@@ -48,7 +48,7 @@ steadiness / tags all read off these):
 
 | Asset | Tier / role | Status |
 |---|---|---|
-| Torch on a stand | Tier 0 — torches/charcoal | ⬜ |
+| Torch on a stand | Tier 0 — torches/charcoal | ✅ catalogued 2026-11-13 (`torch-on-a-stand` bcba2c67…; unrigged prop — not yet in frontend use: `make_lantern_node` renders the Tier-1 prop for every tier and the placement UI only places tier 1, so per-tier prop selection lands with the slice that makes torches placeable) |
 | Oil lantern on a post | Tier 1 — the colony standard | ✅ catalogued and in frontend use 2026-11-11 (OmniLight + emissive flame marker kept) |
 | Fungal-oil lantern | Tier 2 — spore-repellent glow | ⬜ |
 | Sealed pressure lantern | Tier 3 — waterproof (Drowned) | ⬜ |
