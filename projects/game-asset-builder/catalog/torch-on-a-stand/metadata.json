@@ -1,0 +1,81 @@
+{
+ "entry_version": 1,
+ "name": "Torch On A Stand",
+ "slug": "torch-on-a-stand",
+ "source_concept": "media-generation-underreach-torch-on-a-stand-re-0-94fd6eeb-fa78-4099-b724-25af3873f2bb.webp",
+ "asset_file": "torch-on-a-stand.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "bcba2c67765663fdee6815a6944c633e46d851db2a85e4b3f7d894b1d85b9a9f",
+ "bytes": 10271764,
+ "counts": {
+  "verts": 27005,
+  "faces": 49545,
+  "raw_mesh_verts": 218578,
+  "raw_mesh_faces": 285490
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "runner": {
+    "name": "torch-on-a-stand_shape",
+    "exit_code": 0,
+    "seconds": 490.4,
+    "baseline_vram_mib": 2499,
+    "peak_vram_mib": 9231,
+    "peak_delta_mib": 6732,
+    "vram_after_exit_mib": 2789,
+    "n_samples": 1047,
+    "job_state": "done",
+    "adopted_from_lab": true
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 142749,
+    "faces": 285490,
+    "load_s": 114.84,
+    "inference_s": 351.5,
+    "total_s": 466.38,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\torch-on-a-stand\\shape.glb"
+   },
+   "note": "run-1 client died on a transient bridge outage while fetching the shape result (\"Remote end closed connection without response\"); stage had completed on the PC; result and GLB adopted from the lab (shape.glb sha256 79ca4ef7aecfaca501afcabea8d77c4ab8170d3fe2107fa998957772e11f74aa, 5139656 bytes, download-verified against the bridge-side hash)"
+  },
+  "texture_stage": {
+   "runner": {
+    "name": "torch-on-a-stand_texture",
+    "exit_code": 0,
+    "seconds": 488.08,
+    "baseline_vram_mib": 2810,
+    "peak_vram_mib": 11828,
+    "peak_delta_mib": 9018,
+    "vram_after_exit_mib": 2403,
+    "n_samples": 1040,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"torch-on-a-stand_texture\", \"exit_code\": 0, \"seconds\": 488.08, \"baseline_vram_mib\": 2810, \"peak_vram_mib\": 11828, \"peak_delta_mib\": 9018, \"vram_after_exit_mib\": 2403, \"n_samples\": 1040}\r\n"
+   },
+   "stats": {
+    "stage": "texture",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+    "verts": 218578,
+    "faces": 285490,
+    "load_s": 105.92,
+    "texture_s": 353.88,
+    "total_s": 460.57,
+    "torch_peak_mib": 9874.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\torch-on-a-stand\\textured.glb"
+   }
+  },
+  "plate_fix": "POST-CATALOG GATE FIX (shadow plate): the shape stage turned the concept's painted ground shadow into a real flat plate fused under the tripod feet (visible in the first gate renders and as a full triangular sheet in the bottom view). Removed 4413 plate faces post-catalog (discriminator: face centroid z < 0.02 any normal, or z < 0.03 with |nz| > 0.7; candidate set proven plate-only by isolated renders, #4 basket precedent): 53958 -> 49545 faces. Static verify re-run: VERIFY_OK, rest_ground_z 0.017."
+ }
+}
