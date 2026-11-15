@@ -1,0 +1,35 @@
+{
+ "entry_version": 1,
+ "name": "Sealed Food Store",
+ "slug": "sealed-food-store",
+ "source_concept": "media-generation-media-generation-underreach-fo-0-805eebbb-28f0-4a36-b84e-04704ce792aa.webp",
+ "asset_file": "sealed-food-store.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "e210e4541768a1b5256b35b12e8337f9c9e9088e6d1346e2e3cd598b79bd9728",
+ "bytes": 12315100,
+ "counts": {
+  "verts": 29990,
+  "faces": 58099,
+  "raw_mesh_verts": 1209506,
+  "raw_mesh_faces": 1635550
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.2.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ }
+}
