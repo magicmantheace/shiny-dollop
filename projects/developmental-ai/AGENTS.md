@@ -1,3 +1,135 @@
+# Long-window support partial recovery: leg L, a long-window supporting-opposition leg on partial abstention triggers only — 2026-11-14 (FAILED / REGRESSION, stationary clause)
+
+Optional `developmental_ai/long_window_support_partial_recovery.py`
+(identical to the graded partial-scoped candidate in every element —
+acting model recent8 exactly, extended signal, retained archive,
+archive concordance, joint test joint_count >= 1, recovery model,
+the full three-leg authority condition, the minority branch in
+full INCLUDING the inverted minority model and leg W on the
+minority branch, leg T on both recovery branches, leg N and leg D
+on the regular branch, leg P >= 0.70, leg R, leg C, and leg S on
+partial abstention triggers, and the full / retained-partial
+abstention classes with the widened class removed records-only,
+singleton_release_fired carried, support_threshold 1 carried; the
+SINGLE changed element is leg L: the partial gate is leg P AND
+(leg R OR leg C) AND (leg S OR leg L), leg L armed iff
+stale_opposed_count >= 1 over the stale window events[-26:-8],
+long_window_threshold 1 carried unchanged from leg S;
+abstention_disarmed_by_support is true exactly when BOTH support
+legs fail a partial trigger; new decision-record fields
+stale_opposed_count / long_window_threshold / long_window_armed /
+abstention_taken_through_long_window; leg P / leg R / leg C /
+leg S / leg T / leg W / leg N / leg D explicitly NOT re-tuned) was
+evaluated under the protocol frozen BEFORE implementation at
+`benchmarks/long_window_support_partial_recovery_protocol.json`
+on NEW cohorts 552003/552021/552039 and 553001/553017/553041,
+both now INSPECTED — never re-tune against them. **Graded Failed
+/ Regression (stationary clause) under the protocol's own
+definitions (PRIMARY criterion 21 PASSes on BOTH cohorts — TAKEN
+5/6 on both, 2 full + 3 partial, harm 12 vs guard 46 / recent8 72
+dev and 16 vs guard 49 / recent8 71 add — but only as a CARRIED
+PROFILE with the grading cap NOT MET: every graded B1 taking is
+identical to the decisive baseline and ZERO leg-L takings occur
+at graded B1 states on either cohort; the Failed clause triggers
+on the additional cohort several times over: criteria 19, 6, 11,
+17, and 4 FAIL there, criterion 7 PASSes both; the Regression
+clause triggers on the stationary arm — control successes 113 vs
+recent8 121 (−8) dev and 100 vs 111 (−11) add, both past the
+more-than-6 both-cohorts line; the other Regression clauses do
+not trigger — pooled onset harm 154/72 below recent8 258/196,
+k=32 successes at exact recent8 parity on both above the
+recent8 − 4 lines, suite + transfer pass).** Per-criterion,
+development / additional, PRIMARY criterion 21 first, then
+co-graded guards 9, 19, 6, 18, 5, 1, 11, 17, 4, 2, 3, 7: C21
+PASS/PASS and C9 PASS/PASS (same computation — carried profile,
+cap NOT MET), C19 FAIL/FAIL and C6 FAIL/FAIL (dev on (b) alone —
+abstentions 16/240, successes 113 vs 121 required >= 115, harm
+111 vs 119; the entire deficit is leg L's ONE graded stationary
+firing, 552021 control k=2 partial through leg C supporting 0
+stale 3 purity 0.875, candidate abstained 0/0 vs decisive /
+recent8 8/8 — leg L's pre-registered stationary tail realized
+exactly as priced; add on (a) AND (b) — abstentions 48/240,
+successes 100 vs 111 required >= 105, harm 92 vs 129 — entirely
+CARRIED, three partial firings identical to decisive, branch
+diffs vs decisive 0/15 graded control states, leg L firing ZERO
+graded control states there), C18 PASS/PASS and C5 PASS/PASS
+(0/144, successes at exact recent8 parity, non-recent8 0/9,
+abstained 0/9 both — leg L's late-partial exposure at k=32 did
+not occur), C1 FAIL/PASS (dev on (a), (c)-ceiling, and (d) —
+minority 1/6, harm 68 vs guard 76 PASS but ceiling 55.2 FAIL,
+successes 12 vs 20, carried identical; add in full — minority
+3/6 at the floor, harm 24 vs guard 35 / ceiling 44.4, successes
+40 vs 29, including leg L's one graded onset taking at 553041
+B2 k=2, −16 harm vs decisive at identical successes, NOT counted
+toward minority engagement), C11 FAIL/FAIL (stationary side
+only, both), C17 FAIL/FAIL and C4 FAIL/FAIL (dev on ceiling (b)
+alone — 74 vs guard 94 / ceiling 56.4; add on BOTH halves — 32
+vs guard 23 and ceiling 30.6; carried identical both, leg L
+changing no return-A state), C2 FAIL/PASS (dev 22 vs frozen_A
+floor 28.8 on (a) alone; add 64 vs floor 28.0 and guard+16 = 41;
+frozen_A / cumulative both-axes return-A dominance holds on dev
+again), C3 PASS/PASS (154 vs guard 216, cells 6/6 dev; 72 vs
+guard 107, cells 6/6 add), C7 PASS/PASS (replay 72/72 per
+cohort, support_threshold 1 and long_window_threshold 1
+everywhere, stale_opposed_count recomputed exactly from the
+stale_joint_events opposed flags, long_window_armed and
+abstention_taken_through_long_window recomputed exactly,
+abstention_disarmed_by_support recomputed exactly under the
+BOTH-legs-fail formula — exactly one such state across both
+cohorts, dev 552039 B2 k=2 at stale 0 — gate recomputed exactly
+everywhere (full: leg P alone; partial: leg P AND (leg R OR
+leg C) AND (leg S OR leg L)), long-window-rule == candidate
+branch and partial-scoped-rule == decisive branch everywhere,
+companion fields recomputable at every partial state (28 dev /
+23 add) and at fallback elsewhere, kind never widened, stale
+lists of 18, acting lists of 8 and newest lists of 4 with all
+counts recomputable everywhere and newest records == acting
+tail, thresholds as registered, singleton_release_fired and the
+recovery_fired composition recomputed everywhere with 0
+mismatches, minority_model_archive_count == archive_events_count
+and minority_model_inverted true everywhere, cross-check PASS at
+every minority-fired state 7/7 dev and 6/6 add, acquisition 0).
+**The grading cap is NOT MET — leg L took ZERO graded B1 states
+on either cohort; its exactly three takings across both cohorts
+at any checkpoint are dev 552003 B1 k=16 (UNGRAGED checkpoint,
+partial through leg C, supporting 0, stale 6, purity 0.737,
+candidate abstained 0/0 vs decisive / recent8 8/8), dev 552021
+control k=2 (graded control, above), and add 553041 B2 k=2
+(graded B2 onset, above). The leg-L B1 hypothesis is UNTESTED
+at graded checkpoints, neither confirmed nor refuted — its
+designed graded population (a leg-S-disarmed partial trigger at
+k=2 or k=4) did not occur: dev's graded partial takings all
+carry supporting >= 2, and add's one supporting-0 graded B1
+partial (553017 k=2, stale 2) is population Y, blocked by BOTH
+leg R and leg C. Branch diffs vs decisive 2 dev / 1 add, ALL
+leg_L_taking, zero UNEXPECTED. Leg T disarmed zero graded
+states on dev and one minority state on add, changing no graded
+branch or score in the cap's population.** Full unit suite
+(2241) and historical transfer benchmark passed in the
+implementation, evaluation, and grading stages; no CI claimed
+for the evaluation or grading commits (UNVERIFIED). See
+`docs/LONG_WINDOW_SUPPORT_PARTIAL_RECOVERY.md`. Keep the
+learner optional and unpromoted, default controller unchanged,
+no merge, no AthenZ/Synveil integration, D1–D10/V2A/V2B
+unchanged. Next limitation selected: P1 stationary selectivity
+of the support-gated abstention classes under leg L — criteria
+19/6 FAIL on BOTH cohorts and carry this cycle's Regression,
+dev's failure leg L's own stationary tail and add's the carried
+partial class's firings on an arm where leg L is inert; whether
+an evidence-derived condition on the partial abstention class
+can hold criterion 6's frozen form on BOTH cohorts while
+holding B1 engagement (criteria 21/9, PASSing both as a carried
+profile), checkpoint-32 release (criteria 18/5), B2 protection
+(criterion 1), and return-A profiles (criteria 17/4/2) as
+co-graded guards, on NEW cohorts under a NEW protocol. Recorded
+but not selected: criteria 17/4 fail both carried identical with
+no leg-L return-A population — a further return-A retry needs a
+condition on the non-engaged fall-through population;
+criterion 1 fails dev only, carried identical; the leg-L B1
+hypothesis is untested, not refuted — a retry would need a
+cohort design that actually draws graded leg-S-disarmed partial
+triggers, which no graded population this cycle sizes.
+
 # Partial-scoped support abstention recovery: leg S scoped to the partial trigger class — 2026-11-14 (FAILED, not a Regression)
 
 Optional `developmental_ai/partial_scoped_support_abstention_recovery.py`

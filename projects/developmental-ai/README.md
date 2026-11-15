@@ -1122,6 +1122,65 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 14 — Long-window support partial recovery: leg L, a long-window supporting-opposition leg on partial abstention triggers only (FAILED / REGRESSION, stationary clause)
+
+Optional `LongWindowSupportPartialRecoveryMemory` is identical to
+the graded partial-scoped candidate in every element — acting model,
+extended signal, retained archive, archive concordance, joint recovery
+test, recovery model, the full three-leg authority condition, the
+minority branch in full INCLUDING the inverted minority model and leg W
+on the minority branch, leg T on both recovery branches, leg N and leg
+D on the regular branch, leg P ≥ 0.70, leg R, leg C, and leg S on
+partial abstention triggers, and the full / retained-partial abstention
+classes with the widened class removed; the SINGLE changed element is
+leg L: the partial gate is leg P AND (leg R OR leg C) AND (leg S OR
+leg L), leg L armed iff stale_opposed_count >= 1 over the stale window
+events[-26:-8] at long_window_threshold 1 carried unchanged from leg
+S's support_threshold, the full gate stays leg P alone, and
+abstention_disarmed_by_support is true exactly when BOTH support legs
+fail a partial trigger — under a protocol frozen before implementation
+(new cohorts 552003-family / 553001-family, now INSPECTED). **Graded
+Failed / Regression (stationary clause) under the protocol's own
+definitions (PRIMARY criterion 21 PASSes on BOTH cohorts — TAKEN 5/6
+on both, 2 full + 3 partial, harm 12 vs guard 46 / recent8 72
+development and 16 vs guard 49 / recent8 71 additional — but only as a
+CARRIED PROFILE: every graded B1 taking is identical to the decisive
+partial-scoped baseline, ZERO leg-L takings occur at graded B1 states
+on either cohort, and the grading cap is NOT MET, so leg L
+demonstrated nothing at graded B1 on these draws; the Failed clause
+triggers on the additional cohort several times over — criteria 19, 6,
+11, 17, and 4 FAIL there, criterion 7 PASSes both — and the Regression
+clause triggers on the stationary arm: control successes 113 vs
+recent8 121 (−8) development and 100 vs 111 (−11) additional, both
+past the more-than-6 both-cohorts line; the other Regression clauses
+do not trigger — pooled onset harm 154/72 below recent8 258/196, k=32
+successes at exact recent8 parity on both, suite + transfer pass).**
+Leg L took exactly three abstentions across both cohorts at any
+checkpoint, all of the designed shape (partial trigger, supporting 0,
+stale ≥ 1): development 552003 B1 k=16 (an UNGRADED checkpoint, 0/0 vs
+decisive / recent8 8/8), development 552021 control k=2 (the graded
+stationary firing that alone fails development's criterion 19/6(b) —
+candidate abstained 0/0 vs recent8 8/8 at volume 16/240 inside budget,
+harm passing; leg L's pre-registered stationary tail realized exactly
+as priced), and additional 553041 B2 k=2 (graded B2 onset, −16 harm vs
+decisive at identical successes, inside additional's criterion 1 PASS;
+leg-L abstentions do not count toward minority engagement).
+Additional's stationary failure is entirely carried — three partial
+firings identical to the decisive baseline (48/240 volume), leg L
+firing zero graded control states there. Criteria 18/5 and 3 pass
+both; criterion 1 fails development only (carried identical) and
+passes additional in full; criteria 17/4 fail both, carried identical
+with leg L changing no return-A state; criterion 2 fails development
+on the frozen_A floor alone and passes additional. The leg-L B1
+hypothesis is UNTESTED at graded checkpoints, neither confirmed nor
+refuted — its designed graded population did not occur. Next
+limitation selected: P1 stationary selectivity of the support-gated
+abstention classes under leg L, on NEW cohorts under a NEW protocol.
+Learner acquisition actions zero; external TRAIN actor harm published
+in full in the report.
+[Complete preregistration, results and limitations](docs/LONG_WINDOW_SUPPORT_PARTIAL_RECOVERY.md).
+
+
 ### November 14 — Partial-scoped support abstention recovery: leg S scoped to the partial trigger class (FAILED, not a Regression)
 
 Optional `PartialScopedSupportAbstentionRecoveryMemory` is identical to
