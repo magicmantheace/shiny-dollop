@@ -53,7 +53,7 @@ steadiness / tags all read off these):
 | Fungal-oil lantern | Tier 2 — spore-repellent glow | ✅ catalogued 2026-11-13 (`fungal-oil-lantern` aebb0ea6…; unrigged prop — not yet in frontend use: per-tier prop selection lands with the slice that makes tier-2 placement available, see the Tier 0 note) |
 | Sealed pressure lantern | Tier 3 — waterproof (Drowned) | ✅ catalogued 2026-11-14 (`sealed-pressure-lantern` 02235185…; unrigged prop — not yet in frontend use: per-tier prop selection lands with the slice that makes tier-3 placement available, see the Tier 0 note) |
 | Crystal-heart lantern | Tier 4 — focused beam (Crystal Dark) | ✅ catalogued 2026-11-14 (`crystal-heart-lantern` 0b3894f5…; unrigged prop — not yet in frontend use: per-tier prop selection lands with the slice that makes tier-4 placement available, see the Tier 0 note) |
-| Thermal lamp | Tier 5 — vent-fed (Magma) | ⬜ |
+| Thermal lamp | Tier 5 — vent-fed (Magma) | ✅ catalogued 2026-11-14 (`thermal-lamp` 99fef953…; unrigged prop — not yet in frontend use: per-tier prop selection lands with the slice that makes tier-5 placement available, see the Tier 0 note) |
 | Piped light-spine segment | Infrastructure — lit main routes | ⬜ |
 | Crystal relay | Infrastructure — light relay | ⬜ |
 | Heat-pipe relay | Infrastructure — Magma light | ⬜ |
