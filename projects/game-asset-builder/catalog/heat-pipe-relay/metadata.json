@@ -1,0 +1,35 @@
+{
+ "entry_version": 1,
+ "name": "Heat-Pipe Relay",
+ "slug": "heat-pipe-relay",
+ "source_concept": "media-generation-media-generation-underreach-he-0-4152fc22-8288-4d9c-966b-7ec5ebfac8ec.webp",
+ "asset_file": "heat-pipe-relay.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "3eb947d363537fcd9ab305d1cf965131559a8e4d768a8b5c0acc35e9512f3d0d",
+ "bytes": 11340088,
+ "counts": {
+  "verts": 29821,
+  "faces": 59537,
+  "raw_mesh_verts": 692550,
+  "raw_mesh_faces": 906800
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.2.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ }
+}
