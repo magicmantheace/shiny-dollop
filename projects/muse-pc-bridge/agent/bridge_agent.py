@@ -318,6 +318,28 @@ def build_command(shell: str, command: str) -> list[str]:
     raise ValueError(f"unknown shell: {shell!r}")
 
 
+def popen_target(shell: str, argv: list[str],
+                 command: str | None) -> "list[str] | str":
+    """What to hand subprocess.Popen for a shell invocation.
+
+    On Windows a cmd command must reach cmd.exe as a verbatim
+    command line. In list form, subprocess quotes the command
+    argument and escapes its inner quotes; cmd's /c parsing then
+    mangles any command containing a quoted argument or redirect
+    target — it fails with "The filename, directory name, or
+    volume label syntax is incorrect" (exit 1, nothing executed).
+    That broke every queue script job whose text quotes a path
+    (v1.2 Windows smoke, 2026-11-14). Passing the composed line
+    as a single string makes cmd parse the command exactly as
+    written. Other shells and platforms keep the argv list.
+    """
+    if IS_WINDOWS and shell == "cmd" and command is not None:
+        exe = argv[0] if argv else (resolve_shell_exe("cmd")
+                                    or "cmd")
+        return f'"{exe}" /d /s /c {command}'
+    return argv
+
+
 def shell_argv(shell: str) -> list[str]:
     """Argv for an interactive shell of the given kind."""
     if shell == "powershell":
@@ -779,10 +801,26 @@ def assess_uac(core: "BridgeCore", text: str) -> dict:
 
 
 def kill_tree(proc: subprocess.Popen) -> None:
-    """Terminate a process and (POSIX) its process group."""
+    """Terminate a process and its whole tree / process group."""
     try:
         if IS_WINDOWS:
-            proc.kill()
+            # proc.kill() terminates only the shell itself; its
+            # children survive and keep the job's stdout/stderr
+            # pipes open, so the job's completion (which waits for
+            # pipe EOF) stalls for seconds after the kill (v1.2
+            # Windows smoke, 2026-11-14: a cancelled queue job's
+            # ping outlived its cmd and completion took ~10 s).
+            # taskkill /T takes the tree, matching the POSIX
+            # process-group kill below and kill_pid_tree.
+            try:
+                subprocess.run(
+                    ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL, timeout=15)
+            except (OSError, subprocess.SubprocessError):
+                pass
+            if proc.poll() is None:
+                proc.kill()
         else:
             try:
                 os.killpg(proc.pid, signal.SIGKILL)
@@ -1411,7 +1449,8 @@ class Job:
         self.core = core
         self.id = uuid.uuid4().hex[:12]
         self.shell = str(payload.get("shell") or default_shell())
-        self.command_summary = str(payload.get("command", ""))[:500]
+        self.command_text = str(payload.get("command", ""))
+        self.command_summary = self.command_text[:500]
         self.argv = argv
         self.cwd = cwd
         self.env = env
@@ -1449,7 +1488,7 @@ class Job:
         self.state = "running"
         try:
             self.proc = subprocess.Popen(
-                self.argv,
+                popen_target(self.shell, self.argv, self.command_text),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 cwd=self.cwd,
@@ -1481,8 +1520,17 @@ class Job:
             # v0 contract: exit_code is null when a command timed out,
             # even though the kill produced a raw return code.
             self.exit_code = None
+        # Give the pumps a short shared window to drain what the
+        # process wrote before it exited — normally EOF arrives at
+        # once. A surviving grandchild can hold a pipe open far
+        # longer (its output is not this job's completion), and
+        # waiting on it stalled job completion by up to 10 s per
+        # job (two 5 s joins) in the v1.2 Windows smoke. The pumps
+        # are daemon threads; they retire when the pipe eventually
+        # closes, and the buffers stay readable in the meantime.
+        drain_deadline = time.monotonic() + 1.0
         for t in pumps:
-            t.join(timeout=5)
+            t.join(timeout=max(0.0, drain_deadline - time.monotonic()))
         with self._lock:
             if self.state == "running":
                 self.state = "done" if not self.timed_out else "failed"
@@ -1779,9 +1827,10 @@ def spawn_detached(core: BridgeCore, payload: dict) -> DetachedProcess:
         kwargs["creationflags"] = flags
     else:
         kwargs["start_new_session"] = True
+    target = popen_target(shell_name, argv, payload.get("command"))
     try:
         try:
-            proc = subprocess.Popen(argv, stdout=out_fh, stderr=err_fh,
+            proc = subprocess.Popen(target, stdout=out_fh, stderr=err_fh,
                                     stdin=subprocess.DEVNULL, cwd=cwd,
                                     env=env, **kwargs)
         except OSError:
@@ -1790,7 +1839,7 @@ def spawn_detached(core: BridgeCore, payload: dict) -> DetachedProcess:
             kwargs["creationflags"] = (
                 subprocess.CREATE_NEW_PROCESS_GROUP
                 | subprocess.DETACHED_PROCESS)
-            proc = subprocess.Popen(argv, stdout=out_fh, stderr=err_fh,
+            proc = subprocess.Popen(target, stdout=out_fh, stderr=err_fh,
                                     stdin=subprocess.DEVNULL, cwd=cwd,
                                     env=env, **kwargs)
     finally:

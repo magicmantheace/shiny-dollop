@@ -64,6 +64,30 @@ QUEUE_STATES = ("pending", "running", "done", "failed")
 _SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
+def _with_sharing_retry(op, attempts: int = 10, delay_s: float = 0.15):
+    """Run a record-file operation, retrying transient Windows
+    sharing violations.
+
+    Readers (the status endpoint, the owner's tooling) open record
+    files without delete sharing, so a replace or unlink can lose
+    a momentary race — PermissionError even though the reader
+    holds the file for milliseconds. Left unretried, a failed
+    unlink stranded a copy of the record in the source state
+    directory (a finished job still counted as running), and a
+    failed replace could strand the record mid-move (v1.2 Windows
+    smoke, 2026-11-14). POSIX opens do not raise these; the retry
+    is a no-op there in practice.
+    """
+    last: PermissionError | None = None
+    for _ in range(max(1, attempts)):
+        try:
+            return op()
+        except PermissionError as exc:
+            last = exc
+            time.sleep(delay_s)
+    raise last  # type: ignore[misc]
+
+
 def validate_queue_payload(core, payload: dict) -> dict:
     """Validate a POST /v1/queue body and build the stored record.
 
@@ -174,8 +198,14 @@ class QueueRunner:
         d = self.dirs[state]
         d.mkdir(parents=True, exist_ok=True)
         tmp = d / (record["id"] + ".json.tmp")
-        tmp.write_text(json.dumps(record, indent=2), encoding="utf-8")
-        os.replace(tmp, self._record_path(state, record["id"]))
+        text = json.dumps(record, indent=2)
+        target = self._record_path(state, record["id"])
+
+        def write_and_replace() -> None:
+            tmp.write_text(text, encoding="utf-8")
+            os.replace(tmp, target)
+
+        _with_sharing_retry(write_and_replace)
 
     def _read_record(self, state: str, qid: str) -> dict | None:
         try:
@@ -209,7 +239,8 @@ class QueueRunner:
         record["state"] = dst
         self._write_record(dst, record)
         try:
-            self._record_path(src, record["id"]).unlink()
+            _with_sharing_retry(
+                lambda: self._record_path(src, record["id"]).unlink())
         except OSError:
             pass
         return record
@@ -414,7 +445,7 @@ class QueueRunner:
         with self._lock:
             self._write_record("failed", record)
             try:
-                path.unlink()
+                _with_sharing_retry(path.unlink)
             except OSError:
                 pass
         self._audit("queue_failed",

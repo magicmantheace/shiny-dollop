@@ -99,6 +99,17 @@ class GuiSpawnTests(unittest.TestCase):
             if item.get("alive"):
                 cls.http.request(
                     "POST", f"/v1/processes/{item['process_id']}/kill", {})
+        # The kill is issued asynchronously: on Windows a process
+        # keeps its log files locked until it has actually exited,
+        # and cleanup raced that exit (WinError 32 in the v1.2
+        # Windows smoke, 2026-11-14). Wait for the exits.
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            _, listing = cls.http.request("GET", "/v1/processes")
+            if not any(item.get("alive")
+                       for item in listing.get("processes", [])):
+                break
+            time.sleep(0.2)
         cls.server.shutdown()
         cls.server.server_close()
         cls.tmp.cleanup()
