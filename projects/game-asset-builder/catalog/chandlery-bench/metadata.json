@@ -1,0 +1,35 @@
+{
+ "entry_version": 1,
+ "name": "Chandlery Bench",
+ "slug": "chandlery-bench",
+ "source_concept": "media-generation-media-generation-underreach-ch-0-b69b2bae-e8e3-497f-bb8f-aade9a76808a.webp",
+ "asset_file": "chandlery-bench.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "700d1c9e3c168a08ced2350bb951e9fd68df6a95425f64a08f7e6409ae61a1fd",
+ "bytes": 11615484,
+ "counts": {
+  "verts": 29947,
+  "faces": 59904,
+  "raw_mesh_verts": 576218,
+  "raw_mesh_faces": 783802
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.2.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ }
+}
