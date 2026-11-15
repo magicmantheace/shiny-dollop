@@ -66,7 +66,7 @@ steadiness / tags all read off these):
 | Stockpile chest | Ore/goods store marker | ✅ treasure-chest |
 | Cot / bedroll | Delver beds | ✅ catalogued and in frontend use 2026-11-11 |
 | Mushroom plot cluster | Farm plots | ✅ mushroom-cluster |
-| Converter forge | Ore → goods station | ⬜ |
+| Converter forge | Ore → goods station | ✅ catalogued 2026-11-15 (`converter-forge` fef3e81b…; unrigged prop — not yet in frontend use: no converter/station placement exists in the frontend yet, lands with the station slice that makes workstations placeable) |
 | Chandlery / rendering bench | Tallow & oil station | ⬜ |
 | Charcoal kiln | Torch fuel station | ⬜ |
 | Herbalist bench + drying rack | Medicine / spore care | ⬜ |
