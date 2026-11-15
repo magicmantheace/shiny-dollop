@@ -130,7 +130,8 @@ class CatalogDataTests(unittest.TestCase):
                                           "charcoal-kiln",
                                           "herbalist-bench",
                                           "tailor-bench",
-                                          "sealed-food-store"})
+                                          "sealed-food-store",
+                                          "deep-ledger"})
         self.assertEqual(summaries["ember-dragon"]["bone_count"], 14)
         self.assertEqual(summaries["moth-hart"]["bone_count"], 21)
         self.assertEqual(summaries["toasty"]["bone_count"], 11)
