@@ -75,7 +75,7 @@ steadiness / tags all read off these):
 | The Deep Ledger | Lectern/monument — the colony's record, in-world | ✅ catalogued 2026-11-15 (`deep-ledger` 7f0a50a0…; unrigged prop — not yet in frontend use: no station placement exists in the frontend yet, lands with the station slice that makes workstations placeable) |
 | Surface gate | Entrance structure where recruits arrive | ✅ catalogued 2026-11-15 (`surface-gate` 954f7b06…; unrigged prop — not yet in frontend use: no station placement exists in the frontend yet, lands with the station slice that makes workstations placeable) |
 | Timber support set | Shallows gate — beams/props vs cave-ins | ✅ catalogued 2026-11-15 (`timber-support-set` 50fc438a…; unrigged prop — not yet in frontend use: no support-prop placement exists in the frontend yet, lands with the slice that makes gate props placeable) |
-| Ventilation pieces | Shallows gate — shaft + baffles | ⬜ |
+| Ventilation pieces | Shallows gate — shaft + baffles | ✅ catalogued 2026-11-15 (`ventilation-pieces` 0889b35a…; unrigged prop — not yet in frontend use: no ventilation placement exists in the frontend yet, lands with the slice that makes gate props placeable) |
 | Camp clutter set | Crates, barrels, sacks, woodpile | ⬜ (fallen-log + stump ✅ as dressing) |
 
 ## 5. Faces & resources (what gets mined)
