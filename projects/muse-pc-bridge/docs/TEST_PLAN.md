@@ -466,6 +466,69 @@ Windows smoke on the owner's PC (non-elevated) comes before any
 production switch, and the switch itself is the owner pressing
 go. Production still runs v1.1.
 
+## v1.2 verification — 2026-11-14 (owner's PC, Windows 11, Python 3.14.2)
+
+The §4 Windows smoke ran in a clean diagnostic worktree of
+`muse-pc-bridge/v1-2`. **First run (branch tip `2993e2a`): 234
+tests, FAILED (4 failures, 1 error, 9 skips)** — all four
+failures in `tests/test_v1_2_queue.py` (jobs never reached
+done/ within the tests' wait windows) and the error in
+`GuiSpawnTests.tearDownClass` (WinError 32). Instrumented runs on
+the PC pinned three Windows-only defects, each reproduced
+firsthand before fixing:
+
+1. **cmd quoting.** `build_command`'s list form
+   `[cmd, /d, /s, /c, command]` is quoted by `list2cmdline` in a
+   way cmd's `/c` parsing mangles: any command containing a
+   quoted argument or redirect target exits 1 with "The filename,
+   directory name, or volume label syntax is incorrect" and never
+   executes (proven through the production v1.1 executor and a
+   variant matrix: list forms all fail, the verbatim string form
+   works). Every queue script job quotes its marker paths, so
+   script jobs failed instantly with reason `exit_code` while the
+   tests waited on `done/`. Fix: `popen_target()` passes cmd
+   commands to Popen as a single verbatim command-line string on
+   Windows; other shells/platforms keep the argv list.
+2. **Tree kill + pipe drain.** `kill_tree` on Windows was
+   `proc.kill()` (shell only). A cancelled job's child (ping)
+   survived holding the job's pipes; the pump threads never saw
+   EOF and the two 5 s joins stalled completion by 10.02 s
+   (measured in the runner trace), blowing the waiting_uac
+   test's 10 s budget by ~0.9 s. Fix: `kill_tree` uses
+   `taskkill /T /F` (as `kill_pid_tree` already did), and the
+   post-exit pump drain is bounded to a 1 s shared window so a
+   lingering grandchild can never stall completion.
+3. **Record-file sharing races.** `QueueRunner._move` unlinked
+   the source record after writing the destination, swallowing
+   `OSError`; a concurrent reader (the status endpoint the tests
+   poll) holds record files without delete sharing, so the
+   unlink intermittently failed with PermissionError and stranded
+   a stale copy (a finished job still counted as running). Fix:
+   record writes/moves retry `PermissionError` briefly
+   (`_with_sharing_retry`).
+
+Plus two smaller items: `GuiSpawnTests.tearDownClass` now waits
+for killed processes to actually exit before temp cleanup (the
+WinError 32 race), and `UacMonitor.check_once` samples the probe
+under the state lock — sampling outside it let a concurrent poll
+apply a stale result after a state change; the Windows status
+test (`test_status_reflects_monitor_transitions`, the failure
+class noted as unpinned in the 2026-11-08 session-0 runs) hit
+exactly this against the watch thread's first poll and failed
+deterministically in the rerun before this fix.
+
+**After the fixes (branch tip `7fa13fa`): VM suite 234 tests,
+OK (skipped=3); owner-PC Windows smoke 234 tests, OK
+(skipped=9)** — the 9 skips are the platform-conditional ones.
+Production was switched to 1.2.0 the same evening and verified
+live (status version, audit + queue endpoints, audited
+`server_start` for 1.2.0; see the 2026-11-14 MUSE_HANDOFF
+entry). **Still unverified:** `waiting_uac` against a genuine
+consent prompt, the queue runner under the SYSTEM core across a
+real reboot (restart recovery remains suite-proven with planted
+records), and the UAC classifier against real installer command
+lines.
+
 ## What the tests cannot prove
 
 These require the owner's PC and are **not** claimed by any VM test:
@@ -525,13 +588,15 @@ These require the owner's PC and are **not** claimed by any VM test:
   501 for desktop routes before logon (no helper yet). The VM
   proves the proxy, whitelist, registry and audit mechanics with
   both servers on loopback; it cannot prove session behaviour.
-- **v1.2 on real Windows**: queue jobs under PowerShell/cmd, the
-  UAC classifier against real installer command lines, the
-  `waiting_uac` path against a genuine consent prompt (the VM
-  drives it with a stubbed monitor), the queue store on NTFS, and
-  the runner's behaviour inside the session-0 SYSTEM core across a
-  real reboot (recovery is suite-proven with a planted record
-  only). All v1.2 verification to date is POSIX/VM.
+- **v1.2 on real Windows** (narrowed 2026-11-14): the full suite
+  now passes on the owner's PC and production runs 1.2.0, so
+  queue jobs under cmd, the queue store on NTFS, and the runner
+  inside the session-0 SYSTEM core are proven at suite level.
+  Still unproven: the UAC classifier against real installer
+  command lines, the `waiting_uac` path against a genuine
+  consent prompt (everywhere it is driven by a stubbed monitor),
+  and the runner's restart recovery across a real reboot
+  (recovery is suite-proven with a planted record only).
 
 ## Owner-PC verification checklist (part of install)
 

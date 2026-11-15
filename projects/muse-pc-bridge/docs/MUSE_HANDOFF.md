@@ -947,3 +947,63 @@ store behavior); no PC contact was made at all. **Production
 still runs v1.1.** Remaining gates, unchanged from the spec:
 Windows smoke on the PC (non-elevated), then the production
 switch — both owner-gated.
+
+## 2026-11-14 evening — v1.2 Windows smoke fixed and PRODUCTION SWITCHED to 1.2.0
+
+The owner lifted the PC pause and directed the fix + switch.
+The first deployment attempt's smoke (run in the production
+checkout) had failed **234 tests, 4 failures + 1 error** — all
+in the queue tests (jobs never reaching done/ inside the tests'
+waits) plus a `GuiSpawnTests.tearDownClass` WinError 32. This
+pass diagnosed in a clean worktree (`D:\bridge-work\v12diag`)
+with an instrumented runner trace; three Windows-only defects,
+each reproduced firsthand (details in `docs/TEST_PLAN.md`,
+"v1.2 verification — 2026-11-14"):
+
+1. cmd commands in subprocess list form are mangled by
+   `list2cmdline` quoting + cmd `/c` parsing — any quoted
+   argument/redirect target exits 1 unexecuted. This also means
+   **v1.1 production fails any cmd exec containing quotes**; the
+   fix (`popen_target`, verbatim command-line string for cmd on
+   Windows) repairs that in 1.2.0.
+2. `kill_tree` killed only the shell on Windows; surviving
+   children held the job's pipes and stalled completion ~10 s.
+   Now `taskkill /T /F` + a 1 s bounded pipe drain.
+3. Queue record moves lost file-sharing races against readers
+   and stranded stale record copies; writes/moves now retry
+   `PermissionError`.
+
+Also fixed: `UacMonitor.check_once` sampled its probe outside
+the state lock (stale-sample race — the mechanism behind the
+previously unpinned UAC status-transition failures in
+session-0 runs) and the GuiSpawn teardown now waits for killed
+processes to exit before cleanup.
+
+**Fix commits:** `f69fa8f` (the three defects + teardown),
+`7fa13fa` (UacMonitor atomicity). **Verification: VM suite 234
+OK (skipped=3); owner-PC Windows smoke 234 OK (skipped=9),
+Python 3.14.2, run detached in the diag worktree.**
+
+**The switch:** checkout `D:\shiny-dollop` moved to
+`muse-pc-bridge/v1-2` @ `7fa13fa`, then both supervised agents
+were restarted onto the new code (each supervisor respawned its
+agent within seconds of the old one's termination). Topology
+note, verified live that evening: **two** full agents share
+port 8765 via duplicate binds — the session-0 SYSTEM core
+("Muse PC Bridge (core)" task, Running) and the session-1
+avatar supervisor's agent — and requests land on either; both
+had to be (and were) restarted. Post-switch verification:
+`/v1/status` reports **1.2.0** from both, `GET /v1/audit`
+answers with paged entries, `GET /v1/queue` answers (runner
+live, counts zero), the audit log records `server_start` for
+1.2.0, `update_status` reports `current_version: 1.2.0`, and
+the avatar's display-state is publishing (idle after the
+switch). **Rollback:** the v1.1 branch
+(`muse-pc-bridge/v1-1-features` @ `6855539`) is intact —
+checkout + the same two restarts returns production to 1.1.0.
+
+**Still unverified:** `waiting_uac` against a genuine consent
+prompt; queue restart recovery across a real reboot; the UAC
+classifier against real installer command lines; the formal
+reboot-survival test remains separately held for the owner to
+name (not performed).

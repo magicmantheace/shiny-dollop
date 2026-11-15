@@ -195,3 +195,34 @@ build (the owner directed VM-only work). Windows behaviour is
 explicitly unverified: the §4 Windows smoke on the PC and the
 production switch remain owner-gated. See the 2026-11-13 v1.2
 entry in `docs/MUSE_HANDOFF.md`.
+
+**Update (2026-11-14 — v1.2 DEPLOYED, production runs `1.2.0`):**
+the §4 Windows smoke initially failed (4 failures + 1 error, all
+in the new queue tests, plus a GuiSpawn teardown error). Diagnosis
+on the PC found three Windows-only defects, all fixed on the
+branch: (1) cmd commands passed to `cmd.exe` in subprocess list
+form are mangled by `list2cmdline` quoting + cmd `/c` parsing, so
+any command containing a quoted argument or redirect target exited
+1 without running — cmd invocations now go to Popen as a verbatim
+command-line string (`popen_target`); (2) `kill_tree` on Windows
+killed only the shell, leaving children holding the job's pipes
+and stalling job completion ~10 s — it now uses `taskkill /T /F`,
+and the post-exit pipe drain is bounded to a 1 s shared window;
+(3) queue record moves lost momentary file-sharing races against
+readers, stranding stale record copies — record writes/moves now
+retry `PermissionError` briefly. A fourth fix makes
+`UacMonitor.check_once` sample its probe under the state lock
+(a stale-sample race the Windows status test hits against the
+watch thread). **Verified: VM suite 234 tests OK (3 skips);
+owner-PC Windows smoke 234 tests OK (9 skips), Python 3.14.2.**
+Production was switched the same evening (checkout to
+`muse-pc-bridge/v1-2` @ `7fa13fa`; both supervised agents — the
+session-0 SYSTEM core and the session-1 avatar agent — restarted
+onto the new code and verified: `/v1/status` reports 1.2.0,
+`GET /v1/audit` and `GET /v1/queue` answer, the audit log records
+the 1.2.0 `server_start`). Rollback is the intact v1.1 checkout
+branch (`muse-pc-bridge/v1-1-features`). Still unverified:
+`waiting_uac` against a genuine consent prompt, the queue runner
+across a real reboot, the classifier against real installer
+command lines. See the 2026-11-14 entry in
+`docs/MUSE_HANDOFF.md`.
