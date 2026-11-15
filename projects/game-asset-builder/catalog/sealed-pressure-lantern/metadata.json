@@ -1,0 +1,80 @@
+{
+ "entry_version": 1,
+ "name": "Sealed Pressure Lantern",
+ "slug": "sealed-pressure-lantern",
+ "source_concept": "media-generation-underreach-sealed-pressure-lan-0-2b674a8e-6d91-49e8-a0a9-ec913324a988.webp",
+ "asset_file": "sealed-pressure-lantern.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "0223518581cb7c101811a085447a05dc911c7d4c0becaa3c787067366d9b38b2",
+ "bytes": 11750052,
+ "counts": {
+  "verts": 29963,
+  "faces": 59934,
+  "raw_mesh_verts": 370659,
+  "raw_mesh_faces": 473462
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "runner": {
+    "name": "sealed-pressure-lantern_shape",
+    "exit_code": 0,
+    "seconds": 537.61,
+    "baseline_vram_mib": 4003,
+    "peak_vram_mib": 10445,
+    "peak_delta_mib": 6442,
+    "vram_after_exit_mib": 4003,
+    "n_samples": 1144,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"sealed-pressure-lantern_shape\", \"exit_code\": 0, \"seconds\": 537.61, \"baseline_vram_mib\": 4003, \"peak_vram_mib\": 10445, \"peak_delta_mib\": 6442, \"vram_after_exit_mib\": 4003, \"n_samples\": 1144}\r\n"
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 236679,
+    "faces": 473466,
+    "load_s": 118.49,
+    "inference_s": 355.99,
+    "total_s": 474.55,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\sealed-pressure-lantern\\shape.glb"
+   }
+  },
+  "texture_stage": {
+   "runner": {
+    "name": "sealed-pressure-lantern_texture",
+    "exit_code": 0,
+    "seconds": 1175.29,
+    "baseline_vram_mib": 4090,
+    "peak_vram_mib": 11900,
+    "peak_delta_mib": 7810,
+    "vram_after_exit_mib": 2672,
+    "n_samples": 2507,
+    "job_state": "done",
+    "adopted_from_lab": true
+   },
+   "stats": {
+    "stage": "texture",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+    "verts": 370659,
+    "faces": 473466,
+    "load_s": 112.55,
+    "texture_s": 1008.14,
+    "total_s": 1121.47,
+    "torch_peak_mib": 9882.0,
+    "output": "D:\\asset-forge-lab\\out\\gab\\sealed-pressure-lantern\\textured.glb"
+   },
+   "note": "Retry 2026-11-14 (Adam's idle-time rule; first attempt hung 4 h and was killed at a 14,400 s cap). Lab cache purged by slug before the retry (shape.glb kept: sha256 verified identical to the adopted VM copy). Paint completed on the PC in 1,175.29 runner s (texture_s 1,008.14); the VM client died fetching the result JSON (copy raced the stage runner's result write), so the stage was adopted from the lab hash-verified: textured.glb sha256 cf584e75cd0d6b906181a0b829095189b0b97259361a01cfbe8a55fb31c977d1, 18,372,516 bytes."
+  }
+ }
+}
