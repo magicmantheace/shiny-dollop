@@ -1,0 +1,35 @@
+{
+ "entry_version": 1,
+ "name": "Tailor Bench",
+ "slug": "tailor-bench",
+ "source_concept": "media-generation-media-generation-underreach-ta-0-cc7a3702-2d1a-40d0-861f-ce0e2fd741ae.webp",
+ "asset_file": "tailor-bench.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "632f4cf59cc0ad18dbcf44a70f2981bff1fd7c68ac604e4d7dff7596620ab6c2",
+ "bytes": 10965900,
+ "counts": {
+  "verts": 27069,
+  "faces": 52186,
+  "raw_mesh_verts": 743943,
+  "raw_mesh_faces": 1009830
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.2.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ }
+}
