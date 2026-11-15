@@ -1,0 +1,81 @@
+{
+ "entry_version": 1,
+ "name": "Thermal Lamp",
+ "slug": "thermal-lamp",
+ "source_concept": "media-generation-media-generation-underreach-th-0-e189c924-0d86-45cd-85d7-abf7a2480b25.webp",
+ "asset_file": "thermal-lamp.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "99fef953c4c16d2c7976c6f662df5ec5d4cc209435f890b353afe7e6dfde1b4b",
+ "bytes": 10750268,
+ "counts": {
+  "verts": 29962,
+  "faces": 59762,
+  "raw_mesh_verts": 321794,
+  "raw_mesh_faces": 423080
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "runner": {
+    "name": "thermal-lamp_shape",
+    "exit_code": 0,
+    "seconds": 496.97,
+    "baseline_vram_mib": 2863,
+    "peak_vram_mib": 9659,
+    "peak_delta_mib": 6796,
+    "vram_after_exit_mib": 3186,
+    "n_samples": 1060,
+    "job_state": "done",
+    "adopted_from_lab": true
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 211488,
+    "faces": 423082,
+    "load_s": 110.81,
+    "inference_s": 362.78,
+    "total_s": 473.64,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\thermal-lamp\\shape.glb"
+   },
+   "note": "The run-1 VM client was killed externally mid-mesh-job (empty log; the same runtime reaping seen elsewhere this session). The stage completed detached on the PC (496.97 runner s) and was adopted hash-verified: shape.glb sha256 c4798dbcc4fcc113429daf385e6dce5fc1fe87f1983a79cc0364f603d1adce5b, 7,615,628 bytes."
+  },
+  "texture_stage": {
+   "runner": {
+    "name": "thermal-lamp_texture",
+    "exit_code": 0,
+    "seconds": 1021.19,
+    "baseline_vram_mib": 3183,
+    "peak_vram_mib": 11891,
+    "peak_delta_mib": 8708,
+    "vram_after_exit_mib": 2579,
+    "n_samples": 2178,
+    "job_state": "done",
+    "adopted_from_lab": true
+   },
+   "stats": {
+    "stage": "texture",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+    "verts": 321794,
+    "faces": 423082,
+    "load_s": 105.01,
+    "texture_s": 892.67,
+    "total_s": 998.4,
+    "torch_peak_mib": 9879.9,
+    "output": "D:\\asset-forge-lab\\out\\gab\\thermal-lamp\\textured.glb"
+   },
+   "note": "Stage completed on the PC (runner 1,021.19 s; texture_s 892.67 on 423,082 faces). The bridge job wrapper exited while the stage kept running detached, and the resume client died on the by-now-systematic result-fetch copy race; the stage was adopted from the lab hash-verified: textured.glb sha256 e31cdd906d4841ee83edddf682afbed4e08fc0029d902a34113a38790570b1bf, 15,809,364 bytes. A --resume finish then ran prop + catalog + verify."
+  }
+ }
+}
