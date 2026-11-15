@@ -70,7 +70,7 @@ steadiness / tags all read off these):
 | Chandlery / rendering bench | Tallow & oil station | ✅ catalogued 2026-11-15 (`chandlery-bench` 700d1c9e…; unrigged prop — not yet in frontend use: no station placement exists in the frontend yet, lands with the station slice that makes workstations placeable) |
 | Charcoal kiln | Torch fuel station | ✅ catalogued 2026-11-15 (`charcoal-kiln` 4106b836…; unrigged prop — not yet in frontend use: no station placement exists in the frontend yet, lands with the station slice that makes workstations placeable) |
 | Herbalist bench + drying rack | Medicine / spore care | ✅ catalogued 2026-11-15 (`herbalist-bench` 42e19d33…; unrigged prop — not yet in frontend use: no station placement exists in the frontend yet, lands with the station slice that makes workstations placeable) |
-| Tailor bench | Masks & gear crafting | ⬜ |
+| Tailor bench | Masks & gear crafting | ✅ catalogued 2026-11-15 (`tailor-bench` 632f4cf5…; unrigged prop — not yet in frontend use: no station placement exists in the frontend yet, lands with the station slice that makes workstations placeable) |
 | Sealed food store | Fungal-band food storage | ⬜ |
 | The Deep Ledger | Lectern/monument — the colony's record, in-world | ⬜ |
 | Surface gate | Entrance structure where recruits arrive | ⬜ |
