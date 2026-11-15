@@ -1,0 +1,35 @@
+{
+ "entry_version": 1,
+ "name": "Cart",
+ "slug": "cart",
+ "source_concept": "media-generation-media-generation-underreach-ca-0-5ee7de2d-4413-490f-a53b-01ea42cc63f2.webp",
+ "asset_file": "cart.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "ae07e9a6b52c5b2209a85730c2982443fd932fc1990701345af0aa1847aeb804",
+ "bytes": 12121024,
+ "counts": {
+  "verts": 29957,
+  "faces": 59492,
+  "raw_mesh_verts": 802652,
+  "raw_mesh_faces": 1065978
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.2.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ }
+}
