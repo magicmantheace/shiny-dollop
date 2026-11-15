@@ -1,0 +1,80 @@
+{
+ "entry_version": 1,
+ "name": "Crystal-heart Lantern",
+ "slug": "crystal-heart-lantern",
+ "source_concept": "media-generation-media-generation-underreach-cr-0-1676d538-4af0-4962-ae80-9ff0d1e48441.webp",
+ "asset_file": "crystal-heart-lantern.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "0b3894f5e7ceb68cfd432bf1645d78e68c0db8cfbab419614659ebbd0389ab4e",
+ "bytes": 11916472,
+ "counts": {
+  "verts": 29978,
+  "faces": 59973,
+  "raw_mesh_verts": 619499,
+  "raw_mesh_faces": 805172
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.1.0"
+  },
+  "mesh_stage": {
+   "runner": {
+    "name": "crystal-heart-lantern_shape",
+    "exit_code": 0,
+    "seconds": 504.29,
+    "baseline_vram_mib": 3007,
+    "peak_vram_mib": 9577,
+    "peak_delta_mib": 6570,
+    "vram_after_exit_mib": 3144,
+    "n_samples": 1076,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"crystal-heart-lantern_shape\", \"exit_code\": 0, \"seconds\": 504.29, \"baseline_vram_mib\": 3007, \"peak_vram_mib\": 9577, \"peak_delta_mib\": 6570, \"vram_after_exit_mib\": 3144, \"n_samples\": 1076}\r\n"
+   },
+   "stats": {
+    "stage": "mesh",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+    "verts": 402552,
+    "faces": 805182,
+    "load_s": 116.52,
+    "inference_s": 361.53,
+    "total_s": 478.13,
+    "torch_peak_mib": 5707.8,
+    "output": "D:\\asset-forge-lab\\out\\gab\\crystal-heart-lantern\\shape.glb"
+   }
+  },
+  "texture_stage": {
+   "runner": {
+    "name": "crystal-heart-lantern_texture",
+    "exit_code": 0,
+    "seconds": 1364.79,
+    "baseline_vram_mib": 3146,
+    "peak_vram_mib": 11861,
+    "peak_delta_mib": 8715,
+    "vram_after_exit_mib": 2615,
+    "n_samples": 2903,
+    "job_state": "done",
+    "adopted_from_lab": true
+   },
+   "stats": {
+    "stage": "texture",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+    "verts": 619499,
+    "faces": 805182,
+    "load_s": 106.6,
+    "texture_s": 1230.49,
+    "total_s": 1338.14,
+    "torch_peak_mib": 9894.4,
+    "output": "D:\\asset-forge-lab\\out\\gab\\crystal-heart-lantern\\textured.glb"
+   },
+   "note": "Stage completed on the PC (runner 1,364.79 s; texture_s 1,230.49 on 805,182 faces); the VM client died fetching the result JSON (the same copy race as #13 \u2014 Copy-Item ObjectNotFound on the result path), so the stage was adopted from the lab hash-verified: textured.glb sha256 c2a15fa991239f138dea92bf792218d3653625d3e7005a22e2bb1c11acd6708d, 27,492,104 bytes. A --resume finish then ran prop + catalog + verify."
+  }
+ }
+}
