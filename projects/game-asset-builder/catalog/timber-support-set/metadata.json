@@ -1,0 +1,35 @@
+{
+ "entry_version": 1,
+ "name": "Timber Support Set",
+ "slug": "timber-support-set",
+ "source_concept": "media-generation-media-generation-underreach-ti-0-e117aab2-ee4e-4ad7-9125-9d92e07ff4ea.webp",
+ "asset_file": "timber-support-set.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "50fc438aeb245aaaf4f8c939c7cc13ea04f1548891646018f34f5e981ab2ac92",
+ "bytes": 10865452,
+ "counts": {
+  "verts": 29986,
+  "faces": 59835,
+  "raw_mesh_verts": 414479,
+  "raw_mesh_faces": 552058
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.2.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ }
+}
