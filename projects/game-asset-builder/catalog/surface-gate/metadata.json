@@ -1,0 +1,35 @@
+{
+ "entry_version": 1,
+ "name": "Surface Gate",
+ "slug": "surface-gate",
+ "source_concept": "media-generation-media-generation-underreach-su-0-e2c962ca-036f-4990-96c3-25f7fcfd2c5b.webp",
+ "asset_file": "surface-gate.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "954f7b067fda9818b2465ec408783ccdba6d919cb9425f70b20490b4c4f82d05",
+ "bytes": 10334656,
+ "counts": {
+  "verts": 27012,
+  "faces": 53411,
+  "raw_mesh_verts": 694680,
+  "raw_mesh_faces": 946342
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.2.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ }
+}
