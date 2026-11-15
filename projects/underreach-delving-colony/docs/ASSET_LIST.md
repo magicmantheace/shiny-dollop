@@ -57,6 +57,7 @@ steadiness / tags all read off these):
 | Piped light-spine segment | Infrastructure — lit main routes | ✅ catalogued 2026-11-14 (`piped-light-spine-segment` 572ff8f8…; unrigged prop — not yet in frontend use: no light-spine placement exists in the frontend yet, lands with the infrastructure slice that makes spine routes placeable) |
 | Crystal relay | Infrastructure — light relay | ✅ catalogued 2026-11-14 (`crystal-relay` d0bfd195…; unrigged prop — not yet in frontend use: no relay placement exists in the frontend yet, lands with the infrastructure slice that makes relay routes placeable) |
 | Heat-pipe relay | Infrastructure — Magma light | ✅ catalogued 2026-11-14 (`heat-pipe-relay` 3eb947d3…; unrigged prop — not yet in frontend use: no relay placement exists in the frontend yet, lands with the infrastructure slice that makes relay routes placeable) |
+| Cart | Infrastructure — hauling | ✅ catalogued 2026-11-14 (`cart` ae07e9a6…; unrigged prop — not yet in frontend use: no cart/hauling placement exists in the frontend yet, lands with the infrastructure slice that makes hauling routes placeable) |
 
 ## 4. Camp & colony props
 
