@@ -1,0 +1,57 @@
+{
+ "entry_version": 1,
+ "name": "Piped Light-Spine Segment",
+ "slug": "piped-light-spine-segment",
+ "source_concept": "media-generation-underreach-piped-light-spine-s-0-f6b641db-0c1b-4707-a01a-45cd490f9b33.webp",
+ "asset_file": "piped-light-spine-segment.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "572ff8f83d144c7488ce98ffbf9d4db37eedabb913243a582733fb613e8f7bcc",
+ "bytes": 11770068,
+ "counts": {
+  "verts": 29995,
+  "faces": 60000,
+  "raw_mesh_verts": 392640,
+  "raw_mesh_faces": 519998
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.2.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "runner": {
+    "name": "piped-light-spine-segment_texture",
+    "exit_code": 0,
+    "seconds": 850.66,
+    "baseline_vram_mib": 2792,
+    "peak_vram_mib": 11844,
+    "peak_delta_mib": 9052,
+    "vram_after_exit_mib": 2370,
+    "n_samples": 1820,
+    "job_state": "done",
+    "job_stdout_tail": "{\"name\": \"piped-light-spine-segment_texture\", \"exit_code\": 0, \"seconds\": 850.66, \"baseline_vram_mib\": 2792, \"peak_vram_mib\": 11844, \"peak_delta_mib\": 9052, \"vram_after_exit_mib\": 2370, \"n_samples\": 1820}\r\n"
+   },
+   "stats": {
+    "stage": "texture",
+    "model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+    "verts": 392640,
+    "faces": 520000,
+    "load_s": 109.73,
+    "texture_s": 685.38,
+    "total_s": 795.9,
+    "torch_peak_mib": 9883.5,
+    "output": "D:\\asset-forge-lab\\out\\gab\\piped-light-spine-segment\\textured.glb"
+   }
+  }
+ }
+}
