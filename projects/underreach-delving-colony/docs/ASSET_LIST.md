@@ -56,7 +56,7 @@ steadiness / tags all read off these):
 | Thermal lamp | Tier 5 — vent-fed (Magma) | ✅ catalogued 2026-11-14 (`thermal-lamp` 99fef953…; unrigged prop — not yet in frontend use: per-tier prop selection lands with the slice that makes tier-5 placement available, see the Tier 0 note) |
 | Piped light-spine segment | Infrastructure — lit main routes | ✅ catalogued 2026-11-14 (`piped-light-spine-segment` 572ff8f8…; unrigged prop — not yet in frontend use: no light-spine placement exists in the frontend yet, lands with the infrastructure slice that makes spine routes placeable) |
 | Crystal relay | Infrastructure — light relay | ✅ catalogued 2026-11-14 (`crystal-relay` d0bfd195…; unrigged prop — not yet in frontend use: no relay placement exists in the frontend yet, lands with the infrastructure slice that makes relay routes placeable) |
-| Heat-pipe relay | Infrastructure — Magma light | ⬜ |
+| Heat-pipe relay | Infrastructure — Magma light | ✅ catalogued 2026-11-14 (`heat-pipe-relay` 3eb947d3…; unrigged prop — not yet in frontend use: no relay placement exists in the frontend yet, lands with the infrastructure slice that makes relay routes placeable) |
 
 ## 4. Camp & colony props
 
