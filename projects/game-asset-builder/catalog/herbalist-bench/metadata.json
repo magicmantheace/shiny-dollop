@@ -1,0 +1,35 @@
+{
+ "entry_version": 1,
+ "name": "Herbalist Bench",
+ "slug": "herbalist-bench",
+ "source_concept": "media-generation-media-generation-underreach-he-0-27cc2367-6782-458f-8505-7c7ff76241db.webp",
+ "asset_file": "herbalist-bench.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "42e19d330fa643887c7fa7cae5bdf97849cef09695f04276df9ad5de3227746e",
+ "bytes": 11853980,
+ "counts": {
+  "verts": 28861,
+  "faces": 57561,
+  "raw_mesh_verts": 1020558,
+  "raw_mesh_faces": 1358308
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.2.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ }
+}
