@@ -1,0 +1,35 @@
+{
+ "entry_version": 1,
+ "name": "Charcoal Kiln",
+ "slug": "charcoal-kiln",
+ "source_concept": "media-generation-media-generation-underreach-ch-0-423223ac-8bfa-409a-9524-54144cd855d9.webp",
+ "asset_file": "charcoal-kiln.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "4106b836efe8343ad31f0b3443cb1a2249d67f08962eac4b918f103f8d923967",
+ "bytes": 11502908,
+ "counts": {
+  "verts": 29995,
+  "faces": 59705,
+  "raw_mesh_verts": 627382,
+  "raw_mesh_faces": 811792
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.2.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ }
+}
