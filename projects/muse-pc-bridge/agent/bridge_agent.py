@@ -664,11 +664,17 @@ class UacMonitor:
     def check_once(self, now: float | None = None) -> bool:
         """Run one probe; audit and record any transition."""
         now = time.time() if now is None else now
-        try:
-            active = bool(self._probe())
-        except Exception:  # a failing probe reads as "no prompt"
-            active = False
         with self._lock:
+            # Sample under the lock: sampling outside it let a poll
+            # that read the probe just before a concurrent state
+            # change apply its stale result just after, flipping
+            # the state back (on Windows the status test raced the
+            # watch thread's first poll exactly this way, and the
+            # state machine was unsound for any concurrent caller).
+            try:
+                active = bool(self._probe())
+            except Exception:  # a failing probe reads as "no prompt"
+                active = False
             was = self._active
             if active and not was:
                 self._active = True
