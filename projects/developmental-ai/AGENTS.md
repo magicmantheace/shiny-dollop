@@ -91,7 +91,7 @@ and minority_model_inverted true everywhere, cross-check PASS at
 every minority-fired state 7/7 dev and 6/6 add, acquisition 0).
 **The grading cap is NOT MET — leg L took ZERO graded B1 states
 on either cohort; its exactly three takings across both cohorts
-at any checkpoint are dev 552003 B1 k=16 (UNGRAGED checkpoint,
+at any checkpoint are dev 552003 B1 k=16 (UNGRADED checkpoint,
 partial through leg C, supporting 0, stale 6, purity 0.737,
 candidate abstained 0/0 vs decisive / recent8 8/8), dev 552021
 control k=2 (graded control, above), and add 553041 B2 k=2
