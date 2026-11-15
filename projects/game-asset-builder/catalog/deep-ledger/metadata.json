@@ -1,0 +1,35 @@
+{
+ "entry_version": 1,
+ "name": "Deep Ledger",
+ "slug": "deep-ledger",
+ "source_concept": "media-generation-media-generation-underreach-de-0-2541272e-1852-4d9b-9743-9bfced80685b.webp",
+ "asset_file": "deep-ledger.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "7f0a50a07950a18b84cc42ed9d8c82b0188e59e08e1c3c49b4a01b5011502093",
+ "bytes": 11974452,
+ "counts": {
+  "verts": 27010,
+  "faces": 53316,
+  "raw_mesh_verts": 1153351,
+  "raw_mesh_faces": 1539840
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.2.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ }
+}
