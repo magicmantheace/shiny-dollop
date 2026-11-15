@@ -72,7 +72,7 @@ steadiness / tags all read off these):
 | Herbalist bench + drying rack | Medicine / spore care | ✅ catalogued 2026-11-15 (`herbalist-bench` 42e19d33…; unrigged prop — not yet in frontend use: no station placement exists in the frontend yet, lands with the station slice that makes workstations placeable) |
 | Tailor bench | Masks & gear crafting | ✅ catalogued 2026-11-15 (`tailor-bench` 632f4cf5…; unrigged prop — not yet in frontend use: no station placement exists in the frontend yet, lands with the station slice that makes workstations placeable) |
 | Sealed food store | Fungal-band food storage | ✅ catalogued 2026-11-15 (`sealed-food-store` e210e454…; unrigged prop — not yet in frontend use: no station placement exists in the frontend yet, lands with the station slice that makes workstations placeable) |
-| The Deep Ledger | Lectern/monument — the colony's record, in-world | ⬜ |
+| The Deep Ledger | Lectern/monument — the colony's record, in-world | ✅ catalogued 2026-11-15 (`deep-ledger` 7f0a50a0…; unrigged prop — not yet in frontend use: no station placement exists in the frontend yet, lands with the station slice that makes workstations placeable) |
 | Surface gate | Entrance structure where recruits arrive | ⬜ |
 | Timber support set | Shallows gate — beams/props vs cave-ins | ⬜ |
 | Ventilation pieces | Shallows gate — shaft + baffles | ⬜ |
