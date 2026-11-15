@@ -68,7 +68,7 @@ steadiness / tags all read off these):
 | Mushroom plot cluster | Farm plots | ✅ mushroom-cluster |
 | Converter forge | Ore → goods station | ✅ catalogued 2026-11-15 (`converter-forge` fef3e81b…; unrigged prop — not yet in frontend use: no converter/station placement exists in the frontend yet, lands with the station slice that makes workstations placeable) |
 | Chandlery / rendering bench | Tallow & oil station | ✅ catalogued 2026-11-15 (`chandlery-bench` 700d1c9e…; unrigged prop — not yet in frontend use: no station placement exists in the frontend yet, lands with the station slice that makes workstations placeable) |
-| Charcoal kiln | Torch fuel station | ⬜ |
+| Charcoal kiln | Torch fuel station | ✅ catalogued 2026-11-15 (`charcoal-kiln` 4106b836…; unrigged prop — not yet in frontend use: no station placement exists in the frontend yet, lands with the station slice that makes workstations placeable) |
 | Herbalist bench + drying rack | Medicine / spore care | ⬜ |
 | Tailor bench | Masks & gear crafting | ⬜ |
 | Sealed food store | Fungal-band food storage | ⬜ |
