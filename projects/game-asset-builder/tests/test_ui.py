@@ -124,7 +124,8 @@ class CatalogDataTests(unittest.TestCase):
                                           "piped-light-spine-segment",
                                           "crystal-relay",
                                           "heat-pipe-relay",
-                                          "cart"})
+                                          "cart",
+                                          "converter-forge"})
         self.assertEqual(summaries["ember-dragon"]["bone_count"], 14)
         self.assertEqual(summaries["moth-hart"]["bone_count"], 21)
         self.assertEqual(summaries["toasty"]["bone_count"], 11)
