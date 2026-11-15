@@ -1122,6 +1122,67 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 15 — Support-agreement partial recovery: leg A, a conjunctive support-agreement leg on partial abstention triggers only (FAILED, not a Regression)
+
+Optional `SupportAgreementPartialRecoveryMemory` is identical to
+the graded long-window candidate in every element — acting model,
+extended signal, retained archive, archive concordance, joint recovery
+test, recovery model, the full three-leg authority condition, the
+minority branch in full INCLUDING the inverted minority model and leg W
+on the minority branch, leg T on both recovery branches, leg N and leg
+D on the regular branch, leg P ≥ 0.70, leg R, leg C, leg S, and leg L
+on partial abstention triggers, and the full / retained-partial
+abstention classes with the widened class removed; the SINGLE changed
+element is leg A: the partial gate's support condition (leg S OR
+leg L) becomes the conjunction leg S AND leg L, both thresholds 1
+carried unchanged over disjoint windows, the full gate stays leg P
+alone, and abstention_disarmed_by_support_agreement is true exactly
+when a partial trigger taken by the decisive baseline through exactly
+one support leg is disarmed by leg A — under a protocol frozen before
+implementation (new cohorts 562003-family / 563001-family, now
+INSPECTED). **Graded Failed under the protocol's own definitions, NOT
+a Regression (the Failed clause triggers on the additional cohort
+several times over — criteria 18/5, 1, 17, and 4 FAIL there, criterion
+7 PASSes both; no Regression clause triggers — pooled onset harm
+150/209 below recent8 251/275, control successes −5/−1 against
+recent8, k=32 successes 65/72 above the recent8 − 4 lines of 61/69,
+suite + transfer pass). PRIMARY criterion 22 PASSes on BOTH cohorts —
+the first PRIMARY stationary pass on both in this support-gated line —
+and the grading cap is MET on additional: exactly one graded control
+leg-A disarming across both cohorts (additional 563041 control k=32,
+L-only, supporting 0, stale 2, purity 0.875, candidate recent8 8/8 vs
+decisive abstained 0/0) alone moves additional's control profile from
+decisive's [102, 106, 32] (successes 102 below the >= 105 line) to the
+candidate's [110, 114, 16]; development's PRIMARY pass is a carried
+profile identical to decisive [111, 113, 16] with zero graded control
+leg-A disarmings, its one taken control abstention an S&L partial
+carried identical. Any positive reading is a PARTIAL-class verdict
+through the leg-A cap alone, on one graded state, in one cohort.**
+Criteria 19/6 and 11 PASS both (same computation / conjunction);
+criteria 21/9 PASS both (TAKEN 4/6 development identical to decisive,
+3/6 additional AT the floor after leg A's two graded B1 disarmings
+there — pooled onset price +31 harm development / +63 additional
+against decisive at +1 success each cohort, paid in full); criterion 3
+PASSes both. Criterion 1 FAILs both (development on the minority count
+alone, harm passing both comparisons; additional on count,
+harm-ceiling, and successes, leg A's two B2 disarmings there supplying
+exactly the ceiling gap — B2 harm 96 vs decisive 64 at identical
+successes 0); criteria 17/4 FAIL both, carried identical with leg A
+disarming zero return-A states; criterion 2 FAILs development carried
+identical (frozen_A / cumulative both-axes return-A dominance there
+again) and PASSes additional; criteria 18/5 PASS development and FAIL
+additional on sub-condition (c) alone (two carried retained firings at
+return-A k=32, non-recent8 2/9). Leg A disarmed exactly nine states
+across both cohorts, every one a partial trigger taken by decisive
+through exactly one support leg, zero UNEXPECTED. Next limitation
+selected: P1 return-A onset harm — criteria 17/4 fail both on an arm
+where leg A has no population, so the next condition must act on the
+return-A onset population itself, on NEW cohorts under a NEW protocol.
+Learner acquisition actions zero; external TRAIN actor harm published
+in full in the report.
+[Complete preregistration, results and limitations](docs/SUPPORT_AGREEMENT_PARTIAL_RECOVERY.md).
+
+
 ### November 14 — Long-window support partial recovery: leg L, a long-window supporting-opposition leg on partial abstention triggers only (FAILED / REGRESSION, stationary clause)
 
 Optional `LongWindowSupportPartialRecoveryMemory` is identical to
