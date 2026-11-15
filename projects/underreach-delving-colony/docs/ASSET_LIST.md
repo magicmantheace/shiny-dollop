@@ -51,7 +51,7 @@ steadiness / tags all read off these):
 | Torch on a stand | Tier 0 — torches/charcoal | ✅ catalogued 2026-11-13 (`torch-on-a-stand` bcba2c67…; unrigged prop — not yet in frontend use: `make_lantern_node` renders the Tier-1 prop for every tier and the placement UI only places tier 1, so per-tier prop selection lands with the slice that makes torches placeable) |
 | Oil lantern on a post | Tier 1 — the colony standard | ✅ catalogued and in frontend use 2026-11-11 (OmniLight + emissive flame marker kept) |
 | Fungal-oil lantern | Tier 2 — spore-repellent glow | ✅ catalogued 2026-11-13 (`fungal-oil-lantern` aebb0ea6…; unrigged prop — not yet in frontend use: per-tier prop selection lands with the slice that makes tier-2 placement available, see the Tier 0 note) |
-| Sealed pressure lantern | Tier 3 — waterproof (Drowned) | ⬜ |
+| Sealed pressure lantern | Tier 3 — waterproof (Drowned) | ✅ catalogued 2026-11-14 (`sealed-pressure-lantern` 02235185…; unrigged prop — not yet in frontend use: per-tier prop selection lands with the slice that makes tier-3 placement available, see the Tier 0 note) |
 | Crystal-heart lantern | Tier 4 — focused beam (Crystal Dark) | ⬜ |
 | Thermal lamp | Tier 5 — vent-fed (Magma) | ⬜ |
 | Piped light-spine segment | Infrastructure — lit main routes | ⬜ |
