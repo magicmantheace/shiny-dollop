@@ -74,7 +74,7 @@ steadiness / tags all read off these):
 | Sealed food store | Fungal-band food storage | ✅ catalogued 2026-11-15 (`sealed-food-store` e210e454…; unrigged prop — not yet in frontend use: no station placement exists in the frontend yet, lands with the station slice that makes workstations placeable) |
 | The Deep Ledger | Lectern/monument — the colony's record, in-world | ✅ catalogued 2026-11-15 (`deep-ledger` 7f0a50a0…; unrigged prop — not yet in frontend use: no station placement exists in the frontend yet, lands with the station slice that makes workstations placeable) |
 | Surface gate | Entrance structure where recruits arrive | ✅ catalogued 2026-11-15 (`surface-gate` 954f7b06…; unrigged prop — not yet in frontend use: no station placement exists in the frontend yet, lands with the station slice that makes workstations placeable) |
-| Timber support set | Shallows gate — beams/props vs cave-ins | ⬜ |
+| Timber support set | Shallows gate — beams/props vs cave-ins | ✅ catalogued 2026-11-15 (`timber-support-set` 50fc438a…; unrigged prop — not yet in frontend use: no support-prop placement exists in the frontend yet, lands with the slice that makes gate props placeable) |
 | Ventilation pieces | Shallows gate — shaft + baffles | ⬜ |
 | Camp clutter set | Crates, barrels, sacks, woodpile | ⬜ (fallen-log + stump ✅ as dressing) |
 
