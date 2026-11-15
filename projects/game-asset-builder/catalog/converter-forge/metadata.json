@@ -1,0 +1,35 @@
+{
+ "entry_version": 1,
+ "name": "Converter Forge",
+ "slug": "converter-forge",
+ "source_concept": "media-generation-media-generation-underreach-co-0-a45b82fb-7d54-4ef2-9e0d-f27c22f9df15.webp",
+ "asset_file": "converter-forge.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "fef3e81bbd14537356ac6872d9a29f5b1efc7f363966ed141a1826fc55a7346d",
+ "bytes": 11134216,
+ "counts": {
+  "verts": 27011,
+  "faces": 52464,
+  "raw_mesh_verts": 825989,
+  "raw_mesh_faces": 1097956
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.2.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ }
+}
