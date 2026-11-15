@@ -1,0 +1,35 @@
+{
+ "entry_version": 1,
+ "name": "Ventilation Pieces",
+ "slug": "ventilation-pieces",
+ "source_concept": "media-generation-media-generation-underreach-ve-0-41e8c48c-ca7c-445f-acfc-5d0e3fcf911e.webp",
+ "asset_file": "ventilation-pieces.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "0889b35a4e22ac38d6848e52955597da3df9c888326bce9174f0753f0594d24f",
+ "bytes": 10673036,
+ "counts": {
+  "verts": 29975,
+  "faces": 59101,
+  "raw_mesh_verts": 869837,
+  "raw_mesh_faces": 1176178
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.2.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ }
+}
