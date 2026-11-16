@@ -74,6 +74,27 @@ the owner's PC (RTX 3060, torch 2.14.1+cu126, driver 610.62):
 `os.environ.setdefault` at import, before torch initializes CUDA;
 an operator-provided value is respected.
 
+## Addendum (2026-11-16) — stalls recurred; stage instrumented
+
+With the allocator fix in place, the queue still hit silent texture
+stalls: #29 Ore face rock three times (killed ~3,000 s each, never
+reached the paint memory plateau) and #31 Crystal cluster once
+(healthy phase profile for the full 10,800 s cap, no output). Whether
+these are a second allocator trigger, the fix being silently
+bypassed (the `setdefault` yields to any operator-provided value,
+and the stage never logged which value it ran with), or a different
+fault is unknown — the runs produced no evidence beyond OS counters.
+
+At the owner's direction, `hunyuan_paint.py` now: (1) logs its
+effective `PYTORCH_CUDA_ALLOC_CONF` and its source (operator vs
+stage-default) at startup; (2) dumps all thread stacks via
+faulthandler to `<out>.threads.log` every 900 s; (3) prints a
+heartbeat (elapsed + peak VRAM) every 300 s during `pipe()`.
+Pipeline parameters are unchanged. Next step, gated on what the
+dumps show: the chunked-encode workaround from the 2026-11-10
+probes (batch-1 ×6 completed in 3.67 s in the state where batch-6
+hung) is the leading candidate cure if the encode wedges again.
+
 **End-to-end proof (production stage, not a probe):** the Ember
 Owl-Cat — whose paint stalled on two prior attempts — completed its
 texture stage with exit 0: loaded in 104.5 s, "texturing in
