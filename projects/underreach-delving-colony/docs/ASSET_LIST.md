@@ -83,7 +83,7 @@ steadiness / tags all read off these):
 | Asset | Role | Status |
 |---|---|---|
 | Ore face rock | Veined rock block for faces | ⬜ (frontend: coloured cube) |
-| Fungal node | Glowing mineable growth | ⬜ (frontend: coloured cube) |
+| Fungal node | Glowing mineable growth | ✅ catalogued 2026-11-16 (`fungal-node` cc75a873…; unrigged prop — not yet in frontend use: frontend fungal nodes are still coloured-cube stand-ins, lands with the slice that swaps resource faces to models) |
 | Crystal cluster | Crystal Dark resource face | ⬜ |
 | Carried-load props | Ore chunk / oil flask in hands while hauling | ⬜ |
 
