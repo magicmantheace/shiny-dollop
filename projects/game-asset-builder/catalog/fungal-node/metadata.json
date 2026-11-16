@@ -1,0 +1,35 @@
+{
+ "entry_version": 1,
+ "name": "Fungal Node",
+ "slug": "fungal-node",
+ "source_concept": "media-generation-underreach-fungal-node-concept-0-a85923c3-9892-4d95-9082-2bb56bd668ca.webp",
+ "asset_file": "fungal-node.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "cc75a873704a035c9d2dbd6fe199aa09b1e945305930533c7335f206efbc2e49",
+ "bytes": 11224952,
+ "counts": {
+  "verts": 27042,
+  "faces": 50328,
+  "raw_mesh_verts": 1236801,
+  "raw_mesh_faces": 1593880
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.2.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ }
+}
