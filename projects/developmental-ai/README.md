@@ -1122,6 +1122,60 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 16 — Long-disagreement release recovery: leg Q, a long-disagreement release on the regular recovery branch (FAILED / REGRESSION, stationary clause)
+
+Optional `LongDisagreementReleaseRecoveryMemory` is identical to
+the graded support-agreement candidate in every element — acting model,
+extended signal, retained archive, archive concordance, joint recovery
+test, recovery model, the full three-leg authority condition, the
+minority branch in full INCLUDING the inverted minority model and leg W
+on the minority branch, leg T on both recovery branches, leg N and leg
+D on the regular branch, leg P ≥ 0.70, leg R, leg C, leg S, leg L, and
+leg A on partial abstention triggers, and the full / retained-partial
+abstention classes with the widened class removed; the SINGLE changed
+element is leg Q: the regular branch also fires when authority, leg P,
+and leg T hold and `long_disagreement` holds (stable_disagreement AND
+preceding_stable_disagreement, the authority condition's own carried
+field, NO new numeric value), releasing the joint test and the leg
+N / leg D breadth complex on that path only, the standard path retained
+bit-for-bit — under a protocol frozen before implementation (new
+cohorts 572003-family / 573001-family, now INSPECTED). **Graded Failed
+/ Regression (stationary clause) under the protocol's own definitions
+(the Failed clause triggers on the additional cohort — criteria 22, 19,
+6, and 11 FAIL there, criterion 7 PASSes both; the Regression clause
+triggers on the stationary arm — control successes 128 vs recent8 140,
+−12 development, and 85 vs 95, −10 additional, both past the more-than-6
+both-cohorts line, on carried abstention firings identical to the
+decisive baseline's; the other Regression clauses do not trigger —
+pooled onset harm 150/106 below recent8 261/248, k=32 successes 70/64
+above the recent8 − 4 lines of 66/60, suite + transfer pass). PRIMARY
+criterion 23 FAILs development on the ceiling sub-condition (b) alone
+(harm 60 vs guard 92 PASS, ceiling 55.2 FAIL by 4.8) and PASSes
+additional in full (40 vs guard 73 and ceiling 48.6), and the grading
+cap is MET on BOTH cohorts: leg Q fired exactly eleven states across
+both cohorts, every one at return-A, every one a leg_Q_conversion,
+zero UNEXPECTED — six of them graded return-A onset conversions (dev
+572021 k=2 and k=4, 572039 k=2 and k=4; add 573041 k=2 and k=4), worth
++32 successes / −32 harm dev and +21 / −21 add against decisive at
+return-A onset. Development's residual return-A harm is the four
+conversions' own 32 harm plus the two 572003 fall-throughs (28 harm)
+where long_disagreement is FALSE — a population leg Q cannot reach by
+construction.** Criteria 21/9 PASS both (TAKEN 5/6 dev, 4/6 add,
+identical to decisive), criteria 18/5 PASS both in full, criterion 1
+FAILs development carried identical (minority 1/6, harm 74 vs guard 69
+and ceiling 48.0, successes 22 vs 27) and PASSes additional in full,
+criteria 2 and 3 PASS both, criteria 22/19/6 FAIL both on successes
+alone (abstentions 32/240 AT the budget and harm passing on both; the
+entire deficit on each cohort is exactly two carried partial S&L
+abstention firings identical to decisive). Next limitation selected:
+P1 stationary selectivity of the carried support-agreement abstention
+classes — criteria 22/19/6 fail both and carry the Regression on an arm
+where leg Q is structurally inert, on NEW cohorts under a NEW protocol.
+Learner acquisition actions zero; external TRAIN actor harm published
+in full in the report.
+[Complete preregistration, results and limitations](docs/LONG_DISAGREEMENT_RELEASE_RECOVERY.md).
+
+
 ### November 15 — Support-agreement partial recovery: leg A, a conjunctive support-agreement leg on partial abstention triggers only (FAILED, not a Regression)
 
 Optional `SupportAgreementPartialRecoveryMemory` is identical to

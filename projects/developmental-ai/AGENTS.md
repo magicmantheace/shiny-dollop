@@ -1,3 +1,135 @@
+# Long-disagreement release recovery: leg Q, a long-disagreement release on the regular recovery branch — 2026-11-16 (FAILED / REGRESSION, stationary clause)
+
+Optional `developmental_ai/long_disagreement_release_recovery.py`
+(identical to the graded support-agreement candidate in every element —
+acting model recent8 exactly, extended signal, retained archive,
+archive concordance, joint test joint_count >= 1, recovery model,
+the full three-leg authority condition, the minority branch in
+full INCLUDING the inverted minority model and leg W on the
+minority branch, leg T on both recovery branches, leg N and leg D
+on the regular branch, leg P >= 0.70, leg R, leg C, leg S, leg L
+and leg A on partial abstention triggers, and the full /
+retained-partial abstention classes with the widened class
+removed records-only, singleton_release_fired carried,
+support_threshold 1 and long_window_threshold 1 carried; the
+SINGLE changed element is leg Q: the regular branch fires iff the
+standard path holds (joint_count >= 1 AND authority armed AND
+leg P armed AND leg T passing AND (leg N OR leg D)) OR leg Q's
+path holds (authority armed AND leg P armed AND leg T passing
+AND long_disagreement, the authority condition's own carried
+field — stable_disagreement AND preceding_stable_disagreement,
+NO new numeric value), releasing the joint test and the leg N /
+leg D breadth complex on leg Q's path only, the standard path
+retained bit-for-bit; new decision-record field
+long_disagreement_release_fired; leg P / leg R / leg C / leg S /
+leg L / leg A / leg T / leg W / leg N / leg D explicitly NOT
+re-tuned) was evaluated under the protocol frozen BEFORE
+implementation at
+`benchmarks/long_disagreement_release_recovery_protocol.json`
+on NEW cohorts 572003/572021/572039 and 573001/573017/573041,
+both now INSPECTED — never re-tune against them. **Graded Failed
+/ Regression (stationary clause) under the protocol's own
+definitions (the Failed clause triggers on the additional cohort
+— criteria 22, 19, 6, and 11 FAIL there, criterion 7 PASSes
+both; the Regression clause triggers on the stationary arm —
+control successes 128 vs recent8 140 (−12) dev and 85 vs 95
+(−10) add, both past the more-than-6 both-cohorts line, on
+carried abstention firings identical to the decisive baseline's;
+the other Regression clauses do not trigger — pooled onset harm
+150/106 below recent8 261/248, k=32 successes 70/64 above the
+recent8 − 4 lines of 66/60, suite + transfer pass). PRIMARY
+criterion 23 FAILs development on ceiling sub-condition (b)
+alone (harm 60 vs guard 92 PASS, ceiling 0.60 × recent8 92 =
+55.2 FAIL by 4.8) and PASSes additional in full (40 vs guard 73
+and ceiling 0.60 × recent8 81 = 48.6); criteria 17/4 are the
+same computation. The grading cap is MET on BOTH cohorts: leg Q
+fired exactly 11 states across both cohorts, every one at
+return-A, every one a leg_Q_conversion, zero UNEXPECTED (dev 7:
+572021 k=0 diagnostic 10/6 vs decisive recent8 0/16, k=2 10/6 vs
+0/16 GRADED, k=4 10/6 vs 0/16 GRADED, k=8 ungraded 10/6 vs 8/8,
+572039 k=0 diagnostic 6/10 vs 1/15, k=2 6/10 vs 0/16 GRADED, k=4
+6/10 vs 0/16 GRADED; add 4: 573017 k=0 diagnostic 6/10 vs 0/16,
+573041 k=0 diagnostic 11/5 vs 0/16, k=2 11/5 vs 0/16 GRADED, k=4
+11/5 vs 1/15 GRADED) — six graded return-A onset conversions,
+worth +32 successes / −32 harm dev and +21 / −21 add against
+decisive at return-A onset; development's residual return-A harm
+is the conversions' own 32 harm plus the two 572003
+fall-throughs (k=2 long_disagreement FALSE joint 1 purity 0.875
+0/16; k=4 FALSE joint 0 purity 0.867 4/12 — 28 harm) leg Q
+cannot reach by construction.** Per-criterion, development /
+additional, PRIMARY criterion 23 first, then co-graded guards
+17, 4, 22, 19, 6, 21, 9, 18, 5, 1, 11, 2, 3, 7: C23 FAIL/PASS,
+C17 FAIL/PASS and C4 FAIL/PASS (same computation), C22 FAIL/FAIL
+and C19 FAIL/FAIL and C6 FAIL/FAIL (same computation — on (b)
+alone both: abstentions 32/240 AT the budget PASS, successes 128
+vs 140 required >= 134 dev and 85 vs 95 required >= 89 add,
+harm 80 vs 100 dev and 123 vs 145 add PASS; candidate
+branch-identical to decisive at every graded control state, the
+entire deficit on each cohort exactly TWO carried partial S&L
+firings — dev 572021 k=2 supporting 1 stale 3 purity 0.800 and
+k=4 supporting 2 stale 2 purity 0.778, each abstained 0/0 vs
+recent8 6/10; add 573017 k=16 supporting 1 stale 2 purity 0.848
+abstained 0/0 vs recent8 7/9 and 573041 k=4 supporting 1 stale 1
+purity 0.848 abstained 0/0 vs recent8 3/13), C21 PASS/PASS and
+C9 PASS/PASS (dev TAKEN 5/6 — 3 full + 2 partial paths R / R+C,
+harm 16 vs guard 48 and recent8 89; add TAKEN 4/6 — 3 full + 1
+partial path C, harm 31 vs guard 59 and recent8 81; identical
+takings to decisive both), C18 PASS/PASS and C5 PASS/PASS (in
+full both — 0/144, successes 70 = recent8 70 dev and 64 = 64
+add, non-recent8 0/9, abstained 0/9), C1 FAIL/PASS (dev on (a),
+(c)-both, and (d) — minority 1/6, harm 74 vs guard 69 AND
+ceiling 48.0, successes 22 vs guard+16 = 27, selectivity PASS;
+carried identical to decisive; add in full — minority 4/6, harm
+35 vs guard 60 / ceiling 51.6, successes 45 vs 20), C11
+FAIL/FAIL (stationary side only, both), C2 PASS/PASS (dev 36 vs
+frozen_A floor 25.6 and guard+16 = 20; add 56 vs floor 22.4 and
+23 — frozen_A 64/32 dev and 56/40 add and cumulative 66/30 both
+still sit at or above the candidate's return-A successes, stated
+in full), C3 PASS/PASS (150 vs guard 209, cells 6/6 dev; 106 vs
+guard 192, cells 6/6 add), C7 PASS/PASS (replay 72/72 per
+cohort, no criterion-7 field missing, support_threshold 1 and
+long_window_threshold 1 everywhere, long_disagreement recomputed
+exactly (stable AND preceding stable),
+long_disagreement_release_fired recomputed exactly and the
+recovery_fired composition recomputed exactly as standard-path
+OR leg Q, long-disagreement-release-rule == candidate branch and
+support-agreement-rule == decisive branch everywhere,
+support-agreement fields recomputed exactly as carried
+(agreement-disarmed states 2 dev / 6 add, all identical to
+decisive), gate recomputed exactly everywhere (full: leg P
+alone; partial: leg P AND (leg R OR leg C) AND leg S AND leg L),
+companion fields recomputable at every partial state and at
+fallback elsewhere, kind never widened, acting lists of 8 and
+newest lists of 4 with all counts recomputable everywhere and
+newest records == acting tail, minority_model_archive_count ==
+archive_events_count and minority_model_inverted true
+everywhere, cross-check PASS at every minority-fired state 5/5
+dev and 7/7 add, acquisition 0). Full unit suite (2537) and
+historical transfer benchmark passed in the implementation,
+evaluation, and grading stages; no CI claimed for the
+evaluation or grading commits (UNVERIFIED). See
+`docs/LONG_DISAGREEMENT_RELEASE_RECOVERY.md`. Keep the learner
+optional and unpromoted, default controller unchanged, no merge,
+no AthenZ/Synveil integration, D1–D10/V2A/V2B unchanged. Next
+limitation selected: P1 stationary selectivity of the carried
+support-agreement abstention classes — criteria 22/19/6 FAIL on
+BOTH cohorts and carry this cycle's Regression, on an arm where
+leg Q is structurally inert; whether an evidence-derived
+condition on the partial abstention class — one that
+distinguishes the stationary S&L firings (purities 0.778–0.848)
+from the B1 S&L partial takings that PASS criteria 21/9 on both
+cohorts — can hold criterion 6's frozen form on BOTH cohorts
+while holding the return-A gains (criteria 23/17/4), B1
+engagement (criteria 21/9), checkpoint-32 release (criteria
+18/5), and B2 protection (criterion 1) as co-graded guards, on
+NEW cohorts under a NEW protocol. Recorded but not selected:
+development's return-A ceiling residual (60 vs 55.2) — leg Q
+converted every convertible state; the residual population is
+the two long_disagreement-false 572003 fall-throughs plus the
+conversions' own engagement harm; criterion 1 fails development
+carried identical on the minority branch leg Q does not touch
+and passes additional in full.
+
 # Support-agreement partial recovery: leg A, a conjunctive support-agreement leg on partial abstention triggers only — 2026-11-15 (FAILED, not a Regression)
 
 Optional `developmental_ai/support_agreement_partial_recovery.py`
