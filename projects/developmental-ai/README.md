@@ -1122,6 +1122,56 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 17 — Signal archive concordance partial recovery: leg V, a signal archive-concordance veto on partial abstention triggers only (FAILED, not a Regression)
+
+Optional `SignalArchiveConcordancePartialRecoveryMemory` is identical to
+the graded long-disagreement candidate in every element — acting model,
+extended signal, retained archive, archive concordance, joint recovery
+test, recovery model, the full three-leg authority condition, the
+minority branch in full INCLUDING the inverted minority model and leg W
+on the minority branch, leg T on both recovery branches, leg N, leg D,
+and leg Q on the regular branch, leg P ≥ 0.70, leg R, leg C, leg S, leg L,
+and leg A on partial abstention triggers, and the full / retained-partial
+abstention classes with the widened class removed; the SINGLE changed
+element is leg V: the partial gate is leg P AND (leg R OR leg C) AND
+leg S AND leg L AND (concordant_count == 0), concordant_count the carried
+signal-pair archive-concordance field at its absence value 0, NO new
+numeric value — under a protocol frozen before implementation (new
+cohorts 582003-family / 583001-family, now INSPECTED). **Graded Failed,
+not a Regression, under the protocol's own definitions (the Failed
+clause triggers on the additional cohort — criterion 1 FAILs there,
+criterion 7 PASSes both, and every other criterion PASSes both; no
+Regression clause triggers — pooled onset harm 89/93 below recent8
+244/233, control successes −6 development AT the line and 0 additional,
+k=32 successes at exact recent8 parity, suite + transfer pass). PRIMARY
+criterion 24 PASSes on BOTH cohorts — development abstentions 16/240,
+successes 117 vs recent8 123 AT the >= 117 line, harm 107 vs 117, as a
+carried profile with leg V disarming zero graded control states there
+(its one kept concordant-0 partial S&L firing, 582003 k=2, costs exactly
+the 6-success deficit); additional abstentions 0/240, successes 131 =
+recent8 131, harm 109 = 109, the entire candidate-vs-decisive gap the
+ONE graded control leg-V disarming — so the grading cap is MET on
+additional: 583017 control k=8, partial S&L supporting 2 stale 2
+concordant 1 purity 0.829, candidate recent8 7/9 vs decisive abstained
+0/0, without which decisive [124, 100, 16] would FAIL sub-condition
+(b). Leg V disarmed exactly two states across both cohorts, both on
+additional 583017 (the graded control k=8 above and ungraded B1 k=8,
+8/8 vs 0/0), zero UNEXPECTED.** Criteria 23/17/4 PASS both in full
+(return-A harm 24 vs guard 84 / ceiling 50.4 dev, 40 vs 80 / 48.0 add,
+carried identical to decisive), criteria 21/9 PASS both (TAKEN 5/6 dev,
+6/6 add), criteria 18/5 PASS both in full, criteria 11, 2, and 3 PASS
+both, and criterion 1 FAILs BOTH cohorts carried identical to decisive
+on the minority branch leg V does not touch (dev minority 1/6 and
+successes 14 vs 25; add minority 2/6 and harm 53 vs guard 44 and
+ceiling 43.2). Fifteen of sixteen criteria PASS on both cohorts — the
+best per-criterion profile in this line. Next limitation selected: P1
+second-switch (B2) protection of the carried minority branch —
+criterion 1 is now the sole failing criterion, on NEW cohorts under a
+NEW protocol. Learner acquisition actions zero; external TRAIN actor
+harm published in full in the report.
+[Complete preregistration, results and limitations](docs/SIGNAL_ARCHIVE_CONCORDANCE_PARTIAL_RECOVERY.md).
+
+
 ### November 16 — Long-disagreement release recovery: leg Q, a long-disagreement release on the regular recovery branch (FAILED / REGRESSION, stationary clause)
 
 Optional `LongDisagreementReleaseRecoveryMemory` is identical to

@@ -1,3 +1,123 @@
+# Signal archive concordance partial recovery: leg V, a signal archive-concordance veto on partial abstention triggers only — 2026-11-17 (FAILED, not a Regression)
+
+Optional `developmental_ai/signal_archive_concordance_partial_recovery.py`
+(identical to the graded long-disagreement candidate in every element —
+acting model recent8 exactly, extended signal, retained archive,
+archive concordance, joint test joint_count >= 1, recovery model,
+the full three-leg authority condition, the minority branch in
+full INCLUDING the inverted minority model and leg W on the
+minority branch, leg T on both recovery branches, leg N, leg D
+and leg Q on the regular branch, leg P >= 0.70, leg R, leg C,
+leg S, leg L and leg A on partial abstention triggers, and the
+full / retained-partial abstention classes with the widened class
+removed records-only, singleton_release_fired carried,
+support_threshold 1 and long_window_threshold 1 carried; the
+SINGLE changed element is leg V: the partial gate is leg P AND
+(leg R OR leg C) AND leg S AND leg L AND (concordant_count == 0),
+concordant_count the carried signal-pair archive-concordance
+field at its absence value 0, NO new numeric value; the full
+gate stays leg P alone; new decision-record field
+abstention_disarmed_by_signal_concordance; leg P / R / C / S /
+L / A / T / W / N / D / Q explicitly NOT re-tuned) was evaluated
+under the protocol frozen BEFORE implementation at
+`benchmarks/signal_archive_concordance_partial_recovery_protocol.json`
+on NEW cohorts 582003/582021/582039 and 583001/583017/583041,
+both now INSPECTED — never re-tune against them. **Graded Failed
+under the protocol's own definitions (the Failed clause triggers
+on the additional cohort — criterion 1 FAILs there, criterion 7
+PASSes both, every other criterion PASSes both) and NOT a
+Regression (no clause triggers — pooled onset harm 89/93 below
+recent8 244/233, control successes −6 dev AT the more-than-6 line
+and 0 add, k=32 successes 61/90 at exact recent8 parity, suite +
+transfer pass). PRIMARY criterion 24 PASSes on BOTH cohorts —
+dev abstentions 16/240, successes 117 vs recent8 123 required
+>= 117 PASS AT the line, harm 107 vs 117, as a CARRIED profile
+(leg V disarming zero graded control states there; the entire
+remaining deficit the one kept concordant-0 partial S&L firing,
+582003 k=2 supporting 1 stale 3 purity 0.825, abstained 0/0 vs
+recent8 6/10); add abstentions 0/240, successes 131 = recent8
+131, harm 109 = 109, the entire candidate-vs-decisive gap the
+one graded control leg-V disarming (583017 k=8 supporting 2
+stale 2 concordant 1 purity 0.829, candidate recent8 7/9 vs
+decisive abstained 0/0), without which decisive [124, 100, 16]
+would FAIL sub-condition (b).** Per-criterion, development /
+additional, PRIMARY criterion 24 first, then co-graded guards
+23, 17, 4, 22, 19, 6, 21, 9, 18, 5, 1, 11, 2, 3, 7: C24
+PASS/PASS, C23 PASS/PASS and C17 PASS/PASS and C4 PASS/PASS
+(same computation — dev harm 24 vs guard 84 / ceiling 50.4; add
+40 vs guard 80 / ceiling 48.0; carried identical to decisive,
+leg V disarming zero return-A states), C22 PASS/PASS and C19
+PASS/PASS and C6 PASS/PASS (same computation as C24), C21
+PASS/PASS and C9 PASS/PASS (dev TAKEN 5/6 — 4 full + 1 partial
+path C, harm 15 vs guard 33 / recent8 74; add TAKEN 6/6 — 4 full
++ 2 partial paths R+C / R+C, harm 0 vs guard 32 / recent8 81;
+identical takings to decisive at onset both), C18 PASS/PASS and
+C5 PASS/PASS (in full both — 0/144, successes 61 = recent8 61
+dev and 90 = 90 add, non-recent8 0/9, abstained 0/9), C1
+FAIL/FAIL (dev on (a) and (d) — minority 1/6, harm 50 vs guard
+71 / ceiling 51.6 PASS, successes 14 vs guard+16 = 25; add on
+(a) and (c) — minority 2/6, harm 53 vs guard 44 AND ceiling
+43.2, successes 27 vs 20 PASS; carried identical to decisive at
+every B2 onset state both, leg V disarming zero B2 states), C11
+PASS/PASS, C2 PASS/PASS (dev 72 vs frozen_A floor 28.8 and
+guard+16 = 28; add 56 vs floor 24.0 and 32; frozen_A 72/60 still
+at or above candidate successes both), C3 PASS/PASS (89 vs
+guard 188, cells 6/6 dev; 93 vs guard 156, cells 6/6 add), C7
+PASS/PASS (replay 72/72 per cohort, no criterion-7 field
+missing, support_threshold 1 and long_window_threshold 1
+everywhere, concordant_count recomputed exactly from the
+archive records, abstention_disarmed_by_signal_concordance
+recomputed exactly, gate recomputed exactly everywhere (full:
+leg P alone; partial: leg P AND (leg R OR leg C) AND leg S AND
+leg L AND concordant_count == 0), signal-concordance-rule ==
+candidate branch and long-disagreement-release-rule == decisive
+branch everywhere, singleton_release_fired (2 dev / 0 add,
+carried identical) and the recovery_fired composition
+recomputed everywhere, companion fields recomputable at every
+partial state and at fallback elsewhere, kind never widened,
+acting lists of 8 and newest lists of 4 with all counts
+recomputable everywhere and newest records == acting tail,
+minority_model_archive_count == archive_events_count and
+minority_model_inverted true everywhere, cross-check PASS at
+every minority-fired state 6/6 dev and 5/5 add, acquisition 0).
+**The grading cap is MET on the additional cohort and NOT MET
+on development — exactly ONE graded control leg-V disarming
+occurs across both cohorts (add 583017 control k=8 above); any
+positive reading is a PARTIAL-class verdict through the leg-V
+cap alone, on one graded state, in one cohort, no full-class
+claim. Leg V disarmed exactly two states across both cohorts
+(zero dev, two add — the graded control k=8 and ungraded B1
+k=8 at 583017, 8/8 vs decisive 0/0), ALL leg_V_disarming, zero
+UNEXPECTED; branch diffs vs decisive 0 dev / 2 add, score diffs
+0/72 dev and 2/72 add. Taken S&L partial abstentions under leg
+V (concordant 0, kept): dev 3, add 2. Fifteen of sixteen
+criteria PASS on both cohorts — the best per-criterion profile
+in this line.** Full unit suite (2699) and historical transfer
+benchmark passed in the implementation, evaluation, and grading
+stages; no CI claimed for the evaluation or grading commits
+(UNVERIFIED). See
+`docs/SIGNAL_ARCHIVE_CONCORDANCE_PARTIAL_RECOVERY.md`. Keep the
+learner optional and unpromoted, default controller unchanged,
+no merge, no AthenZ/Synveil integration, D1–D10/V2A/V2B
+unchanged. Next limitation selected: P1 second-switch (B2)
+protection of the carried minority branch — criterion 1 is now
+the SOLE failing criterion, FAILing on BOTH cohorts (dev
+minority 1/6 and successes; add minority 2/6 and harm vs guard
+and ceiling), while the other fifteen criteria PASS on both, on
+an arm where the candidate is identical to the decisive
+baseline at every B2 onset state and leg V disarmed zero B2
+states; whether an evidence-derived condition on the B2 /
+minority population itself can hold criterion 1's frozen form
+on BOTH cohorts while holding stationary selectivity (criteria
+24/22/19/6), the return-A gains (criteria 23/17/4), B1
+engagement (criteria 21/9), checkpoint-32 release (criteria
+18/5), and criteria 11/2/3 as co-graded guards, on NEW cohorts
+under a NEW protocol. Recorded but not selected: development's
+stationary (b) margin is exactly zero — its one kept
+concordant-0 partial S&L firing costs the full 6-success
+deficit, and the pooled evidence review found no permitted
+quantity separating kept concordant-0 firings.
+
 # Long-disagreement release recovery: leg Q, a long-disagreement release on the regular recovery branch — 2026-11-16 (FAILED / REGRESSION, stationary clause)
 
 Optional `developmental_ai/long_disagreement_release_recovery.py`
