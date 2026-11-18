@@ -1122,6 +1122,52 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 18 — Minority acting breadth removal recovery: removal of leg W from the minority branch only (FAILED, not a Regression)
+
+Optional `MinorityActingBreadthRemovalRecoveryMemory` is identical to
+the graded signal-concordance candidate in every element — acting model,
+extended signal, retained archive, archive concordance, joint recovery
+test, recovery model, the full three-leg authority condition, the
+minority branch in full INCLUDING the inverted minority model, leg T on
+both recovery branches, leg N, leg D, and leg Q on the regular branch,
+leg P ≥ 0.70, leg R, leg C, leg S, leg L, leg A, and leg V on partial
+abstention triggers, and the full / retained-partial abstention classes
+with the widened class removed; the SINGLE changed element is the
+removal of leg W (acting breadth, acting_minority_joint_count >= 3)
+from the MINORITY branch only — the minority branch fires iff
+minority_joint_count >= 1 AND minority_armed AND leg P AND leg T
+through the inverted archive model as carried, leg W staying on the
+regular branch bit-for-bit, NO new numeric value — under a protocol
+frozen before implementation (new cohorts 592003-family /
+593001-family, now INSPECTED). **Graded Failed, not a Regression,
+under the protocol's own definitions (the Failed clause triggers on
+the additional cohort — criteria 24, 22, 19, 6, and 11 FAIL there,
+criterion 7 PASSes both; no Regression clause triggers — pooled onset
+harm 83/102 below recent8 257/256, control successes 0 dev / −7 add
+against the more-than-6 both-cohorts line, k=32 successes 55/61 above
+the recent8 − 4 lines, suite + transfer pass). PRIMARY criterion 1
+PASSes on BOTH cohorts in full and the grading cap is MET on BOTH
+cohorts: the removal fired exactly seven states across both cohorts,
+every one at B2, five of them graded B2 onset firings (dev 592003 k=4
+minority 12/4 vs decisive abstained 0/0 and 592021 k=2 14/2 vs
+decisive recent8 0/16; add 593001 k=4 12/4, 593017 k=2 10/6, 593041
+k=2 10/6), moving B2 minority engagement from decisive's 2/6 to 4/6
+dev and 5/6 add, B2 scores candidate [47, 33] dev / [52, 44] add vs
+decisive [21, 43] / [20, 44]. The stationary family FAILs additional
+on sub-condition (b) alone by 1 success (125 vs recent8 132, line
+>= 126; abstentions 16/240 and harm 99 vs 108 PASS), IDENTICAL to
+decisive — the entire deficit one carried partial S&L firing kept
+under leg V at concordant 0 (593017 control k=8, supporting 1 stale 1
+purity 0.825, abstained 0/0 vs recent8 7/9) on an arm where the
+removal is structurally inert. All other criteria PASS both.**
+Next limitation selected: P1 stationary selectivity of the kept
+concordant-0 partial S&L abstention firings — criteria 24/22/19/6 are
+now the sole failing family, on NEW cohorts under a NEW protocol.
+Learner acquisition actions zero; external TRAIN actor harm published
+in full in the report.
+[Complete preregistration, results and limitations](docs/MINORITY_ACTING_BREADTH_REMOVAL_RECOVERY.md).
+
+
 ### November 17 — Signal archive concordance partial recovery: leg V, a signal archive-concordance veto on partial abstention triggers only (FAILED, not a Regression)
 
 Optional `SignalArchiveConcordancePartialRecoveryMemory` is identical to
