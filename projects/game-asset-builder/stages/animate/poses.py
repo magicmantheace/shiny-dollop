@@ -653,8 +653,19 @@ def biped_scream(t: float) -> dict:
         up = 1.0
     else:
         up = _smoothstep((period - tt) / 0.4)
-    wiggle = math.sin(TAU * 2.0 * (tt - 1.2)) if 1.2 <= tt <= 2.6 \
-        else 0.0
+    # The wiggle fades in/out over 0.3 s at its gates: hard-gating
+    # the 2 Hz sine at 2.6 s (where it sits at -0.99 while `up` is
+    # still 1.0) snapped arm2_wave by 0.30 rad in a single 24 FPS
+    # frame, with a matching snap in head_tilt.
+    if tt < 1.2 or tt > 2.6:
+        fade = 0.0
+    elif tt < 1.5:
+        fade = _smoothstep((tt - 1.2) / 0.3)
+    elif tt > 2.3:
+        fade = _smoothstep((2.6 - tt) / 0.3)
+    else:
+        fade = 1.0
+    wiggle = fade * math.sin(TAU * 2.0 * (tt - 1.2))
     return {
         **BREST,
         "root_y": 0.01 * up,

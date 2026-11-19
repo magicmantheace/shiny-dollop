@@ -146,6 +146,25 @@ class SignatureShapeTests(unittest.TestCase):
         self.assertLess(hold["head_pitch"], -0.25)  # head thrown back
         self.assertAlmostEqual(fn(0.0)["arm_sway"], 0.0, places=6)
 
+    def test_scream_wiggle_fades_at_its_gate(self):
+        # Regression (Codex review, PR #51): the wiggle was
+        # hard-gated at 2.6 s while its 2 Hz sine sat at -0.99 and
+        # `up` was still 1.0, so sampled arm2_wave snapped
+        # -0.298 -> 0 between frames 62 and 63, with head_tilt
+        # snapping -0.060 -> 0 alongside. The wiggle amplitude
+        # must fade to zero ahead of the closing gate.
+        fn, _ = poses.SIGNATURES["biped"]["scream"]
+        for gate in (1.2, 2.6):
+            before, after = fn(gate - 0.001), fn(gate + 0.001)
+            for channel in before:
+                self.assertLess(abs(after[channel] - before[channel]),
+                                0.01, channel)
+        samples = poses.sample_for("biped", "scream")
+        by_frame = dict(samples)
+        for channel in ("arm2_wave", "head_tilt"):
+            jump = abs(by_frame[63][channel] - by_frame[62][channel])
+            self.assertLess(jump, 0.05, channel)
+
     def test_bow_dips_the_head(self):
         fn, _ = poses.SIGNATURES["biped"]["bow"]
         self.assertGreater(fn(1.3)["head_pitch"], 0.7)
