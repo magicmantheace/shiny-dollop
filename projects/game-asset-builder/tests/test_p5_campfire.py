@@ -142,6 +142,22 @@ class SignatureShapeTests(unittest.TestCase):
         self.assertGreater(max(sway), 0.03)
         self.assertLess(min(sway), -0.03)
 
+    def test_shiver_tail_closes_at_clip_boundary(self):
+        # Regression (Codex review, PR #51): the tail's 3 Hz
+        # oscillation completes 4.8 cycles in the 1.6 s clip, so
+        # unenveloped it snapped from -0.20 rad on the final sampled
+        # frame to +0.141 rad on the first at every repeat. Like
+        # every other shiver channel, the tail must be under the
+        # in/out envelope so the sampled loop closes.
+        samples = poses.sample_for("quadruped", "shiver")
+        first = samples[0][1]["tail_yaw"]
+        last = samples[-1][1]["tail_yaw"]
+        self.assertLess(abs(first - last), 0.05)
+        # No shiver channel may jump at the loop boundary either.
+        for channel in samples[0][1]:
+            jump = abs(samples[0][1][channel] - samples[-1][1][channel])
+            self.assertLess(jump, 0.05, channel)
+
     def test_wiggle_travels_to_the_tail(self):
         fn, seconds = poses.SIGNATURES["quadruped"]["wiggle"]
         peak = max(fn(i * seconds / 96)["tail_yaw"] for i in range(97))

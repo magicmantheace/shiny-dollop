@@ -687,7 +687,7 @@ def quad_shiver(t: float) -> dict:
         "root_y": 0.006 * env * buzz,
         "neck_pitch": -0.03 * env * buzz,
         "head_pitch": 0.03 * env * math.sin(TAU * 6.0 * tt + 0.5),
-        "tail_yaw": 0.20 * math.sin(TAU * 3.0 * tt),
+        "tail_yaw": 0.20 * env * math.sin(TAU * 3.0 * tt),
     }
 
 
