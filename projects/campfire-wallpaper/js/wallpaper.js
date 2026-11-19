@@ -670,8 +670,8 @@ function updateDressing(t, dt) {
       }
       if (i < rows) {
         const b = i * 3;
-        idx.push(b, b + 3, b + 1, b + 1, b + 3, b + 4,
-                 b + 1, b + 4, b + 2, b + 2, b + 4, b + 5);
+        idx.push(b, b + 1, b + 3, b + 1, b + 4, b + 3,
+                 b + 1, b + 2, b + 4, b + 2, b + 5, b + 4);
       }
     }
     const g = new THREE.BufferGeometry();
