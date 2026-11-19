@@ -108,6 +108,25 @@ class SignatureShapeTests(unittest.TestCase):
         self.assertAlmostEqual(fn(seconds)["wing_pitch"],
                                fn(0.0)["wing_pitch"], places=6)
 
+    def test_fan_flutter_fades_at_its_gates(self):
+        # Regression (Codex review, PR #51): the flutter was
+        # hard-gated at 2.2 s while its 3 Hz sine sat at -0.95 and
+        # the spread envelope was still 1.0, so sampled wing_pitch
+        # snapped 0.698 -> 0.850 rad between frames 52 and 53, with
+        # matching snaps in wing2_pitch and ear_pitch. The flutter
+        # amplitude must fade to zero at both gating boundaries.
+        fn, _ = poses.SIGNATURES["winged-quadruped"]["fan"]
+        for gate in (0.6, 2.2):
+            before, after = fn(gate - 0.001), fn(gate + 0.001)
+            for channel in before:
+                self.assertLess(abs(after[channel] - before[channel]),
+                                0.01, channel)
+        samples = poses.sample_for("winged-quadruped", "fan")
+        by_frame = dict(samples)
+        for channel in ("wing_pitch", "wing2_pitch", "ear_pitch"):
+            jump = abs(by_frame[53][channel] - by_frame[52][channel])
+            self.assertLess(jump, 0.05, channel)
+
     def test_headturn_yaws_both_ways(self):
         fn, _ = poses.SIGNATURES["winged-creature"]["headturn"]
         values = [fn(i * 0.05)["head_yaw"] for i in range(65)]

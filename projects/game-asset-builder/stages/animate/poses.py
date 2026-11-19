@@ -511,9 +511,20 @@ def wq_fan(t: float) -> dict:
         env = 1.0
     else:
         env = _smoothstep((period - tt) / 0.6)
-    flut = math.sin(TAU * 3.0 * (tt - 0.6)) if 0.6 <= tt <= 2.2 else 0.0
-    flut2 = math.sin(TAU * 3.0 * (tt - 0.6) - 0.5) \
-        if 0.6 <= tt <= 2.2 else 0.0
+    # The flutter fades in/out over 0.3 s at its gates: hard-gating
+    # the 3 Hz sine mid-cycle (at 2.2 s it sits at -0.95) snapped
+    # wing_pitch by 0.15 rad in a single 24 FPS frame, with matching
+    # snaps in the phase-offset secondary wing and the antennae.
+    if tt < 0.6 or tt > 2.2:
+        fade = 0.0
+    elif tt < 0.9:
+        fade = _smoothstep((tt - 0.6) / 0.3)
+    elif tt > 1.9:
+        fade = _smoothstep((2.2 - tt) / 0.3)
+    else:
+        fade = 1.0
+    flut = fade * math.sin(TAU * 3.0 * (tt - 0.6))
+    flut2 = fade * math.sin(TAU * 3.0 * (tt - 0.6) - 0.5)
     return _wq(quad_idle(t),
                wing_pitch=0.85 * env + 0.16 * env * flut,
                wing2_pitch=0.55 * env + 0.12 * env * flut2,
