@@ -1663,6 +1663,22 @@ class Creature {
     scene.remove(this.group);
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.model);
+    // Instance-owned blob shadow: its geometry and material are
+    // created per creature in the constructor, so dispose them here.
+    // (Material.dispose() does not dispose textures, so the shared
+    // blobTex map survives for the next creature.)
+    this.shadow.geometry.dispose();
+    this.shadow.material.dispose();
+    // SkeletonUtils.clone() reuses the template's geometries,
+    // materials and textures by reference — those stay untouched —
+    // but it clones each SkinnedMesh's skeleton, and that skeleton's
+    // bone texture is allocated per instance when rendered.
+    // Skeleton.dispose() frees exactly that texture.
+    const skeletons = new Set();
+    this.model.traverse((o) => {
+      if (o.isSkinnedMesh && o.skeleton) skeletons.add(o.skeleton);
+    });
+    for (const skeleton of skeletons) skeleton.dispose();
   }
 }
 
