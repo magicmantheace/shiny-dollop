@@ -1122,6 +1122,59 @@ no promotion, no merge or AthenZ/Synveil work.
 [Complete preregistration, results and limitations](docs/REGRET_SWITCH.md).
 
 
+### November 18 — Disagreeing span partial recovery: leg X, a local-archive span-disagreement leg on partial abstention triggers only (FAILED, not a Regression)
+
+Optional `DisagreeingSpanPartialRecoveryMemory` is identical to the
+graded minority-removal candidate in every element — acting model,
+extended signal, retained archive, archive concordance, joint recovery
+test, recovery model, the full three-leg authority condition, the
+minority branch in full INCLUDING the inverted minority model and the
+leg-W removal, leg T on both recovery branches, leg N, leg D, and leg Q
+on the regular branch, leg P ≥ 0.70, leg R, leg C, leg S, leg L, leg A,
+and leg V on partial abstention triggers, and the full /
+retained-partial abstention classes with the widened class removed;
+the SINGLE changed element is leg X: the partial gate is leg P AND
+(leg R OR leg C) AND leg S AND leg L AND leg V AND
+disagreeing_span_count >= 1, the carried authority field at its
+presence value 1, NO new numeric value, the full gate staying leg P
+alone — under a protocol frozen before implementation (new cohorts
+602003-family / 603001-family, now INSPECTED). **Graded Failed, not a
+Regression, under the protocol's own definitions (the Failed clause
+triggers on the additional cohort — PRIMARY criterion 24 and its
+carried forms 22/19/6 FAIL there on sub-condition (b) alone, and
+criteria 1, 21, 9, 18, 5, and 11 FAIL there with them; criterion 1
+also FAILs development on its harm ceiling; criterion 7 PASSes both;
+no Regression clause triggers — pooled onset harm 134/173 below
+recent8 227/242, control successes −2 dev / −10 add against the
+more-than-6 both-cohorts line, k=32 successes 63/91 above the
+recent8 − 4 lines, suite + transfer pass). The grading cap is MET on
+additional and NOT MET on development: leg X disarmed exactly two
+states across both cohorts, both on additional, ALL leg_X_disarming,
+zero UNEXPECTED — 603001 B1 k=4 (graded B1 onset, 1/15 vs decisive
+abstained 0/0) and 603041 control k=8 (graded control, supporting 1
+stale 2 concordant 0 disagreeing 0 purity 0.8286, candidate recent8
+11/5 vs decisive abstained 0/0), closing 11 of decisive's 15-success
+stationary deficit on additional; but additional's PRIMARY still
+FAILs (b) by 4 (118 vs recent8 128, line >= 122; abstentions 16/240
+and harm 106 vs 112 PASS), its entire remaining deficit the one FULL
+control firing at 603017 k=2 (abstained 0/0 vs recent8 10/6) that leg
+X cannot touch by construction. Development drew zero leg-X
+disarmings and PASSes the PRIMARY as a carried profile identical to
+decisive (abstentions 32/240 AT the budget, successes 87 vs line 83,
+harm 121 vs 151). Leg X's priced B1 tail was realized on additional:
+its B1 disarming was decisive's only B1 taking there, failing
+criteria 21/9 (taken 0/6, harm 94 = guard = recent8). Criterion 1
+FAILs both carried identical (dev harm 65 vs guard 56 / ceiling 51.0;
+add 45 vs ceiling 42.0). Criteria 23/17/4, 2, 3, 7 PASS both.**
+Next limitation selected: P1 stationary selectivity of the FULL
+abstention trigger class — after leg X, the PRIMARY family's entire
+remaining additional deficit is one full firing, and every leg in
+this line is partial-scoped while the full gate is leg P alone, on
+NEW cohorts under a NEW protocol. Learner acquisition actions zero;
+external TRAIN actor harm published in full in the report.
+[Complete preregistration, results and limitations](docs/DISAGREEING_SPAN_PARTIAL_RECOVERY.md).
+
+
 ### November 18 — Minority acting breadth removal recovery: removal of leg W from the minority branch only (FAILED, not a Regression)
 
 Optional `MinorityActingBreadthRemovalRecoveryMemory` is identical to
