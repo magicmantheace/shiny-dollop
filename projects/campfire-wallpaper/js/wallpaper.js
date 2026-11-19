@@ -1212,7 +1212,10 @@ function updateDressing(t, dt) {
   }
 
   /* An occasional shooting star: one additive sprite streaking the
-     upper sky every ~10–25 s. Pure decoration, zero steady cost. */
+     upper sky every ~10–25 s. Pure decoration, zero steady cost.
+     It flies at z = +150 — the southern sky in front of the camera
+     (which sits at z = -10.8 facing +z); at -150 it streaked the
+     northern sky behind the viewer and never appeared. */
   {
     const sm = new THREE.SpriteMaterial({
       map: radialSpriteTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0)'),
@@ -1222,13 +1225,13 @@ function updateDressing(t, dt) {
     });
     const star = new THREE.Sprite(sm);
     star.scale.set(4.6, 0.5, 1);
-    star.position.set(0, 60, -150);
+    star.position.set(0, 60, 150);
     scene.add(star);
     const st = { next: 6 + layoutRand() * 10, t0: -1, from: new THREE.Vector3() };
     dressingUpdaters.push((t) => {
       if (st.t0 < 0 && t >= st.next) {
         st.t0 = t;
-        st.from.set(40 + layoutRand() * 60, 52 + layoutRand() * 20, -150);
+        st.from.set(40 + layoutRand() * 60, 52 + layoutRand() * 20, 150);
       }
       if (st.t0 >= 0) {
         const p = (t - st.t0) / 0.9;
@@ -1237,7 +1240,7 @@ function updateDressing(t, dt) {
           st.next = t + 9 + layoutRand() * 16;
           sm.opacity = 0;
         } else {
-          star.position.set(st.from.x - 58 * p, st.from.y - 13 * p, -150);
+          star.position.set(st.from.x - 58 * p, st.from.y - 13 * p, 150);
           sm.opacity = Math.sin(p * Math.PI) * 0.8;
         }
       }
