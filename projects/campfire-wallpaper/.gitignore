@@ -1,0 +1,5 @@
+.chrome-profile/
+verification/
+node_modules/
+*.log
+.DS_Store
