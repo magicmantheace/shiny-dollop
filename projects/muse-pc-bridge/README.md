@@ -227,8 +227,8 @@ across a real reboot, the classifier against real installer
 command lines. See the 2026-11-14 entry in
 `docs/MUSE_HANDOFF.md`.
 
-**Update (2026-11-21 — v1.2.1 BUILT, agent `1.2.1`, NOT yet
-deployed):** the owner reported that bridge work flashes a
+**Update (2026-11-21 — v1.2.1 DEPLOYED, production runs
+`1.2.1`):** the owner reported that bridge work flashes a
 terminal window on his desktop for every command — the agent
 runs under pythonw (no console of its own), so Windows created
 a fresh console for every console child it spawned. v1.2.1
@@ -241,8 +241,15 @@ be visible stays visible: GUI spawns (`"gui": true`) are
 untouched, and exec/jobs/processes payloads accept
 `"visible": true` to opt a shell spawn back into a console.
 **Verified: VM suite 242 tests OK (3 skips), including 8 new
-tests in `tests/test_v1_2_1_no_window.py`.** Windows behaviour
-— no popup during real bridge work, GUI launches still
-opening, console form unchanged — is owner-PC verification,
-pending the production switch. See the 2026-11-21 entry in
+tests in `tests/test_v1_2_1_no_window.py`; and on the owner's
+PC the same day** — the release bundle was staged through the
+bridge's own self-update (`update_applied` / `update_healthy`
+in both supervisors' logs, all three files backed up), both
+agents report `1.2.1`, a session-1 job created no window
+(UIA window diff + a mid-job screenshot over the owner's
+fullscreen game), a `"gui": true` Notepad launch opened a
+real window, and an exec with `"visible": true` produced a
+console window on demand. The console service form is not
+run in production, so its behaviour is verified by code
+inspection only. See the 2026-11-21 entries in
 `docs/MUSE_HANDOFF.md`.

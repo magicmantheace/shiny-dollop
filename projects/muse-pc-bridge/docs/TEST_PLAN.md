@@ -539,14 +539,21 @@ lines.
 
 **Full suite: 242 tests, OK (skipped=3)** — the 234-test v1.2
 baseline plus the 8 new no-window tests; the 3 skips are the
-pre-existing environment ones. **Owner-PC checks still owed
-(part of the production switch):** run ordinary bridge work
-(jobs, a session, a detached spawn, a kill, a UIA call) while
-watching the desktop — no console window may appear; a
-`"gui": true` launch still opens its window; an exec with
-`"visible": true` shows a console; the console service form
-still shows its shared console and Ctrl+C still stops the
-agent gracefully.
+pre-existing environment ones. **Owner-PC checks: DONE the
+same day as part of the production switch** (deployed via the
+bridge's own staged self-update; both supervisors logged
+`update_applied` / `update_healthy` for 1.2.1, with backups
+of all three files). Verified on the PC: both agents report
+`1.2.1`; a job pinned to the interactive session created no
+new window (UIA top-level window diff) and a mid-job
+screenshot over the owner's fullscreen game showed no console;
+a `"gui": true` Notepad launch opened a real window (closed
+afterwards); an exec with `"visible": true` in the
+interactive session produced a new console window (UIA diff).
+Still unverified: the console service form (not run in
+production — its shared-console behaviour is unchanged by
+inspection) and a session spawn under load; sessions use the
+same hidden kwargs as jobs.
 
 ## What the tests cannot prove
 

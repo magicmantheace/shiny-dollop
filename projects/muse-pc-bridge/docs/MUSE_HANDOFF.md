@@ -1067,3 +1067,49 @@ form unchanged. **Production still runs 1.2.0** — the switch
 2026-11-14) is a separate step, to be run when the owner
 names the moment (he was mid-game and mid-comic-run when the
 update was built).
+
+## Update (2026-11-21, later): v1.2.1 DEPLOYED to production
+
+The owner said "Switch now" (he was in-game; the popups were
+the thing being fixed). Deployment used the bridge's own
+self-update rather than a checkout move: a release bundle
+(`bridge-release.json` + the three changed files, sha256
+`cbfd4307…`) was uploaded to the file root and staged via
+`POST /v1/update/stage`; both agent processes were then
+killed so each supervisor hit its restart boundary. The core
+supervisor's log records `update_applied` then
+`update_healthy` for 1.2.1; the GUI supervisor applied the
+same staged update (shared state dir) and its agent came back
+reporting `1.2.1`. All three previous files are backed up
+under the state dir, so the update system's rollback remains
+available; the PC checkout still sits at the 1.2.0 commit —
+the installed files, not git, are the live record of this
+switch.
+
+**Owner-PC verification (all 2026-11-21, after the switch):**
+
+- `/v1/status` reports `1.2.1` (both agents restarted: core
+  pid 56448, GUI-session agent pid 58412).
+- A job pinned to the interactive session (the job writes
+  its own session id to a file first — agent routing is
+  nondeterministic between the two agents) created **no new
+  top-level window** (UIA window diff against baseline), and
+  a mid-job screenshot showed the owner's fullscreen game
+  with no console over it.
+- A `"gui": true` Notepad spawn opened a real window
+  ("Untitled - Notepad", nonzero handle); the test instance
+  was closed afterwards. Note: Windows 11's packaged Notepad
+  hands off from the launched stub to a singleton app
+  process, so the tracked pid exiting does not mean the
+  window closed — check for a `notepad` process with a
+  window handle when cleaning up.
+- An exec with `"visible": true` in the interactive session
+  produced a **new console window** (UIA diff: a
+  CASCADIA_HOSTING_WINDOW_CLASS window named for
+  powershell.exe) that closed when the job ended.
+- Detached `process_spawn` with `shell: "powershell"` was
+  observed during the switch to exit 0 without running its
+  command (empty logs, no side effects), while the same
+  spawn through `shell: "cmd"` worked. Not diagnosed — the
+  switch routed around it (kill jobs via exec). Flagged here
+  for a future look; jobs/sessions/GUI spawns are unaffected.
