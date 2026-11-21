@@ -141,7 +141,8 @@ class Client:
     def exec_submit(self, command: str, shell: str | None = None,
                     timeout_s: float | None = None, cwd: str | None = None,
                     env: dict | None = None,
-                    require_no_uac: bool = False) -> dict:
+                    require_no_uac: bool = False,
+                    visible: bool = False) -> dict:
         payload: dict = {"command": command}
         if shell:
             payload["shell"] = shell
@@ -153,6 +154,10 @@ class Client:
             payload["env"] = env
         if require_no_uac:
             payload["require_no_uac"] = True
+        if visible:
+            # Opt out of the agent's console-free default (v1.2.1):
+            # only for work that is supposed to be seen on the PC.
+            payload["visible"] = True
         return self.request("POST", "/v1/exec", payload)
 
     def job_get(self, job_id: str, stdout_offset: int = 0,
@@ -216,10 +221,12 @@ class Client:
                  timeout_s: float | None = None, cwd: str | None = None,
                  env: dict | None = None,
                  wait_timeout: float | None = None,
-                 require_no_uac: bool = False) -> dict:
+                 require_no_uac: bool = False,
+                 visible: bool = False) -> dict:
         job = self.exec_submit(command, shell=shell, timeout_s=timeout_s,
                                cwd=cwd, env=env,
-                               require_no_uac=require_no_uac)
+                               require_no_uac=require_no_uac,
+                               visible=visible)
         return self.job_wait(job["job_id"], timeout=wait_timeout)
 
     # ------------------------------------------------------------------
@@ -287,7 +294,8 @@ class Client:
                       shell: str | None = None,
                       cwd: str | None = None, env: dict | None = None,
                       gui: bool = False, executable: str | None = None,
-                      args: list | None = None) -> dict:
+                      args: list | None = None,
+                      visible: bool = False) -> dict:
         """Spawn a detached process.
 
         Default mode wraps ``command`` in a shell. With ``gui=True``
@@ -306,6 +314,8 @@ class Client:
             payload["command"] = command
             if shell:
                 payload["shell"] = shell
+            if visible:
+                payload["visible"] = True
         if cwd:
             payload["cwd"] = cwd
         if env:

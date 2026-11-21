@@ -101,7 +101,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 AGENT_NAME = "muse-pc-bridge"
 MAX_GET_BYTES = 16 * 1024 * 1024          # whole-file /v1/file/get limit
 MAX_RANGE_BYTES = 64 * 1024 * 1024        # per-call range-read limit
@@ -338,6 +338,51 @@ def popen_target(shell: str, argv: list[str],
                                     or "cmd")
         return f'"{exe}" /d /s /c {command}'
     return argv
+
+
+def hidden_spawn_kwargs(visible: bool = False) -> dict:
+    """Popen/run kwargs that keep a Windows child console-free.
+
+    The production agent runs under pythonw (no console of its
+    own), so every console child it spawns — powershell, cmd,
+    taskkill, the UIA helper — would otherwise have Windows
+    create a brand-new console window for it on the owner's
+    desktop: a terminal flashing up mid-game for every bridge
+    command (owner report, 2026-11-21). CREATE_NO_WINDOW runs
+    the child with no console at all; stdio still flows through
+    the pipes and files the bridge already captures, and GUI
+    children are unaffected (the flag governs consoles only,
+    never an app's own windows).
+
+    ``visible=True`` is the caller's explicit opt-in (the payload
+    field of the same name on exec/jobs/processes) for work that
+    is supposed to be seen. Off Windows, or when visible, there
+    is nothing to add.
+    """
+    # The os.name check alongside IS_WINDOWS: the test suite
+    # simulates the Windows code paths on POSIX hosts (e.g. the
+    # session pipe pump with a real Popen), and a Windows-only
+    # creation flag must never reach a POSIX Popen. On a real
+    # Windows host both conditions are the same fact. getattr
+    # with the constant's stable numeric value for the same
+    # simulation reason: the attribute exists only on Windows
+    # builds of subprocess.
+    if IS_WINDOWS and os.name == "nt" and not visible:
+        return {"creationflags": getattr(
+            subprocess, "CREATE_NO_WINDOW", 0x08000000)}
+    return {}
+
+
+def spawn_kwargs(visible: bool = False) -> dict:
+    """Platform spawn kwargs for a bridge child process.
+
+    POSIX: a new session (the long-standing detach behaviour).
+    Windows: console-free unless ``visible`` — see
+    hidden_spawn_kwargs.
+    """
+    if IS_WINDOWS:
+        return hidden_spawn_kwargs(visible)
+    return {"start_new_session": True}
 
 
 def shell_argv(shell: str) -> list[str]:
@@ -822,7 +867,8 @@ def kill_tree(proc: subprocess.Popen) -> None:
                 subprocess.run(
                     ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
                     stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL, timeout=15)
+                    stderr=subprocess.DEVNULL, timeout=15,
+                    **hidden_spawn_kwargs())
             except (OSError, subprocess.SubprocessError):
                 pass
             if proc.poll() is None:
@@ -842,7 +888,7 @@ def kill_pid_tree(pid: int) -> None:
         try:
             subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                           timeout=15)
+                           timeout=15, **hidden_spawn_kwargs())
         except (OSError, subprocess.SubprocessError):
             pass
         return
@@ -1455,6 +1501,7 @@ class Job:
         self.core = core
         self.id = uuid.uuid4().hex[:12]
         self.shell = str(payload.get("shell") or default_shell())
+        self.visible = payload.get("visible") is True
         self.command_text = str(payload.get("command", ""))
         self.command_summary = self.command_text[:500]
         self.argv = argv
@@ -1499,7 +1546,7 @@ class Job:
                 stderr=subprocess.PIPE,
                 cwd=self.cwd,
                 env=self.env,
-                start_new_session=not IS_WINDOWS,
+                **spawn_kwargs(self.visible),
             )
         except OSError as exc:
             self.state = "failed"
@@ -1821,8 +1868,18 @@ def spawn_detached(core: BridgeCore, payload: dict) -> DetachedProcess:
     kwargs: dict = {}
     breakaway = False
     if IS_WINDOWS:
-        flags = (subprocess.CREATE_NEW_PROCESS_GROUP
-                 | subprocess.DETACHED_PROCESS)
+        base_flags = (subprocess.CREATE_NEW_PROCESS_GROUP
+                      | subprocess.DETACHED_PROCESS)
+        if not gui and payload.get("visible") is not True:
+            # A detached shell spawn is background work: keep it
+            # console-free like every other bridge child (see
+            # hidden_spawn_kwargs). GUI spawns are visible by
+            # definition, and "visible": true opts a shell spawn
+            # back into a console. getattr for the same reason as
+            # in hidden_spawn_kwargs (simulated-Windows tests).
+            base_flags |= getattr(
+                subprocess, "CREATE_NO_WINDOW", 0x08000000)
+        flags = base_flags
         if gui:
             # Best effort: keep the app out of any job object that
             # dies with the agent (a Task Scheduler / supervisor
@@ -1842,9 +1899,7 @@ def spawn_detached(core: BridgeCore, payload: dict) -> DetachedProcess:
         except OSError:
             if not breakaway:
                 raise
-            kwargs["creationflags"] = (
-                subprocess.CREATE_NEW_PROCESS_GROUP
-                | subprocess.DETACHED_PROCESS)
+            kwargs["creationflags"] = base_flags
             proc = subprocess.Popen(target, stdout=out_fh, stderr=err_fh,
                                     stdin=subprocess.DEVNULL, cwd=cwd,
                                     env=env, **kwargs)
@@ -1900,7 +1955,7 @@ class Session:
             self.proc = subprocess.Popen(
                 argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT, cwd=cwd, env=env,
-                start_new_session=not IS_WINDOWS)
+                **spawn_kwargs())
             threading.Thread(target=self._pump_pipe, daemon=True,
                              name=f"session-{self.id}").start()
         threading.Thread(target=self._waiter, daemon=True).start()
@@ -2626,7 +2681,8 @@ def run_uia(core: "BridgeCore", payload: dict) -> dict:
         proc = subprocess.run(
             [exe, "-NoProfile", "-NonInteractive", "-ExecutionPolicy",
              "Bypass", "-File", str(helper), "-In", str(inbox)],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60,
+            **hidden_spawn_kwargs())
     finally:
         inbox.unlink(missing_ok=True)
     out = proc.stdout.decode("utf-8", errors="replace").strip()

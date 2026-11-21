@@ -1007,3 +1007,63 @@ prompt; queue restart recovery across a real reboot; the UAC
 classifier against real installer command lines; the formal
 reboot-survival test remains separately held for the owner to
 name (not performed).
+
+## Update (2026-11-21): v1.2.1 — no console popups (BUILT, VM-verified, NOT deployed)
+
+**Owner request, verbatim intent:** "create an update on the
+bridge that makes console windows not pop up when you're doing
+work unless it is supposed to be visible" — reported from the
+comic-panel work, where every bridge command flashed a terminal
+over his game; the popups were the only effect of the work he
+could feel.
+
+**Root cause:** production runs under pythonw (headless core +
+GUI/avatar supervisor), so neither supervisor nor agent has a
+console. Windows creates a brand-new console window for any
+console child of a console-less process — one popup per job,
+session, `taskkill`, and UIA helper invocation.
+
+**Change (branch `muse-pc-bridge/v1-2`, agent `1.2.1`):**
+
+- `agent/bridge_agent.py`: new `hidden_spawn_kwargs(visible)` /
+  `spawn_kwargs(visible)` helpers returning
+  `{"creationflags": CREATE_NO_WINDOW}` on Windows unless
+  `visible`. Applied at: `Job._run` (exec + queue executor —
+  the popup source), `Session` (always hidden; sessions are
+  pipe-driven), `spawn_detached` (shell spawns; GUI spawns
+  untouched, breakaway retry keeps the flag), `kill_tree` /
+  `kill_pid_tree` (`taskkill`), and the UIA helper run.
+  Payloads for exec/jobs/processes accept `"visible": true`
+  (literal true only) to opt a spawn back into a console.
+  The flag emission also requires `os.name == "nt"` so the
+  suite's simulated-Windows paths on POSIX never hand a
+  Windows-only flag to a POSIX Popen.
+- `agent/supervisor.py`: `_start_child` adds
+  `CREATE_NO_WINDOW` to the agent child's flags only when the
+  supervisor itself has no console (`_has_console()` via
+  `GetConsoleWindow`). The console service form is byte-for-byte
+  unchanged in behaviour — its shared console is the kill
+  switch and `CTRL_BREAK_EVENT` needs it.
+- `client/bridge_client.py`: `visible=` parameter on
+  `exec_submit`, `exec_run`, and `process_spawn`.
+- `tests/test_v1_2_1_no_window.py`: 8 tests — kwargs shape on
+  POSIX and under a simulated Windows branch, the Job visible
+  flag (literal-true only), supervisor POSIX spawn shape and
+  console probe, and end-to-end exec/process runs with and
+  without `visible` against a hermetic agent.
+
+**Verification: VM suite 242 tests OK (skipped=3)** — the
+234-test v1.2 baseline plus the 8 new ones; the 3 skips are
+the pre-existing environment ones. One mid-development failure
+was the simulated-Windows session test handing `creationflags`
+to a POSIX Popen; fixed by the `os.name` guard above.
+
+**NOT verified / not done:** Windows behaviour is unproven
+until the PC smoke: no console flash during real bridge work,
+`"gui": true` launches still opening their windows,
+`"visible": true` exec showing a console, the console service
+form unchanged. **Production still runs 1.2.0** — the switch
+(checkout + both supervised agents restarted, as on
+2026-11-14) is a separate step, to be run when the owner
+names the moment (he was mid-game and mid-comic-run when the
+update was built).

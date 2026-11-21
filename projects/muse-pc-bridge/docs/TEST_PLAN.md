@@ -529,6 +529,25 @@ real reboot (restart recovery remains suite-proven with planted
 records), and the UAC classifier against real installer command
 lines.
 
+### v1.2.1 suite (added 2026-11-21)
+
+| File | Covers |
+| --- | --- |
+| `tests/test_v1_2_1_no_window.py` (8) | the console-free spawn fix: `hidden_spawn_kwargs` / `spawn_kwargs` return the pre-v1.2.1 kwargs on POSIX and `CREATE_NO_WINDOW` under a simulated Windows branch (IS_WINDOWS + os.name stubbed), with `visible=True` opting back out in both; `Job.visible` is set only by a literal `"visible": true` in the payload; the supervisor's `_has_console` probe is true off Windows and its POSIX `_start_child` passes no creationflags; end-to-end exec (default and `visible`) and detached process spawn with `visible` run to completion with output intact against a hermetic agent |
+
+## v1.2.1 verification — 2026-11-21 (Muse's Linux VM, Python 3.12)
+
+**Full suite: 242 tests, OK (skipped=3)** — the 234-test v1.2
+baseline plus the 8 new no-window tests; the 3 skips are the
+pre-existing environment ones. **Owner-PC checks still owed
+(part of the production switch):** run ordinary bridge work
+(jobs, a session, a detached spawn, a kill, a UIA call) while
+watching the desktop — no console window may appear; a
+`"gui": true` launch still opens its window; an exec with
+`"visible": true` shows a console; the console service form
+still shows its shared console and Ctrl+C still stops the
+agent gracefully.
+
 ## What the tests cannot prove
 
 These require the owner's PC and are **not** claimed by any VM test:

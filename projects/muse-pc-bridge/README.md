@@ -226,3 +226,23 @@ branch (`muse-pc-bridge/v1-1-features`). Still unverified:
 across a real reboot, the classifier against real installer
 command lines. See the 2026-11-14 entry in
 `docs/MUSE_HANDOFF.md`.
+
+**Update (2026-11-21 — v1.2.1 BUILT, agent `1.2.1`, NOT yet
+deployed):** the owner reported that bridge work flashes a
+terminal window on his desktop for every command — the agent
+runs under pythonw (no console of its own), so Windows created
+a fresh console for every console child it spawned. v1.2.1
+passes `CREATE_NO_WINDOW` at every agent spawn site (jobs,
+sessions, detached shell spawns, `taskkill`, the UIA helper)
+and in the supervisor's agent child when the supervisor itself
+has no console (the console service form is unchanged — its
+shared console is the kill switch). Work that is supposed to
+be visible stays visible: GUI spawns (`"gui": true`) are
+untouched, and exec/jobs/processes payloads accept
+`"visible": true` to opt a shell spawn back into a console.
+**Verified: VM suite 242 tests OK (3 skips), including 8 new
+tests in `tests/test_v1_2_1_no_window.py`.** Windows behaviour
+— no popup during real bridge work, GUI launches still
+opening, console form unchanged — is owner-PC verification,
+pending the production switch. See the 2026-11-21 entry in
+`docs/MUSE_HANDOFF.md`.

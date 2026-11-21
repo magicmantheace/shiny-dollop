@@ -66,6 +66,26 @@ import display_state  # noqa: E402
 STOP_REQUEST_NAME = "stop-request.json"
 
 
+def _has_console() -> bool:
+    """True when this process is attached to a Windows console.
+
+    Under pythonw (the headless core and the GUI form) there is
+    no console; a console child spawned from there would have
+    Windows invent a brand-new console window for it on the
+    owner's desktop. In the console service form the shared
+    console is deliberate — it is the kill switch, and the
+    graceful CTRL_BREAK stop needs it — so callers hide the
+    agent child only when there is no console to begin with.
+    """
+    if os.name != "nt":
+        return True
+    try:
+        import ctypes
+        return bool(ctypes.windll.kernel32.GetConsoleWindow())
+    except Exception:
+        return True
+
+
 def _agent_dir() -> Path:
     return Path(__file__).resolve().parent
 
@@ -126,7 +146,17 @@ class Supervisor:
             # Own process group so _stop_child can deliver
             # CTRL_BREAK_EVENT to the agent alone (a graceful stop),
             # not to every process sharing this console.
-            kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+            flags = subprocess.CREATE_NEW_PROCESS_GROUP
+            if not _has_console():
+                # pythonw forms: no console to share, and without
+                # this the agent (a console python) gets a fresh
+                # console window on the owner's desktop at every
+                # (re)start. Console form keeps the shared console
+                # exactly as before. getattr: the attribute exists
+                # only on Windows builds of subprocess.
+                flags |= getattr(
+                    subprocess, "CREATE_NO_WINDOW", 0x08000000)
+            kwargs["creationflags"] = flags
         self._child = subprocess.Popen(self._agent_cmd(), **kwargs)
         return self._child
 
