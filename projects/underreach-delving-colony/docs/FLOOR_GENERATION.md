@@ -197,7 +197,10 @@ cells and render as ordinary floor.
 - **Cave-in and bad-air mechanics** — and with them the gameplay
   answers (timber supports, ventilation). The cells exist so
   floors can be designed around them; walking past one does
-  nothing yet.
+  nothing yet. *(S7 amendment, 2026-11-23: built — the
+  mechanics and their timber/ventilation answers now exist in
+  the sim on branch `underreach-delving-colony/hazard-mechanics`;
+  see `docs/TEST_PLAN.md`. In S6 they were data only.)*
 - **Face registration for embedded pockets.** An off-network
   vein is layout data; if a player carves into one today, no
   face appears. Registering faces on exposure is a later slice.

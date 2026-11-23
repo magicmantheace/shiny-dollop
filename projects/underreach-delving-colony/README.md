@@ -69,6 +69,18 @@ loop runs on it through the bridge's `gen` scenario); the other
 four bands are explicit NOT-BUILT stubs that generate through the
 same code. Design record: `docs/FLOOR_GENERATION.md`.
 
+**S7 — the Shallows bite back (2026-11-23, branch
+`underreach-delving-colony/hazard-mechanics`):** the hazard
+pockets S6 generates are live. Mining a face ringed with loose
+rock can cave it in — rubble buries the stand, the fall can
+down the miner, and the colony digs them out on the rescue
+clock; bad air seeps from sealed pockets into the open cells
+beside them and gasps anyone working there. The Shallows' gate
+set answers both: timber supports and vents, placed kit at a
+goods apiece. Verified headless (`cargo test` 43/43, the
+`scenario` binary's protected/unprotected contrast); the Godot
+frontend does not render the new pieces yet.
+
 ## Layout
 
 - `sim/` — the Rust simulation core, its tests, the `scenario`
