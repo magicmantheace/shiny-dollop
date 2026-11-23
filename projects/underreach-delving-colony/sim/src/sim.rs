@@ -290,7 +290,11 @@ pub const LANTERN_OIL_COST: u32 = 1;
 
 /// Bad-air load gained per tick spent breathing a gassy cell
 /// (a carved cell touching a `Cell::BadAir` pocket, unvented).
-pub const AIR_RATE: f32 = 0.6;
+/// Worse per tick than ambient spores — a pocket's seep is
+/// concentrated — but it only bites where the pocket touches
+/// open space, so passing through costs little and lingering
+/// at a gassy face is what gasps a delver.
+pub const AIR_RATE: f32 = 1.0;
 /// Air load at which a delver is gasping: work halved and morale
 /// hit, like the spore-cough.
 pub const GASPING_AT: f32 = 60.0;
