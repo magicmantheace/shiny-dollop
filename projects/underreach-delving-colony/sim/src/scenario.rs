@@ -312,6 +312,62 @@ pub fn build_scenario_gen(world_seed: u64) -> Sim {
     sim
 }
 
+/// S7: the S2 colony on the same Shallows layout — but the rock
+/// around the face is rotten with loose pockets, and bad air
+/// pools in sealed pockets beside the face's stand and the last
+/// stretch of tunnel. The Shallows' own hazards, live: mining
+/// the face can bring the roof down, and standing at the face
+/// loads a delver's air. The gate set that answers them —
+/// timber supports, vents — is placed by the player script,
+/// not the scenario.
+pub fn build_scenario_s7() -> Sim {
+    let mut world = shallows_world();
+    // Loose rock around the face's rock cell and its stand.
+    for p in [
+        Pos::new(15, 8, 3),
+        Pos::new(15, 8, 5),
+        Pos::new(15, 7, 4),
+        Pos::new(15, 9, 4),
+        Pos::new(14, 8, 5),
+        Pos::new(14, 7, 4),
+        Pos::new(14, 9, 4),
+    ] {
+        world.set(p, Cell::Loose);
+    }
+    // Bad air sealed beside the stand and the tunnel's last cell.
+    world.set(Pos::new(14, 8, 3), Cell::BadAir);
+    world.set(Pos::new(13, 8, 3), Cell::BadAir);
+    let delvers = vec![
+        Delver::new(0, "Bram", Pos::new(3, 3, 4), Job::Miner),
+        Delver::new(1, "Sella", Pos::new(4, 3, 5), Job::Farmer),
+        Delver::new(2, "Hale", Pos::new(4, 3, 3), Job::Hauler),
+    ];
+    let mut face = the_face();
+    face.ore = 24;
+    let mut sim = Sim::new(
+        world,
+        delvers,
+        Pos::new(3, 3, 4), // stockpile
+        vec![Pos::new(2, 3, 3), Pos::new(2, 3, 5), Pos::new(6, 3, 5)],
+        vec![face],
+        Pos::new(6, 3, 4), // gate
+        Stores {
+            ore: 0,
+            goods: 4, // enough for the gate set: a support and a vent
+            food: 12,
+            fungal_oil: 0,
+            masks: 0,
+        },
+        0x5EED_0009,
+        1500,
+        false, // the rock is the threat here, not the dark
+    );
+    sim.place_lantern(CAMP_LANTERN, 1, 1_000_000.0);
+    sim.plant_plot(Pos::new(5, 3, 3));
+    sim.plant_plot(Pos::new(6, 3, 3));
+    sim
+}
+
 /// The player's frontier work on a generated floor — the
 /// analogue of `light_the_way`: carry light from the camp along
 /// the natural passages to the first workable face (the faces
