@@ -355,6 +355,51 @@ class GracefulShutdownTests(unittest.TestCase):
         self.assertTrue(wait_for_audit(self.audit, "server_stop"),
                         "no audited server_stop after SIGTERM")
 
+    def test_agent_immediate_sigterm_still_writes_server_stop(self):
+        # Regression for the startup audit race (root fix
+        # 2026-11-24): stop the agent the instant server_start is
+        # audited, while create_server() may still be running.
+        # Before the fix the SIGTERM handler was installed only
+        # after create_server() returned, so this stop killed the
+        # agent by the signal's default action (probe on v1.2.1:
+        # 3/12) and the audit log kept server_start with no
+        # server_stop. With the handlers installed before
+        # create_server() and aimed at a holder, every attempt must
+        # exit 0 with an audited server_stop.
+        agent = PROJECT_DIR / "agent" / "bridge_agent.py"
+        for attempt in range(6):
+            root = Path(self.tmp.name) / f"race{attempt}"
+            root.mkdir(parents=True, exist_ok=True)
+            audit = root / "logs" / "audit.jsonl"
+            config = root / "config.json"
+            config.write_text(json.dumps({
+                "host": "127.0.0.1", "port": free_port(),
+                "token": "test-token-graceful",
+                "allowed_file_root": str(root / "bridge-files"),
+                "audit_log": str(audit),
+                "state_dir": str(root / "state"),
+            }), encoding="utf-8")
+            proc = subprocess.Popen(
+                [sys.executable, str(agent), "--config", str(config)],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            try:
+                self.assertTrue(wait_for_audit(audit, "server_start"),
+                                "agent did not start / audit server_start")
+                proc.terminate()  # the moment server_start lands
+                proc.wait(timeout=15)
+            finally:
+                if proc.poll() is None:
+                    proc.kill()
+                    proc.wait(timeout=5)
+                if proc.stdout is not None:
+                    proc.stdout.close()
+            self.assertEqual(proc.returncode, 0,
+                             f"attempt {attempt}: agent died by the "
+                             f"signal's default action")
+            self.assertTrue(wait_for_audit(audit, "server_stop"),
+                            f"attempt {attempt}: no audited "
+                            f"server_stop after immediate SIGTERM")
+
     def test_supervisor_stop_child_writes_server_stop(self):
         sup = supervisor_mod.Supervisor(PROJECT_DIR, self.config,
                                         self.state)

@@ -275,8 +275,8 @@ records fresh boots and resumed jobs, and Project Mode (a
 recorded, exactly-reversible toggle that frees the desktop's
 GPU headroom for jobs and auto-disengages when the owner uses
 the PC). Design: `docs/JOB_RUNNER.md`. **Verified on Muse's
-Linux VM: full suite 301 tests, OK (3 pre-existing skips)** —
-59 new tests across `test_job_runner.py`, `test_presence.py`,
+Linux VM: full suite 302 tests, OK (3 pre-existing skips)** —
+60 new tests across `test_job_runner.py`, `test_presence.py`,
 `test_boot_beacon.py`, `test_window_raise.py`,
 `test_project_mode.py`, and `test_v1_3_bridge_additions.py`,
 including a real worker process SIGKILLed mid-job and resumed

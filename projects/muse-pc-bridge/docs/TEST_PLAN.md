@@ -580,6 +580,20 @@ above all a **real reboot** mid-job with resume — is unproven
 until the deploy smoke in `docs/JOB_RUNNER.md` runs.
 Production still runs v1.2.1; this release is not deployed.
 
+**Addendum (same day, owner's direction): the SIGTERM startup
+audit race root fix.** `main()` now installs the SIGTERM/SIGBREAK
+handlers before `create_server()`, aimed at a holder; a stop
+arriving during startup is remembered and runs the audited
+shutdown instead of killing the agent by default action.
+Regression test
+`test_agent_immediate_sigterm_still_writes_server_stop` stops a
+fresh agent the instant `server_start` is audited, 6 attempts,
+asserting exit 0 + `server_stop` each time. **Full suite: 302
+tests, OK (skipped=3)**; the graceful-shutdown class re-run 3x
+consecutively, all OK. POSIX-proven only — the Windows
+CTRL_BREAK_EVENT path during startup is the same code shape but
+remains owner-PC verification, like the rest of this release.
+
 ## What the tests cannot prove
 
 These require the owner's PC and are **not** claimed by any VM test:

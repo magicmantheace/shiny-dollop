@@ -1283,3 +1283,38 @@ also starts inside it). The root fix — install the signal
 handlers before `create_server`, aimed at a server holder —
 is a production-startup change and is deliberately NOT in
 this release; it is recorded here for the owner's call.
+
+### Follow-up 2 (same day): SIGTERM audit race — root fix SHIPPED in this release, at the owner's call
+
+The owner was told of the race above and directed: "Fix it."
+The root fix is now in this release. `main()` installs the
+SIGTERM (POSIX) / SIGBREAK (Windows) handlers BEFORE
+`create_server()` runs, aimed at a holder dict
+(`{"server": None, "stop_requested": False}`). The handler
+shuts the server down when one exists; before that, it records
+the request, and `main()` — right after `create_server()`
+returns — runs the same audited shutdown path (shutdown thread
++ `serve_forever` + the `finally` that writes `server_stop`)
+instead of serving. A stop signal can therefore no longer land
+in a handler-less window after `server_start` is audited: the
+window is closed by construction, not narrowed. The
+imports-before-`log_start()` ordering in `create_server()` is
+kept but is no longer load-bearing; its comment says so.
+
+**Verified (Muse's Linux VM, 2026-11-24):** new regression
+test `test_agent_immediate_sigterm_still_writes_server_stop`
+(GracefulShutdownTests) stops a fresh agent the instant
+`server_start` appears in the audit log, 6 attempts per run,
+asserting exit code 0 and an audited `server_stop` every time —
+the exact probe that default-killed 3/12 on v1.2.1. Full
+suite: **302 tests, OK (skipped=3)**; the graceful-shutdown
+class re-run 3x consecutively, all OK (18 further immediate
+stops, all clean).
+
+**NOT verified:** the Windows side. SIGBREAK handler
+installation before `create_server()` is the same code path,
+but CTRL_BREAK_EVENT delivery during startup has not been
+exercised on the owner's PC; it rides the same deploy smoke
+as the rest of this release. Still NOT deployed — production
+remains v1.2.1, and deploying this branch (now including the
+root fix) is the owner's call at a gap, as before.

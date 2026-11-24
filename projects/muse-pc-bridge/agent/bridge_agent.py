@@ -4052,17 +4052,16 @@ def _session_reaper(core: BridgeCore) -> None:
 def create_server(cfg: dict) -> ThreadingHTTPServer:
     core = BridgeCore(cfg)
     # This release's imports and the boot beacon run BEFORE
-    # log_start() on purpose. main() installs the SIGTERM/SIGBREAK
-    # handler only after create_server returns, so everything
-    # between log_start() (which makes server_start visible) and
-    # that installation is a window in which a stop signal kills
-    # the agent by default action — before the audited
-    # server_stop can be written. That window pre-exists (the
-    # queue runner starts inside it); first-time module imports
-    # after log_start measurably widened it (probe: default-kill
-    # in 7/12 immediate stops vs 3/12 on v1.2.1 — see
-    # docs/MUSE_HANDOFF.md, 2026-11-24). Keep the window as
-    # small as it was: pay the import cost first.
+    # log_start(). That ordering was load-bearing under the old
+    # startup sequence, where main() installed the SIGTERM/SIGBREAK
+    # handlers only after create_server returned and every import
+    # after log_start widened the window in which a stop signal
+    # could orphan the server_start entry. Since the root fix
+    # (2026-11-24, see main()), the handlers are installed BEFORE
+    # create_server() runs and a stop arriving in here is
+    # remembered, not fatal — so the ordering is no longer
+    # load-bearing. It is kept anyway: paying the import cost
+    # before the server exists is still the cheaper startup.
     import boot_beacon
     import project_mode
     try:
@@ -4150,15 +4149,34 @@ def main(argv: list[str] | None = None) -> int:
               "unless you really mean this. ***", file=sys.stderr)
         print("=" * 72, file=sys.stderr)
 
-    server = create_server(cfg)
     # Graceful stop on SIGTERM (POSIX) / SIGBREAK (Windows): the
     # supervisor's normal stop terminates the child process, and
     # without a handler that bypasses the finally block below — the
     # audit log would hold server_start with no server_stop, against
     # the AGENTS.md rule that server start/stop are always audited.
     # Route those signals through the same shutdown path as Ctrl+C.
+    #
+    # Root fix for the startup audit race (owner's call, 2026-11-24):
+    # the handlers are installed BEFORE create_server() and aim at a
+    # holder, because create_server() is where log_start() writes
+    # server_start. Previously the handlers were installed only after
+    # create_server() returned, so a stop signal landing inside
+    # create_server() — after server_start was audited but before any
+    # handler existed — killed the agent by the signal's default
+    # action and orphaned the server_start (probe on v1.2.1: 3/12
+    # immediate stops died that way). Now a signal that arrives
+    # before the server exists is remembered in the holder; main()
+    # checks it right after create_server() and runs the audited
+    # shutdown instead of serving. A signal arriving later shuts the
+    # running server down, as before.
+    shutdown_holder: dict = {"server": None, "stop_requested": False}
+
     def _signal_shutdown(_signum, _frame):
-        threading.Thread(target=server.shutdown, daemon=True).start()
+        srv = shutdown_holder["server"]
+        if srv is not None:
+            threading.Thread(target=srv.shutdown, daemon=True).start()
+        else:
+            shutdown_holder["stop_requested"] = True
 
     for _sig in (getattr(signal, "SIGTERM", None),
                  getattr(signal, "SIGBREAK", None)):
@@ -4167,6 +4185,9 @@ def main(argv: list[str] | None = None) -> int:
                 signal.signal(_sig, _signal_shutdown)
             except (ValueError, OSError):
                 pass
+
+    server = create_server(cfg)
+    shutdown_holder["server"] = server
     host, port = server.server_address[0], server.server_address[1]
     print(f"[bridge] {AGENT_NAME} {VERSION} listening on http://{host}:{port} "
           f"(shell default: {default_shell()})")
@@ -4176,6 +4197,15 @@ def main(argv: list[str] | None = None) -> int:
     print("[bridge] Running. Closing this window (or Ctrl+C) stops the agent — "
           "that is the kill switch.")
     try:
+        if shutdown_holder["stop_requested"]:
+            # A stop signal landed during create_server(), before
+            # the server existed for the handler to shut down. Go
+            # through the same audited shutdown as a mid-run stop:
+            # shutdown() ends serve_forever() promptly and the
+            # finally below writes server_stop.
+            print("[bridge] Stop signal received during startup; "
+                  "shutting down.")
+            threading.Thread(target=server.shutdown, daemon=True).start()
         server.serve_forever()
     except KeyboardInterrupt:
         print("\n[bridge] Ctrl+C received; shutting down.")
