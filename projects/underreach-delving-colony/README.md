@@ -230,6 +230,34 @@ and the recommended first real-machine step are in
 Verified headless (`cargo test` 87/87, every S1–S12
 scenario section unchanged in numbers and hash).
 
+**S14 — fungal-oil face registration (2026-11-24, branch
+`underreach-delving-colony/fungal-oil-faces`):** the first
+slice on top of merged `main`, closing the second half of
+the S9/S10 finding. The generator registered faces from
+ore veins only, so on generated Fungal Reaches floors the
+fungal-node clusters sat in the rock as embedded pockets
+and fungal oil never flowed — the band's economy (tier-2+
+lanterns burn oil) was dead on the floors it belongs to.
+Now every cluster that touches carved, reachable space
+registers as a face under the same rule a vein follows:
+stand at the carved neighbour closest to the entry, yield
+at the generator's per-cell rate, kind `FungalOil`.
+Clusters sealed in the rock stay pockets. Registration
+draws no RNG and moves no rock — generated worlds are
+byte-identical; only Fungal-band face lists grow, and no
+sim code changed (the S5 mine → haul → deposit path and
+oil charge already handled the yield kind). The proof is
+a full gate-set run on the demo generated floor 2: masks
+crafted from the first goods, both ore faces worked, all
+12 oil units in stores at tick 500, and a tier-2 lantern
+burning one charge at the fungal face. Verified headless
+(`cargo test` 91/91; in the scenario binary every S1–S13
+section is unchanged except the S8 and S9 F2 state-hash
+lines — the floor-2 state now records the registered
+face, with every printed number in those sections
+identical). Still open: face registration when a pocket
+is carved open mid-game.
+
 ## Layout
 
 - `sim/` — the Rust simulation core, its tests, the `scenario`

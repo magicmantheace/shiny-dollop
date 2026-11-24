@@ -388,8 +388,10 @@ pub struct FloorLayout {
     pub veins: Vec<Vein>,
     pub hazards: Vec<HazardPocket>,
     pub dressing: Vec<DressingAnchor>,
-    /// Workable faces registered from veins, sorted by rock
-    /// position (the order `Sim` keeps).
+    /// Workable faces registered from veins — and, on the
+    /// Fungal band, from fungal-node clusters that touch carved
+    /// space (S14) — sorted by rock position (the order `Sim`
+    /// keeps).
     pub faces: Vec<Face>,
     /// Which sampling attempt produced this layout (see
     /// `generate_floor`): 0 = the first layout the seed drew.
@@ -1297,10 +1299,12 @@ fn generate_once(seed: u64, floor_index: u32, attempt: u32) -> Floor {
     veins.sort_by_key(|v| v.cells.first().copied().unwrap_or(ENTRY));
     faces.sort_by_key(|f| f.rock);
 
-    // -- Fungal node clusters (stub bands' second resource). --
+    // -- Fungal node clusters (the Fungal band's second
+    // resource). --
     if theme.fungal_node_clusters > 0 {
         let mut placed_clusters = 0;
         let mut guard = 0;
+        let mut clusters: Vec<Vec<Pos>> = Vec::new();
         while placed_clusters < theme.fungal_node_clusters && guard < 200 {
             guard += 1;
             // Sorted before sampling: a HashSet's iteration
@@ -1326,8 +1330,51 @@ fn generate_once(seed: u64, floor_index: u32, attempt: u32) -> Floor {
             });
             if !cells.is_empty() {
                 placed_clusters += 1;
+                clusters.push(cells);
             }
         }
+
+        // -- Fungal faces (S14): a cluster that touches carved,
+        // reachable space registers as a workable face, exactly
+        // as a vein does — the stand is the carved neighbour
+        // closest to the entry, the yield is the cluster's cells
+        // at the generator's per-cell rate, rendered as fungal
+        // oil. This closes the S9/S10 finding that fungal oil
+        // never flows on generated floors: the oil was in the
+        // rock all along, but no face ever pointed at it.
+        // Clusters sealed in the rock (or touching only sealed
+        // space) stay embedded pockets, as veins do. No RNG is
+        // drawn here — registration is a pure read of the placed
+        // clusters and the measured distances, so the generated
+        // world itself is byte-identical to the pre-S14 world.
+        for cells in &clusters {
+            let mut best: Option<(i32, Pos, Pos)> = None;
+            for rock in cells {
+                for stand in rock.neighbors6() {
+                    if world.get(stand) != Some(Cell::Carved) {
+                        continue;
+                    }
+                    let d = world.idx(stand).map(|i| dist[i]).unwrap_or(-1);
+                    if d < 0 {
+                        continue;
+                    }
+                    let cand = (d, *rock, stand);
+                    if best.map_or(true, |b| cand < b) {
+                        best = Some(cand);
+                    }
+                }
+            }
+            if let Some((_, rock, stand)) = best {
+                faces.push(Face {
+                    rock,
+                    stand,
+                    ore: 6 * cells.len() as u32,
+                    cache: 0,
+                    yield_kind: YieldKind::FungalOil,
+                });
+            }
+        }
+        faces.sort_by_key(|f| f.rock);
     }
 
     // -- Hazard pockets: loose rock anywhere in the walls, bad

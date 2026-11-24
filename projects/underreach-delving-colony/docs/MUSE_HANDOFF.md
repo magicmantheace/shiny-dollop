@@ -248,6 +248,19 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   (frontier rights/permissions, multi-rescuer lantern clock,
   player downing/rescue) and the recommended first
   real-machine step, is `docs/COOP_ASSESSMENT.md`.
+- **S14 — fungal-oil face registration (BUILT 2026-11-24,
+  branch `underreach-delving-colony/fungal-oil-faces`).**
+  The first slice on top of merged `main`, at the owner's
+  direction ("the flow should be happening"). The generator
+  now registers a workable face for every fungal-node
+  cluster that touches carved, reachable space — the rule a
+  vein already followed — so a colony founded on a
+  generated Fungal Reaches floor can harvest fungal oil
+  through the ordinary mine → haul → deposit path and burn
+  it in tier-2+ lanterns. This closes the second half of
+  the S9/S10 finding. Registration draws no RNG and moves
+  no rock: generated worlds are byte-identical to before;
+  only face lists on Fungal-band floors grow.
 - Later: Crystal Dark gates, colony failure & succession.
 
 ## Status — 2026-11-10
@@ -612,13 +625,47 @@ frontier rights for every player with colony-shared credit,
 and open multi-rescuer lantern-clock rescues with the
 line-bell heard by every player. Questions 3–5 remain open.
 
+## S14 — fungal-oil face registration (2026-11-24)
+
+Built on branch `underreach-delving-colony/fungal-oil-faces`
+on top of merged `main` (`a9606e4`), VM-verified headless:
+`cargo test` **91/91** (87 pre-existing + 4 new S14 tests).
+The generator's fungal-cluster step now also registers
+faces: for each placed cluster, the carved neighbour
+closest to the entry becomes the stand, the cluster cell
+beside it the rock, and the yield is the cluster's cells ×
+6 (the generator's per-cell face rate), `YieldKind::
+FungalOil`. Clusters touching only sealed or no carved
+space stay embedded pockets, exactly as veins do. No RNG
+is drawn and no cell changes, so every generated world is
+byte-identical to its pre-S14 form — the S9 finding's
+second half ("fungal oil never flows on generated floors")
+is closed by the face list alone.
+
+The proof is a full gate-set colony run on the demo
+generated floor 2 (`docs/TEST_PLAN.md`, S14 section): the
+colony lights the face routes in order, crafts two spore
+masks from the first goods, works through both ore faces,
+and lands all 12 oil in stores at tick 500; a tier-2
+lantern then places at the fungal face and draws its
+1-charge of oil (12 → 11). Baseline movement in the
+`scenario` binary is exactly two state-hash lines (S8 and
+S9 F2 — the floor-2 state now records the registered
+face; every printed number in those sections is unchanged,
+and the S9 F2 run still lands no oil because the standard
+opening never reaches the third face in its budget).
+Still open, unchanged: face registration when a pocket is
+carved open mid-game (a runtime event, not generation),
+and the Crystal Dark gate slice.
+
 ## Further owner decisions (2026-11-24)
 
 - **Crystal Dark gate mechanics: DECIDED as a future slice**
   — approved in principle; not yet scheduled or built.
 - **Fungal-oil face registration: APPROVED to build** — it
   will be the first slice on top of merged `main`, so fungal
-  oil flows on generated floors.
+  oil flows on generated floors. **(Built as S14,
+  2026-11-24 — see the S14 record above.)**
 - Co-op questions 3–5 in `docs/COOP_ASSESSMENT.md` section
   (c) were also decided on 2026-11-24: hardcore is one
   per-colony rule with a lantern-clock rescue option (setup

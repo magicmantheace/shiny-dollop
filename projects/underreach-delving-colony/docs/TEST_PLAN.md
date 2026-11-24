@@ -1298,6 +1298,126 @@ reproducing exactly.
   is an open owner question (assessment section (c)), not
   something this layer decides.
 
+## S14 — fungal-oil face registration (verified 2026-11-24, VM headless)
+
+Branch `underreach-delving-colony/fungal-oil-faces`, on top
+of merged `main` (`a9606e4`). Owner direction 2026-11-24:
+"the flow should be happening." This closes the second
+half of the S9/S10 finding — on generated floors, faces
+yielded ore only and the Fungal Reaches' fungal-node
+clusters were embedded pockets, not faces, so fungal oil
+never flowed on floor 2 and the band's economy (tier-2+
+lanterns burn oil) could not run there. The hand-authored
+S5 floor worked all along; only generated floors were
+dead.
+
+### What changed
+
+- **`sim/src/gen.rs` — registration only.** The fungal
+  cluster step now keeps each placed cluster's cells and,
+  after placement, registers one face per cluster that
+  touches carved, reachable space: the stand is the carved
+  neighbour with the smallest measured network distance
+  from the entry (ties broken by rock, then stand, in
+  sorted order), the rock is the cluster cell beside it,
+  and the yield is the cluster's cells × 6 — the
+  generator's per-cell face rate, the same arithmetic as
+  ore faces — with `yield_kind: FungalOil` (the mapping
+  `yield_of` already carried). Clusters touching only
+  sealed space, or no carved space, stay embedded pockets,
+  exactly as veins do. **No RNG is drawn and no world cell
+  changes**: registration is a pure read of the placed
+  clusters and the already-measured distances, so every
+  generated world is byte-identical to its pre-S14 form
+  and only the face lists on Fungal-band floors grow.
+  Pocket placement, cluster counts, and all balance
+  numbers are untouched; no sim code changed at all — the
+  mine → haul → deposit path and the tier-2 oil charge
+  already handled `YieldKind::FungalOil` (S5).
+- **`sim/src/scenario.rs`** gains one choreography helper,
+  `light_route_to_face` — `open_current_floor`'s lantern
+  spacing aimed at a chosen face's stand.
+- **One pre-existing test was re-pinned** (the S10
+  precedent: a test that encoded a superseded finding is
+  updated to pin the new truth, with the reason recorded
+  in place): `scenario_s9.rs`'s
+  `fungal_spores_engage_in_floor_2s_deep_zone` no longer
+  asserts all floor-2 faces yield ore; it pins the demo
+  floor's one fungal face (rock (15, 4, 1), a `FungalNode`
+  cell) and keeps its closing oil assertion with the
+  corrected reason — the standard opening lights only the
+  first face's route and spends its 6,000 ticks on the
+  first two ore faces, so the fungal face (third in order)
+  is never reached in that run. Its spore probes are
+  unchanged: the fungal face sorts behind both ore faces
+  on the demo seed, so faces[0] and faces[1] are the same
+  faces S9/S10 always staged at.
+
+### Tests (`sim/tests/scenario_s14.rs`, 4 tests)
+
+- **Registration across the spread:** seeds 1–16 plus the
+  demo seed, floors 2 and 6 (both Fungal band): every
+  floor registers at least one fungal face; at most one
+  face per cluster; ore faces still ≤ `face_veins_max`;
+  every fungal face's rock is a `FungalNode` cell, its
+  stand is carved and reachable (BFS distance ≥ 0), and
+  its yield is a whole multiple of the per-cell rate.
+  (A pre-build probe over seeds 0x5EED0007 + 1–30 × floors
+  2/6 found 62/62 floors had a faceable cluster.)
+- **No fungal faces on the other bands:** floors 1, 3, 4,
+  5 (demo seed) register ore faces only.
+- **The demo floor's face, pinned:** exactly one fungal
+  face — rock (15, 4, 1), stand (15, 4, 2), 12 units (two
+  cluster cells × 6) — third in working order.
+- **The colony proof:** founded on generated floor 2, a
+  tier-2 lantern first refuses (empty oil store). The
+  player lights the routes to the faces in order, crafts
+  two spore masks from the first goods (the deep ore face
+  stands in spore air), and the colony works through both
+  ore faces to the fungal face: oil hauls are ledgered
+  (`HaulDelivered`, "hauled … fungal oil"), all 12 units
+  reach the stores, goods stand above zero, nobody is
+  lost, and a mask was worn for the deep work. Mid-flow,
+  the save/load reproduces the state hash and a 300-tick
+  twin continuation stays identical. Finally a tier-2
+  lantern places at the fungal face and draws exactly
+  `LANTERN_OIL_COST` (1) from the stores.
+
+### Full-suite + harness results
+
+- `cargo test`: **91/91** (87 pre-existing + 4 S14),
+  0 failed.
+- `scenario` binary (release), diffed against the
+  pre-S14 run on merged `main`: **every S1–S13 section is
+  byte-identical except two state-hash lines**, each
+  explained by the mechanic engaging, not by any behaviour
+  change:
+  - S8 state hash `7ad45892…` → `d94a0b3e…`: the floor-2
+    leg's state now records the registered fungal face.
+    All S8 numbers are unchanged (floor-2 goods 33,
+    deliveries 5, lost 0) — the traversal choreography
+    never works the third face.
+  - S9 F2 state hash `2ae86138…` → `e4c4ea18…`: same
+    cause. All S9 F2 numbers are unchanged (goods 9,
+    deliveries 6, fungal oil 0) — the standard opening
+    never reaches the fungal face in its budget, as the
+    re-pinned S9 test now records.
+- The new S14 section: **500 ticks — masks crafted=2, oil
+  landed=12 at tick 500, goods=14, deliveries=14, delvers
+  alive=3, lost=0, tier-2 lantern placed=true, fungal oil
+  after burn=11**, state hash
+  `bfcc8c2a7443de4a3420973a87a7884020bcc2ab8ebbd8b123b33d34ed302091`.
+
+### Not verified / not built
+
+- **Face registration on carve-open** (a pocket exposed by
+  a player's carving mid-game) remains unbuilt — it was
+  the S6 follow-on and is a runtime event, not generation;
+  S14 registers at generation time only.
+- No frontend or bridge change: faces reach the frontend
+  through the existing state, and no S14 claim is made
+  about rendering. Nothing was measured on owner hardware.
+
 ## Planned (later slices)
 
 - Owner-PC visual pass of the frontend; performance measurement

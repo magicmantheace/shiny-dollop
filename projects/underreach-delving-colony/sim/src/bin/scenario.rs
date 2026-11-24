@@ -6,11 +6,12 @@
 use underreach_sim::gen::{carved_path, generate_floor};
 use underreach_sim::scenario::{
     build_scenario, build_scenario_gen, build_scenario_gen_floor, build_scenario_s2,
-    build_scenario_s3, build_scenario_s5, build_scenario_s7, build_scenario_s12, light_the_deep,
-    light_the_way, open_current_floor, open_current_floor_as, open_floor1, GEN_WORLD_SEED,
+    build_scenario_s3, build_scenario_s5, build_scenario_s7, build_scenario_s12, light_route_to_face,
+    light_the_deep, light_the_way, open_current_floor, open_current_floor_as, open_floor1,
+    GEN_WORLD_SEED,
 };
 use underreach_sim::session::{merge_streams, replay, Command, PlayerCommand, Session};
-use underreach_sim::sim::{Job, LedgerKind};
+use underreach_sim::sim::{Job, LedgerKind, YieldKind};
 use underreach_sim::world::{Cell, Pos};
 
 fn count(sim: &underreach_sim::sim::Sim, kind: LedgerKind) -> usize {
@@ -536,6 +537,64 @@ fn main() {
         replay_matches,
     );
     println!("S13 state hash: {}", s13.sim().state_hash());
+
+    // ---- S14: fungal oil flows on generated floor 2 ------------------------
+    // The gate-set run a player would make on the generated
+    // Fungal Reaches: found the colony, light the routes to
+    // the faces in working order (the fungal face is third),
+    // craft spore masks from the first goods for the deep ore
+    // face, work through to the fungal face, haul the oil
+    // home — then burn one charge of it in a tier-2 lantern
+    // at the fungal face, the lantern the oil exists to fuel.
+    let mut s14 = build_scenario_gen_floor(GEN_WORLD_SEED, 2);
+    let fungal_face = s14
+        .faces
+        .iter()
+        .find(|f| f.yield_kind == YieldKind::FungalOil)
+        .cloned()
+        .expect("the demo floor registers a fungal face");
+    for f in s14.faces.clone() {
+        light_route_to_face(&mut s14, &f);
+        if f.yield_kind == YieldKind::FungalOil {
+            break;
+        }
+    }
+    let mut s14_ticks = 0u32;
+    while s14.stores.masks < 2 && s14_ticks < 20_000 {
+        for _ in 0..100 {
+            s14.tick();
+        }
+        s14_ticks += 100;
+        while s14.stores.masks < 2 && s14.craft_mask() {}
+    }
+    while s14.stores.fungal_oil == 0 && s14_ticks < 40_000 {
+        for _ in 0..100 {
+            s14.tick();
+        }
+        s14_ticks += 100;
+    }
+    let oil_landed = s14.stores.fungal_oil;
+    let oil_at_tick = s14.tick_count;
+    let masks_crafted = s14
+        .ledger
+        .iter()
+        .filter(|e| e.kind == LedgerKind::Crafted && e.detail.contains("spore mask"))
+        .count();
+    let tier2_placed = s14.place_lantern(fungal_face.stand, 2, 500.0);
+    println!(
+        "S14 fungal oil on generated floor 2 ({} ticks): masks crafted={}, oil landed={} at tick {}, goods={}, deliveries={}, delvers alive={}, lost={}, tier-2 lantern placed={}, fungal oil after burn={}",
+        s14.tick_count,
+        masks_crafted,
+        oil_landed,
+        oil_at_tick,
+        s14.stores.goods,
+        count(&s14, LedgerKind::HaulDelivered),
+        s14.delvers.len(),
+        count(&s14, LedgerKind::DelverLost),
+        tier2_placed,
+        s14.stores.fungal_oil,
+    );
+    println!("S14 state hash: {}", s14.state_hash());
 
     println!("deep ledger (S2):");
     for e in &sim.ledger {
