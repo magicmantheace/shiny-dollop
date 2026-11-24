@@ -555,6 +555,31 @@ production — its shared-console behaviour is unchanged by
 inspection) and a session spawn under load; sessions use the
 same hidden kwargs as jobs.
 
+### Durable job runner release suites (added 2026-11-24)
+
+| File | Covers |
+| --- | --- |
+| `tests/test_job_runner.py` (10) | submit → run → complete with per-stage checkpoints and marker-file proof; failing stage (exit 3) marks the job failed with `failed_stage` + `exit_code`; manifest retry (flaky stage succeeds on attempt 2); invalid manifests (bad JSON + bad schema) become failed records with the queue files retired `.rejected`; **PAUSED kills the running stage's tree, returns the job to queued (never failed), blocks new starts, and both jobs complete after the flag is removed**; per-job stop flag stops a running job and a restarted engine does not resume it; a `gpu: true` job waits checkpointed behind a stubbed Wow.exe process list (`waiting_for_gpu` + `gpu_wait` event) and runs when it clears; manifest validation rejects bad shapes; **a real worker subprocess is SIGKILLed mid-stage-2 and a fresh worker resumes: stage 1 never re-runs (marker count 1), stage 2 completes (count 2), `orphan_killed` + `resume` + `completed` events recorded** (POSIX-only; skipped on Windows) |
+| `tests/test_presence.py` (15) | game detection is pure: launchers-only lists (steam/battle.net/epic helpers) are NOT gaming; Wow.exe-class executables are; anchored + case-insensitive matching (`notwow.exe`, `wow.exe.bak` rejected); extra blocker patterns extend detection; `gpu_contention` combines game detection with the utilization threshold via stubbed probes; nvidia-smi CSV parsing incl. garbage → None; snapshot shape and honest per-field degradation with notes |
+| `tests/test_boot_beacon.py` (6) | fresh-boot detection with a monkeypatched boot-time seam: first start counts fresh, same-boot restart is not fresh, a changed boot time is fresh, an unknown boot time records `fresh_boot: null` (never guessed); the beacon state file tracks the last boot; `jobs_resumed` events append with their payload |
+| `tests/test_window_raise.py` (7) | `pick_window` selection: by pid, by case-insensitive title substring, visible windows preferred, no match → None, exactly-one-selector validation; off Windows `raise_window` refuses with `WindowUnavailable` (skipped on Windows) |
+| `tests/test_project_mode.py` (12) | engage/disengage against a FakeOps seam: engage records and applies (power-plan GUID recorded then High Performance set, Lively + listed helper + OneDrive closed, WSearch stopped) while **unlisted processes (chrome, explorer) are never touched**; disengage restores exactly the record (scheme GUID back, precisely the closed exes relaunched, service restarted once); double-engage is a no-op; a service stop that needs elevation degrades that step to `skipped` without failing the toggle and is never "restored"; a process refusing graceful close is left running and reported (the Ops API has no force operation); close-list matching, powercfg/sc output parsers, and the presence auto-disengage decision (settle window, game launch, idle-drop = fresh input, idle growth = nobody home) are pure-tested; the monitor disengages end-to-end on a stubbed game launch |
+| `tests/test_v1_3_bridge_additions.py` (9) | over real HTTP against the real agent: `GET /v1/presence` shape with honest null idle/foreground off Windows; `POST /v1/window/raise` → 501 off Windows + selector validation 400s; spawn proof of life — a sleeper reports `proof.alive: true`, an instant-exit command reports `alive: false` with `exit_code: 0` and `ok: false` in the 201 response; `"session": "interactive"` spawn carries the session echo + proof; bad session value and out-of-range `proof_delay_s` are 400s (validated before spawning); Project Mode routes engage/disengage/status with per-step honest statuses off Windows |
+
+## Durable job runner release verification — 2026-11-24 (Muse's Linux VM, Python 3.12)
+
+**Full suite: 301 tests, OK (skipped=3)** — the 242-test
+v1.2.1 baseline plus 59 new tests; the 3 skips are the
+pre-existing environment ones. **Owner-PC checks: NOT done.**
+Everything Windows about this release — the presence ctypes
+probes (idle/foreground), tasklist-based process probes,
+session-1 spawn behaviour and the verbatim-powershell
+mitigation, the window raise, Project Mode's Windows
+operations (powercfg, WM_CLOSE closes, service control), and
+above all a **real reboot** mid-job with resume — is unproven
+until the deploy smoke in `docs/JOB_RUNNER.md` runs.
+Production still runs v1.2.1; this release is not deployed.
+
 ## What the tests cannot prove
 
 These require the owner's PC and are **not** claimed by any VM test:
@@ -623,6 +648,24 @@ These require the owner's PC and are **not** claimed by any VM test:
   consent prompt (everywhere it is driven by a stubbed monitor),
   and the runner's restart recovery across a real reboot
   (recovery is suite-proven with a planted record only).
+- **Durable job runner release on real Windows** (added
+  2026-11-24): everything in the deploy smoke in
+  `docs/JOB_RUNNER.md` — the runner worker/supervisor as
+  Windows processes; a real reboot mid-job with checkpoint
+  resume and orphan cleanup; presence's ctypes probes
+  (GetLastInputInfo idle, foreground window) and tasklist
+  process probe against the real desktop; nvidia-smi readings
+  from the owner's RTX 3060; session-mode spawn side effects
+  (including whether the verbatim-command form fixes the
+  2026-11-21 powershell no-run incident — the diagnosis is a
+  suspect, not a proven cause); the window raise against real
+  windows incl. foreground-lock behaviour; Project Mode's
+  powercfg scheme switch, WM_CLOSE closes of Lively/launcher
+  helpers, OneDrive quit/relaunch, WSearch stop under
+  elevation, and presence-triggered auto-disengage with the
+  owner actually at the keyboard. The VM suite proves the
+  logic, state machines, file contracts, and HTTP shapes on
+  POSIX only.
 
 ## Owner-PC verification checklist (part of install)
 

@@ -1113,3 +1113,147 @@ switch.
   spawn through `shell: "cmd"` worked. Not diagnosed — the
   switch routed around it (kill jobs via exec). Flagged here
   for a future look; jobs/sessions/GUI spawns are unaffected.
+
+## Update (2026-11-24): durable job runner release — BUILT, VM-verified, NOT deployed
+
+**Branch:** `muse-pc-bridge/durable-job-runner`, from the
+v1.2.1 tip (`992bf0a`). **Production still runs 1.2.1; the PC
+was not touched.** The owner directed this after the Wrong
+House comic queue's VM-side driver died in a runtime restart:
+one general facility in the bridge for every long PC job
+(comic queue first, then LoRA training, the 1,600-stills
+harvester, Underreach GPU stages) — plus, folded in at his
+word, presence, session spawn + raise-window, the boot
+beacon, and Project Mode. Full design: `docs/JOB_RUNNER.md`.
+
+### What was built
+
+- **`agent/job_runner.py`** — the durable runner. Generic
+  manifest jobs (name, workdir, ordered stages as argv lists
+  or shell strings, optional per-stage timeout/retries,
+  `gpu: true`, `rerun: true`); NO per-stage time cap (the
+  900 s bridge cap is routed around by living outside the
+  agent). Runs as its own supervised process
+  (`RunnerSupervisor`, mirroring supervisor.py: worker child,
+  backoff, status JSON) so jobs survive agent restarts and VM
+  restarts. Atomic per-stage checkpoints under
+  `<state_dir>/jobs/state/`; on worker start, interrupted jobs
+  resume from `next_stage` — completed stages never re-run,
+  an orphaned stage pid is killed first (`orphan_killed`).
+  **Control is file-based on purpose** (no HTTP routes):
+  submit = drop a manifest in `jobs/queue/`, status = read the
+  state JSON (or `--status`), pause-all = `jobs/PAUSED`
+  (kills the running tree promptly, job returns to queued,
+  never failed), stop = `jobs/stop/<id>`. Rationale: submission
+  must work while the agent is down — the failure this fixes —
+  and the existing file/exec API already drives it. Invalid
+  manifests become failed records (`.rejected`); duplicate ids
+  never clobber (`.duplicate`). `gpu: true` jobs wait
+  checkpointed (`waiting_for_gpu`, `gpu_wait`/`gpu_clear`
+  events) on `presence.gpu_contention()` — never failed for
+  waiting. Lifecycle events append to `jobs/events.jsonl`;
+  the runner never sees the bridge token.
+- **`agent/presence.py`** — one presence implementation, two
+  callers (endpoint + runner yield). `GET /v1/presence`
+  (desktop route, brokered): input idle seconds, foreground
+  window/app, gaming + game list, GPU via nvidia-smi.
+  `detect_games` is pure: anchored full-name matches;
+  **launchers (steam.exe, steamwebhelper.exe, battle.net.exe,
+  agent.exe, epic helpers, leagueclient…) never count**.
+  Idle/foreground are Windows-only ctypes probes with declared
+  signatures; off Windows they return null + a note, never a
+  fabrication. This retires the staged `gab16r_preflight.ps1`
+  idle hack.
+- **Session spawn + proof of life** (`bridge_agent.py`):
+  `POST /v1/processes` accepts `"session": "interactive"`
+  (brokered to the helper like `gui: true` — retires the
+  scheduled-task GUI workaround) and `proof_delay_s` (default
+  3 in session mode): the 201 response carries
+  `proof: {alive, exit_code, ok}` measured after the delay, so
+  a spawn that died instantly is reported in the response
+  itself. Validation happens before spawning.
+  **The 2026-11-21 powershell no-run incident (flagged in the
+  v1.2.1 entry above) — diagnosis:** prime suspect is
+  list-form argv joining mangling the `-Command` argument
+  (subprocess list2cmdline quoting), so PowerShell parsed a
+  different string than submitted and exited 0. `popen_target`
+  (f69fa8f) gave cmd the verbatim-string form for this class
+  of reason; powershell never got it. **Suspect, not proven.**
+  Mitigation shipped, scoped to session mode only so existing
+  spawn paths are byte-identical: on Windows, a session-mode
+  powershell string command uses the verbatim command line.
+  Proof of life makes any recurrence visible immediately.
+- **`agent/window_raise.py`** — `POST /v1/window/raise`
+  (desktop route): raise ONE window by pid or title substring.
+  Hard rule from the 2026-11-12 incident: no other window is
+  ever minimized/moved/resized — only the target is touched
+  (SW_RESTORE on the target alone if iconic,
+  SetForegroundWindow verified by read-back, fallback
+  SetWindowPos HWND_TOP with NOMOVE|NOSIZE). Foreground-lock
+  refusal is reported as `foreground: false`, never worked
+  around. Selection (`pick_window`) is pure; off Windows the
+  route is 501.
+- **`agent/boot_beacon.py`** — `<state_dir>/boot-log.jsonl` +
+  `boot-beacon.json`: supervisor, agent, and helper append a
+  start line carrying the machine boot time (Windows:
+  GetTickCount64 derivation; POSIX: /proc/stat btime; unknown
+  → `fresh_boot: null`, never guessed). Fresh boot = boot time
+  changed by >30 s vs the last record (tolerance for the
+  Windows derivation's clock drift). The runner appends
+  `jobs_resumed` after recovery, so "what was mid-flight at
+  shutdown and got resumed" is answerable from the state dir.
+  All hooks are try/except-guarded.
+- **`agent/project_mode.py`** — Project Mode. `GET
+  /v1/project-mode`, `POST …/engage`, `POST …/disengage`
+  (desktop routes). Engage records EXACTLY what it changed in
+  `<state_dir>/project-mode.json` and disengage restores
+  precisely that: power plan (previous GUID recorded, High
+  Performance set), Lively closed gracefully, close-list
+  processes closed gracefully, OneDrive quit (sync pauses),
+  WSearch stopped. Close list defaults are conservative —
+  launcher background helpers only (`steamwebhelper.exe`,
+  `epicwebhelper.exe`); config `project_mode_close_list` is
+  the owner's to curate. **Graceful only, never force-kill**
+  (a survivor is reported, not killed); nothing unlisted is
+  touched. **Elevation honesty:** WSearch stop needs admin —
+  under the bridge's usual contexts the step records
+  `skipped: needs elevation` and the toggle still succeeds;
+  every step's outcome is in the response, the state file,
+  and `project-mode-events.jsonl` (plus the bridge audit log
+  for API toggles). No silent partial success. While engaged,
+  `ProjectModeMonitor` (started by the main agent) watches
+  presence: a game launch or fresh owner input (idle dropping
+  between polls, after a 15 s settle window) auto-disengages.
+  The runner auto-engages before `gpu: true` jobs only behind
+  `job_project_mode_auto`, **default OFF**, and disengages
+  only its own engagements.
+- `agent/session_helper.py` whitelist + `agent/supervisor.py`
+  beacon hook + `config.example.json` keys
+  (`job_runner_poll_s`, `job_gpu_poll_s`,
+  `job_gpu_util_threshold`, `job_project_mode_auto`,
+  `project_mode_close_list`, `project_mode_watch_s`).
+
+### Verified (Muse's Linux VM, Python 3.12.3, 2026-11-24)
+
+- `python3 -m unittest discover -s tests` → **301 tests, OK
+  (skipped=3)** — the 242-test v1.2.1 baseline plus 59 new:
+  `test_job_runner.py` (10, incl. a real worker subprocess
+  SIGKILLed mid-stage-2 and resumed — stage 1 marker count 1,
+  stage 2 count 2, orphan_killed + resume events),
+  `test_presence.py` (15), `test_boot_beacon.py` (6),
+  `test_window_raise.py` (7), `test_project_mode.py` (12,
+  FakeOps seam), `test_v1_3_bridge_additions.py` (9, real HTTP
+  incl. proof-of-life alive/dead and the Project Mode routes).
+
+### NOT verified / deploy TODOs (owner-PC only)
+
+Everything Windows: full suite under Windows Python;
+presence ctypes probes against the real desktop; session-1
+spawn behaviour + whether the verbatim form fixes the
+powershell no-run; the raise against real windows incl.
+foreground-lock; Project Mode's powercfg/WM_CLOSE/service
+steps and keyboard/game auto-disengage; and a **real reboot
+mid-job** — the deploy smoke list is in `docs/JOB_RUNNER.md`.
+Until those run, this release is *implemented and VM-tested*,
+not *installed*, and no consumer has been moved onto the
+runner.

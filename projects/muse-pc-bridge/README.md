@@ -65,6 +65,11 @@ and token to Muse **out-of-band** — never via git.
 | `agent/assets/avatar/` | avatar animation loops, one full-frame transparent GIF per display state |
 | `agent/bridge_update.py` | self-update mechanics (bundle verify, staged apply, rollback) |
 | `agent/queue_runner.py` | resident queue runner (v1.2): a thread in the agent draining `<state_dir>/queue/` — hash-pinned script jobs, PAUSED kill switch, skip-if-likely UAC policy, restart recovery that fails (never re-runs) interrupted jobs |
+| `agent/job_runner.py` | durable job runner (built 2026-11-24, NOT deployed): a separate supervised process running generic manifest jobs from `<state_dir>/jobs/` — per-stage checkpoints, resume that never re-runs completed stages, file-based control (queue drop / PAUSED / per-job stop flags), GPU yield via presence; see `docs/JOB_RUNNER.md` |
+| `agent/presence.py` | native presence: input idle (Windows), foreground window, game detection (launchers never count), GPU load via nvidia-smi — one implementation behind `GET /v1/presence` and the runner's GPU yield check |
+| `agent/window_raise.py` | raise ONE window (by pid or title) to the foreground without minimizing/moving/resizing any other window (`POST /v1/window/raise`); foreground-lock refusal is reported, never worked around |
+| `agent/boot_beacon.py` | boot beacon: per-start lines in `<state_dir>/boot-log.jsonl` distinguishing a fresh boot from an agent restart, plus the runner's `jobs_resumed` record |
+| `agent/project_mode.py` | Project Mode (built 2026-11-24, NOT deployed): engage/disengage toggle that records exactly what it changed (power plan, Lively, a curated close list, OneDrive, search indexing — each step degrading honestly, WSearch needs elevation) and restores precisely that; presence auto-disengages on owner input or a game launch |
 | `agent/helpers/uia.ps1` | fixed UI Automation helper driven by the agent (JSON parameters only) |
 | `client/bridge_client.py` | Muse-side library + CLI (jobs, processes incl. `spawn-gui`, sessions, chunked files, screenshot/input/clipboard/uia, `wol`, `audit`, queue commands) |
 | `scripts/start-bridge.cmd` | start the agent in a visible console |
@@ -81,6 +86,7 @@ and token to Muse **out-of-band** — never via git.
 | `docs/INSTALL_WINDOWS.md` | exact Windows install + verification steps, plus the v1 upgrade path |
 | `docs/CHATGPT_INSTALL_HANDOFF.md` | delegated install (D: drive) that stops before the owner's token/final-setup steps |
 | `docs/TEST_PLAN.md` | what the tests prove — and what they cannot |
+| `docs/JOB_RUNNER.md` | design of the durable job runner release: runner, presence, session spawn + raise-window, boot beacon, Project Mode — incl. the file-based control surface rationale and the deploy-time smoke checklist |
 | `docs/MUSE_HANDOFF.md` | current state, decisions, next steps |
 | `docs/V1_PLAN.md` | the v1 feature plan (recorded 2026-11-04) |
 | `REQUIREMENTS.md` | Python >= 3.11, stdlib only, Tailscale |
@@ -253,3 +259,29 @@ console window on demand. The console service form is not
 run in production, so its behaviour is verified by code
 inspection only. See the 2026-11-21 entries in
 `docs/MUSE_HANDOFF.md`.
+
+**Update (2026-11-24): durable job runner release — BUILT,
+VM-verified, NOT deployed.** On branch
+`muse-pc-bridge/durable-job-runner`: a general-purpose durable
+job runner (its own supervised process; manifest jobs with
+per-stage checkpoints and resume that never re-runs completed
+stages; file-based control — queue drop, PAUSED kill switch,
+per-job stop flags; GPU yield for `gpu: true` jobs), a native
+presence endpoint (`GET /v1/presence`: input idle, foreground
+app, game detection with launchers excluded, GPU load),
+session-aware spawn with proof of life plus a raise-window
+call that never disturbs other windows, a boot beacon that
+records fresh boots and resumed jobs, and Project Mode (a
+recorded, exactly-reversible toggle that frees the desktop's
+GPU headroom for jobs and auto-disengages when the owner uses
+the PC). Design: `docs/JOB_RUNNER.md`. **Verified on Muse's
+Linux VM: full suite 301 tests, OK (3 pre-existing skips)** —
+59 new tests across `test_job_runner.py`, `test_presence.py`,
+`test_boot_beacon.py`, `test_window_raise.py`,
+`test_project_mode.py`, and `test_v1_3_bridge_additions.py`,
+including a real worker process SIGKILLed mid-job and resumed
+from its checkpoint. **NOT verified: everything Windows** —
+the presence ctypes probes, session-1 spawn behaviour, the
+raise, Project Mode's Windows operations, and a real reboot
+resume are owner-PC smokes listed in `docs/JOB_RUNNER.md`.
+Production still runs v1.2.1.
