@@ -19,6 +19,7 @@
 //!   {"cmd":"plant","pos":[x,y,z]}
 //!   {"cmd":"craft_mask"}
 //!   {"cmd":"support","pos":[x,y,z]} / {"cmd":"vent","pos":[x,y,z]} (S7)
+//!   {"cmd":"pump","pos":[x,y,z]} / {"cmd":"craft_cooling"} (S10)
 //!   {"cmd":"descend"} / {"cmd":"ascend"} (S8: floor-to-floor traversal)
 //!   {"cmd":"light_the_way"} / {"cmd":"light_the_deep"}
 //!   {"cmd":"open_floor1"} (gen scenario: lantern the route to the first face)
@@ -96,6 +97,14 @@ fn apply(sim: &mut Sim, cmd: &Value) {
                 sim.place_vent(p);
             }
         }
+        Some("pump") => {
+            if let Some(p) = cmd.get("pos").and_then(pos) {
+                sim.place_pump(p);
+            }
+        }
+        Some("craft_cooling") => {
+            sim.craft_cooling_gear();
+        }
         Some("descend") => {
             sim.descend();
         }
@@ -112,12 +121,16 @@ fn apply(sim: &mut Sim, cmd: &Value) {
 fn view(sim: &Sim) -> Value {
     let mut carved: Vec<Value> = Vec::new();
     let mut lit: Vec<Value> = Vec::new();
+    let mut flooded: Vec<Value> = Vec::new();
     for y in 0..sim.world.sy as i32 {
         for x in 0..sim.world.sx as i32 {
             for z in 0..sim.world.sz as i32 {
                 let p = Pos::new(x, y, z);
                 if sim.world.get(p) == Some(Cell::Carved) {
                     carved.push(json!([x, y, z]));
+                    if sim.flooded_at(p) {
+                        flooded.push(json!([x, y, z]));
+                    }
                     if let Some(i) = sim.world.idx(p) {
                         if sim.lit.get(i).copied().unwrap_or(false) {
                             lit.push(json!([x, y, z]));
@@ -138,7 +151,7 @@ fn view(sim: &Sim) -> Value {
                 "state": format!("{:?}", d.state),
                 "hp": d.hp, "energy": d.energy, "hunger": d.hunger,
                 "morale": d.morale, "spore": d.spore, "masked": d.masked,
-                "air": d.air,
+                "air": d.air, "water": d.water, "heat": d.heat, "cooled": d.cooled,
                 "carrying": d.carrying,
                 "carrying_kind": format!("{:?}", d.carrying_kind),
                 "mining_xp": d.mining_xp, "hauling_xp": d.hauling_xp,
@@ -220,6 +233,8 @@ fn view(sim: &Sim) -> Value {
         "lanterns": lanterns,
         "supports": sim.supports.iter().map(|p| json!([p.x, p.y, p.z])).collect::<Vec<_>>(),
         "vents": sim.vents.iter().map(|p| json!([p.x, p.y, p.z])).collect::<Vec<_>>(),
+        "pumps": sim.pumps.iter().map(|p| json!([p.x, p.y, p.z])).collect::<Vec<_>>(),
+        "flooded": flooded,
         "faces": faces,
         "plots": plots,
         "delvers": delvers,
@@ -230,6 +245,7 @@ fn view(sim: &Sim) -> Value {
         "stores": {
             "ore": sim.stores.ore, "goods": sim.stores.goods, "food": sim.stores.food,
             "fungal_oil": sim.stores.fungal_oil, "masks": sim.stores.masks,
+            "cooling_gear": sim.stores.cooling_gear,
         },
         "ledger": ledger,
     })

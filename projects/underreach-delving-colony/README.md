@@ -43,9 +43,9 @@ S1 proves the spine of the game in simulation:
 Verified: `cargo test` in `sim/` (unit + scenario tests), and the
 `scenario` binary's two-phase run (blocked in the dark → lit → producing).
 
-**Not yet built:** the deeper bands' mechanics (Drowned flooding,
-Magma heat — their hazard flags are modelled in S5's recombination
-table but not yet simulated), co-op, and children/generations. S2
+**Not yet built:** the Crystal Dark's gate items, co-op, and
+children/generations. (The Drowned flooding and Magma heat
+mechanics were built in S10, below.) S2
 added the colony (multiple delvers, jobs, morale, camp farming,
 recruitment); S3 added creatures, combat, lantern-clock strandings,
 rescue runs, and permadeath; S5 added the Fungal Reaches: spore
@@ -119,6 +119,30 @@ Galleries and Magma Roots on their S10 flooding/heat
 mechanics, and the Crystal Dark on gate items that have never
 been modelled. Verified headless (`cargo test` 60/60, every
 S1–S8 scenario section unchanged in numbers and hash).
+
+**S10 — deeper band hazards (2026-11-24, branch
+`underreach-delving-colony/band-hazards`):** hazard exposure
+is now keyed to the active floor's band on generated floors
+(`hazards_here`: the band's flags rule in the floor's deep
+zone, y ≥ 6, while the camp at y = 3 stays refuge; hand-built
+worlds keep the depth table exactly), and the two flag-only
+hazards are live mechanics. In the Drowned Galleries, flood
+water loads a delver toward drowning and douses unsealed
+lanterns; the answers are placed **pumps** (1 goods, a dry
+reach around them) and **sealed pressure lanterns** (tier 3).
+In the Magma Roots, heat loads a delver toward overheating;
+the answer is crafted **cooling gear** (2 goods, worn like a
+mask). The ordinary colony runs show it: unprotected floor 3
+takes 3 drowning events and 3 doused lanterns, floor 5 takes
+2 overheating events, and the protected runs — pumps +
+pressure lanterns, cooling gear — produce exactly as much
+with zero band events and nobody lost. With each band's
+mechanics demonstrably engaging on its generated floor, the
+Fungal Reaches, Drowned Galleries, and Magma Roots flip to
+`built`; the Crystal Dark stays unbuilt, its gate items
+still unmodelled. Verified headless (`cargo test` 70/70,
+every S1–S9 scenario section unchanged in behaviour
+numbers).
 
 ## Layout
 

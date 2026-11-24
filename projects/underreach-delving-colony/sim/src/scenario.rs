@@ -69,6 +69,7 @@ pub fn build_scenario() -> Sim {
             food: 10,
             fungal_oil: 0,
             masks: 0,
+            cooling_gear: 0,
         },
         0x5EED_0001,
         u64::MAX, // the S1 scenario takes no recruits
@@ -98,6 +99,7 @@ pub fn build_scenario_s2() -> Sim {
             food: 12,
             fungal_oil: 0,
             masks: 0,
+            cooling_gear: 0,
         },
         0x5EED_0002,
         1500, // first recruit is due at tick 1500 if the colony is fed
@@ -142,6 +144,7 @@ pub fn build_scenario_s3() -> Sim {
             food: 12,
             fungal_oil: 0,
             masks: 0,
+            cooling_gear: 0,
         },
         0x5EED_0003,
         1500,
@@ -233,6 +236,7 @@ pub fn build_scenario_s5() -> Sim {
             food: 12,
             fungal_oil: 0,
             masks: 0,
+            cooling_gear: 0,
         },
         0x5EED_0005,
         1500,
@@ -312,6 +316,7 @@ pub fn build_scenario_gen_floor(world_seed: u64, floor_index: u32) -> Sim {
             food: 12,
             fungal_oil: 0,
             masks: 0,
+            cooling_gear: 0,
         },
         world_seed,
         1500,
@@ -372,6 +377,7 @@ pub fn build_scenario_s7() -> Sim {
             food: 12,
             fungal_oil: 0,
             masks: 0,
+            cooling_gear: 0,
         },
         0x5EED_0009,
         1500,
@@ -410,6 +416,16 @@ pub fn open_floor1(sim: &mut Sim) {
 /// the same spacing as `open_floor1`, whose floor-1 behaviour
 /// is unchanged.
 pub fn open_current_floor(sim: &mut Sim) {
+    open_current_floor_as(sim, 1);
+}
+
+/// S10: `open_current_floor` with a chosen lantern tier — the
+/// Drowned Galleries' protected opening carries sealed
+/// pressure lanterns (tier 3) down the route, the only tier
+/// the flood water cannot douse. Tier-2+ placements draw the
+/// usual oil charge, so a pressure opening needs oil in
+/// stores, exactly as a player's would.
+pub fn open_current_floor_as(sim: &mut Sim, tier: u8) {
     let Some(info) = sim.floor.clone() else {
         return;
     };
@@ -422,7 +438,7 @@ pub fn open_current_floor(sim: &mut Sim) {
     };
     for (i, p) in path.iter().enumerate() {
         if i % 4 == 3 || i == path.len() - 1 {
-            sim.place_lantern(*p, 1, 5_000.0);
+            sim.place_lantern(*p, tier, 5_000.0);
         }
     }
 }

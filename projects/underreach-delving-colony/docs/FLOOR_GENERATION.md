@@ -83,10 +83,10 @@ of 3–6 cells; 1 loop edge; ~33 % of passage segments widened to
 | Band (floors) | Built | Hazards | Resources | Loose / bad-air pockets | Dressing kinds | Den critters |
 |---|---|---|---|---|---|---|
 | Shallows (1) | **yes** | none | ore | 5 / 4 (base) | stalactite, stalagmite, rubble, boulder | gloam rat |
-| Fungal Reaches (2) | stub | spores | ore + fungal nodes (4 clusters) | 3 / 3 | giant mushroom, spore pod, stalactite, rubble | gloam rat, deep lurker |
-| Drowned Galleries (3) | stub | flooded (flag only) | ore | 4 / 5, veins 5 | pump, air bell, rubble, stalagmite | deep lurker |
+| Fungal Reaches (2) | **yes** | spores | ore + fungal nodes (4 clusters) | 3 / 3 | giant mushroom, spore pod, stalactite, rubble | gloam rat, deep lurker |
+| Drowned Galleries (3) | **yes** | flooded | ore | 4 / 5, veins 5 | pump, air bell, rubble, stalagmite | deep lurker |
 | Crystal Dark (4) | stub | none flagged | ore | 6 / 2 | crystal formation, lens post, rubble | deep lurker |
-| Magma Roots (5) | stub | hot (flag only) | ore | 6 / 4 | basalt column, heat pipe, rubble | deep lurker |
+| Magma Roots (5) | **yes** | hot | ore | 6 / 4 | basalt column, heat pipe, rubble | deep lurker |
 
 The stub rows are **explicitly NOT BUILT**: they generate
 through the same code so the shape is testable, but no scenario,
@@ -103,6 +103,20 @@ faces yield ore only; fungal nodes are embedded pockets, not
 faces); the Drowned `flooded` and Magma `hot` hazards are
 flag-only until S10; and the Crystal Dark's gate items have
 never been modelled. Full record: `docs/TEST_PLAN.md`.)*
+*(S10 amendment, 2026-11-24: the finding is resolved.
+Exposure is band-keyed — `Sim::hazards_here` applies the
+active floor's theme hazards in the floor's deep zone
+(carved cells at y ≥ 6, the line generation already uses
+for bad-air pooling; the camp at y = 3 stays refuge) —
+and flooding and heat are live mechanics with their
+decision-9 answers (pumps + sealed pressure lanterns;
+cooling gear). The Fungal, Drowned, and Magma rows flip
+to `built: yes` in the table above; the Crystal Dark
+stays a stub, its gate items still unmodelled. The
+finding's second half stands: generated faces still
+yield ore only, so fungal oil does not flow on floor 2 —
+face registration for embedded pockets remains open.
+Full record: `docs/TEST_PLAN.md`.)*
 
 ## The generator, step by step
 

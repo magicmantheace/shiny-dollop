@@ -30,6 +30,7 @@ fn corridor_sim(lit: bool, delvers: Vec<Delver>) -> Sim {
             food: 10,
             fungal_oil: 0,
             masks: 0,
+            cooling_gear: 0,
         },
         0x5EED_0010,
         u64::MAX,

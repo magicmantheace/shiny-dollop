@@ -1,13 +1,15 @@
 //! S9 acceptance: floors 2–5 scenarios and balance — a colony
 //! founded directly on each generated band floor runs the
 //! delve → haul → convert loop there, deterministically, and
-//! nobody is lost. The Fungal finding these tests also encode
-//! (recorded in `docs/TEST_PLAN.md`): the S5 spore mechanics do
-//! NOT engage on generated floor 2, because exposure is keyed
-//! to depth via `hazards_at(y)` — spores start at y ≥ 10
-//! (`FUNGAL_FROM`) while generated floors hold all their carved
-//! space at y ≤ 9 (`GEN_MAX_Y`). No band's `built` flag flips
-//! in this slice; see the per-band reasoning in TEST_PLAN.
+//! nobody is lost. The Fungal finding these tests originally
+//! encoded (S9, recorded in `docs/TEST_PLAN.md`): the S5 spore
+//! mechanics did NOT engage on generated floor 2, because
+//! exposure was keyed to depth via `hazards_at(y)`. **S10
+//! superseded that finding**: exposure is now band-keyed
+//! (`hazards_here`), and the Fungal test below pins the new
+//! truth — spores engage in floor 2's deep zone, and the
+//! shallow first face stays clean. The full S10 proofs live
+//! in `scenario_s10.rs`.
 
 use underreach_sim::gen::{generate_floor, theme_for_floor, DressingKind, GEN_MAX_Y};
 use underreach_sim::scenario::{
@@ -126,26 +128,28 @@ fn determinism_on_floor_5() {
     assert_eq!(sim.state_hash(), loaded.state_hash(), "twin continuation identical");
 }
 
-/// The Fungal proof (S9 item 3): on generated floor 2 the S5
-/// spore mechanics do **not** engage. Exposure is keyed to
-/// depth — `hazards_at(y).spores` is true only at y ≥ 10 —
-/// and a generated floor's carved space tops out at y = 9, so
-/// no delver on the floor can ever stand in spore-bearing air.
-/// Fungal oil does not flow either: the generator registers
-/// faces from the theme's primary resource cell (ore) only,
-/// and the fungal-node clusters are embedded pockets, not
-/// faces. Mask protection itself remains proven by the S5
-/// tests on the hand-built deep floor (chamber at y = 14).
+/// The Fungal proof, updated for S10 (this test's S9 form
+/// proved the opposite; see the file header). Exposure is now
+/// band-keyed: on generated floor 2 the band's spores fill the
+/// floor's deep zone (y ≥ `BAND_ZONE_FROM_Y`), while the first
+/// face's stand — at y = 5, in the floor's shallows — stays in
+/// clean air, exactly as the camp does. Fungal oil still does
+/// not flow: the generator registers faces from the theme's
+/// primary resource cell (ore) only, and the fungal-node
+/// clusters are embedded pockets, not faces (that half of the
+/// S9 finding stands; face registration for embedded pockets
+/// remains a separate recorded follow-on). The depth table
+/// itself is untouched: every face stand is still above the
+/// hand-built Fungal line, which is precisely why the S9
+/// depth-keyed proof came back negative.
 #[test]
-fn fungal_spores_do_not_engage_on_generated_floor_2() {
+fn fungal_spores_engage_in_floor_2s_deep_zone() {
     let floor = generate_floor(GEN_WORLD_SEED, 2);
-    // Every carved cell of the generated floor is above the
-    // Fungal line, and every face stand is in clean air.
     assert!(GEN_MAX_Y < FUNGAL_FROM, "generated content sits above the Fungal line");
     for stand in floor.layout.faces.iter().map(|f| f.stand) {
         assert!(
             !hazards_at(stand.y).spores,
-            "face stand {stand:?} is in spore-bearing air"
+            "the depth table alone still keys no stand {stand:?} as spore-bearing"
         );
     }
     // The faces yield ore, not fungal oil.
@@ -154,8 +158,9 @@ fn fungal_spores_do_not_engage_on_generated_floor_2() {
         "generated floor 2 faces yield ore only"
     );
 
-    // An unmasked delver staged at the first face's stand for
-    // 2,000 ticks gains exactly no spore load and never sickens.
+    // An unmasked delver staged at the first face's stand (the
+    // floor's shallows) for 2,000 ticks gains exactly no spore
+    // load and never sickens — the shallows are refuge.
     let mut sim = build_scenario_gen_floor(GEN_WORLD_SEED, 2);
     open_current_floor(&mut sim);
     let stand = sim.faces[0].stand;
@@ -164,21 +169,38 @@ fn fungal_spores_do_not_engage_on_generated_floor_2() {
     for _ in 0..2000 {
         sim.tick();
         sim.delvers[0].pos = stand;
-        assert_eq!(sim.delvers[0].spore, 0.0, "no spore load accrues at the face");
+        assert_eq!(sim.delvers[0].spore, 0.0, "no spore load accrues in the shallows");
     }
     assert_eq!(count(&sim, LedgerKind::DelverSick), 0);
 
-    // And across a full colony run, no delver's load ever moves
-    // and no oil reaches the stores.
+    // Staged at a deep face's stand, the same delver loads up
+    // and the spore-cough fires — the band engages (the full
+    // proof, mask included, is S10's `scenario_s10.rs`).
+    let mut sim = build_scenario_gen_floor(GEN_WORLD_SEED, 2);
+    open_current_floor(&mut sim);
+    let stand = sim.faces[1].stand;
+    assert!(sim.hazards_here(stand).spores, "the deep stand is band-keyed spore air");
+    sim.place_lantern(stand, 1, 100_000.0); // lit staging, as in the S10 proofs
+    sim.delvers[0].pos = stand;
+    let mut peak = 0.0f32;
+    for _ in 0..2000 {
+        sim.tick();
+        sim.delvers[0].pos = stand;
+        peak = peak.max(sim.delvers[0].spore);
+    }
+    assert!(peak > 0.0, "spore load accrues at the deep face");
+    assert!(
+        count(&sim, LedgerKind::DelverSick) >= 1,
+        "the spore-cough fires on generated floor 2"
+    );
+
+    // And across a full colony run no oil reaches the stores:
+    // generated faces yield ore only (unchanged from S9).
     let mut sim = build_scenario_gen_floor(GEN_WORLD_SEED, 2);
     open_current_floor(&mut sim);
     for _ in 0..6000 {
         sim.tick();
-        for d in &sim.delvers {
-            assert_eq!(d.spore, 0.0, "spore load moved on generated floor 2");
-        }
     }
-    assert_eq!(count(&sim, LedgerKind::DelverSick), 0);
     assert_eq!(sim.stores.fungal_oil, 0, "no fungal oil flows from ore faces");
 }
 

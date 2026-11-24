@@ -654,6 +654,260 @@ bands and remain correct as written.
   feeds S10); Crystal Dark gate items; Godot frontend
   surfacing for floors 2–5 (the bridge view carries
   `floor_index`; no per-band rendering exists yet).
+  *(S10 amendment, 2026-11-24: flooding, heat, and
+  band-keyed exposure are built — see the S10 section below.
+  The Fungal finding is resolved for spores; its second
+  half — fungal oil never flows from generated faces —
+  stands, and face registration for embedded pockets
+  remains open.)*
+
+## S10 — deeper band hazards (verified 2026-11-24, VM headless)
+
+Branch `underreach-delving-colony/band-hazards`. The S9
+finding is acted on: hazard exposure is keyed to the active
+floor's band on generated floors, and the two flag-only
+hazards — Drowned flooding and Magma heat — become live
+mechanics with their decision-9 answers. Save hashes shift
+again in this slice (delvers gain water/heat loads, a
+cooling-gear flag, and threshold latches; the stores gain a
+cooling-gear count; the sim and per-floor state gain pump
+lists); behaviour numbers for the S1–S9 scenarios are
+unchanged, as the full-suite results below show.
+
+### The band-keying design (`hazards_here`)
+
+One query, `Sim::hazards_here(pos)`, is the only exposure
+source every hazard consults (spores, water, heat, and the
+lantern-dousing check):
+
+- **Generated floor** (`floor` is Some): the active floor's
+  band flags — `theme_for_floor(index).hazards` — decide
+  which hazards a cell can carry, applied in the floor's
+  **deep zone**: carved cells at y ≥ `BAND_ZONE_FROM_Y` (6).
+  That is the same depth line generation already uses
+  (bad air pools only at y ≥ 6; the entry camp sits at
+  y = 3), and it mirrors the hand-built world, where the
+  camp is clean air above the Fungal line and the hazard
+  lives in the deep workings. The camp stays a refuge on
+  every band floor, so loads clear at camp exactly as they
+  do in the hand-built S5 world; the faces, which generation
+  places deep, are where the band bites. The depth table is
+  not consulted on a generated floor — nothing double-applies.
+- **Hand-built world** (`floor` is None): the depth-keyed
+  `hazards_at(y)` table rules, exactly as before S10, at
+  every depth — including its recombined flooded/hot bands
+  deep down, where the new mechanics now also engage (no
+  hand-built scenario reaches those depths; S5's chamber at
+  y = 14 is in the spore-only band, so no baseline moves).
+
+### The mechanics
+
+- **Flooding (Drowned).** A delver standing in flood water
+  — a flooded-band deep-zone cell no pump keeps dry — gains
+  **water load** +1.0/tick (`WATER_RATE`, the air rate's
+  value). At 60 (`DROWNING_AT`) they are **drowning**: work
+  halved, morale −20, bed-seeking — the shared threshold
+  shape (`DelverDrowning` ledgered). At 100 the load drains
+  hp 0.2/tick and can down onto the rescue clock. Load
+  clears 0.25/tick in dry cells, 1.25/tick within a pump's
+  reach. **Lantern failure**: an unsealed lantern (tier <
+  3) standing in flood water loses `DOUSE_RATE` 2.0 extra
+  fuel/tick on top of its burn — a 5,000-fuel route lantern
+  is doused in ~2,475 ticks — and its death is ledgered as
+  `LanternDoused`, not a burnout.
+- **The Drowned answers.** A **pump**: placed kit at
+  **1 goods**, carved cells only, no stacking; carved cells
+  within Chebyshev radius 2 (`PUMP_RADIUS`, the vent's
+  radius) are dry — no load, fast clearing, lanterns there
+  burn normally. The **sealed pressure lantern** is lantern
+  **tier 3** (decision 8's waterproof tier): placement
+  follows `place_lantern`'s existing rules, so it draws the
+  tier-2+ charge of 1 fungal oil, and it burns in flood
+  water at its plain tier rate. Air bells and drains were
+  **not** modelled: the pump's dry reach already provides
+  refuge cells and a workable face, so a second water
+  answer would duplicate it, not complete it (modelling
+  decision, recorded here and in the handoff).
+- **Heat (Magma).** A delver in a hot band's deep zone gains
+  **heat load** +1.0/tick (`HEAT_RATE`); at 60
+  (`OVERHEATING_AT`) the shared threshold shape applies
+  (`DelverOverheating` ledgered); at 100, hp drains
+  0.2/tick. Clears 0.25/tick in cool areas. The answer is
+  **cooling gear**: worn crafted kit at **2 goods** (the
+  mask's price and pattern — crafted into stores,
+  auto-equipped at camp, permanent), which prevents the
+  gain entirely. No placed heat answer was modelled:
+  decision 9's list leads with cooling gear, and worn kit
+  travels with the delver through the whole hot zone
+  (modelling decision).
+- **One correction, on the record:** `SPORE_RATE_MASKED`
+  went 0.05 → 0.0. S5's record says a mask "protects its
+  wearer entirely", and S10's mask proof asserts a load of
+  exactly 0 at a deep face; the 0.05 leak contradicted both.
+  No S5 assertion depended on the leak (its mask test
+  asserts no sickness, which holds either way), and the S5
+  scenario numbers below are unchanged.
+
+No rate was re-tuned on evidence in this slice: the rates
+are the established pattern values (load 1.0 as `AIR_RATE`,
+threshold 60 as `SICK_AT`/`GASPING_AT`, drain 0.2, clear
+0.25 / assisted 1.25 as air's), and the first full runs
+showed the intended contrasts (below).
+
+### Tests (`sim/tests/scenario_s10.rs`, 10 tests)
+
+- **Band-keying:** a delver staged at floor 2's deep face
+  (stand y = 7) maxes spore load and the spore-cough fires
+  for them; the camp shallows are clean; a masked delver at
+  the same stand keeps a load of exactly 0.0 and never
+  sickens. On generated floor 1 nothing engages: all three
+  loads stay 0 at the deepest face stand.
+- **Flooding loads and downs:** staged at floor 3's deep
+  face, water maxes, `DelverDrowning` fires; a hurt delver
+  kept working the face (staged Mining, the S7 hurt-miner
+  pattern) is downed onto the rescue clock. (A delver who
+  rests between trips heals faster than the 0.2 drain —
+  the flood's honest pace; the downing proof therefore
+  stages continuous work.)
+- **A pump keeps its reach dry:** the pumped face stand is
+  not `flooded_at`; a delver pinned there for 2,000 ticks
+  keeps water exactly 0.0, never drowns, and the tier-1
+  lantern on the stand burns at its plain rate throughout
+  (fuel > 4,900 of 5,000 after 2,000 ticks).
+- **Pressure lantern vs tier-1:** both placed in flood
+  water with 100 fuel — tier-3 placement first refuses with
+  no oil, then places for exactly 1 oil; after 200 ticks
+  the tier-1 is at 0 with `LanternDoused` ledgered, the
+  pressure lantern holds > 90 fuel and its cell is lit.
+- **Heat:** staged at floor 5's first face (stand y = 6),
+  heat maxes and `DelverOverheating` fires; with cooling
+  gear crafted and auto-equipped at camp, the same staging
+  keeps heat exactly 0.0.
+- **Placement/cost rules:** solid rock refuses a pump;
+  a pump costs 1 goods with no stacking; a broke colony
+  places and crafts nothing; cooling gear costs 2 goods.
+- **Determinism:** twin-run + save/load continuation
+  hash-identical on a flooded floor (3) and a hot floor (5).
+- Staged proofs pin the delver at the stand with a lantern
+  placed there first (lit staging) — an unlit staging
+  conflates the flood with the dark's own clock, which an
+  early version of these tests demonstrated the hard way.
+
+### Full-suite + harness results
+
+- `cargo test`: **70/70** (60 pre-existing + 10 S10),
+  0 failed.
+- `scenario` binary (release): S1/S2/S3/S5/GEN/S7/S8
+  sections unchanged in behaviour (S1 goods 6, S3 goods
+  20, S5 oil 19 / sick 0, GEN goods 24, S7 unprotected
+  16/3/2/1, S7 protected 14/0/0/0, S8 floor-2 goods 33,
+  nobody lost anywhere). S9 sections: every band's goods
+  and deliveries reproduce S9 exactly (F2 9, F3 15, F4 9,
+  F5 6) — with the now-live events visible in the same
+  runs: **F3 drowning=3, doused=3** and **F5
+  overheating=2**, downed=0 and lost=0 on both. **F2's
+  sick stays 0, for a new reason**: the demo-seed colony
+  spends the whole 6,000-tick budget working its first
+  face (ore_left 0 at run end), whose stand at y = 5 sits
+  above the deep zone; floor 2's engagement is proven by
+  the staged tests at its deeper faces, not by this run.
+  All state hashes differ from S9's (new save fields);
+  determinism is proven by the twin-run tests as before.
+- New S10 sections (6,000 ticks each, demo seed):
+
+  | Run | Goods | Deliveries | Alive | Lost | Band events |
+  |---|---|---|---|---|---|
+  | Drowned unprotected (tier-1 opening) | 15 | 8 | 5 | 0 | drowning 3, doused 3, downed 0 |
+  | Drowned protected (3 pumps + pressure opening) | 15 | 8 | 5 | 0 | drowning 0, doused 0, downed 0 |
+  | Magma unprotected | 6 | 4 | 5 | 0 | overheating 2, downed 0 |
+  | Magma protected (6 cooling gear crafted) | 6 | 4 | 5 | 0 | overheating 0, downed 0 |
+
+  The protected runs' scripts grant the supplies a prepared
+  colony would carry in (3 goods for the pumps, 8 oil for
+  the pressure lanterns — placement spent 3 goods and one
+  oil charge per lantern actually placed; 12 goods for the
+  gear) and the net goods land exactly on the unprotected
+  runs' numbers: the answers cost their kit price and
+  nothing in production. Drowned protected hash
+  `e0b6a85e87110238…`; magma protected hash
+  `9066728cc322593e…`. The unprotected runs are the S9
+  F3/F5 runs themselves (identical hashes to the S9
+  sections above).
+- Bridge check (release binary, file protocol): `init gen`
+  → a step carrying `pump` and `craft_cooling` commands
+  applies cleanly (both refused at 0 goods, as designed);
+  the view carries `pumps`, `flooded` (0 cells on floor 1),
+  per-delver `water`/`heat`/`cooled`, and the stores'
+  `cooling_gear`.
+
+### Baseline movements — each one explained
+
+No pre-existing scenario number or test assertion about
+behaviour moved. The movements are exactly these:
+
+- **`gen.rs` unit test + `gen_floor.rs` stub-band test**:
+  the `built` expectations for floors 2, 3, and 5 flip to
+  `true` (floor 4 stays `false`) — this slice's intended
+  flag flips; see the `built` decisions below.
+- **`scenario_s9.rs`'s Fungal proof** is rewritten to pin
+  the new truth (its S9 form proved spores do *not*
+  engage): it still asserts the depth table keys no
+  generated stand as spore-bearing, that the shallow first
+  face stays clean under staging, and that no fungal oil
+  flows from generated faces — and now also that a deep
+  face's stand is band-keyed spore air where the cough
+  fires. The property it exists to prove — floor 2's
+  hazard-engagement status is pinned by test, whichever
+  way the mechanics stand — is kept; the direction is
+  S10's intended change.
+- **`scenario_s3.rs`**: one mechanical line — its `Stores`
+  literal gains the new `cooling_gear: 0` field (as do all
+  of `scenario.rs`'s). No assertion touched.
+- **State hashes** in every scenario section differ from
+  their S9 values (new save fields, listed above). S9's
+  own precedent applies: determinism is proven by the
+  twin-run tests, not by hash stability across slices.
+
+### The `built` decisions — three flags flip
+
+Under S9's rule — (a) the band's scenario runs the colony
+loop on its generated floor, (b) its balance numbers are
+recorded, (c) the mechanics that exist for that band
+demonstrably engage on the generated floor:
+
+- **Fungal Reaches: flips to `true`.** (a) and (b) held
+  since S9; (c) now holds — band-keyed spores engage in
+  floor 2's deep zone (staged proofs: load maxes, the
+  cough fires, a mask holds the load at exactly 0). The
+  oil half of the S9 finding is unchanged and does not
+  block the flip: it was never a hazard mechanic, and face
+  registration for embedded pockets remains a recorded
+  follow-on.
+- **Drowned Galleries: flips to `true`.** (c) holds in the
+  ordinary colony run itself — drowning and dousing events
+  fire unprotected and are wholly absent under pumps +
+  pressure lanterns, at equal production.
+- **Crystal Dark: stays `false`.** Its gate items (lenses,
+  quiet gear, harnesses, brittle floors, sound hunters)
+  have still never been modelled; nothing about this
+  slice changes that.
+- **Magma Roots: flips to `true`.** (c) holds in the
+  ordinary run — overheating fires unprotected and is
+  wholly absent under cooling gear, at equal production.
+
+### Not verified / not built
+
+- Godot frontend surfacing for pumps, flooded cells, water
+  / heat loads, and cooling gear (the bridge view carries
+  all of it; the frontend renders none of it yet — the
+  same stance as S5/S7's sim-side builds).
+- Face registration for embedded pockets (fungal-oil faces
+  on generated floors) — the S6/S9 follow-on, still open.
+- Crystal Dark gate items; flooding/heat *combinations*
+  on recombined floors ≥ 6 beyond what the band cycle and
+  the depth table already compose (each generated floor
+  ≥ 6 takes its cycled band's flags under `hazards_here`;
+  no scenario run was made there in this slice).
 
 ## Planned (later slices)
 
