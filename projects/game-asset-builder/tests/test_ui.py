@@ -135,7 +135,8 @@ class CatalogDataTests(unittest.TestCase):
                                           "surface-gate",
                                           "timber-support-set",
                                           "ventilation-pieces",
-                                          "fungal-node"})
+                                          "fungal-node",
+                                          "ore-face-rock-v2"})
         self.assertEqual(summaries["ember-dragon"]["bone_count"], 14)
         self.assertEqual(summaries["moth-hart"]["bone_count"], 21)
         self.assertEqual(summaries["toasty"]["bone_count"], 11)
