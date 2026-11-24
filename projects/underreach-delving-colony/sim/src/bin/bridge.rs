@@ -28,6 +28,7 @@ use std::process::exit;
 
 use serde_json::{json, Value};
 
+use underreach_sim::gen::band_for_floor;
 use underreach_sim::scenario::{
     build_scenario, build_scenario_gen, build_scenario_s2, build_scenario_s3, build_scenario_s5,
     build_scenario_s7, light_the_deep, light_the_way, open_floor1, GEN_WORLD_SEED,
@@ -152,6 +153,11 @@ fn view(sim: &Sim) -> Value {
                 "hp": d.hp, "energy": d.energy, "hunger": d.hunger,
                 "morale": d.morale, "spore": d.spore, "masked": d.masked,
                 "air": d.air, "water": d.water, "heat": d.heat, "cooled": d.cooled,
+                // S11 (additive, presentation only): the sim's own
+                // suffering predicates, so the frontend flags state
+                // without re-deriving thresholds. No state, no hash.
+                "sick": d.sick(), "gasping": d.gasping(),
+                "drowning": d.drowning(), "overheating": d.overheating(),
                 "carrying": d.carrying,
                 "carrying_kind": format!("{:?}", d.carrying_kind),
                 "mining_xp": d.mining_xp, "hauling_xp": d.hauling_xp,
@@ -201,9 +207,13 @@ fn view(sim: &Sim) -> Value {
         .collect();
     // Floor-generation record (S6): present when the sim stands
     // on a generated floor, null for the hand-built scenarios.
-    let (floor_index, descent, dens, dressing, hazards) = match &sim.floor {
+    let (floor_index, band, descent, dens, dressing, hazards) = match &sim.floor {
         Some(f) => (
             json!(f.index),
+            // S11 (additive, presentation only): the active floor's
+            // band, derived from the floor index by the sim's own
+            // table, so the frontend HUD never re-derives it.
+            json!(format!("{:?}", band_for_floor(f.index))),
             json!([f.descent.x, f.descent.y, f.descent.z]),
             f.dens.iter().map(|p| json!([p.x, p.y, p.z])).collect::<Vec<_>>().into(),
             f.dressing
@@ -217,12 +227,13 @@ fn view(sim: &Sim) -> Value {
                 .collect::<Vec<_>>()
                 .into(),
         ),
-        None => (Value::Null, json!([]), json!([]), json!([]), json!([])),
+        None => (Value::Null, Value::Null, json!([]), json!([]), json!([]), json!([])),
     };
     json!({
         "tick": sim.tick_count,
         "world_seed": sim.world_seed,
         "floor_index": floor_index,
+        "band": band,
         "descent": descent,
         "dens": dens,
         "dressing": dressing,

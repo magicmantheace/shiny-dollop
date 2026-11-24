@@ -205,6 +205,19 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   pressure lanterns, and the Magma heat mechanic (heat
   load) with cooling gear. The Fungal, Drowned, and Magma
   `built` flags flip; Crystal stays unbuilt.
+- **S11 — Godot frontend surfacing (BUILT 2026-11-24, branch
+  `underreach-delving-colony/frontend-surfacing`).** The
+  S7/S8/S10 pieces the frontend did not render — supports,
+  vents, pumps, flooded cells, per-delver air/water/heat
+  loads, cooling-gear stores, and floor traversal — are
+  surfaced: placeholder kit markers, a flooded-cell overlay,
+  load lines + suffering flags on delver panels and name
+  labels, a HUD floor/band indicator, descend/ascend
+  controls, support/vent/pump tools, and a cooling-gear
+  button, all over the existing bridge commands. The bridge
+  view gains two purely additive presentation fields (band
+  name; the sim's own suffering booleans) so no sim rule is
+  re-derived in the frontend.
 - Later: Crystal Dark gates, co-op, colony failure &
   succession, children/generations.
 
@@ -408,3 +421,35 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   them all), face registration for embedded pockets (the
   S9 finding's oil half stands — generated faces still
   yield ore only), Crystal gate items.
+- **S11 — Godot frontend surfacing (2026-11-24, VM-verified;
+  branch `underreach-delving-colony/frontend-surfacing`, not
+  yet merged):** the frontend-not-rendered caveats of S7, S8,
+  and S10 are closed. Supports, vents, and pumps render as
+  placeholder markers (distinct colour per kind, dressing
+  idiom; no catalog GLBs exist), flooded cells as a
+  blue-tinted overlay instance per cell on the viewed layer,
+  and delver panels + name labels carry air/water/heat loads
+  verbatim with `[SICK]` / `[GASPING]` / `[DROWNING]` /
+  `[OVERHEATING]` text flags and MASKED / COOLED state. The
+  HUD shows floor index + band, with descend/ascend buttons
+  and PgDn/PgUp keys, support/vent/pump click tools, and a
+  craft-cooling button — commands only; no sim rules in the
+  frontend. One bridge change, purely additive and justified
+  in `docs/TEST_PLAN.md`: the view gains `band` (the sim's
+  own `band_for_floor`) and per-delver suffering booleans
+  (the sim's own predicates), so the frontend never
+  re-derives the band table or the load thresholds. The sim
+  library is untouched: `cargo test` 70/70 and every
+  scenario section's numbers reproduce exactly. The headless
+  verify prints its two prior PASS lines unchanged plus
+  `UNDERREACH_VERIFY_PASS scenario=s11 supports=1 vents=1
+  pumps=1 cooling_gear=1 floor_index=3 flooded=96
+  flooded_layer=35 tick=0` — kit placed through the bridge
+  on the S7 colony, cooling gear crafted on a fresh founding
+  (the kit leaves 1 good, short of the 2-good craft), the
+  floor indicator followed through descend 1 → 2 → 3, and
+  the Drowned floor's flooded overlay matched to the view
+  on layer 9. **Rendered appearance of all S11 surfacing is
+  UNVERIFIED** — headless proves load and logic only; a
+  visual pass awaits the owner's PC. NOT built: Crystal
+  gate items, face registration for embedded pockets.

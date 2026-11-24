@@ -79,7 +79,8 @@ beside them and gasps anyone working there. The Shallows' gate
 set answers both: timber supports and vents, placed kit at a
 goods apiece. Verified headless (`cargo test` 43/43, the
 `scenario` binary's protected/unprotected contrast); the Godot
-frontend does not render the new pieces yet.
+frontend did not render the new pieces yet — surfaced in S11,
+below.
 
 **S8 — floor-to-floor traversal (2026-11-24, branch
 `underreach-delving-colony/traversal`):** the descent is a
@@ -143,6 +144,32 @@ Fungal Reaches, Drowned Galleries, and Magma Roots flip to
 still unmodelled. Verified headless (`cargo test` 70/70,
 every S1–S9 scenario section unchanged in behaviour
 numbers).
+
+**S11 — Godot frontend surfacing (2026-11-24, branch
+`underreach-delving-colony/frontend-surfacing`):** everything
+S7/S8/S10 left sim-side only is now in the frontend, closing
+those slices' frontend-not-rendered caveats. Placed supports,
+vents, and pumps render as placeholder markers (distinct
+colours per kind; no catalog GLBs exist for them), flooded
+cells get a blue-tinted overlay in the depth-slice view, and
+each delver's panel line and name label show their air /
+water / heat loads verbatim with suffering flagged in text
+(`[GASPING]`, `[DROWNING]`, `[OVERHEATING]`, `[SICK]`) plus
+masked/cooled state. The HUD shows the current floor and its
+band, with Descend/Ascend controls (buttons or PgDn/PgUp),
+new Support/Vent/Pump placement tools, and a cooling-gear
+crafting button — all sending the existing bridge commands;
+no sim rules moved into the frontend (the bridge view gained
+only two additive presentation fields, the band name and the
+sim's own suffering booleans). The headless verify gains a
+third PASS line proving the frontend's synced counts match
+the bridge view exactly, the floor indicator follows a
+descend, and a Drowned floor's flooded overlay matches the
+view cell-for-cell on the checked layer. Verified headless
+(`cargo test` 70/70 and every scenario number unchanged);
+**the rendered appearance of all S11 surfacing is
+unverified** — headless proves load and logic only, and a
+visual pass awaits the owner's PC.
 
 ## Layout
 

@@ -909,6 +909,140 @@ demonstrably engage on the generated floor:
   ≥ 6 takes its cycled band's flags under `hazards_here`;
   no scenario run was made there in this slice).
 
+## S11 — Godot frontend surfacing (verified 2026-11-24, VM headless)
+
+Branch `underreach-delving-colony/frontend-surfacing`. The
+pieces S7/S8/S10 built sim-side only — supports, vents, pumps,
+flooded cells, per-delver air/water/heat loads, cooling gear,
+and floor traversal — are now surfaced in the Godot frontend.
+The frontend still holds **no sim rules**: it renders the
+bridge view and sends the existing bridge commands. The sim
+library is untouched; the only `sim/` change is in the bridge
+binary's view JSON, purely additive (below).
+
+### What the frontend now does
+
+- **Placed kit renders** (`supports` / `vents` / `pumps` from
+  the view) as placeholder markers in the dressing idiom, one
+  per placed piece on the viewed layer, with a distinct colour
+  per kind (timber-brown support, pale-cyan vent, blue-steel
+  pump — recorded in `frontend/README.md`). No catalog GLBs
+  exist for these; placeholders are the owner-approved stance.
+  The placed pump is distinct from the "Pump" *dressing*
+  anchor, which remains unbuilt scenery data.
+- **Flooded cells render** (`flooded` from the view) as a
+  thin blue-tinted overlay instance per flooded cell on the
+  viewed layer (a second MultiMesh, the floors' idiom).
+- **Delver loads surface**: the right-panel status line shows
+  air / water / heat verbatim from the view (spore when > 0),
+  plus `MASKED` / `COOLED` worn-kit state; suffering is
+  flagged in text — `[SICK]`, `[GASPING]`, `[DROWNING]`,
+  `[OVERHEATING]` — in the panel line and appended to the
+  3D name label (which also tints orange while suffering).
+- **Floor indicator + traversal**: the HUD shows
+  `Floor <index> · <band name>` from the view (`Floor — ·
+  hand-built` for the hand-built scenarios), and the player
+  can `descend` / `ascend` via Colony buttons or PgDn / PgUp.
+  New tools **Support** / **Vent** / **Pump** place kit by
+  clicking a cell (the carve/lantern/plant pattern), and a
+  **Craft cooling gear (2 goods)** button sends
+  `craft_cooling`. The scenario row gains **S7**.
+
+### The one bridge change — additive only, justified
+
+The view already carried every S11 field except two things
+the HUD/flags need: the active floor's **band name** and each
+delver's **suffering state**. Deriving either in the frontend
+would duplicate sim logic (the band table; the load
+thresholds) in the presentation layer, against rule 5's
+spirit. The bridge view therefore gains, purely additively:
+`band` (the sim's own `band_for_floor` for the active floor,
+null on hand-built worlds) and per-delver `sick` / `gasping`
+/ `drowning` / `overheating` booleans (the sim's own
+`Delver` predicates). No sim state, no save field, no hash
+input, no behaviour change — proven by the baselines below:
+`cargo test` 70/70 and every scenario section's numbers
+(including the S10 protected-run hashes `e0b6a85e87110238…`
+and `9066728cc322593e…`) reproduce exactly.
+
+### Headless verification — the extended `--underreach-verify`
+
+The verify keeps its two existing parts byte-identical and
+adds a third (S11) part. Exact output (VM, headless, exit 0,
+zero script errors):
+
+```
+UNDERREACH_VERIFY_PASS goods=20 delvers=5 floor_instances=15 tick=4000
+UNDERREACH_VERIFY_PASS scenario=gen goods=24 delvers=5 floor_instances=61 tick=4000
+UNDERREACH_VERIFY_PASS scenario=s11 supports=1 vents=1 pumps=1 cooling_gear=1 floor_index=3 flooded=96 flooded_layer=35 tick=0
+```
+
+What the S11 part proves, each check failing loudly
+(`UNDERREACH_VERIFY_FAIL scenario=s11 …`, exit 1) on any
+mismatch — no silent skips:
+
+- **Kit placement + sync (Phase A).** On a fresh `init s7`
+  colony (4 goods — its script founds no kit), the verify
+  drives the bridge commands `support` at (14, 8, 4), `vent`
+  at (14, 8, 4), and `pump` at (13, 8, 4) — the face stand
+  and its tunnel neighbour. The frontend's synced counts
+  (`kit_synced`, taken from the view on every `apply_view`)
+  must equal the view's array sizes exactly (1 each), and
+  the rendered marker count on layer 8 (`count_rendered_kit`,
+  counting `kit_kind`-tagged props) must be 1 per kind.
+- **Load display (Phase A).** For every delver in the view,
+  the panel line the frontend actually built
+  (`delver_load_texts`) must contain `air <v>`, `water <v>`,
+  and `heat <v>` formatted from that delver's view values.
+  The suffering/worn-kit flags are additionally proven on a
+  synthetic delver entry (sick + gasping + drowning + masked
+  + cooled, not overheating), so the flag logic is exercised
+  regardless of this run's loads.
+- **Cooling gear (Phase B).** A fresh `init s7` (the kit in
+  Phase A leaves only 1 good, short of the 2-good craft)
+  takes `craft_cooling` through the bridge; the view's
+  `cooling_gear` must be 1 and the HUD stores line must read
+  `Cooling 1`.
+- **Traversal + flooded (Phase C).** On `init gen`, the HUD
+  floor indicator must read Floor 1 · Shallows; after a
+  `descend` command it must read Floor 2 · Fungal Reaches
+  (the spec's 1 → 2 follow, asserted on both the view's
+  `floor_index` and the label text); after a second
+  `descend`, Floor 3 · Drowned Galleries with
+  `flooded=96` in the view, the frontend's `flooded_synced`
+  equal to it, and the overlay's instance count on layer 9
+  equal to the view's layer-9 flooded count (35) — computed
+  independently in the verify from the view, not from the
+  renderer's own bookkeeping. Kit sync is re-asserted on
+  floor 3 (0 each, matching the view).
+
+### Full-suite + harness results
+
+- `cargo test`: **70/70**, 0 failed — unchanged.
+- `scenario` binary (release): every S1–S10 section
+  reproduces its S10 numbers exactly (S1 goods 6, S3 goods
+  20, S5 oil 19 / sick 0, GEN goods 24, S7 unprotected
+  16/3/2/1, S7 protected 14/0/0/0, S8 floor-2 goods 33, S9
+  F2 9 / F3 15 with drowning 3 + doused 3 / F4 9 / F5 6
+  with overheating 2, S10 protected hashes as above;
+  nobody lost anywhere).
+- Godot headless verify: the three PASS lines above.
+  (Environment note: a fresh worktree needs one
+  `godot --headless --editor --import` pass before the
+  verify, or the GLB import cache is missing and loads
+  fail — the same wrinkle the 2026-11-12 on-PC pass hit.
+  The `.godot` cache is gitignored; no project file
+  changed by it.)
+
+### Not verified
+
+- **Rendered appearance of all S11 surfacing: unverified,
+  awaits the owner's PC.** Headless verify proves load and
+  logic only — this VM produces no viewport image. The kit
+  markers' colours/sizes, the flooded overlay's look, the
+  name-label flag text, and the HUD layout have never been
+  seen rendered. No performance claims, as ever.
+
 ## Planned (later slices)
 
 - Owner-PC visual pass of the frontend; performance measurement
