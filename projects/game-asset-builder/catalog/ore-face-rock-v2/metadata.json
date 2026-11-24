@@ -1,0 +1,35 @@
+{
+ "entry_version": 1,
+ "name": "Ore Face Rock V2",
+ "slug": "ore-face-rock-v2",
+ "source_concept": "media-generation-underreach-ore-face-rock-v2-co-0-2a2ae805-6904-418e-988c-07de871300ae.webp",
+ "asset_file": "ore-face-rock-v2.glb",
+ "asset_location": "outputs/<slug>/ (local; not in git)",
+ "sha256": "a460f9761f7a848290afc246a3cc6cb384c316908e3748b002d617e7f9d947e4",
+ "bytes": 10127408,
+ "counts": {
+  "verts": 27006,
+  "faces": 53992,
+  "raw_mesh_verts": 739999,
+  "raw_mesh_faces": 979260
+ },
+ "bones": [],
+ "actions": [],
+ "provenance": {
+  "mesh_model": "tencent/Hunyuan3D-2 hunyuan3d-dit-v2-0",
+  "texture_model": "tencent/Hunyuan3D-2 hunyuan3d-paint-v2-0",
+  "rigged": false,
+  "rig_template": null,
+  "weight_method": null,
+  "gpu_host": {
+   "hostname": "AthenZ971",
+   "agent": "1.2.0"
+  },
+  "mesh_stage": {
+   "resumed": true
+  },
+  "texture_stage": {
+   "resumed": true
+  }
+ }
+}
