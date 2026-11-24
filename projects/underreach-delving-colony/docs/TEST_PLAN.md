@@ -534,6 +534,127 @@ behaviour numbers for the S1–S7 scenarios are unchanged.
   band, and no Fungal gate set is founded with the forward
   camp.
 
+## S9 — floors 2–5 scenarios and balance (verified 2026-11-24, VM headless)
+
+Branch `underreach-delving-colony/band-scenarios`. The gen
+founding is generalized: `build_scenario_gen_floor(world_seed,
+floor_index)` founds a colony directly on any generated floor
+with the exact `build_scenario_gen` pattern (entry-camp
+delvers, beds + stockpile, generated faces, gate, pipe-fed
+camp lantern, one resident critter per den, and the two camp
+farming plots — a founded colony is a home, where S8's forward
+camps omit the plots). `build_scenario_gen` is now that
+function at floor 1; a test pins the two foundings
+hash-identical, and the GEN section below is unchanged.
+
+### Tests (`sim/tests/scenario_s9.rs`, 9 tests)
+
+- **Founding identity:** `build_scenario_gen(seed)` and
+  `build_scenario_gen_floor(seed, 1)` produce identical state
+  hashes.
+- **One loop test per band (floors 2–5):** founded on the
+  demo seed `0x5EED0007`, the active world equals
+  `generate_floor(seed, floor)`, founding drew no runtime RNG,
+  opened with `open_current_floor`, 6,000 ticks → goods
+  strictly increase, deliveries ≥ 1, 0 lost.
+- **Determinism (floors 2 and 5):** save/load mid-run
+  reproduces the state hash; twin continuation for 300 ticks
+  stays hash-identical.
+- **The Fungal spore proof** (below).
+- **Floor 1 guard:** every value of the Shallows theme row is
+  pinned exactly as it stood before this slice.
+
+### Per-band scenario numbers (scenario binary, 6,000 ticks each)
+
+| Floor / band | Goods | Deliveries | Alive | Lost | Sick | Gasping | Cave-ins | Downed | Fungal oil | Food at end* |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2 Fungal Reaches | 9 | 6 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 94 |
+| 3 Drowned Galleries | 15 | 8 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 96 |
+| 4 Crystal Dark | 9 | 6 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 92 |
+| 5 Magma Roots | 6 | 4 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 94 |
+
+\* Food read from the identical test-configuration runs (the
+binary does not print it). State hashes: F2
+`7693079b122fbe76c7…`, F3 `59bb11997b063ddb92…`, F4
+`0e6be80d248a9d50b3…`, F5 `7096ce90a703e9abc1…`. Critters
+spotted/slain in the same runs: F2 9/9, F3 10/10, F4 9/9,
+F5 8/8 — the lit network did the repelling, the same honest
+read as S3; no cave-in or gasping event fired on any band's
+opened faces in these runs.
+
+### The Fungal finding — spores do NOT engage on generated floors
+
+Proven by test, not assumed. Spore exposure in `sim.rs` is
+keyed to **depth**: a delver gains load only where
+`hazards_at(pos.y).spores`, which is true only at
+y ≥ `FUNGAL_FROM` (10). A generated floor's content lives at
+y ≤ `GEN_MAX_Y` (9) — the demo floor 2's carved cells top out
+at y = 9 and every face stand sits in clean air
+(`hazards_at(stand.y).spores == false` for all three faces).
+An unmasked delver staged at floor 2's first face stand for
+2,000 ticks gains exactly 0.0 spore load; across the full
+6,000-tick colony run every delver's load stays 0.0 and
+`DelverSick` never fires. Fungal oil does not flow either:
+the generator registers faces from the theme's primary
+resource cell (ore) only, so all of floor 2's faces yield
+ore, and the fungal-node clusters are embedded pockets, not
+faces — oil in stores stays 0. Mask protection itself remains
+proven by the S5 tests on the hand-built floor (chamber at
+y = 14, above the Fungal line). **No rewire was made:**
+keying exposure to the floor's band instead of depth would
+change S8's floor-2 behaviour, so it is not provably inert
+for the existing baselines; the finding feeds S10, where the
+Drowned/Magma mechanics land and band-keying can be designed
+once for all bands.
+
+### Balance pass — no tuning
+
+The tuning triggers (a band's colony cannot produce, starves,
+or is wiped by its dens before it can work) fired for **no**
+band: every band produced from its stub theme numbers, ended
+the run fed (food 92–96), and lost nobody. Per the slice
+rule — tune only on evidence, by the smallest change — **no
+theme row was changed**: floors 2–5 keep their S6 stub
+numbers, and the Shallows row is pinned by the guard test.
+
+### The `built` decisions — no flag flips
+
+A band flips only when (a) its scenario runs the colony loop
+on its generated floor, (b) its balance numbers are recorded,
+and (c) the mechanics that exist for that band today
+demonstrably engage on the generated floor.
+
+- **Fungal Reaches: stays `false`.** (a) and (b) hold; (c)
+  fails on the finding above — spores never engage and oil
+  never flows on the generated floor.
+- **Drowned Galleries: stays `false`.** (a) and (b) hold;
+  (c) fails — `flooded` is flag-only until S10, no flooding
+  mechanics exist to engage.
+- **Crystal Dark: stays `false`.** (a) and (b) hold; (c)
+  fails — its gate items (lenses, quiet gear, harnesses,
+  brittle floors, sound hunters) have never been modelled.
+- **Magma Roots: stays `false`.** (a) and (b) hold; (c)
+  fails — `hot` is flag-only until S10.
+
+Consequently **no pre-existing assertion changed**: the
+`built` expectations in the `gen.rs` unit test and in
+`sim/tests/gen_floor.rs` already assert `false` for the stub
+bands and remain correct as written.
+
+### Full-suite + harness results
+
+- `cargo test`: **60/60** (51 pre-existing + 9 S9), 0 failed.
+- `scenario` binary (release): S1/S2/S3/S5/GEN/S7/S8 sections
+  unchanged in behaviour **and** in state hash (S1 goods 6,
+  S3 goods 20, S5 oil 19, GEN goods 24 / lost 0, S7
+  unprotected 16/3/2/1, S7 protected 14/0/0/0, S8 floor-2
+  goods 33). New S9 F2/F3/F4/F5 sections as tabulated above.
+- **Not verified / not built:** flooding and heat mechanics
+  (S10); band-keyed hazard exposure (the Fungal finding,
+  feeds S10); Crystal Dark gate items; Godot frontend
+  surfacing for floors 2–5 (the bridge view carries
+  `floor_index`; no per-band rendering exists yet).
+
 ## Planned (later slices)
 
 - Owner-PC visual pass of the frontend; performance measurement

@@ -187,8 +187,18 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   forward camp at its entry camp; return visits restore the
   packed state exactly. Descents and ascents are ledgered
   (`Descended` / `Ascended`, naming the floor and its band).
-- Later: Drowned/Crystal/Magma gates, floors 2–5 scenarios
-  and balance, co-op, colony failure & succession,
+- **S9 — floors 2–5 scenarios and balance (BUILT 2026-11-24,
+  branch `underreach-delving-colony/band-scenarios`).**
+  Per-band founding (`build_scenario_gen_floor`), one
+  scenario per band floor on the demo seed, and a balance
+  pass that tuned nothing (every band playable as generated).
+  The Fungal proof came back negative — spores and fungal
+  oil do not engage on generated floors (see status) — so
+  no band's `built` flag flipped.
+- Later: Drowned/Magma mechanics (flooding, heat — S10,
+  where band-keyed hazard exposure should be designed once
+  for all bands, per the S9 Fungal finding), Crystal Dark
+  gates, co-op, colony failure & succession,
   children/generations.
 
 ## Status — 2026-11-10
@@ -311,3 +321,34 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   scenarios/balance and band mechanics (floor 2 generates
   and runs the generic loop, but the Fungal gate set is not
   wired per-floor), frontend surfacing for traversal.
+- **S9 — floors 2–5 scenarios and balance (2026-11-24,
+  VM-verified; branch
+  `underreach-delving-colony/band-scenarios`, not yet
+  merged):** colonies found directly on floors 2–5 and run.
+  `cargo test` 60/60 (51 pre-existing + 9 new S9 tests); the
+  `scenario` binary's S1–S8 sections are unchanged in
+  behaviour and state hash, and its new S9 sections produce
+  on every band (goods F2 9, F3 15, F4 9, F5 6 in 6,000
+  ticks; nobody lost; every colony ends fed). **Balance:
+  no theme numbers were tuned** — no band met the tuning
+  triggers (cannot produce / starves / wiped by its dens).
+  **FINDING (feeds S10): the Fungal Reaches' mechanics do
+  not engage on generated floor 2.** Spore exposure is
+  keyed to depth via `hazards_at(y)` — spores only at
+  y ≥ 10 — while generated floors hold all carved space at
+  y ≤ 9 (GEN_MAX_Y); an unmasked delver staged at floor 2's
+  face for 2,000 ticks gains exactly 0.0 spore load, proven
+  by test. Fungal oil never flows either: generated faces
+  are registered from the theme's primary resource cell
+  (ore) only, and fungal-node clusters are embedded pockets,
+  not faces. `hazards_at` was NOT rewired in this slice —
+  band-keying exposure would change S8's floor-2 behaviour,
+  so it is not provably inert for the existing baselines;
+  band-keyed exposure should be designed once, with S10's
+  flooding/heat mechanics. **`built` decisions: no band
+  flips.** Fungal fails the engagement test above; Drowned
+  (`flooded` flag-only) and Magma (`hot` flag-only) wait on
+  S10; Crystal's gate items were never modelled. No
+  pre-existing assertion changed. NOT built: flooding/heat
+  mechanics, band-keyed hazards, Crystal gate items,
+  frontend surfacing for floors 2–5.

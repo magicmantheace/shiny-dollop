@@ -5,9 +5,9 @@
 
 use underreach_sim::gen::generate_floor;
 use underreach_sim::scenario::{
-    build_scenario, build_scenario_gen, build_scenario_s2, build_scenario_s3, build_scenario_s5,
-    build_scenario_s7, light_the_deep, light_the_way, open_current_floor, open_floor1,
-    GEN_WORLD_SEED,
+    build_scenario, build_scenario_gen, build_scenario_gen_floor, build_scenario_s2,
+    build_scenario_s3, build_scenario_s5, build_scenario_s7, light_the_deep, light_the_way,
+    open_current_floor, open_floor1, GEN_WORLD_SEED,
 };
 use underreach_sim::sim::LedgerKind;
 
@@ -269,6 +269,41 @@ fn main() {
         s8.lanterns == floor1_lanterns,
     );
     println!("S8 state hash: {}", s8.state_hash());
+
+    // ---- S9: a colony founded on each band floor -------------------------
+    // One run per band (floors 2–5): founded directly on the
+    // generated floor, opened, and run for the standard budget.
+    // The band events are printed per floor — sick for the
+    // Fungal Reaches (the S9 finding: it stays 0, because spore
+    // exposure is keyed to depth y ≥ 10 and generated floors
+    // hold their carved space at y ≤ 9), gasping / cave-ins /
+    // downed for the generic S7 hazards every floor carries.
+    for (label, floor) in [
+        ("F2 fungal reaches", 2),
+        ("F3 drowned galleries", 3),
+        ("F4 crystal dark", 4),
+        ("F5 magma roots", 5),
+    ] {
+        let mut s9 = build_scenario_gen_floor(GEN_WORLD_SEED, floor);
+        open_current_floor(&mut s9);
+        for _ in 0..6000 {
+            s9.tick();
+        }
+        println!(
+            "S9 {label} ({} ticks): goods={}, deliveries={}, delvers alive={}, lost={}, sick={}, gasping={}, cave-ins={}, downed={}, fungal oil={}",
+            s9.tick_count,
+            s9.stores.goods,
+            count(&s9, LedgerKind::HaulDelivered),
+            s9.delvers.len(),
+            count(&s9, LedgerKind::DelverLost),
+            count(&s9, LedgerKind::DelverSick),
+            count(&s9, LedgerKind::DelverGasping),
+            count(&s9, LedgerKind::CaveIn),
+            count(&s9, LedgerKind::DelverDowned),
+            s9.stores.fungal_oil,
+        );
+        println!("S9 {label} state hash: {}", s9.state_hash());
+    }
 
     println!("deep ledger (S2):");
     for e in &sim.ledger {

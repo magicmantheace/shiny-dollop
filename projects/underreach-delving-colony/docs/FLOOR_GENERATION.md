@@ -90,7 +90,19 @@ of 3–6 cells; 1 loop edge; ~33 % of passage segments widened to
 
 The stub rows are **explicitly NOT BUILT**: they generate
 through the same code so the shape is testable, but no scenario,
-balance, or band mechanics exist for them yet.
+balance, or band mechanics exist for them yet. *(S9 amendment,
+2026-11-24: floors 2–5 now have scenarios and a balance pass —
+a colony founded directly on each band floor runs the colony
+loop there, and every band was playable as generated, so no
+theme numbers were tuned. The rows stay stubs (`built: false`)
+because the band-mechanics test fails for each: on generated
+floor 2 the S5 spore mechanics never engage (spore exposure is
+keyed to depth, y ≥ 10, while generated floors hold their
+carved space at y ≤ 9) and fungal oil never flows (generated
+faces yield ore only; fungal nodes are embedded pockets, not
+faces); the Drowned `flooded` and Magma `hot` hazards are
+flag-only until S10; and the Crystal Dark's gate items have
+never been modelled. Full record: `docs/TEST_PLAN.md`.)*
 
 ## The generator, step by step
 
@@ -219,5 +231,12 @@ cells and render as ordinary floor.
   auto-spawner still uses its S3 rule (carved, unlit, near
   light).
 - **Floors 2–5 scenarios and balance** — stub themes only.
+  *(S9 amendment, 2026-11-24: built — colonies founded
+  directly on floors 2–5 run the loop, all four bands were
+  playable as generated with no theme tuning, and the
+  per-band numbers are recorded in `docs/TEST_PLAN.md`. The
+  bands themselves remain NOT BUILT (`built: false`): their
+  band mechanics do not engage on generated floors yet —
+  see the theme-table amendment above.)*
 - **Per-band footprints** — every floor currently generates in
   the Floor 1 footprint.
