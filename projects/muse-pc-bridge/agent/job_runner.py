@@ -300,7 +300,9 @@ class JobRunner:
                  poll_interval_s: float = 0.25,
                  gpu_poll_s: float = 30.0,
                  gpu_threshold_pct: int = 90,
-                 process_names_fn=None, gpu_fn=None):
+                 process_names_fn=None, gpu_fn=None,
+                 shutdown_grace_s: float = 10.0,
+                 shutdown_fn=None):
         self.jobs_dir = Path(jobs_dir)
         self.state_dir = Path(state_dir)
         self.cfg = cfg or {}
@@ -318,6 +320,11 @@ class JobRunner:
         # Injectable probes (tests stub the process list / GPU).
         self._process_names_fn = process_names_fn
         self._gpu_fn = gpu_fn
+        self._shutdown_grace_s = max(0.0, float(shutdown_grace_s))
+        # Injectable probe (tests stub the shutdown state).
+        self._shutdown_fn = shutdown_fn \
+            if shutdown_fn is not None \
+            else bridge_agent.system_shutting_down
         self._extra_patterns = _blocker_patterns(
             self.cfg.get("job_gpu_blockers") or ())
         self._events_lock = threading.Lock()
@@ -828,11 +835,55 @@ class JobRunner:
             self._fail_job(record, idx, reason, exit_code)
             return "failed"
 
+    def _shutdown_interruption(self, record: dict, stage_rec: dict,
+                               exit_code: int) -> bool:
+        """Decide whether a stage's non-zero exit is really the
+        machine shutting down underneath it.
+
+        On a graceful Windows shutdown the OS terminates stage
+        processes (console children) seconds before the runner
+        worker (a console-less pythonw), so the worker's first
+        sight of a shutdown is its stage dying with a generic
+        exit code — indistinguishable from a real failure unless
+        the shutdown itself is probed. Deploy smoke, 2026-11-24:
+        a demo job's sleep stage exited 1 as the PC rebooted and
+        the job was marked failed, leaving nothing to resume.
+        So: probe immediately, then keep probing for the grace
+        window (the flag can lag the kills). A shutdown found at
+        any point converts the exit into an interruption — the
+        stage returns to pending and the job resumes on the next
+        worker start. A worker stop during the window converts
+        too (the job is being left, not failed). Only a full
+        quiet window lets the failure verdict through, delayed
+        by at most the grace.
+        """
+        if self._shutdown_fn():
+            self._event("shutdown_interrupted", record,
+                        stage=stage_rec["index"], exit_code=exit_code)
+            return True
+        deadline = time.monotonic() + self._shutdown_grace_s
+        while time.monotonic() < deadline:
+            if self._stop_event.is_set():
+                return True
+            if self._shutdown_fn():
+                self._event("shutdown_interrupted", record,
+                            stage=stage_rec["index"],
+                            exit_code=exit_code)
+                return True
+            time.sleep(0.1)
+        return False
+
     def _spawn_and_wait(self, record: dict, spec: dict,
                         stage_rec: dict) -> tuple[str, int | None]:
         """Spawn one stage attempt and watch it. Returns
         (kind, exit_code): kind is "exit", "timeout",
-        "spawn_failed", "paused", "stopped", or "shutdown"."""
+        "spawn_failed", "paused", "stopped", or "shutdown".
+        A non-zero exit is arbitrated by _shutdown_interruption
+        before it may be reported as a failure, and a shutdown
+        that begins while the stage still runs is reported as
+        "shutdown" without killing the stage tree (the OS reaps
+        it; recover() orphan-kills it on the next start if it
+        somehow survives)."""
         manifest = record.get("manifest") or {}
         command = spec["command"]
         if isinstance(command, list):
@@ -872,6 +923,9 @@ class JobRunner:
             while True:
                 code = proc.poll()
                 if code is not None:
+                    if code != 0 and self._shutdown_interruption(
+                            record, stage_rec, code):
+                        return "shutdown", None
                     return "exit", code
                 if deadline is not None and time.monotonic() >= deadline:
                     bridge_agent.kill_tree(proc)
@@ -896,6 +950,14 @@ class JobRunner:
                     if self._kill_current:
                         bridge_agent.kill_tree(proc)
                         proc.wait(timeout=10)
+                    return "shutdown", None
+                if self._shutdown_fn():
+                    # The machine is going down while the stage
+                    # still runs: checkpoint now (the stage goes
+                    # back to pending) instead of waiting to be
+                    # killed mid-write.
+                    self._event("shutdown_interrupted", record,
+                                stage=stage_rec["index"], pid=proc.pid)
                     return "shutdown", None
                 time.sleep(_POLL_S)
         finally:
@@ -1032,7 +1094,8 @@ def _make_runner(cfg: dict, state_dir: Path, jobs_dir: Path) -> JobRunner:
         jobs_dir, state_dir, cfg,
         poll_interval_s=_float("job_runner_poll_s", 0.25),
         gpu_poll_s=_float("job_gpu_poll_s", 30.0),
-        gpu_threshold_pct=_int("job_gpu_util_threshold", 90))
+        gpu_threshold_pct=_int("job_gpu_util_threshold", 90),
+        shutdown_grace_s=_float("job_shutdown_grace_s", 10.0))
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -101,7 +101,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-VERSION = "1.3.1"
+VERSION = "1.3.2"
 AGENT_NAME = "muse-pc-bridge"
 MAX_GET_BYTES = 16 * 1024 * 1024          # whole-file /v1/file/get limit
 MAX_RANGE_BYTES = 64 * 1024 * 1024        # per-call range-read limit
@@ -371,6 +371,28 @@ def hidden_spawn_kwargs(visible: bool = False) -> dict:
         return {"creationflags": getattr(
             subprocess, "CREATE_NO_WINDOW", 0x08000000)}
     return {}
+
+
+def system_shutting_down() -> bool:
+    """True when Windows says this session is shutting down.
+
+    GetSystemMetrics(SM_SHUTTINGDOWN) via ctypes (stdlib only).
+    The durable job runner probes this when a stage dies: on a
+    graceful shutdown the OS kills stage processes before the
+    runner worker, and without the probe that kill is
+    indistinguishable from a stage failure (2026-11-24 deploy
+    smoke: a demo job was failed by its own reboot instead of
+    being resumed). False off Windows and on any error — a
+    failed probe must never fake a shutdown, which would
+    silently convert real failures into resumes.
+    """
+    if not IS_WINDOWS or os.name != "nt":
+        return False
+    try:
+        import ctypes
+        return bool(ctypes.windll.user32.GetSystemMetrics(0x2000))
+    except Exception:
+        return False
 
 
 def spawn_kwargs(visible: bool = False) -> dict:

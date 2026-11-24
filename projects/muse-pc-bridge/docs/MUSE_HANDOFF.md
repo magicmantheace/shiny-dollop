@@ -1318,3 +1318,45 @@ exercised on the owner's PC; it rides the same deploy smoke
 as the rest of this release. Still NOT deployed — production
 remains v1.2.1, and deploying this branch (now including the
 root fix) is the owner's call at a gap, as before.
+
+### Follow-up 3 (2026-11-24, later): DEPLOYED 1.3.1; graceful-shutdown gap found; 1.3.2 STAGED
+
+At the owner's word the release was deployed the same day:
+1.3.0 (VERSION bump `27fd875`) went live, the on-PC suite
+passed under Windows Python (306 tests, 16 platform skips),
+and the smokes passed — presence with real values, session
+spawns with proof of life, raise-window on Muse's own
+Notepad with zero disturbance to other windows, and an
+abrupt-kill job resume verified live across a real reboot.
+
+Two defects surfaced during the smoke:
+
+1. Every detached PowerShell spawn exited 0 without running.
+   Root cause isolated on the PC: any creation-flag
+   combination containing DETACHED_PROCESS makes Windows
+   PowerShell 5.1 exit 0 silently (this was also the true
+   cause of the 2026-11-21 incident, previously misattributed
+   to quoting). Fixed in 1.3.1 (`2b4b904`): the flag removed
+   from `spawn_detached` and Project Mode's launcher, with
+   regression tests. 1.3.1 is what production runs now.
+2. The graceful-reboot leg of the resume smoke FAILED: the
+   demo job's sleep stage was terminated by Windows seconds
+   before the runner worker, the worker recorded exit 1 as a
+   stage failure, and the job was failed with nothing left to
+   resume. (The abrupt-kill leg passed; see `docs/JOB_RUNNER.md`
+   §1, "Graceful shutdown vs abrupt kill".)
+
+Fix STAGED as 1.3.2 on this branch, NOT deployed (the owner
+directed staging only — the PC was unreachable and no restart
+was authorized): the runner probes
+`bridge_agent.system_shutting_down()` (GetSystemMetrics
+SM_SHUTTINGDOWN); a shutdown beginning mid-stage returns the
+stage to pending, and every non-zero stage exit is arbitrated
+against the probe across a grace window (config
+`job_shutdown_grace_s`, default 10 s) before it may be
+recorded as a failure. New tests:
+`tests/test_v1_3_2_shutdown_resume.py` (7). **Verified on
+Muse's Linux VM: full suite 313 tests, OK (3 skips).** NOT
+verified: the real Windows shutdown path — the graceful-reboot
+resume re-test is an owner-PC smoke for the next deploy gap,
+together with the still-outstanding Project Mode smoke.

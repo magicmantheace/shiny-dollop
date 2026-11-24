@@ -285,3 +285,24 @@ the presence ctypes probes, session-1 spawn behaviour, the
 raise, Project Mode's Windows operations, and a real reboot
 resume are owner-PC smokes listed in `docs/JOB_RUNNER.md`.
 Production still runs v1.2.1.
+
+**Update (2026-11-24, later): 1.3.0/1.3.1 DEPLOYED; 1.3.2
+staged.** The release (plus the SIGTERM audit-race root fix)
+was deployed to the owner's PC the same day and the deploy
+smokes passed: full suite under Windows Python, presence,
+session spawns, raise-window, and an abrupt-kill job resume
+after a real reboot. Two defects were found and fixed along
+the way: 1.3.1 removed DETACHED_PROCESS from detached spawns
+(it makes Windows PowerShell exit 0 without running), and the
+graceful-reboot leg of the resume smoke exposed that a
+graceful shutdown kills a job's stage before the runner, so
+the stage's exit was recorded as a failure instead of an
+interruption. 1.3.2 fixes that: the runner probes
+SM_SHUTTINGDOWN and arbitrates non-zero stage exits against
+it (config `job_shutdown_grace_s`, default 10), returning the
+stage to pending for resume. **Verified on Muse's Linux VM:
+full suite 313 tests, OK (3 skips)**, including 7 new tests in
+`test_v1_3_2_shutdown_resume.py`. 1.3.2 is committed on the
+branch but NOT deployed; production runs 1.3.1, and the
+graceful-reboot resume re-test is an owner-PC smoke for the
+next deploy gap.

@@ -173,10 +173,43 @@ A stage exiting non-zero is retried only up to its manifest
 (submitted, job_started, stage_started, stage_finished,
 stage_failed, stage_retry, pause_kill, stop_kill, stopped,
 resume, orphan_killed, gpu_wait, gpu_clear, completed, failed,
-invalid_manifest, runner_started, runner_stopped) append to
-`jobs/events.jsonl`. Command text is not duplicated into
-events (the archived manifest holds it); no credential is
-ever written — the runner never sees the bridge token at all.
+invalid_manifest, runner_started, runner_stopped,
+shutdown_interrupted) append to `jobs/events.jsonl`. Command
+text is not duplicated into events (the archived manifest
+holds it); no credential is ever written — the runner never
+sees the bridge token at all.
+
+### Graceful shutdown vs abrupt kill (found 2026-11-24)
+
+Resume survives an abrupt kill (power loss, force-kill): the
+worker dies with its stage, the record is left `running`, and
+recover() resumes from the checkpoint — proven on the owner's
+PC in the deploy smoke (worker and stage force-killed; the
+job resumed from stage 2 and completed).
+
+A graceful shutdown is a different ordering: Windows
+terminates the stage processes (console children) seconds
+before the runner worker (a console-less pythonw), so the
+worker is still alive to watch its stage die with a generic
+exit code. In the 2026-11-24 smoke a demo job's sleep stage
+exited 1 as the PC rebooted; the worker recorded
+`stage_failed` and failed the job, and after the reboot there
+was nothing to resume.
+
+Fixed in 1.3.2 (staged on the branch, not deployed): the
+runner probes `bridge_agent.system_shutting_down()`
+(GetSystemMetrics SM_SHUTTINGDOWN). A shutdown that begins
+while a stage runs returns the stage to pending without
+killing its tree (the OS reaps it; recover() orphan-kills a
+survivor). A non-zero stage exit is arbitrated against the
+probe — immediately, then across a grace window (config
+`job_shutdown_grace_s`, default 10 s) — before it may be
+recorded as a failure; a shutdown found at any point emits
+`shutdown_interrupted` and converts the exit into an
+interruption. Only a full quiet window lets a genuine
+failure through, delayed by at most the grace. Deploy TODO
+for the next gap: repeat the demo job across a graceful
+reboot and confirm it resumes and completes.
 
 ---
 

@@ -681,6 +681,45 @@ These require the owner's PC and are **not** claimed by any VM test:
   logic, state machines, file contracts, and HTTP shapes on
   POSIX only.
 
+## v1.3.2 — graceful-shutdown job interruption (2026-11-24)
+
+**Implemented, VM-verified, NOT deployed.** Production runs
+1.3.1. Found by the 1.3.1 deploy smoke: a demo job mid-stage
+was failed (not resumed) by a graceful reboot, because Windows
+kills stage processes seconds before the runner worker and the
+worker recorded the stage's exit 1 as a failure.
+
+New tests: `tests/test_v1_3_2_shutdown_resume.py` (7 tests).
+
+Proven here (Linux VM):
+
+- `system_shutting_down()` is False on POSIX, False when the
+  (stubbed) Windows metric reads 0, True when it reads 1, and
+  False when the API raises — a failed probe never fakes a
+  shutdown.
+- A stage that exits non-zero while the (stubbed) shutdown
+  probe is set is interrupted, not failed: the job record is
+  left `queued` with the stage `pending`, a
+  `shutdown_interrupted` event is written, and a fresh runner
+  completes the job without re-running the finished stage.
+- A stage still running when the shutdown begins returns to
+  `pending` the same way and completes after the restart.
+- A genuine failure with the probe clear still fails with
+  reason `exit_code` — after waiting out the grace window
+  (`job_shutdown_grace_s`; the test uses 0.3 s and asserts the
+  stage record spans at least 0.25 s).
+
+Full suite after this change: **313 tests, OK (3 skips)** on
+Muse's Linux VM.
+
+NOT proven here: everything Windows — the real
+SM_SHUTTINGDOWN metric under an actual shutdown, the timing
+of the flag relative to the stage kills, and the end-to-end
+graceful-reboot resume. Owner-PC smoke for the next deploy
+gap: submit the demo job (stage 2 = a long sleep), reboot
+gracefully mid-stage, and confirm the job resumes and
+completes instead of failing.
+
 ## Owner-PC verification checklist (part of install)
 
 From `docs/INSTALL_WINDOWS.md`:
