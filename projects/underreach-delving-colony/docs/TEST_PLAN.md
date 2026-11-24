@@ -1386,3 +1386,103 @@ reproducing exactly.
   delvers=5 floor_instances=61 tick=4000`; `scenario=s11
   supports=1 vents=1 pumps=1 cooling_gear=1 floor_index=3
   flooded=96 flooded_layer=35 tick=0`.
+
+## S15 — co-op rules (verified 2026-11-24, VM headless)
+
+Branch `underreach-delving-colony/coop-rules`. The owner's five
+co-op rulings of 2026-11-24 (docs/COOP_ASSESSMENT.md (c)) are
+implemented in the headless sim as an additive rules layer in
+`sim/src/session.rs`: `CoopSession` wraps the S13 `Session` and
+adds the roster/join order, `CoopConfig` (host, colony-wide
+`hardcore`, `rescue_at_setup`), downed-player incidents on a
+lantern clock, colony-shared credit, session events, host
+priority merging (`merge_coop_streams`), and the host-leave
+pause. **`Sim` is untouched** — players are session-layer actors
+issuing typed commands, distinct from the colony's delvers, so
+player downing state lives in the session layer. Consequence,
+proven below: every S1–S13 scenario section reproduces its
+recorded numbers *and* state hash exactly.
+
+### Tests (`sim/tests/scenario_s15.rs`, 11 tests)
+
+- **(a) Frontier rights, shared credit:** a non-host (P2) plants
+  the shaft + tunnel lanterns on the hand-built S1 colony; the
+  sim's `FirstLight` ledger entries name no player, and the
+  session records one `SharedCredit::FirstLight` per first light
+  planted through the session (the type carries no planter
+  field). Separately: P3 carves, P2 spends colony goods on a
+  support (goods 2 → 1), P3 reassigns a delver's job — no
+  permission is checked anywhere.
+- **(b) Rescue:** with rescue enabled at setup, P3 goes down at
+  the face stand; the `LineBell` event is visible to players
+  1, 2, and 3 and to no unjoined player; the downed player
+  cannot act; P2 plants a lantern through the ordinary typed
+  command and the incident clock goes 900 → 1,200; P2 runs the
+  rescue — P3 wakes standing at the camp stockpile, gear kept,
+  and the credit is `SharedCredit::Rescue { downed_player: 3 }`
+  (the colony's credit; the rescuer appears only in the event
+  feed, never in credit).
+- **(c) Downed outcomes:** rescue via pop-up (incident waits in
+  `AwaitingPopup`; `run_rescue` refuses until `resolve_popup`
+  allows it; then the host rescues, gear kept); pop-up declined
+  → solo fallback to the *closest* camp (a registered forward
+  camp at (10, 8, 4) beats the home stockpile for a downing at
+  (13, 8, 4)), gear lost; last-player-down non-hardcore (a
+  one-player session) → `SoloAfterClock`, 900 ticks run out,
+  same solo fallback at the stockpile, gear lost, run not over;
+  hardcore last-player-down → `run_over` immediately, commands
+  and time refused afterwards; hardcore clock expiry with the
+  host still standing → the downed player is `Lost`, play
+  continues (assumption below).
+- **(d) Contested spends:** 1 good, host and P2 both place a
+  support in the same tick, streams arriving P2-first —
+  `merge_coop_streams` orders the host first; the host's spend
+  applies, P2's is recorded `applied: false` (quiet failure, no
+  error), goods spent exactly once, only the host's support
+  stands, and the contested log replays to the live hash. With
+  the host sitting out, P2 beats P3 by join order the same way.
+- **(e) Roster and host authority:** P2 leaves mid-session —
+  the colony plays on, P2's commands refuse `NotPresent`; P3
+  drops in mid-session and acts at once; the host leaves —
+  `is_paused`, commands refuse `HostAbsent`, `run_to` refuses,
+  tick and state hash frozen; the host returns — commands and
+  time flow again and the full session log still replays to
+  the live hash.
+
+### Modelling assumptions (the rulings were silent; named, not hidden)
+
+- A rescue clock that runs out unrescued is a **failed rescue**:
+  non-hardcore falls back to the solo return (closest colony,
+  gear lost); hardcore loses the player (owner decision 1:
+  permadeath only when a rescue fails) — short of the last
+  standing player, whose hardcore downing is the run-over case
+  the ruling does cover.
+- The pop-up is per-incident pending state and the incident
+  clock **does not run while the pop-up is pending** — the
+  decision is modelled as made at the moment of the downing.
+- A rescued player wakes at the closest camp with gear kept
+  (the solo fallback's "closest colony, no gear" is the
+  *unrescued* outcome; rescue succeeding is what the clock is
+  for). Light-planting extends the clock by a flat 300 ticks
+  per successful planting (`LIGHT_EXTENSION_TICKS`); the
+  player clock is 900 ticks, the delver `DOWNED_CLOCK` value.
+- "Closest" is Manhattan distance over registered camps: the
+  founding stockpile plus forward camps registered with
+  `register_camp` (S8's forward camps are the in-fiction
+  colonies a deeper downing would wake at).
+
+### Full-suite + harness results
+
+- `cargo test`: **98/98** (87 pre-existing + 11 S15), 0 failed.
+- `scenario` binary (release): every S1–S13 section reproduces
+  its recorded numbers and state hash exactly (S1 `e3599701…`,
+  S3 `4dc99472…`, S10 protected `e0b6a85e…`, S12 goods 964 /
+  `8d4d431f…`, S13 goods 22 / `replay_matches=true` /
+  `11e30e9d…`) — the slice is session-layer only, as designed.
+- **Not verified / not built:** any transport — no sockets, no
+  loopback, no pacing, no Godot multiplayer (Slice B's work;
+  S15 is the rules layer that transport will carry, per
+  docs/COOP_ASSESSMENT.md (e)); a downed *delver* rescued by a
+  player-actor as distinct from S3's delver-rescues-delver
+  (player downing is the S15 model; delver rescue is unchanged
+  S3 behaviour); rendered/frontend surfacing of any co-op state.

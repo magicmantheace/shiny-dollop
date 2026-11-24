@@ -248,6 +248,21 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   (frontier rights/permissions, multi-rescuer lantern clock,
   player downing/rescue) and the recommended first
   real-machine step, is `docs/COOP_ASSESSMENT.md`.
+- **S15 — co-op rules (BUILT 2026-11-24, branch
+  `underreach-delving-colony/coop-rules`).** The owner's five
+  co-op rulings (decided 2026-11-24, recorded in
+  `docs/COOP_ASSESSMENT.md` (c)) implemented headless as an
+  additive rules layer over S13 (`CoopSession` in
+  `sim/src/session.rs`; `Sim` untouched): universal frontier
+  rights with colony-shared Deep Ledger credit, any-player
+  lantern-clock rescues with the line-bell heard by everyone,
+  colony-wide hardcore with setup/pop-up rescue choice and the
+  closest-colony solo fallback (hardcore last-player-down ends
+  the run), host-first/join-order contested priority with quiet
+  failure, and host-owned sessions (free drop-in/out, host
+  leave pauses everyone). Slice A of the authorized co-op
+  program: the rules layer the future loopback transport
+  (Slice B) will carry. No networking in this slice.
 - Later: Crystal Dark gates, colony failure & succession.
 
 ## Status — 2026-11-10
@@ -629,3 +644,33 @@ line-bell heard by every player. Questions 3–5 remain open.
   non-hosts, pause for everyone if the host leaves. With
   questions 1–2 decided earlier the same day, all five
   section (c) questions are now decided.
+
+## S15 status (2026-11-24)
+
+- **S15 — co-op rules (2026-11-24, VM-verified; branch
+  `underreach-delving-colony/coop-rules`, not yet merged):**
+  all five owner co-op rulings are implemented in the headless
+  sim/session layer. `cargo test` **98/98** (87 pre-existing +
+  11 new S15 tests); the `scenario` binary's S1–S13 sections
+  reproduce every recorded number and state hash exactly (the
+  slice adds session-layer code only; `Sim` is untouched).
+  What exists: `CoopSession` (roster + join order, host-first
+  contested merging via `merge_coop_streams`, host-leave pause
+  with hash-frozen state, host-return resume, drop-in/drop-out),
+  `CoopConfig` (host, colony-wide hardcore, rescue-at-setup),
+  downed-player incidents (900-tick lantern clock, +300 per
+  rescue light-planting, pop-up decision as per-incident input,
+  closest-camp solo fallback with gear lost, hardcore
+  last-player-down run-over), colony-shared credit
+  (`SharedCredit` — no planter/rescuer field by construction),
+  and the line-bell as an event visible to every joined player.
+  Modelling assumptions where the rulings were silent (full
+  list in `docs/TEST_PLAN.md` S15): an expired rescue clock is
+  a failed rescue (non-hardcore → solo fallback; hardcore →
+  the player is lost, per decision 1's permadeath-on-failed-
+  rescue); the pop-up clock does not run while pending; a
+  rescued player wakes at the closest camp with gear kept.
+  **NOT built: any transport/networking (Slice B loopback will
+  carry this rules layer), Godot multiplayer surfacing, desync
+  recovery protocol.** Full record: `docs/COOP_ASSESSMENT.md`
+  section (e), numbers in `docs/TEST_PLAN.md`.

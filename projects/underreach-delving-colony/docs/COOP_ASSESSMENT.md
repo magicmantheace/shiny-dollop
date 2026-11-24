@@ -100,18 +100,24 @@ was faked up unverifiable:
 - **Desync recovery over a live connection.** Detection exists
   (hash comparison, and replay's applied-flag check). Recovery
   does not: there is no protocol for a diverged peer to fetch
-  the authoritative log/save and resync, and no decision about
-  whose copy is authoritative when hashes disagree.
+  the authoritative log/save and resync. (Whose copy is
+  authoritative is no longer open: ruling 5, decided 2026-11-24
+  and modelled in S15 — the host's. The recovery *protocol*
+  remains unbuilt.)
 - **Playing with 2–4 real clients on real machines.** Never
   done, in any form. Every S13 proof is one process applying a
   scripted merged stream to itself.
 
-## (c) Open OWNER design questions
+## (c) OWNER design questions — all DECIDED 2026-11-24, implemented in S15
 
-These are the owner's calls. The session layer was built to be
+These were the owner's calls. The session layer was built to be
 neutral on all of them (attribution is recorded; no permission
 is enforced anywhere), and none should be settled by an
-implementer guessing.
+implementer guessing. **The owner decided all five on
+2026-11-24 (each ruling is recorded verbatim under its question
+below), and S15 (branch `underreach-delving-colony/coop-rules`)
+implements all five in the headless sim/session layer — see
+section (e).**
 
 1. **Frontier rights and permissions.** The design record says
    "the player is the frontier" and "only the player plants
@@ -196,3 +202,78 @@ will say more about what (b) really costs than any design pass
 from here. Only after loopback agreement is boring should a
 second machine (LAN/Tailscale) and real latency enter the
 picture.
+
+## (e) S15 — the five rulings implemented (2026-11-24, VM headless)
+
+Branch `underreach-delving-colony/coop-rules`. The rulings are
+implemented as an additive rules layer in `sim/src/session.rs`
+(`CoopSession`, wrapping the S13 `Session`); `Sim` is untouched,
+so every pre-S15 scenario number and state hash reproduces
+exactly. Verified by `sim/tests/scenario_s15.rs` (11 tests);
+full suite `cargo test` **98/98** (87 pre-existing + 11 new),
+0 failed. Ruling by ruling:
+
+1. **Frontier rights / shared credit.** Any present, standing
+   player may issue any typed `Command` — carve, plant first
+   light, place supports/vents/pumps, assign jobs, spend colony
+   goods; there is no permission check anywhere. First light
+   planted through the session and every successful player
+   rescue record a `SharedCredit` — a type with **no
+   planter/rescuer field by construction** (a rescue credit
+   names only who was rescued, the Ledger's subject). The sim's
+   own `FirstLight` ledger text names no player.
+2. **Multi-rescuer lantern clock.** A downing opens a
+   `DownedIncident` on a 900-tick lantern clock
+   (`PLAYER_RESCUE_CLOCK`, the delver clock's value) and rings
+   the line-bell: a `CoopEvent::LineBell` that
+   `events_visible_to` returns for **every** joined player (and
+   for no one who never joined). Any standing player may plant
+   light through the ordinary `Lantern` command to extend the
+   clock (+300 ticks per successful planting,
+   `LIGHT_EXTENSION_TICKS`) or run the rescue outright; a
+   rescued player wakes standing at the closest camp, gear
+   kept.
+3. **Downed players.** `CoopConfig` carries the setup choices:
+   `hardcore` (one colony-wide flag — there is no per-player
+   hardcore state to set) and `rescue_at_setup`. Without the
+   setup option, an incident waits in `AwaitingPopup` until
+   `resolve_popup` decides it (the clock does not run while the
+   pop-up is pending). Declined/never-enabled → solo rules:
+   non-hardcore wakes the player at the **closest** registered
+   camp (Manhattan over the founding stockpile plus any
+   `register_camp` forward camps), gear lost. Last standing
+   player down: non-hardcore → `SoloAfterClock`, the clock runs
+   out and the same solo fallback applies; hardcore →
+   `run_over`, and commands and time are refused from then on.
+   Assumptions where the rulings were silent, named here and in
+   TEST_PLAN: a rescue clock that expires unrescued is a failed
+   rescue — non-hardcore falls back to the solo return,
+   hardcore loses the player (decision 1's permadeath on a
+   failed rescue), short of the last player so play continues.
+4. **Contested actions.** `merge_coop_streams` validates exactly
+   as S13's merge, then orders each tick host-first, then join
+   order (a stable re-prioritisation; per-player `seq` order is
+   preserved). Applied through `CoopSession`, the winner's spend
+   lands and the loser is recorded `applied: false` in the
+   canonical log — the quiet failure, no claim/queue — and the
+   contested log replays to the live hash.
+5. **Drop-in/drop-out and authority.** The roster is join-ordered
+   (host first, max 4). `join` works mid-session (a returner
+   reclaims their slot); a non-host `leave` never ends or pauses
+   the colony, and an absent player issues no commands. The
+   host leaving sets the pause: `apply_entry` and `run_to` both
+   refuse with `HostAbsent` and the state hash does not move
+   until `host_return`. Authority is modelled as S13 built it:
+   the canonical, host-priority-ordered session log is the
+   record, and `replay` reconstructs the authoritative state
+   from it — the host's copy wins by definition because the
+   host's ordered log *is* the copy of record.
+
+**Slice A is the rules layer the future loopback transport will
+carry.** S15 is deliberately transport-free: no sockets, no
+pacing, no discovery (all still section (b)). The loopback
+slice (Slice B) will move exactly these artefacts between two
+processes — `CoopSession` command streams in, the canonical
+log and state hash back — and its state-agreement checks will
+compare the same hashes S13/S15 already pin. Nothing in the
+rules layer needs to change for transport to carry it.

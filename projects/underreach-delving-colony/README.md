@@ -223,12 +223,37 @@ none of it is headless-verifiable:** network transport and
 host/join, session discovery, lockstep pacing under real
 latency, Godot multiplayer, desync recovery over a live
 connection, and play with real clients on real machines.
-The full assessment, the open owner design questions
-(frontier rights, multi-rescuer rescues, player downing),
-and the recommended first real-machine step are in
+The full assessment, the then-open owner design questions
+(frontier rights, multi-rescuer rescues, player downing —
+all since decided and built in S15, below), and the
+recommended first real-machine step are in
 [`docs/COOP_ASSESSMENT.md`](docs/COOP_ASSESSMENT.md).
 Verified headless (`cargo test` 87/87, every S1–S12
 scenario section unchanged in numbers and hash).
+
+**S15 — co-op rules (2026-11-24, branch
+`underreach-delving-colony/coop-rules`):** the owner decided
+S13's five open questions on 2026-11-24, and S15 implements
+the rulings headless as an additive rules layer over the S13
+session (`CoopSession` in `sim/src/session.rs`; the sim core
+is untouched). Every player has full frontier rights and Deep
+Ledger credit for first light and rescues is shared by the
+colony (the credit type has no planter/rescuer field); any
+player can run a lantern-clock rescue or plant light to
+stretch the clock, and the line-bell event is visible to
+every joined player; hardcore is one colony-wide setup rule,
+a downed player's rescue plays out when enabled at setup or
+allowed by a per-incident pop-up, otherwise the solo fallback
+wakes them at the closest colony with gear lost — and a
+hardcore last-player-down ends the run; contested same-tick
+actions resolve host-first, then join order, the loser
+recorded as a quiet `applied: false`; and sessions are
+host-owned — players drop in and out freely, but the host
+leaving pauses the colony for everyone until they return.
+This is Slice A of the co-op program: the rules layer the
+future loopback transport will carry. Still no networking.
+Verified headless (`cargo test` 98/98, every S1–S13 scenario
+section unchanged in numbers and hash).
 
 ## Layout
 
@@ -245,6 +270,7 @@ scenario section unchanged in numbers and hash).
   mapping).
 - `docs/COOP_ASSESSMENT.md` — the S13 co-op assessment (what
   the lockstep foundation proves, what co-op still needs, the
-  open owner design questions, the first real-machine step).
+  owner design questions — all decided 2026-11-24 and
+  implemented in S15 — and the first real-machine step).
 - `REQUIREMENTS.md` — project requirements.
 - `AGENTS.md` — project rules.
