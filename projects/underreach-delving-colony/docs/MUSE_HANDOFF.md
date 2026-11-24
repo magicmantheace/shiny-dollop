@@ -233,8 +233,22 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   job XP, and are never rescuers; the 18-year crossing
   ledgers one `CameOfAge` and they are ordinary delvers
   from then on. Modelling decisions in `docs/TEST_PLAN.md`.
-- Later: Crystal Dark gates, co-op, colony failure &
-  succession.
+- **S13 — co-op foundations (BUILT 2026-11-24, branch
+  `underreach-delving-colony/coop-foundations`).** The
+  lockstep foundation for the 1–4 co-op, headless only: a
+  typed `Command` layer mirroring the bridge's vocabulary, an
+  attributed `SessionLog` (founding save + `{tick, player,
+  seq, command, applied}` entries) with a canonical merge
+  (sort by `(tick, player, seq)`; duplicates and `seq` gaps
+  are errors), and a `Session` driver whose sessions replay
+  from the log to the identical state hash. **Co-op itself
+  is NOT built**: no networking, transport, host/join, pacing,
+  or Godot multiplayer — none of it is headless-verifiable.
+  The full record, including the open owner design questions
+  (frontier rights/permissions, multi-rescuer lantern clock,
+  player downing/rescue) and the recommended first
+  real-machine step, is `docs/COOP_ASSESSMENT.md`.
+- Later: Crystal Dark gates, colony failure & succession.
 
 ## Status — 2026-11-10
 
@@ -497,3 +511,37 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   Crystal gate items, face registration for embedded
   pockets, any frontend surfacing for age/children, colony
   failure & succession.
+- **S13 — co-op foundations (2026-11-24, VM-verified;
+  branch `underreach-delving-colony/coop-foundations`, not
+  yet merged):** the lockstep foundation is built and
+  verified; co-op itself is not. `cargo test` 87/87 (80
+  pre-existing + 7 new S13 tests); the `scenario` binary's
+  S1–S12 sections are byte-identical to the pre-S13 run —
+  **numbers and state hashes alike** (the session layer is
+  additive library code; the bridge is unmodified) — and
+  the new S13 section runs a two-player session on
+  generated floor 1 (P1's 10 lantern commands light the
+  way, P2 plants a plot and sets a support + vent): goods
+  22, nobody lost, `replay_matches=true` computed by
+  replaying the log inside the section, hash
+  `11e30e9ddb3f6aa9b46e2fdd32df9a13ecf66f9d8c4dbfff4b4c6c332f2c787d`.
+  What exists: the typed `Command` layer (the bridge's
+  vocabulary; its choreography scripts excluded as founding
+  scripts, not commands), the attributed `SessionLog` with
+  canonical merge (arrival-order independent; duplicate
+  `(player, seq)` and `seq` gaps are errors), live `Session`
+  + `replay` to the identical hash, mid-session save/load
+  resume, and JSON log roundtrips — plus the desync *check*
+  that has existed since S1 (canonical save + SHA-256).
+  **NOT built (not headless-verifiable): network transport
+  and host/join, session discovery, lockstep pacing under
+  real latency, Godot multiplayer, desync recovery over a
+  live connection, and play with real clients on real
+  machines.** Owner design questions the slice surfaced but
+  did not decide — per-player frontier rights/permissions,
+  whether the lantern-clock rescue changes with multiple
+  rescuers, and player downing/rescue (decision 6 was
+  written for one player) — are recorded in
+  `docs/COOP_ASSESSMENT.md` with the recommended first
+  real-machine step (a two-process loopback session on the
+  owner's PC, hashes compared every 100 ticks).

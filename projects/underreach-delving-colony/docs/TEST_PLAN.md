@@ -1185,6 +1185,119 @@ idling at camp and proves nothing the staged year does not).
   the Ledger-inheritance half of decision 5's world — is
   still not built.
 
+## S13 — co-op foundations (verified 2026-11-24, VM headless)
+
+Branch `underreach-delving-colony/coop-foundations`. The
+lockstep foundation for the design's 1–4 co-op, built only
+where headless verification can reach: a typed command layer,
+an attributed session log with a canonical merge, and replay.
+**No networking code exists** — no sockets, no transport, no
+Godot multiplayer. The full assessment of what co-op still
+needs, and the owner design questions it raises, is in
+`docs/COOP_ASSESSMENT.md`. The session layer is additive
+library code (`sim/src/session.rs`); the bridge is unmodified
+and no sim behaviour changed — proven by the baselines below,
+which for the first time since S12 include state hashes
+reproducing exactly.
+
+### The layer
+
+- **`Command`** mirrors the bridge's player-action vocabulary
+  one-for-one (carve, lantern with tier + fuel, job, plant,
+  craft_mask, support, vent, pump, craft_cooling, descend,
+  ascend), and `apply` dispatches to the same `Sim` methods
+  the bridge handler calls with the same arguments (the
+  bridge's lantern fuel is fixed at 5,000; its tier defaults
+  to 1). The bridge's choreography scripts (`light_the_way`,
+  `light_the_deep`, `open_floor1`) are **excluded**: they are
+  multi-step founding scripts, not single sim operations, and
+  stay bridge/scenario side. Two outcome conventions where the
+  bridge discards the result: `carve` reports whether a cell
+  was actually carved, and `plant` reports whether a new plot
+  now stands (both are what a session log needs to record
+  `applied` honestly).
+- **`SessionLog`**: the founding save (the founding sim's
+  canonical save JSON) + `end_tick` + entries
+  `{tick, player, seq, command, applied}`. Players are 1–4;
+  each player's `seq` starts at 0 and increments by 1.
+- **`merge_streams`** sorts all entries by `(tick, player,
+  seq)` — a total order independent of stream arrival order.
+  A duplicate `(player, seq)` or a `seq` gap is a `MergeError`,
+  surfaced, never repaired.
+- **`Session` / `replay`**: a session advances to each entry's
+  tick, applies, and records `applied` (a sim-refused command
+  is recorded `applied: false`, not an error; a bad player,
+  out-of-order `seq`, or past tick *is* an error and records
+  nothing). `replay` rebuilds from the log alone, runs to
+  `end_tick`, and rejects a log whose recorded `applied` flags
+  disagree with the replayed outcomes (`AppliedMismatch` —
+  a desync, named). `Session::resume` continues a session on
+  a sim loaded from a mid-session save, keeping the original
+  founding save in the log so replay is unaffected.
+
+### Tests (`sim/tests/scenario_s13.rs`, 7 tests)
+
+- **Two players, one colony:** on the gen Floor-1 founding,
+  P1's lantern commands (the `open_floor1` route and spacing,
+  issued as commands) and P2's plant (tick 0) + support + vent
+  on the first face's stand (tick 1,000, once production holds
+  goods — the gen colony reaches 2+ goods by ~tick 115) all
+  apply with correct attribution and per-player `seq`; at
+  6,200 ticks goods = 22 (> 0), nobody lost.
+- **Replay:** `replay(log)` reproduces the live session's
+  final state hash exactly, at the same tick count.
+- **Arrival-order independence:** the same streams merged in
+  reversed arrival order produce an identical merged sequence,
+  byte-identical session logs (`to_json` equal), and identical
+  final hashes.
+- **Mid-session save/load:** at tick 3,000 the live sim is
+  saved, loaded (hash reproduced), and the session resumed on
+  the loaded copy; its final hash *and* its log JSON equal the
+  uninterrupted session's.
+- **Rejected commands:** a support on solid rock is recorded
+  `applied: false` with the state hash unchanged across the
+  entry; a command from player 5 is refused at the API
+  (`InvalidPlayer`, nothing recorded); a past-tick entry is
+  refused (`TickInPast`).
+- **Merge validation:** duplicate `(player, seq)` →
+  `DuplicateSeq`; a gap (0, 2) → `SeqGap`; player 5 →
+  `InvalidPlayer`.
+- **Log roundtrip:** `SessionLog` → JSON → parsed is equal and
+  re-serializes byte-identically; replaying the parsed log
+  reproduces the original session hash.
+
+### Full-suite + harness results
+
+- `cargo test`: **87/87** (80 pre-existing + 7 S13),
+  0 failed.
+- `scenario` binary (release): the output was diffed against
+  the pre-S13 run — **every S1–S12 section is byte-identical,
+  numbers and state hashes alike** (S1 `e3599701…`, S3
+  `4dc99472…`, GEN goods 24, S12 goods 964 / hash
+  `8d4d431f…`, all as recorded in their own sections). The
+  only addition is the new S13 section: 6,200 ticks, **P1
+  applied commands=10, P2 applied commands=3, goods=22,
+  delvers alive=5, lost=0, replay_matches=true** (computed by
+  actually replaying the session log inside the section),
+  S13 state hash
+  `11e30e9ddb3f6aa9b46e2fdd32df9a13ecf66f9d8c4dbfff4b4c6c332f2c787d`.
+  Goods are GEN's 24 minus the 2 P2 spent on the support +
+  vent — the answers cost their kit price, as in S10.
+
+### Not verified / not built
+
+- Everything in `docs/COOP_ASSESSMENT.md` section (b):
+  network transport and host/join, session discovery,
+  lockstep pacing under real latency, Godot multiplayer,
+  desync *recovery* over a live connection (detection exists:
+  hash comparison + replay's applied-flag check), and play
+  with 2–4 real clients on real machines. None of it is
+  headless-verifiable, so none of it was built.
+- No permission/role enforcement: attribution is recorded,
+  but whether every player may carve and plant first light
+  is an open owner question (assessment section (c)), not
+  something this layer decides.
+
 ## Planned (later slices)
 
 - Owner-PC visual pass of the frontend; performance measurement
