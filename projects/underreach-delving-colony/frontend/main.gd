@@ -47,7 +47,14 @@ var cam_target := Vector3(6, -3, 4)
 
 var floors_mmi: MultiMeshInstance3D
 var rock_mmi: MultiMeshInstance3D
+var flooded_mmi: MultiMeshInstance3D
 var props_root: Node3D
+## S11 synced surfacing state: counts taken from the bridge view
+## on every apply_view, so the headless verify can assert the
+## frontend's picture matches the view exactly.
+var kit_synced := {"supports": 0, "vents": 0, "pumps": 0}
+var flooded_synced := 0
+var delver_load_texts := {}
 var delver_nodes := {}
 var critter_nodes := {}
 var delver_rows := {}
@@ -55,6 +62,7 @@ var rows_signature := ""
 
 var tick_label: Label
 var stores_label: Label
+var floor_label: Label
 var layer_label: Label
 var pause_btn: Button
 var speed_btn: Button
@@ -210,6 +218,19 @@ func build_world_nodes() -> void:
 	rock_mmi.multimesh = mm2
 	add_child(rock_mmi)
 
+	# Flooded-cell overlay (S11): a thin blue-tinted instance per
+	# flooded cell on the viewed layer, in the placeholder idiom.
+	var flood_box := BoxMesh.new()
+	flood_box.size = Vector3(0.92, 0.05, 0.92)
+	flooded_mmi = MultiMeshInstance3D.new()
+	var mm3 := MultiMesh.new()
+	mm3.transform_format = MultiMesh.TRANSFORM_3D
+	mm3.use_colors = true
+	mm3.mesh = flood_box
+	mm3.mesh.surface_set_material(0, floor_material())
+	flooded_mmi.multimesh = mm3
+	add_child(flooded_mmi)
+
 	props_root = Node3D.new()
 	add_child(props_root)
 
@@ -222,6 +243,12 @@ func key_of(c: Array) -> String:
 func apply_view() -> void:
 	if view.is_empty():
 		return
+	kit_synced = {
+		"supports": (view.get("supports", []) as Array).size(),
+		"vents": (view.get("vents", []) as Array).size(),
+		"pumps": (view.get("pumps", []) as Array).size(),
+	}
+	flooded_synced = (view.get("flooded", []) as Array).size()
 	rebuild_layer()
 	sync_entities()
 	update_hud()
@@ -268,6 +295,13 @@ func rebuild_layer() -> void:
 
 	fill_multimesh(floors_mmi, floors)
 	fill_multimesh(rock_mmi, rocks)
+	# Flooded cells on this layer (S11, from the view's `flooded`).
+	var flood_items: Array = []
+	for c in view.get("flooded", []):
+		if int(c[1]) != layer:
+			continue
+		flood_items.append([Transform3D(Basis(), cell_to_world(c) + Vector3(0, 0.03, 0)), Color(0.2, 0.45, 0.9)])
+	fill_multimesh(flooded_mmi, flood_items)
 	rebuild_props()
 	cam_target = Vector3(cam_target.x, -float(layer), cam_target.z)
 
@@ -397,6 +431,41 @@ func rebuild_props() -> void:
 		var mk := make_marker(style[0], style[1], false)
 		mk.position = cell_to_world(p) + Vector3(0, float(style[2]), 0)
 		props_root.add_child(mk)
+	# Placed kit (S11) — supports (S7), vents (S7), and pumps
+	# (S10) from the view, as placeholder markers in the dressing
+	# idiom. No catalog GLBs exist for these; see README.md.
+	# (Distinct from the "Pump" *dressing* anchor above, which is
+	# unbuilt scenery data from floor generation.)
+	for kind in ["supports", "vents", "pumps"]:
+		var style := kit_style(kind)
+		for p in view.get(kind, []):
+			if int(p[1]) != layer:
+				continue
+			var mk := make_marker(style[0], style[1], false)
+			mk.set_meta("kit_kind", kind)
+			mk.position = cell_to_world(p) + Vector3(0, float(style[2]), 0)
+			props_root.add_child(mk)
+
+## Placeholder look per placed-kit kind: [size, colour, y offset].
+func kit_style(kind: String) -> Array:
+	match kind:
+		"supports":
+			return [Vector3(0.6, 0.7, 0.6), Color(0.72, 0.52, 0.28), 0.1]
+		"vents":
+			return [Vector3(0.45, 0.55, 0.45), Color(0.55, 0.75, 0.8), 0.08]
+		"pumps":
+			return [Vector3(0.5, 0.45, 0.5), Color(0.2, 0.5, 0.85), 0.05]
+	return [Vector3(0.3, 0.3, 0.3), Color(0.5, 0.5, 0.5), 0.05]
+
+## How many placed-kit markers of `kind` are rendered on the
+## current layer (the headless verify compares this against the
+## view, layer-filtered).
+func count_rendered_kit(kind: String) -> int:
+	var n := 0
+	for child in props_root.get_children():
+		if child.has_meta("kit_kind") and str(child.get_meta("kit_kind")) == kind:
+			n += 1
+	return n
 
 func make_marker(size: Vector3, color: Color, emissive: bool) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
@@ -496,9 +565,15 @@ func sync_entities() -> void:
 		var node: Node3D = rec["root"]
 		node.visible = int(d["pos"][1]) == layer
 		var label: Label3D = rec["label"]
+		# S11: suffering state rides the name label in text form.
+		var flags := suffering_flags(d)
+		label.text = str(d["name"]) if flags.is_empty() else "%s\n[%s]" % [str(d["name"]), " ".join(flags)]
 		if str(d["state"]) == "Downed":
 			label.modulate = Color(1.0, 0.35, 0.3)
 			node.rotation_degrees = Vector3(0, node.rotation_degrees.y, 78)
+		elif not flags.is_empty():
+			label.modulate = Color(1.0, 0.6, 0.25)
+			node.rotation_degrees = Vector3(0, node.rotation_degrees.y, 0)
 		else:
 			label.modulate = Color(0.95, 0.9, 0.8)
 			node.rotation_degrees = Vector3(0, node.rotation_degrees.y, 0)
@@ -599,6 +674,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				KEY_E: cam_target.x += 1.0
 				KEY_W: cam_target.z -= 1.0
 				KEY_S: cam_target.z += 1.0
+				KEY_PAGEDOWN: queue({"cmd": "descend"})
+				KEY_PAGEUP: queue({"cmd": "ascend"})
 
 func apply_tool_at_mouse(mouse_pos: Vector2) -> void:
 	var origin := camera.project_ray_origin(mouse_pos)
@@ -622,6 +699,12 @@ func apply_tool_at_mouse(mouse_pos: Vector2) -> void:
 			queue({"cmd": "lantern", "pos": [cx, layer, cz], "tier": 1})
 		"plant":
 			queue({"cmd": "plant", "pos": [cx, layer, cz]})
+		"support":
+			queue({"cmd": "support", "pos": [cx, layer, cz]})
+		"vent":
+			queue({"cmd": "vent", "pos": [cx, layer, cz]})
+		"pump":
+			queue({"cmd": "pump", "pos": [cx, layer, cz]})
 
 # ---------------------------------------------------------------------------
 # UI
@@ -643,8 +726,10 @@ func build_ui() -> void:
 	canvas.add_child(top)
 	tick_label = Label.new()
 	stores_label = Label.new()
+	floor_label = Label.new()
 	top.add_child(tick_label)
 	top.add_child(stores_label)
+	top.add_child(floor_label)
 	pause_btn = make_button("Pause", func() -> void:
 		playing = not playing
 		pause_btn.text = "Play" if not playing else "Pause"
@@ -670,13 +755,13 @@ func build_ui() -> void:
 	var scen_label := Label.new()
 	scen_label.text = "Scenario"
 	left.add_child(scen_label)
-	for s in ["s1", "s2", "s3", "s5", "gen"]:
+	for s in ["s1", "s2", "s3", "s5", "s7", "gen"]:
 		var sn: String = s
 		left.add_child(make_button(sn.to_upper(), func() -> void: init_scenario(sn)))
 	var tool_head := Label.new()
 	tool_head.text = "Tool (click a cell)"
 	left.add_child(tool_head)
-	for t in ["inspect", "carve", "lantern", "plant"]:
+	for t in ["inspect", "carve", "lantern", "plant", "support", "vent", "pump"]:
 		var tn: String = t
 		left.add_child(make_button(tn.capitalize(), func() -> void:
 			tool = tn
@@ -692,6 +777,9 @@ func build_ui() -> void:
 	left.add_child(make_button("Light the deep (S5)", func() -> void: queue({"cmd": "light_the_deep"})))
 	left.add_child(make_button("Open Floor 1 (gen)", func() -> void: queue({"cmd": "open_floor1"})))
 	left.add_child(make_button("Craft mask (2 goods)", func() -> void: queue({"cmd": "craft_mask"})))
+	left.add_child(make_button("Craft cooling gear (2 goods)", func() -> void: queue({"cmd": "craft_cooling"})))
+	left.add_child(make_button("Descend (PgDn)", func() -> void: queue({"cmd": "descend"})))
+	left.add_child(make_button("Ascend (PgUp)", func() -> void: queue({"cmd": "ascend"})))
 
 	var right := PanelContainer.new()
 	right.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
@@ -713,14 +801,66 @@ func set_layer(l: int) -> void:
 	layer = clampi(l, 0, int(dims[1]) - 1)
 	apply_view()
 
+## Display name for the bridge's band value (S11). The bridge
+## derives the band from the floor index with the sim's own
+## table; this only spells the enum out for the HUD.
+func band_display(band: String) -> String:
+	match band:
+		"Shallows": return "Shallows"
+		"FungalReaches": return "Fungal Reaches"
+		"DrownedGalleries": return "Drowned Galleries"
+		"CrystalDark": return "Crystal Dark"
+		"MagmaRoots": return "Magma Roots"
+	return band
+
+## Suffering flags for a delver view entry (S11), in text form.
+## The bridge carries the sim's own predicates (`sick`,
+## `gasping`, `drowning`, `overheating`); the load-threshold
+## fallback (60, the sim's shared threshold) only covers a view
+## that predates those fields.
+func suffering_flags(d: Dictionary) -> Array:
+	var flags: Array = []
+	if bool(d.get("sick", float(d.get("spore", 0.0)) >= 60.0)):
+		flags.append("SICK")
+	if bool(d.get("gasping", float(d.get("air", 0.0)) >= 60.0)):
+		flags.append("GASPING")
+	if bool(d.get("drowning", float(d.get("water", 0.0)) >= 60.0)):
+		flags.append("DROWNING")
+	if bool(d.get("overheating", float(d.get("heat", 0.0)) >= 60.0)):
+		flags.append("OVERHEATING")
+	return flags
+
+## The per-delver status line (S11): needs, then the hazard
+## loads verbatim from the view (air / water / heat, plus spore
+## when present), worn-kit state, suffering flags, rescue clock.
+func delver_load_text(d: Dictionary) -> String:
+	var clock := ""
+	if d.get("dark_clock") != null:
+		clock = " · CLOCK %d" % int(d["dark_clock"])
+	var flags := suffering_flags(d)
+	var flag_text := "" if flags.is_empty() else " · [%s]" % " ".join(flags)
+	return "%s · HP %.0f · E %.0f · F %.0f · M %.0f · air %.0f · water %.0f · heat %.0f%s%s%s%s%s" % [
+		str(d["state"]), float(d["hp"]), float(d["energy"]), float(d["hunger"]),
+		float(d["morale"]), float(d.get("air", 0.0)), float(d.get("water", 0.0)),
+		float(d.get("heat", 0.0)),
+		(" · spore %.0f" % float(d["spore"])) if float(d.get("spore", 0.0)) > 0.0 else "",
+		" · MASKED" if bool(d.get("masked", false)) else "",
+		" · COOLED" if bool(d.get("cooled", false)) else "",
+		flag_text, clock,
+	]
+
 func update_hud() -> void:
 	var st: Dictionary = view.get("stores", {})
 	tick_label.text = "Tick %d" % int(view.get("tick", 0))
-	stores_label.text = "Ore %d · Goods %d · Food %d · Oil %d · Masks %d · Delvers %d · Critters %d" % [
+	stores_label.text = "Ore %d · Goods %d · Food %d · Oil %d · Masks %d · Cooling %d · Delvers %d · Critters %d" % [
 		int(st.get("ore", 0)), int(st.get("goods", 0)), int(st.get("food", 0)),
-		int(st.get("fungal_oil", 0)), int(st.get("masks", 0)),
+		int(st.get("fungal_oil", 0)), int(st.get("masks", 0)), int(st.get("cooling_gear", 0)),
 		(view.get("delvers", []) as Array).size(), (view.get("critters", []) as Array).size(),
 	]
+	if view.get("floor_index") == null:
+		floor_label.text = "Floor — · hand-built"
+	else:
+		floor_label.text = "Floor %d · %s" % [int(view["floor_index"]), band_display(str(view.get("band", "")))]
 	layer_label.text = "Depth %d" % layer
 	update_delver_panel()
 	var lines: Array = []
@@ -765,14 +905,8 @@ func update_delver_panel() -> void:
 		var id := int(d["id"])
 		if delver_rows.has(id):
 			var info: Label = delver_rows[id]
-			var clock := ""
-			if d.get("dark_clock") != null:
-				clock = " · CLOCK %d" % int(d["dark_clock"])
-			info.text = "%s · HP %.0f · E %.0f · F %.0f · M %.0f%s%s" % [
-				str(d["state"]), float(d["hp"]), float(d["energy"]), float(d["hunger"]),
-				float(d["morale"]), (" · spore %.0f" % float(d["spore"])) if float(d["spore"]) > 0.0 else "",
-				clock,
-			]
+			info.text = delver_load_text(d)
+			delver_load_texts[id] = info.text
 
 # ---------------------------------------------------------------------------
 # Headless verification (--underreach-verify)
@@ -815,10 +949,129 @@ func run_verify() -> void:
 	goods = int(view.get("stores", {}).get("goods", 0))
 	floors = floors_mmi.multimesh.instance_count
 	ok = goods >= 1 and floors > 0 and delver_nodes.size() == (view.get("delvers", []) as Array).size()
-	if ok:
-		print("UNDERREACH_VERIFY_PASS scenario=gen goods=%d delvers=%d floor_instances=%d tick=%d" % [
-			goods, delver_nodes.size(), floors, int(view.get("tick", 0))])
-		get_tree().quit(0)
-	else:
+	if not ok:
 		print("UNDERREACH_VERIFY_FAIL scenario=gen goods=%d floors=%d nodes=%d" % [goods, floors, delver_nodes.size()])
 		get_tree().quit(1)
+		return
+	print("UNDERREACH_VERIFY_PASS scenario=gen goods=%d delvers=%d floor_instances=%d tick=%d" % [
+		goods, delver_nodes.size(), floors, int(view.get("tick", 0))])
+	run_verify_s11()
+
+func s11_fail(what: String) -> void:
+	print("UNDERREACH_VERIFY_FAIL scenario=s11 %s" % what)
+
+## Part 3 — S11 surfacing: placed kit, flooded cells, delver
+## loads, floor indicator + traversal. Every count is compared
+## against the bridge view itself; any mismatch fails loudly.
+func run_verify_s11() -> void:
+	# Phase A — the S7 colony (4 goods) takes a support, a vent,
+	# and a pump through the bridge. (Cooling gear costs 2 more
+	# goods than the kit leaves, so it is proven in Phase B on a
+	# fresh founding of the same colony.)
+	init_scenario("s7")
+	if view.is_empty():
+		s11_fail("no view from bridge for s7")
+		get_tree().quit(1)
+		return
+	queue({"cmd": "support", "pos": [14, 8, 4]})
+	queue({"cmd": "vent", "pos": [14, 8, 4]})
+	queue({"cmd": "pump", "pos": [13, 8, 4]})
+	step(0)
+	for kind in ["supports", "vents", "pumps"]:
+		if int(kit_synced[kind]) != (view.get(kind, []) as Array).size() or int(kit_synced[kind]) != 1:
+			s11_fail("kit %s synced=%d view=%d" % [kind, int(kit_synced[kind]), (view.get(kind, []) as Array).size()])
+			get_tree().quit(1)
+			return
+	layer = 8
+	apply_view()
+	for kind in ["supports", "vents", "pumps"]:
+		if count_rendered_kit(kind) != 1:
+			s11_fail("kit %s rendered=%d on layer 8, want 1" % [kind, count_rendered_kit(kind)])
+			get_tree().quit(1)
+			return
+	if flooded_synced != (view.get("flooded", []) as Array).size():
+		s11_fail("flooded synced=%d view=%d" % [flooded_synced, (view.get("flooded", []) as Array).size()])
+		get_tree().quit(1)
+		return
+	# Delver load display matches the view's numbers verbatim.
+	for d in view.get("delvers", []):
+		var id := int(d["id"])
+		var shown: String = delver_load_texts.get(id, "")
+		for field in ["air", "water", "heat"]:
+			if not shown.contains("%s %.0f" % [field, float(d[field])]):
+				s11_fail("delver %d display %s missing %s %.0f" % [id, shown, field, float(d[field])])
+				get_tree().quit(1)
+				return
+	# Suffering / worn-kit flags, proven on a synthetic entry so
+	# the flag logic is exercised regardless of this run's loads.
+	var synth := {
+		"state": "Idle", "hp": 50.0, "energy": 50.0, "hunger": 50.0, "morale": 50.0,
+		"air": 65.0, "water": 70.0, "heat": 5.0, "spore": 80.0,
+		"masked": true, "cooled": true, "dark_clock": null,
+		"sick": true, "gasping": true, "drowning": true, "overheating": false,
+	}
+	var synth_text := delver_load_text(synth)
+	for want in ["SICK", "GASPING", "DROWNING", "MASKED", "COOLED"]:
+		if not synth_text.contains(want):
+			s11_fail("synthetic load line missing %s: %s" % [want, synth_text])
+			get_tree().quit(1)
+			return
+	if synth_text.contains("OVERHEATING"):
+		s11_fail("synthetic load line flags OVERHEATING wrongly: %s" % synth_text)
+		get_tree().quit(1)
+		return
+	# Phase B — cooling gear crafted through the bridge.
+	init_scenario("s7")
+	queue({"cmd": "craft_cooling"})
+	step(0)
+	var gear := int(view.get("stores", {}).get("cooling_gear", 0))
+	if gear != 1 or not stores_label.text.contains("Cooling 1"):
+		s11_fail("cooling_gear=%d stores_label=%s" % [gear, stores_label.text])
+		get_tree().quit(1)
+		return
+	# Phase C — traversal: the HUD floor indicator follows a
+	# descend (1 → 2), and a second descend lands on the Drowned
+	# floor, whose flooded cells the overlay must match exactly.
+	init_scenario("gen")
+	if view.get("floor_index") == null or int(view["floor_index"]) != 1 \
+			or not floor_label.text.contains("Floor 1") or not floor_label.text.contains("Shallows"):
+		s11_fail("floor indicator at founding: %s (view %s)" % [floor_label.text, str(view.get("floor_index"))])
+		get_tree().quit(1)
+		return
+	queue({"cmd": "descend"})
+	step(0)
+	if int(view.get("floor_index", 0)) != 2 or not floor_label.text.contains("Floor 2") \
+			or not floor_label.text.contains("Fungal Reaches"):
+		s11_fail("floor indicator after descend: %s (view %s)" % [floor_label.text, str(view.get("floor_index"))])
+		get_tree().quit(1)
+		return
+	queue({"cmd": "descend"})
+	step(0)
+	if int(view.get("floor_index", 0)) != 3 or not floor_label.text.contains("Drowned Galleries"):
+		s11_fail("floor indicator on floor 3: %s (view %s)" % [floor_label.text, str(view.get("floor_index"))])
+		get_tree().quit(1)
+		return
+	var flooded_total := (view.get("flooded", []) as Array).size()
+	if flooded_total <= 0 or flooded_synced != flooded_total:
+		s11_fail("flooded total=%d synced=%d" % [flooded_total, flooded_synced])
+		get_tree().quit(1)
+		return
+	layer = 9
+	apply_view()
+	var expected_layer := 0
+	for c in view.get("flooded", []):
+		if int(c[1]) == layer:
+			expected_layer += 1
+	var rendered_flood := flooded_mmi.multimesh.instance_count
+	if rendered_flood != expected_layer or rendered_flood <= 0:
+		s11_fail("flooded rendered=%d expected_on_layer=%d" % [rendered_flood, expected_layer])
+		get_tree().quit(1)
+		return
+	for kind in ["supports", "vents", "pumps"]:
+		if int(kit_synced[kind]) != (view.get(kind, []) as Array).size():
+			s11_fail("floor3 kit %s synced=%d view=%d" % [kind, int(kit_synced[kind]), (view.get(kind, []) as Array).size()])
+			get_tree().quit(1)
+			return
+	print("UNDERREACH_VERIFY_PASS scenario=s11 supports=1 vents=1 pumps=1 cooling_gear=%d floor_index=%d flooded=%d flooded_layer=%d tick=%d" % [
+		gear, int(view["floor_index"]), flooded_total, rendered_flood, int(view.get("tick", 0))])
+	get_tree().quit(0)
