@@ -563,3 +563,51 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   `docs/COOP_ASSESSMENT.md` with the recommended first
   real-machine step (a two-process loopback session on the
   owner's PC, hashes compared every 100 ticks).
+
+## Merge record — both lines landed on `main` (2026-11-24)
+
+At the owner's direction (2026-11-24, option (b): merge both
+lines and sort the conflicts), the two Underreach lines that
+had diverged at the S5 base (`0180271`) were merged into
+`main`:
+
+- The **slice chain** S6→S13 (floor-generation,
+  hazard-mechanics, traversal, band-scenarios, band-hazards,
+  frontend-surfacing, generations, coop-foundations), merged
+  in slice order. After each slice merge the sim suite
+  reproduced that slice's recorded count exactly (S6 37,
+  S7 43, S8 51, S9 60, S10 70, S11 70, S12 80, S13 87), and
+  after S13 the project tree was byte-identical to the S13
+  branch tip's tree (tree hash `b21789ff…` both sides).
+- The **foundation line** (ASSET_LIST catalogue paperwork for
+  asset queue #12–#30 plus the gloam-rat frontend asset work)
+  was then merged in. Of the five files changed on both
+  sides, four auto-merged and were verified as true unions
+  (project README, this handoff, frontend README, and
+  `frontend/main.gd` — the merged file carries both the S11
+  surfacing and the kind-aware GloamRat critter rendering,
+  no duplicated or dropped hunks). `docs/TEST_PLAN.md`
+  conflicted at the tail and was union-resolved: the S13
+  Planned-list bullet and the foundation line's gloam-rat
+  swap section both survive verbatim.
+
+Post-merge verification on merged `main` (VM, headless):
+`cargo test` **87/87**; the `scenario` binary reproduces
+every recorded section number and state hash (S1 `e3599701…`,
+S3 `4dc99472…`, GEN goods 24, S10 protected `e0b6a85e…`,
+S12 goods 964 / `8d4d431f…`, S13 goods 22 /
+`replay_matches=true` / `11e30e9d…`); `docs/ASSET_LIST.md`
+is identical to the foundation tip (catalogue entries for
+queue #12–#30 all present); `frontend/assets/gloam-rat.glb`
+is present with the foundation line's blob hash; and the
+Godot headless verify prints all three recorded PASS lines
+(`goods=20 … tick=4000`, `scenario=gen goods=24 …`,
+`scenario=s11 supports=1 vents=1 pumps=1 cooling_gear=1
+floor_index=3 flooded=96 flooded_layer=35`). No branches
+were deleted.
+
+Also recorded 2026-11-24: the owner decided co-op questions
+1 and 2 in `docs/COOP_ASSESSMENT.md` section (c) — full
+frontier rights for every player with colony-shared credit,
+and open multi-rescuer lantern-clock rescues with the
+line-bell heard by every player. Questions 3–5 remain open.

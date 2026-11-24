@@ -1356,3 +1356,33 @@ reproducing exactly.
   camera zoom is mouse-wheel-only (the input API has no wheel
   action). The live view JSON (`user://out.json`) was read
   throughout the session and matched the HUD.
+
+## Merge verification — both lines on `main` (verified 2026-11-24, VM headless)
+
+- Slice chain merged into `main` in order S6→S13; `cargo
+  test` after each merge reproduced the slice's recorded
+  count exactly: S6 37/37, S7 43/43, S8 51/51, S9 60/60,
+  S10 70/70, S11 70/70, S12 80/80, S13 87/87. After S13 the
+  project tree was byte-identical to the S13 tip's tree
+  (`b21789ff…`).
+- Foundation line (asset catalogue #12–#30 + gloam-rat
+  frontend work) merged on top; `docs/TEST_PLAN.md` tail
+  conflict union-resolved (both records kept verbatim);
+  `frontend/main.gd` auto-merge hand-verified as a true
+  union (S11 surfacing + kind-aware `RAT_SCENE` critter
+  rendering; no duplicate definitions).
+- On merged `main`: `cargo test` **87/87**, 0 failed;
+  `scenario` binary (release) reproduces every recorded
+  section number and state hash, including S13 goods 22,
+  `replay_matches=true`, hash `11e30e9ddb3f6aa9…`;
+  `docs/ASSET_LIST.md` identical to the foundation tip;
+  `frontend/assets/gloam-rat.glb` present (blob
+  `a25e1d3c…`, same as foundation).
+- Godot headless verify on merged `main` (after one
+  `--editor --import` pass): exit 0, no script errors, all
+  three recorded PASS lines printed exactly —
+  `UNDERREACH_VERIFY_PASS goods=20 delvers=5
+  floor_instances=15 tick=4000`; `scenario=gen goods=24
+  delvers=5 floor_instances=61 tick=4000`; `scenario=s11
+  supports=1 vents=1 pumps=1 cooling_gear=1 floor_index=3
+  flooded=96 flooded_layer=35 tick=0`.

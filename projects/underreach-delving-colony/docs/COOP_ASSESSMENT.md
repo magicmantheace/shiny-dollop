@@ -121,12 +121,23 @@ implementer guessing.
    are there roles/permissions — and if so, whose? (The Deep
    Ledger already names depths and losses; should first light
    and rescues also be attributed by player name?)
+   **DECIDED 2026-11-24 (owner):** every player is the
+   frontier — anyone may carve, plant first light, place kit,
+   assign jobs, and spend colony goods; there are no roles or
+   permissions. Credit is **shared by the colony**: first
+   light and rescues are NOT attributed by player name in the
+   Deep Ledger. Session-log attribution stays mechanical —
+   it exists for determinism and replay, not for credit.
 2. **The lantern-clock rescue with multiple rescuers.** Decision
    1's rescue fantasy is one rescuer racing a delver's lantern
    clock, guided by a line-bell. Does it change when another
    *player* can run the rescue, plant light to stretch the
    clock, or split the search? Does every player get the
    line-bell, or only the nearest / the one who noticed?
+   **DECIDED 2026-11-24 (owner):** it does not change — every
+   player can run the rescue, plant light to stretch the
+   clock, and split the search, and **every player hears the
+   line-bell**.
 3. **Player downing and rescue.** Decision 6 covers a single
    player: wake rescued at the last camp with no gear, with a
    hardcore option. In co-op, can a downed *player* be rescued
