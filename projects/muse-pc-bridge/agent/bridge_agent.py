@@ -1849,7 +1849,8 @@ def _gui_launch_argv(payload: dict) -> tuple[list[str], str, str]:
     return argv, cwd, " ".join(argv)[:500]
 
 
-def spawn_detached(core: BridgeCore, payload: dict) -> DetachedProcess:
+def spawn_detached(core: BridgeCore, payload: dict,
+                   session_mode: bool = False) -> DetachedProcess:
     gui = payload.get("gui") is True
     if gui:
         argv, cwd, summary = _gui_launch_argv(payload)
@@ -1891,6 +1892,19 @@ def spawn_detached(core: BridgeCore, payload: dict) -> DetachedProcess:
     else:
         kwargs["start_new_session"] = True
     target = popen_target(shell_name, argv, payload.get("command"))
+    if session_mode and IS_WINDOWS and shell_name == "powershell" \
+            and isinstance(payload.get("command"), str):
+        # Session mode takes the verbatim command-line form that
+        # popen_target already uses for cmd: list-form argv joins
+        # quote the -Command argument with subprocess rules, and
+        # PowerShell then parses a different string than the one
+        # submitted — the prime suspect for the 2026-11-21
+        # detached powershell spawn that exited 0 without running
+        # its command (empty logs, no side effects) while the same
+        # spawn through cmd worked. Scoped to session mode so the
+        # established spawn paths are byte-identical to before.
+        target = f'"{argv[0]}" -NoProfile -NonInteractive ' \
+                 f'-Command {payload["command"]}'
     try:
         try:
             proc = subprocess.Popen(target, stdout=out_fh, stderr=err_fh,
@@ -2878,6 +2892,11 @@ class BridgeHandler(BaseHTTPRequestHandler):
             (method == "GET" and route == "/v1/screenshot")
             or (method == "POST" and route == "/v1/input")
             or (method == "POST" and route == "/v1/uia")
+            or (method == "GET" and route == "/v1/presence")
+            or (method == "POST" and route == "/v1/window/raise")
+            or (route == "/v1/project-mode" and method == "GET")
+            or (method == "POST" and route in (
+                "/v1/project-mode/engage", "/v1/project-mode/disengage"))
             or (route == "/v1/clipboard" and method in ("GET", "POST")))
         if desktop_direct:
             body = self._body_bytes(MAX_BODY_BYTES) \
@@ -2891,7 +2910,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 peek = json.loads(raw.decode("utf-8")) if raw else {}
             except (UnicodeDecodeError, json.JSONDecodeError):
                 peek = {}
-            if isinstance(peek, dict) and peek.get("gui") is True:
+            if isinstance(peek, dict) and (
+                    peek.get("gui") is True
+                    or peek.get("session") == "interactive"):
                 proxied = self._broker_or_block(
                     method, route, parsed, raw)
                 if proxied is not None:
@@ -2942,6 +2963,16 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return self._handle_process_get(proc_match.group(1), parsed)
         if method == "POST" and proc_match and proc_match.group(2) == "kill":
             return self._handle_process_kill(proc_match.group(1))
+        if method == "GET" and route == "/v1/presence":
+            return self._handle_presence()
+        if method == "POST" and route == "/v1/window/raise":
+            return self._handle_window_raise()
+        if method == "GET" and route == "/v1/project-mode":
+            return self._handle_project_mode_status()
+        if method == "POST" and route == "/v1/project-mode/engage":
+            return self._handle_project_mode_toggle(True)
+        if method == "POST" and route == "/v1/project-mode/disengage":
+            return self._handle_project_mode_toggle(False)
         if method == "POST" and route == "/v1/sessions":
             return self._handle_session_open()
         if method == "GET" and sess_match and not sess_match.group(2):
@@ -3341,9 +3372,114 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def _handle_process_spawn(self):
         payload = self._read_json_body()
-        record = spawn_detached(self.core, payload)
-        return 201, record.describe(), \
-            f"process spawn: {record.command_summary} (pid {record.pid})", {}
+        session_mode = payload.get("session") == "interactive"
+        if "session" in payload and not session_mode:
+            raise ValueError(
+                "field 'session' must be \"interactive\" when given")
+        # Validate the proof delay BEFORE spawning anything.
+        proof_delay = payload.get("proof_delay_s")
+        if proof_delay is None and session_mode:
+            proof_delay = 3.0
+        if proof_delay is not None:
+            try:
+                proof_delay = float(proof_delay)
+            except (TypeError, ValueError):
+                raise ValueError("proof_delay_s must be a number")
+            if proof_delay < 0 or proof_delay > 30:
+                raise ValueError("proof_delay_s must be within 0..30")
+        record = spawn_detached(self.core, payload,
+                                session_mode=session_mode)
+        obj = record.describe()
+        summary = f"process spawn: {record.command_summary} " \
+                  f"(pid {record.pid})"
+        if session_mode:
+            obj["session"] = "interactive"
+            summary += " [session: interactive]"
+        # Proof of life: after the delay, is the process still
+        # there? A detached spawn once exited 0 without ever
+        # running its command and nothing noticed for hours; the
+        # proof makes that failure visible in the spawn response
+        # itself. Default on for session spawns, opt-in otherwise.
+        if proof_delay is not None:
+            if proof_delay > 0:
+                time.sleep(proof_delay)
+            alive = record.alive()
+            exit_code = record.exit_code()
+            obj["proof"] = {"delay_s": proof_delay, "alive": alive,
+                            "exit_code": exit_code, "ok": alive}
+            summary += f" [proof after {proof_delay:g}s: " \
+                       + ("alive" if alive
+                          else f"EXITED (code {exit_code})") + "]"
+        return 201, obj, summary, {}
+
+    # -- presence / window / project mode --------------------------------
+
+    def _handle_presence(self):
+        import presence
+        obj = presence.snapshot()
+        return 200, obj, \
+            f"presence (gaming={obj['gaming']}, " \
+            f"idle={obj['input_idle_s']})", {}
+
+    def _handle_window_raise(self):
+        payload = self._read_json_body()
+        pid = payload.get("pid")
+        title = payload.get("title")
+        if (pid is None) == (title is None):
+            raise ValueError(
+                "exactly one of 'pid' / 'title' is required")
+        if pid is not None and (not isinstance(pid, int)
+                                or isinstance(pid, bool) or pid <= 0):
+            raise ValueError("field 'pid' must be a positive integer")
+        if title is not None and (not isinstance(title, str)
+                                  or not title.strip()):
+            raise ValueError("field 'title' must be a non-empty string")
+        import window_raise
+        try:
+            result = window_raise.raise_window(pid=pid, title=title)
+        except window_raise.WindowUnavailable as exc:
+            raise PlatformUnavailable(str(exc))
+        except LookupError as exc:
+            return 404, {"error": str(exc)}, \
+                "window raise: no matching window", {}
+        return 200, result, \
+            f"window raised: {result['title']!r} via " \
+            f"{result['method']} (foreground={result['foreground']})", {}
+
+    def _project_mode_audit(self, event: str, summary: str,
+                            **fields) -> None:
+        entry = {"event": event, "ip": None, "method": None,
+                 "path": None, "summary": summary, "status": None,
+                 "duration_ms": None}
+        entry.update(fields)
+        self.core.audit(entry)
+
+    def _handle_project_mode_status(self):
+        import project_mode
+        obj = project_mode.status(self.core.state_dir)
+        return 200, obj, \
+            f"project mode (engaged={obj['engaged']})", {}
+
+    def _handle_project_mode_toggle(self, engage: bool):
+        import project_mode
+        if engage:
+            obj = project_mode.engage(
+                self.core.state_dir, source="api",
+                audit=self._project_mode_audit)
+            verb = "engaged"
+        else:
+            obj = project_mode.disengage(
+                self.core.state_dir, source="api",
+                audit=self._project_mode_audit)
+            verb = "disengaged"
+        key = "engage_steps" if engage else "disengage_steps"
+        applied = [s["step"] for s in obj.get(key, [])
+                   if s.get("status") == "applied"]
+        skipped = [s["step"] for s in obj.get(key, [])
+                   if s.get("status") not in ("applied",)]
+        return 200, obj, \
+            f"project mode {verb} (applied: {applied or 'none'}; " \
+            f"other: {skipped or 'none'})", {}
 
     def _handle_process_get(self, proc_id: str, parsed):
         core = self.core
@@ -3919,6 +4055,19 @@ def create_server(cfg: dict) -> ThreadingHTTPServer:
     server.core = core  # type: ignore[attr-defined]
     server.daemon_threads = True
     core.log_start()
+    try:
+        # Boot beacon: one line per process start in the state
+        # dir's boot-log.jsonl, carrying the machine boot time —
+        # after a real reboot this is the passive record that the
+        # bridge came back (see boot_beacon.py). Best-effort: a
+        # beacon failure never blocks the server.
+        import boot_beacon
+        boot_beacon.note_boot(
+            core.state_dir,
+            "session_helper" if cfg.get("session_helper") else "agent",
+            version=VERSION)
+    except Exception:
+        pass
     threading.Thread(target=_session_reaper, args=(core,), daemon=True,
                      name="session-reaper").start()
     if not cfg.get("session_helper"):
@@ -3935,6 +4084,14 @@ def create_server(cfg: dict) -> ThreadingHTTPServer:
         runner = queue_runner.QueueRunner(core)
         core.queue_runner = runner
         runner.start()
+        # Project Mode presence watch: while Project Mode is
+        # engaged, fresh owner input or a game launch disengages
+        # it (the owner's use always wins). Main agent only, like
+        # the queue runner — the helper is a route server.
+        import project_mode
+        monitor = project_mode.ProjectModeMonitor(core)
+        core.project_mode_monitor = monitor
+        monitor.start()
     return server
 
 

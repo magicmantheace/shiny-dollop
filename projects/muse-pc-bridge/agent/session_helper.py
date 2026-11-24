@@ -76,6 +76,15 @@ _PROC_ROUTE = re.compile(r"/v1/processes(?:/([0-9a-f]+)(?:/(kill))?)?")
 def is_desktop_route(method: str, route: str) -> bool:
     if method == "GET" and route == "/v1/screenshot":
         return True
+    if method == "GET" and route == "/v1/presence":
+        return True
+    if method == "POST" and route == "/v1/window/raise":
+        return True
+    if method == "GET" and route == "/v1/project-mode":
+        return True
+    if method == "POST" and route in (
+            "/v1/project-mode/engage", "/v1/project-mode/disengage"):
+        return True
     if method == "POST" and route in ("/v1/input", "/v1/uia"):
         return True
     if route == "/v1/clipboard" and method in ("GET", "POST"):

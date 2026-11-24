@@ -53,6 +53,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import boot_beacon  # noqa: E402
 import bridge_update  # noqa: E402
 import display_state  # noqa: E402
 
@@ -308,6 +309,12 @@ class Supervisor:
         try:
             (self.state_dir / STOP_REQUEST_NAME).unlink()
         except OSError:
+            pass
+        try:
+            # Boot beacon (see boot_beacon.py): records whether
+            # this supervisor start follows a fresh boot.
+            boot_beacon.note_boot(self.state_dir, "supervisor")
+        except Exception:
             pass
         self._write_status("starting")
         threading.Thread(target=self._display_loop, daemon=True,
