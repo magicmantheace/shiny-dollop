@@ -439,13 +439,108 @@ air, which the unchanged scenario sections below demonstrate.
   (mining only in this slice); floors 2–5 scenarios;
   floor-to-floor traversal.
 
+## S8 — floor-to-floor traversal (verified 2026-11-24, VM headless)
+
+Branch `underreach-delving-colony/traversal`. The S6 descent
+becomes a transition: per-floor stored state, `descend()` /
+`ascend()` on the sim (and `descend` / `ascend` bridge
+commands; the bridge view already carried `floor_index`).
+Save hashes shift again in this slice (the save gains the
+`floors` stored-state map and two Ledger kinds);
+behaviour numbers for the S1–S7 scenarios are unchanged.
+
+### Modelling decisions (the record was silent on these)
+
+- **Whole-colony immediate transition.** Every delver
+  travels together; there is no per-delver cross-floor
+  pathing. On descent delvers gather at the target floor's
+  entry camp; on ascent they arrive at the floor above's
+  descent cell (they climb back up the stairs they came
+  down), with their current work step reset.
+- **A floor left behind is frozen.** Its packed state is
+  not ticked: its lanterns do not burn fuel while the
+  colony is away, and it restores exactly on return.
+- **Forward camp on first arrival.** A never-visited floor
+  is generated purely from `(world_seed, floor_index)` and
+  founded at its entry camp mirroring `build_scenario_gen`
+  (delvers at the entry camp, beds + stockpile there, the
+  generated floor's registered faces, gate at the entry
+  camp, a pipe-fed camp lantern, one resident critter per
+  den) — except that **farming plots do not carry down**:
+  a fresh floor starts with no plots. Stores, delvers, the
+  Ledger, tick, RNG, and the arrival schedule are global
+  and travel with the colony.
+
+### Tests (`sim/tests/scenario_s8.rs`, 8 tests)
+
+- **Descend lands on floor 2:** `floor.index == 2`, the
+  active world equals `generate_floor(seed, 2).world`,
+  `FloorInfo` equals that floor's `info()`; a forward camp
+  (stockpile at the entry, beds, the generated faces, no
+  plots), floor 1 stored behind, one `Descended` entry.
+- **Generation purity:** `rng_state` identical before and
+  after a generating descend; descending 1→2→3 yields
+  worlds equal to standalone `generate_floor` for floors
+  2 and 3.
+- **Round-trip restoration:** after producing on floor 1
+  and setting a support + vent, descend, run 1,000 ticks
+  on floor 2, ascend — floor 1's world, lanterns, faces,
+  supports, vents, and lit_depths are exactly as they were
+  at departure (lantern fuel unburned: the floor froze).
+- **Save/load across floors:** mid-run on floor 2,
+  `save_json` → `load_json` reproduces `state_hash()`
+  exactly, stored floor included; twin continuation for
+  300 ticks stays hash-identical; the loaded copy ascends.
+- **First light per floor:** after descending and opening
+  floor 2, `FirstLight` entries exist beyond those
+  recorded on floor 1 (lit depths are packed per floor).
+- **The loop continues:** on floor 2 after opening,
+  deliveries ≥ 1 (actual 5 in the binary run) and goods
+  strictly increase (24 → 33 in the binary run); 0 lost.
+- **Refusals:** `descend` on the hand-built S1 scenario
+  (floor `None`) returns false with the state hash
+  unchanged; `ascend` on floor 1 returns false.
+- **Ledger append-only:** the entries present before a
+  descent are a strict prefix of the ledger after it.
+
+### Full-suite + harness results
+
+- `cargo test`: **51/51** (43 pre-existing + 8 S8),
+  0 failed.
+- `scenario` binary (release): S1/S2/S3/S5/GEN/S7 sections
+  unchanged in behaviour (S1 goods 6, S3 goods 20, S5 oil
+  19, GEN goods 24 with nobody lost, S7 unprotected goods
+  16 / cave-ins 3 / gasping 2 / downed 1, S7 protected
+  goods 14 / cave-ins 0 / gasping 0 / downed 0). New S8
+  section: floor 1 goods=24, deliveries=13, alive=5,
+  lost=0 at 6,000 ticks; descend ok, floor=2; floor 2
+  goods=33 (was 24 on arrival), 5 deliveries on that
+  floor, alive=6 (a recruit arrived), lost=0, 12
+  first-light entries in total across both floors at
+  12,000 ticks; ascend ok, back on floor=1, floor 1 world
+  intact=true, floor 1 lanterns intact=true. S8 state
+  hash `7fff65ca28fd8bcec5ce1815e52a65dd9be807f23b81692a6f1942e97bea9def`.
+- Bridge check (release binary, file protocol): `init
+  gen` → step with `[{"cmd":"descend"}]` reports
+  `floor_index` 2; a following `[{"cmd":"ascend"}]` step
+  reports `floor_index` 1.
+- **Not verified / not built:** Godot frontend surfacing
+  for traversal (the bridge view carries `floor_index`;
+  the frontend has no floor-switch UI yet); floors 2–5
+  scenarios, balance, and per-floor band mechanics —
+  floor 2 generates as the Fungal Reaches stub and runs
+  the generic delve → haul → convert loop, but spores are
+  still keyed to depth (`hazards_at`), not to the floor's
+  band, and no Fungal gate set is founded with the forward
+  camp.
+
 ## Planned (later slices)
 
 - Owner-PC visual pass of the frontend; performance measurement
   before any frame budget claim.
 - The dedicated gloam-lurker asset once it is built (not yet in the
   builder catalog); the ember-dragon stands in until then.
-- S6 follow-ons: floor-to-floor traversal, face
-  registration when a pocket is carved open, floors 2–5
-  scenarios. (Cave-in/bad-air mechanics from this list were
-  built in S7, above.)
+- S6 follow-ons: face registration when a pocket is carved
+  open, floors 2–5 scenarios. (Cave-in/bad-air mechanics from
+  this list were built in S7, above; floor-to-floor
+  traversal was built in S8, above.)

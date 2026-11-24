@@ -178,8 +178,18 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   60 load (work halved), hp drain at 100. Timber supports
   and vents are placed kit at 1 goods each. Sim + bridge
   only; frontend surfacing follows later, as S5's did.
-- Later: Drowned/Crystal/Magma gates, floor-to-floor traversal,
-  co-op, colony failure & succession, children/generations.
+- **S8 — floor-to-floor traversal (BUILT 2026-11-24, branch
+  `underreach-delving-colony/traversal`).** Per-floor stored
+  state in the save (`Sim.floors`, keyed by floor index); the
+  active floor swaps in/out on `descend()` / `ascend()` (also
+  bridge commands). First arrival on a floor generates it
+  purely from `(world_seed, floor_index)` and founds a
+  forward camp at its entry camp; return visits restore the
+  packed state exactly. Descents and ascents are ledgered
+  (`Descended` / `Ascended`, naming the floor and its band).
+- Later: Drowned/Crystal/Magma gates, floors 2–5 scenarios
+  and balance, co-op, colony failure & succession,
+  children/generations.
 
 ## Status — 2026-11-10
 
@@ -280,3 +290,24 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   bad-air pocket carved open is spent. NOT built: frontend
   surfacing for supports/vents/air, floors 2–5 scenarios,
   floor-to-floor traversal.
+- **S8 — floor-to-floor traversal (2026-11-24, VM-verified;
+  branch `underreach-delving-colony/traversal`, not yet
+  merged):** the S6 descent is a transition. `cargo test`
+  51/51 (43 pre-existing + 8 new S8 tests); the `scenario`
+  binary's S1–S7 sections are unchanged in behaviour, and
+  its new S8 section produces on floor 1 (goods 24), descends,
+  produces on floor 2 (goods 24 → 33, 5 deliveries there,
+  nobody lost), then ascends and finds floor 1's world and
+  lanterns exactly as left. Three modelling decisions where
+  the record was silent, all flagged in
+  `docs/TEST_PLAN.md`: whole-colony immediate transition
+  (no per-delver cross-floor pathing — every delver gathers
+  at the new floor's entry camp on descent, and at the floor
+  above's descent cell on ascent); a floor left behind is
+  frozen (its lanterns do not burn fuel while the colony is
+  away); on first arrival a forward camp is founded at the
+  entry camp mirroring `build_scenario_gen`'s founding, and
+  farming plots do not carry down. NOT built: floors 2–5
+  scenarios/balance and band mechanics (floor 2 generates
+  and runs the generic loop, but the Fungal gate set is not
+  wired per-floor), frontend surfacing for traversal.
