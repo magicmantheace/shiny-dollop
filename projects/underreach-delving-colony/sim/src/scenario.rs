@@ -269,7 +269,22 @@ pub const GEN_WORLD_SEED: u64 = 0x5EED_0007;
 /// The dens' residents are home: one critter per den, placed by
 /// the scenario script, as choreographed tests place theirs.
 pub fn build_scenario_gen(world_seed: u64) -> Sim {
-    let floor = generate_floor(world_seed, 1);
+    build_scenario_gen_floor(world_seed, 1)
+}
+
+/// S9: `build_scenario_gen` generalized to any generated floor —
+/// a colony founded directly on floor `floor_index` (1–5), with
+/// the exact founding pattern of the Floor 1 gen scenario (and of
+/// S8's forward camps): entry-camp delvers, beds + stockpile at
+/// the entry camp, the generated floor's registered faces, the
+/// gate at the entry camp, a pipe-fed camp lantern, and one
+/// resident critter per den. Like `build_scenario_gen` it also
+/// plants the two camp farming plots — a colony *founded* on a
+/// floor is a home, not a forward camp (S8's forward camps omit
+/// the plots because the colony's home stays behind). The
+/// runtime RNG starts at the world seed, as on Floor 1.
+pub fn build_scenario_gen_floor(world_seed: u64, floor_index: u32) -> Sim {
+    let floor = generate_floor(world_seed, floor_index);
     let info = floor.info();
     let faces = floor.layout.faces.clone();
     let dens: Vec<(Pos, CritterKind)> = floor
