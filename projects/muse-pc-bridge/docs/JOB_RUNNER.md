@@ -211,6 +211,67 @@ failure through, delayed by at most the grace. Deploy TODO
 for the next gap: repeat the demo job across a graceful
 reboot and confirm it resumes and completes.
 
+### Completion notification (v1.4.0)
+
+Until 1.4.0, the only way to learn a job had finished was to
+poll — a watcher on a timer, or the owner asking for a
+progress update. Watchers die with the runtime that hosts
+them and schedules can miss the moment. The runner now pushes
+the news itself: when a job reaches a terminal state
+(`done` or `failed` — no intermediate states in v1), it sends
+ONE email to the configured recipient (default
+`nyx-adam@muse.ai`, Nyx's Muse Mail inbox, where inbound
+mail surfaces on its own — no polling on either side).
+
+- **Transport**: stdlib `smtplib`, STARTTLS, short connection
+  timeout (`notify_smtp_timeout_s`, default 15 s). Expected
+  provider is Gmail (`smtp.gmail.com:587`); host and port are
+  configurable.
+- **Config keys** (all optional, in the agent config):
+  `notify_email_enabled` (default **false** — unconfigured,
+  the runner behaves exactly as before), `notify_smtp_host`,
+  `notify_smtp_port`, `notify_smtp_user`,
+  `notify_recipient`, `notify_smtp_timeout_s`.
+- **The secret rule**: the SMTP app password is NEVER a
+  config value and is never committed anywhere. The runner
+  reads it only from the environment variable
+  **`BRIDGE_NOTIFY_APP_PASSWORD`** (set in the environment of
+  the runner supervisor process, so the worker child inherits
+  it). Error summaries are scrubbed of the password value
+  before they are written anywhere; tests assert it appears
+  in no event, record, or email body.
+- **Email content**: subject `[pc-bridge] job <id>
+  completed` / `... failed`; plain-text body with job id,
+  name, outcome, submitted/started/finished times, duration,
+  and a per-stage summary (name, status, attempts, exit
+  code). Failures add the reason, the failing stage index,
+  and the last non-empty line of the job's stage log.
+- **Best-effort, exactly once**: the send happens after the
+  terminal state is recorded. Any failure (SMTP down, bad
+  credentials, no network) is caught, recorded as a
+  `notify_failed` event with a non-secret error summary, and
+  never fails the job, crashes the runner, or blocks stage
+  execution. The job record carries `notified`,
+  `notify_pending`, `notify_attempts`, and `notify_given_up`:
+  `notified: true` is written after a successful send, so a
+  runner restart never re-sends; a failed send is retried at
+  most once on the next runner start, then given up
+  (`notify_gave_up` event) and never attempted again.
+- **Deploy-time setup (Adam, once)**: in the Google account
+  used for sending, enable 2-Step Verification and create an
+  **App password** for Mail; set `notify_smtp_user` to that
+  account's address and `notify_email_enabled` to true in the
+  PC's `config.json`; set the `BRIDGE_NOTIFY_APP_PASSWORD`
+  environment variable to the app password for the runner
+  supervisor's environment; restart the runner supervisor.
+  The app password is entered only on the PC — never in chat,
+  never in this repository.
+
+The Windows/Gmail path is **UNVERIFIED** until the deploy
+smoke: a real send from the PC and its arrival at
+nyx-adam@muse.ai. VM tests drive a fake SMTP factory and an
+injectable sender only.
+
 ---
 
 ## 2. Presence
@@ -459,3 +520,12 @@ see the deploy checklist.
    confirm auto-disengage restores the desktop.
 6. Only after 1–5: move the first real consumer (the comic
    queue) onto the runner.
+7. Completion notification (1.4.0): complete the one-time
+   Gmail app-password setup (see "Completion notification"
+   above), enable `notify_email_enabled` with
+   `BRIDGE_NOTIFY_APP_PASSWORD` set for the runner
+   supervisor, run a trivial job to `done` and one to
+   `failed`, and confirm both emails arrive at
+   nyx-adam@muse.ai with the right subjects, the events log
+   shows `notify_sent` for each, and no second email arrives
+   after a runner restart.

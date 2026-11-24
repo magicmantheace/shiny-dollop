@@ -88,6 +88,20 @@ orphan_killed, gpu_wait, completed, failed, ...) are appended to
 events.jsonl. Manifest contents are archived under manifests/;
 command text is not duplicated into the event log, and no
 credential is ever written there.
+
+Completion notification (v1.4.0): when a job reaches a terminal
+state (`done` / `failed`) and notification is configured, the
+runner emails the owner-side inbox (default
+nyx-adam@muse.ai) exactly once — event-driven, so completion
+is learned without polling. Best-effort by design: a send
+failure is recorded (events `notify_failed` / `notify_sent` /
+`notify_gave_up`), never fails the job, and a failed send is
+retried at most once on the next runner start. The SMTP app
+password is read ONLY from the environment variable
+BRIDGE_NOTIFY_APP_PASSWORD — never from the config file, never
+written to any record, event, or log. Unconfigured (the
+default) the runner behaves exactly as before. See
+docs/JOB_RUNNER.md, "Completion notification".
 """
 
 from __future__ import annotations
@@ -97,11 +111,15 @@ import json
 import os
 import re
 import signal
+import smtplib
+import ssl
 import subprocess
 import sys
 import threading
 import time
 import uuid
+from datetime import datetime, timezone
+from email.message import EmailMessage
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -110,6 +128,12 @@ import boot_beacon  # noqa: E402
 import bridge_agent  # noqa: E402
 import bridge_update  # noqa: E402
 import presence  # noqa: E402
+
+#: Environment variable holding the SMTP app password. The one
+#: and only place the secret is read from.
+NOTIFY_PASSWORD_ENV = "BRIDGE_NOTIFY_APP_PASSWORD"
+NOTIFY_DEFAULT_RECIPIENT = "nyx-adam@muse.ai"
+_TERMINAL_STATES = ("done", "failed")
 
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 _SHELLS = ("powershell", "cmd", "posix")
@@ -276,6 +300,7 @@ def jobs_status(jobs_dir: Path) -> dict:
             "exit_code": record.get("exit_code"),
             "reason": record.get("reason"),
             "waiting_for_gpu": record.get("waiting_for_gpu"),
+            "notified": record.get("notified"),
         })
     jobs.sort(key=lambda j: (j.get("submitted_at") or 0,
                              str(j.get("id"))))
@@ -302,7 +327,8 @@ class JobRunner:
                  gpu_threshold_pct: int = 90,
                  process_names_fn=None, gpu_fn=None,
                  shutdown_grace_s: float = 10.0,
-                 shutdown_fn=None):
+                 shutdown_fn=None,
+                 notify_fn=None, smtp_factory=None):
         self.jobs_dir = Path(jobs_dir)
         self.state_dir = Path(state_dir)
         self.cfg = cfg or {}
@@ -325,6 +351,10 @@ class JobRunner:
         self._shutdown_fn = shutdown_fn \
             if shutdown_fn is not None \
             else bridge_agent.system_shutting_down
+        # Completion notification seams (tests inject a fake
+        # sender / SMTP factory; production uses SMTP below).
+        self._notify_fn = notify_fn
+        self._smtp_factory = smtp_factory
         self._extra_patterns = _blocker_patterns(
             self.cfg.get("job_gpu_blockers") or ())
         self._events_lock = threading.Lock()
@@ -352,6 +382,217 @@ class JobRunner:
         except OSError as exc:
             print(f"[job-runner] WARNING: event write failed: {exc}",
                   file=sys.stderr)
+
+    # -- completion notification (v1.4.0) -----------------------------------
+
+    def _notify_enabled(self) -> bool:
+        return bool(self.cfg.get("notify_email_enabled"))
+
+    def _notify_terminal(self, record: dict) -> None:
+        """Mark a terminal job as owing a notification and try
+        to send it now. No-op when the feature is unconfigured.
+        Never raises: notification is best-effort and must not
+        disturb the job's recorded outcome."""
+        if record.get("state") not in _TERMINAL_STATES:
+            return
+        if not self._notify_enabled():
+            return
+        if record.get("notified") or record.get("notify_given_up"):
+            return
+        if not record.get("notify_pending"):
+            record["notify_pending"] = True
+            try:
+                self._write_record(record)
+            except OSError:
+                pass
+        self._attempt_notify(record)
+
+    def _attempt_notify(self, record: dict) -> None:
+        """One send attempt. Exactly-once is anchored on the
+        record: `notified` is written after a successful send,
+        and attempts are capped at 2 (the initial send plus one
+        retry on a later runner start), after which the runner
+        gives up and logs it."""
+        if record.get("notified") or record.get("notify_given_up"):
+            return
+        record["notify_attempts"] = \
+            int(record.get("notify_attempts") or 0) + 1
+        attempt = int(record["notify_attempts"])
+        try:
+            self._write_record(record)
+        except OSError:
+            pass
+        try:
+            self._send_notification(record)
+        except Exception as exc:  # best-effort: never propagate
+            summary = self._scrub_secret(
+                f"{type(exc).__name__}: {exc}")[:200]
+            if attempt >= 2:
+                record["notify_given_up"] = True
+                record["notify_pending"] = False
+            try:
+                self._write_record(record)
+            except OSError:
+                pass
+            self._event("notify_failed", record, attempt=attempt,
+                        error=summary)
+            if record.get("notify_given_up"):
+                self._event("notify_gave_up", record,
+                            attempts=attempt)
+            print(f"[job-runner] notification failed for job "
+                  f"{record.get('id')}: {summary}", file=sys.stderr)
+            return
+        record["notified"] = True
+        record["notify_pending"] = False
+        try:
+            self._write_record(record)
+        except OSError:
+            pass
+        self._event("notify_sent", record, attempt=attempt,
+                    recipient=self._notify_recipient())
+
+    def _retry_pending_notifications(self) -> None:
+        """At runner start: jobs that reached a terminal state
+        but whose notification never landed (send failed, or the
+        runner died between recording the outcome and sending)
+        get their one retry here. Records already notified or
+        given up are never touched again."""
+        if not self._notify_enabled():
+            return
+        for record in self._list_records():
+            if record.get("state") not in _TERMINAL_STATES:
+                continue
+            if not record.get("notify_pending"):
+                continue
+            if record.get("notified") \
+                    or record.get("notify_given_up"):
+                continue
+            if int(record.get("notify_attempts") or 0) >= 2:
+                continue
+            self._attempt_notify(record)
+
+    def _notify_recipient(self) -> str:
+        return str(self.cfg.get("notify_recipient")
+                   or NOTIFY_DEFAULT_RECIPIENT)
+
+    def _scrub_secret(self, text: str) -> str:
+        """Defence in depth: the SMTP password must never land
+        in an event, record, or log — strip it if an exception
+        message somehow contains it."""
+        password = os.environ.get(NOTIFY_PASSWORD_ENV) or ""
+        if password:
+            text = text.replace(password, "***")
+        return text
+
+    def _send_notification(self, record: dict) -> None:
+        """Deliver one notification. Raises on any failure; the
+        caller (_attempt_notify) owns the bookkeeping."""
+        if self._notify_fn is not None:
+            self._notify_fn(record)
+            return
+        subject, body = self.build_notification(record)
+        user = str(self.cfg.get("notify_smtp_user") or "")
+        password = os.environ.get(NOTIFY_PASSWORD_ENV) or ""
+        if not user or not password:
+            raise RuntimeError(
+                "notification SMTP not configured: "
+                "notify_smtp_user and the "
+                f"{NOTIFY_PASSWORD_ENV} environment variable "
+                "are both required")
+        host = str(self.cfg.get("notify_smtp_host")
+                   or "smtp.gmail.com")
+        try:
+            port = int(self.cfg.get("notify_smtp_port") or 587)
+        except (TypeError, ValueError):
+            port = 587
+        try:
+            timeout = float(self.cfg.get("notify_smtp_timeout_s")
+                            or 15.0)
+        except (TypeError, ValueError):
+            timeout = 15.0
+        msg = EmailMessage()
+        msg["From"] = user
+        msg["To"] = self._notify_recipient()
+        msg["Subject"] = subject
+        msg.set_content(body)
+        factory = self._smtp_factory or smtplib.SMTP
+        with factory(host, port, timeout=timeout) as server:
+            server.starttls(context=ssl.create_default_context())
+            server.login(user, password)
+            server.send_message(msg)
+
+    @staticmethod
+    def _fmt_ts(value) -> str:
+        try:
+            ts = float(value)
+        except (TypeError, ValueError):
+            return "unknown"
+        return datetime.fromtimestamp(ts, timezone.utc).strftime(
+            "%Y-%m-%d %H:%M:%S UTC")
+
+    def _last_log_line(self, record: dict) -> str | None:
+        """Last non-empty line of the job's stage log (bounded
+        tail read), for failure emails. None when unavailable."""
+        try:
+            path = self.logs_dir / f"{record['id']}.log"
+            with open(path, "rb") as fh:
+                fh.seek(0, os.SEEK_END)
+                size = fh.tell()
+                fh.seek(max(0, size - 65536))
+                tail = fh.read().decode("utf-8", "replace")
+        except OSError:
+            return None
+        for line in reversed(tail.splitlines()):
+            if line.strip():
+                return line.strip()[:300]
+        return None
+
+    def build_notification(self, record: dict) -> tuple[str, str]:
+        """(subject, plain-text body) for a terminal record.
+        Pure apart from the bounded log-tail read on failures."""
+        outcome = "completed" if record.get("state") == "done" \
+            else "failed"
+        subject = (f"[pc-bridge] job {record.get('id')} {outcome}")
+        lines = [
+            f"Job: {record.get('id')}",
+            f"Name: {record.get('name') or '(unnamed)'}",
+            f"Outcome: {outcome}",
+            f"Submitted: {self._fmt_ts(record.get('submitted_at'))}",
+            f"Started: {self._fmt_ts(record.get('started_at'))}",
+            f"Finished: {self._fmt_ts(record.get('finished_at'))}",
+        ]
+        started, finished = record.get("started_at"), \
+            record.get("finished_at")
+        if isinstance(started, (int, float)) \
+                and isinstance(finished, (int, float)) \
+                and finished >= started:
+            lines.append(f"Duration: {finished - started:.1f} s")
+        if record.get("reason"):
+            lines.append(f"Reason: {record.get('reason')}")
+        if record.get("failed_stage") is not None:
+            lines.append(
+                f"Failed stage: {record.get('failed_stage')}")
+        if record.get("exit_code") is not None:
+            lines.append(f"Exit code: {record.get('exit_code')}")
+        lines.append("")
+        lines.append("Stages:")
+        stages = record.get("stages") or []
+        if stages:
+            for stage in stages:
+                lines.append(
+                    f"  {stage.get('index')}. "
+                    f"{stage.get('name')}: "
+                    f"{stage.get('status')} "
+                    f"(attempts: {stage.get('attempts')}, "
+                    f"exit code: {stage.get('exit_code')})")
+        else:
+            lines.append("  (none recorded)")
+        if outcome == "failed":
+            last = self._last_log_line(record)
+            if last:
+                lines.append("")
+                lines.append(f"Last log line: {last}")
+        return subject, "\n".join(lines) + "\n"
 
     # -- records -------------------------------------------------------------
 
@@ -434,6 +675,7 @@ class JobRunner:
             self._write_record(record)
             self._event("invalid_manifest", record,
                         detail=str(exc)[:300], source_file=path.name)
+            self._notify_terminal(record)
             self._retire_queue_file(path, ".rejected")
             return
         job_id = manifest["id"] or uuid.uuid4().hex
@@ -486,6 +728,10 @@ class JobRunner:
             "waiting_for_gpu": None,
             "pause_kills": 0,
             "runner_pid": None,
+            "notified": False,
+            "notify_pending": False,
+            "notify_attempts": 0,
+            "notify_given_up": False,
             "updated_at": time.time(),
         }
 
@@ -555,6 +801,7 @@ class JobRunner:
                     self.state_dir, "jobs_resumed", resumed=resumed)
             except OSError:
                 pass
+        self._retry_pending_notifications()
         self._event("runner_started", None, resumed=resumed)
         self._paused_known = self._is_paused()
         while not self._stop_event.is_set():
@@ -741,6 +988,7 @@ class JobRunner:
                            "exit_code": 0, "reason": None})
             self._write_record(record)
             self._event("completed", record)
+            self._notify_terminal(record)
         finally:
             if pm_engaged:
                 self._disengage_project_mode(record)
@@ -783,6 +1031,7 @@ class JobRunner:
         self._write_record(record)
         self._event("failed", record, reason=reason,
                     stage=stage_idx, exit_code=exit_code)
+        self._notify_terminal(record)
 
     def _run_stage(self, record: dict, idx: int) -> str:
         """Run one stage (with its retries). Returns "done",

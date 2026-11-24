@@ -101,7 +101,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-VERSION = "1.3.2"
+VERSION = "1.4.0"
 AGENT_NAME = "muse-pc-bridge"
 MAX_GET_BYTES = 16 * 1024 * 1024          # whole-file /v1/file/get limit
 MAX_RANGE_BYTES = 64 * 1024 * 1024        # per-call range-read limit
@@ -133,6 +133,16 @@ DEFAULT_CONFIG = {
     "auth_fail_limit": 5,                  # failures inside the window ...
     "auth_fail_window_s": 60,              # ... trigger a temporary block
     "auth_block_s": 30,
+    # Durable-runner completion notification (v1.4.0). Dark
+    # unless enabled; the SMTP app password is NEVER a config
+    # value — the runner reads it from the environment variable
+    # BRIDGE_NOTIFY_APP_PASSWORD only.
+    "notify_email_enabled": False,
+    "notify_smtp_host": "smtp.gmail.com",
+    "notify_smtp_port": 587,
+    "notify_smtp_user": "",
+    "notify_recipient": "nyx-adam@muse.ai",
+    "notify_smtp_timeout_s": 15,
 }
 
 _DRIVE_RE = re.compile(r"^[a-zA-Z]:")

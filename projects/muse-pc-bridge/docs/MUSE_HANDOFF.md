@@ -1360,3 +1360,65 @@ Muse's Linux VM: full suite 313 tests, OK (3 skips).** NOT
 verified: the real Windows shutdown path — the graceful-reboot
 resume re-test is an owner-PC smoke for the next deploy gap,
 together with the still-outstanding Project Mode smoke.
+
+### Follow-up 4 (2026-11-24, later still): 1.4.0 completion notification STAGED
+
+Owner-approved feature (2026-11-24, voice): the durable
+runner now emails nyx-adam@muse.ai when a job reaches a
+terminal state (`done` / `failed`), so completion/failure is
+learned event-driven instead of by polling a watcher — the
+gap the owner hit repeatedly ("I don't know the job is done
+unless I ask"). Design and setup steps:
+`docs/JOB_RUNNER.md`, "Completion notification".
+
+What shipped on this branch, VM-side only (the PC was NOT
+touched; production still runs 1.3.1):
+
+- `agent/job_runner.py`: notification engine — one email per
+  terminal transition, sent after the outcome is recorded;
+  best-effort (any send error → `notify_failed` event with a
+  scrubbed, non-secret summary; the job is never affected);
+  exactly-once anchored on the job record (`notified`,
+  `notify_pending`, `notify_attempts`, `notify_given_up`); a
+  failed send retries at most once on the next runner start,
+  then `notify_gave_up`. Transport is stdlib `smtplib` +
+  STARTTLS with a configurable timeout. Email: subject
+  `[pc-bridge] job <id> completed|failed`; body with times,
+  duration, per-stage summary, and for failures the reason,
+  failing stage, and last log line.
+- Config keys (in `bridge_agent.DEFAULT_CONFIG` and
+  `config.example.json`): `notify_email_enabled` (default
+  false — feature dark), `notify_smtp_host`,
+  `notify_smtp_port`, `notify_smtp_user`,
+  `notify_recipient` (default nyx-adam@muse.ai),
+  `notify_smtp_timeout_s`. **Secret rule (design decision,
+  simpler of the two spec options): the app password is read
+  ONLY from the environment variable
+  `BRIDGE_NOTIFY_APP_PASSWORD` — never from the config file,
+  never committed, and error summaries are scrubbed of its
+  value before being written anywhere.**
+- VERSION bumped to **1.4.0**; this supersedes the staged
+  1.3.2 bump — the graceful-shutdown fix (follow-up 3) rides
+  along unchanged.
+- New tests `tests/test_v1_4_0_notify.py` (8): fake SMTP
+  factory + injectable sender; success/failure/unconfigured/
+  restart/give-up paths and secret hygiene. **Verified on
+  Muse's Linux VM: full suite 321 tests, OK (skipped=3).**
+
+Still owed, at the next deploy gap and only with the
+owner's explicit word:
+
+1. Deploy 1.4.0 (carrying the 1.3.2 shutdown fix) — including
+   the graceful-reboot resume re-test from follow-up 3 and
+   the still-outstanding Project Mode smoke.
+2. Adam's one-time Gmail app-password setup (2-Step
+   Verification → App passwords on the sending account),
+   `notify_smtp_user` + `notify_email_enabled: true` in the
+   PC config, and `BRIDGE_NOTIFY_APP_PASSWORD` set in the
+   runner supervisor's environment. The password is entered
+   only on the PC.
+3. Windows-side verification, UNVERIFIED until then: a real
+   Gmail send from the PC for one `done` job and one
+   `failed` job, end-to-end arrival at nyx-adam@muse.ai,
+   `notify_sent` events on the PC, and no duplicate email
+   after a runner restart.

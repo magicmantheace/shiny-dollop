@@ -720,6 +720,58 @@ gap: submit the demo job (stage 2 = a long sleep), reboot
 gracefully mid-stage, and confirm the job resumes and
 completes instead of failing.
 
+## v1.4.0 — completion notification by email (2026-11-24)
+
+Feature (owner-approved 2026-11-24): the durable runner
+emails nyx-adam@muse.ai when a job reaches a terminal state
+(`done` / `failed`), so completion is learned event-driven
+instead of by polling. This release supersedes the staged
+1.3.2 version bump — the graceful-shutdown fix rides along;
+VERSION is 1.4.0.
+
+New tests: `tests/test_v1_4_0_notify.py` (8 tests), all with a
+fake SMTP factory or an injectable sender — no network, no
+real credentials (an obvious dummy password):
+
+- A completed job sends exactly once: record marked
+  `notified`, `notify_sent` event, and a fresh runner over
+  the same store never re-sends.
+- A failing send leaves the job's own outcome untouched,
+  logs `notify_failed`, and is retried exactly once on the
+  next runner start (success on retry lands, attempts = 2).
+- A second failure gives up: `notify_gave_up` event, and a
+  third runner start makes no further attempt.
+- A failed job notifies too (sender sees state `failed`).
+- Unconfigured (no notify keys): nothing is sent, no notify
+  events, record fields stay at their defaults — the feature
+  is dark.
+- SMTP composition through the fake factory: connects to
+  `smtp.gmail.com:587`, STARTTLS, login with the configured
+  user and the password taken from the
+  `BRIDGE_NOTIFY_APP_PASSWORD` environment variable only;
+  subject `[pc-bridge] job <id> completed`; body carries the
+  job name, outcome, duration, and per-stage summary; the
+  dummy password appears in NO email body, event, or record.
+- A failed job's body names the failing stage and reason
+  and includes the last line of the job's stage log.
+- Missing password: a clean `notify_failed`, no SMTP
+  connection attempted, job record intact.
+
+Full suite after this change: **321 tests, OK (3 skips)** on
+Muse's Linux VM (313-test 1.3.2 baseline + 8 new).
+
+NOT proven here: everything Windows and everything real —
+the actual Gmail send from the owner's PC (real app
+password, real STARTTLS session), and end-to-end arrival at
+nyx-adam@muse.ai. Owner-PC smoke for the deploy gap (with
+the 1.3.2 graceful-reboot re-test and the Project Mode
+smoke): complete the app-password setup in
+`docs/JOB_RUNNER.md` ("Completion notification"), enable the
+feature, run one job to `done` and one to `failed`, confirm
+both emails arrive with the right subjects, `notify_sent`
+events are recorded, and a runner restart produces no
+duplicate email.
+
 ## Owner-PC verification checklist (part of install)
 
 From `docs/INSTALL_WINDOWS.md`:

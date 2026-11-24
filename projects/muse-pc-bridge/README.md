@@ -306,3 +306,32 @@ full suite 313 tests, OK (3 skips)**, including 7 new tests in
 branch but NOT deployed; production runs 1.3.1, and the
 graceful-reboot resume re-test is an owner-PC smoke for the
 next deploy gap.
+
+**Update (2026-11-24, later still): 1.4.0 — completion
+notification, STAGED on the branch, NOT deployed.** The
+durable runner now emails Nyx's Muse Mail inbox
+(`nyx-adam@muse.ai`) when a job reaches a terminal state
+(`done` / `failed`), so completion and failure are learned
+event-driven instead of by polling a watcher. One email per
+job, exactly once (anchored on the job record); best-effort —
+a failed send is recorded (`notify_failed`), retried at most
+once on the next runner start, then given up
+(`notify_gave_up`), and never fails the job. SMTP over
+STARTTLS via stdlib `smtplib`; config keys
+`notify_email_enabled` (default false — the feature is dark
+until configured), `notify_smtp_host` / `notify_smtp_port` /
+`notify_smtp_user` / `notify_recipient` /
+`notify_smtp_timeout_s`. **The app password is never a config
+value**: the runner reads it only from the environment
+variable `BRIDGE_NOTIFY_APP_PASSWORD`. This release
+supersedes the staged 1.3.2 version bump — the
+graceful-shutdown fix rides along in 1.4.0. **Verified on
+Muse's Linux VM: full suite 321 tests, OK (3 skips)**,
+including 8 new tests in `test_v1_4_0_notify.py` (fake SMTP /
+injectable sender; no network, no real credentials). **NOT
+verified: the real Windows/Gmail send path** — a real Gmail
+send from the PC and end-to-end arrival at the Muse Mail
+inbox are owner-PC smokes for the deploy gap, which also
+includes Adam's one-time Gmail app-password setup. Design:
+`docs/JOB_RUNNER.md`, "Completion notification". Production
+still runs 1.3.1.
