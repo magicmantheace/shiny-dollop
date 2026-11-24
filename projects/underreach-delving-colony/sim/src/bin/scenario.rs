@@ -6,7 +6,7 @@
 use underreach_sim::gen::generate_floor;
 use underreach_sim::scenario::{
     build_scenario, build_scenario_gen, build_scenario_s2, build_scenario_s3, build_scenario_s5,
-    light_the_deep, light_the_way, open_floor1, GEN_WORLD_SEED,
+    build_scenario_s7, light_the_deep, light_the_way, open_floor1, GEN_WORLD_SEED,
 };
 use underreach_sim::sim::LedgerKind;
 
@@ -123,6 +123,62 @@ fn main() {
         );
     }
     println!("S5 state hash: {}", sim.state_hash());
+
+    // ---- S7: the Shallows bite back -------------------------------------
+    // The same colony, but the face is ringed with loose rock and
+    // bad air pools beside the stand. Run one works it bare; the
+    // player clears each fall as it happens (re-carving the
+    // stand), but sets no timber and rigs no vent.
+    let mut sim = build_scenario_s7();
+    light_the_way(&mut sim);
+    let s7_stand = sim.faces[0].stand;
+    for _ in 0..6000 {
+        sim.tick();
+        if sim.world.get(s7_stand) == Some(underreach_sim::world::Cell::Stone) {
+            sim.carve(s7_stand);
+        }
+    }
+    println!(
+        "S7 unprotected face ({} ticks): delvers alive={}, goods={}, cave-ins={}, gasping={}, downed={}, lost={}",
+        sim.tick_count,
+        sim.delvers.len(),
+        sim.stores.goods,
+        count(&sim, LedgerKind::CaveIn),
+        count(&sim, LedgerKind::DelverGasping),
+        count(&sim, LedgerKind::DelverDowned),
+        count(&sim, LedgerKind::DelverLost),
+    );
+    for d in &sim.delvers {
+        println!(
+            "  {} ({:?}): hp={:.0} air={:.0} morale={:.0} mining_xp={}",
+            d.name, d.job, d.hp, d.air, d.morale, d.mining_xp,
+        );
+    }
+    println!("S7 unprotected state hash: {}", sim.state_hash());
+
+    // Run two spends 2 of its 4 goods on the gate set — a timber
+    // support and a vent on the face's stand — before lighting up.
+    let mut sim = build_scenario_s7();
+    let stand = sim.faces[0].stand;
+    let supported = sim.place_support(stand);
+    let vented = sim.place_vent(stand);
+    light_the_way(&mut sim);
+    for _ in 0..6000 {
+        sim.tick();
+    }
+    println!(
+        "S7 protected face ({} ticks): support placed={}, vent placed={}, delvers alive={}, goods={}, cave-ins={}, gasping={}, downed={}, lost={}",
+        sim.tick_count,
+        supported,
+        vented,
+        sim.delvers.len(),
+        sim.stores.goods,
+        count(&sim, LedgerKind::CaveIn),
+        count(&sim, LedgerKind::DelverGasping),
+        count(&sim, LedgerKind::DelverDowned),
+        count(&sim, LedgerKind::DelverLost),
+    );
+    println!("S7 protected state hash: {}", sim.state_hash());
 
     // ---- GEN (S6): the colony loop on a generated Floor 1 ---------------
     let mut gen = build_scenario_gen(GEN_WORLD_SEED);

@@ -355,13 +355,97 @@ the twin-run tests as before.
   floor-to-floor traversal (descent is a marker, not a
   transition).
 
+## S7 — the Shallows bite back (verified 2026-11-23, VM headless)
+
+Branch `underreach-delving-colony/hazard-mechanics`. The
+Shallows gate set from owner decision 9, over the pockets S6
+generates: cave-ins at loose faces and bad air beside sealed
+pockets, answered by timber supports and vents. Save hashes
+shift again in this slice (delvers gain an air load; the save
+gains `supports`/`vents` lists); behaviour numbers for the
+S1–S6 scenarios are unchanged — a colony that never meets
+loose rock or bad air draws no new RNG and breathes no bad
+air, which the unchanged scenario sections below demonstrate.
+
+### The mechanics
+
+- **Bad air.** A carved cell touching a `Cell::BadAir` pocket
+  is gassy unless a vent reaches it. Load +1.0/tick in a gassy
+  cell; at 60 the delver is **gasping** (work halved, morale
+  −20, bed-seeking — the spore-cough's shape); at 100 it
+  drains hp 0.2/tick and can down, starting the rescue clock.
+  Clears 0.25/tick in clean air, 1.25/tick within a vent's
+  reach. A pocket carved open is spent — its gas is gone with
+  the rock (a modelling decision, recorded in `sim.rs`).
+- **Cave-ins.** Per unit mined at a face: 2% per loose cell
+  neighbouring the face's rock or its stand, rolled on the
+  sim RNG (draws happen only when loose rock neighbours an
+  unsupported face). A collapse spends the first loose cell
+  in scan order, fills the stand cell with stone, and deals
+  55 damage to the delver working there. A survivor climbs
+  out through the existing pathing; a downed delver is dug
+  out — rescuers aim at the rubble's nearest carved
+  neighbour and carry from there. The player re-carves the
+  stand to reopen the face.
+- **The answers.** `place_support` / `place_vent`: crafted
+  kit at **1 goods each**, carved cells only, no stacking. A
+  support protects any face whose stand it stands on or
+  touches; a vent ventilates carved cells within Chebyshev
+  radius 2. Both are exposed over the bridge (`support` /
+  `vent` commands; the view gains `air`, `supports`,
+  `vents`; `init s7` founds the demo colony).
+
+### Tests (`sim/tests/scenario_s7.rs`, 6 tests)
+
+- **The unprotected face bites both ways:** 6,000 ticks with
+  the player script clearing each fall — `CaveIn` ≥ 1
+  (actual 3), `DelverGasping` ≥ 1 (actual 2), 1 downed,
+  0 lost, goods 16: the colony weathers it, at a price.
+- **Timber support stops cave-ins:** `CaveIn` == 0, the
+  stand never buried, the face produced (goods 14 in the
+  binary's protected run, support + vent together).
+- **A vent keeps the air clean:** `DelverGasping` == 0 and
+  every delver's air load exactly 0 — while `CaveIn` ≥ 1:
+  the vent answers air, not rock.
+- **Placement rules:** solid rock refused, 1 goods apiece,
+  no stacking on a cell, a broke colony refused.
+- **Burial and dig-out:** vented but unsupported face, the
+  miner staged at 50 hp — the fall comes early in the run,
+  the stand is `Stone`, `DelverDowned` fires, and within
+  the rescue window `DelverRescued` fires with 0 lost.
+- **Determinism:** twin-run and save/load continuation
+  hashes identical, as every slice before.
+
+### Full-suite + harness results
+
+- `cargo test`: **43/43** (37 pre-existing + 6 S7), 0 failed.
+- `scenario` binary (release): S1/S2/S3/S5/GEN sections
+  unchanged in behaviour (S1 goods 6, S3 goods 20, S5 oil
+  19, GEN goods 24, nobody lost). New S7 sections:
+  unprotected — goods=16, cave-ins=3, gasping=2, downed=1,
+  lost=0, hash `a0fa094e684ff118d3…`; protected — goods=14,
+  cave-ins=0, gasping=0, downed=0, hash
+  `d709d50d524c0ab248…`.
+- **Balance note (tuned once, on evidence):** `AIR_RATE`
+  went 0.6 → 1.0 after the first runs. At 0.6 a miner's
+  haul trips cleared more load than a mining stint gained,
+  so bad air could never gasp anyone at a single face; a
+  pocket's seep is concentrated, unlike ambient spores.
+- **Not verified / not built:** Godot frontend surfacing
+  for supports, vents, and air loads (the bridge view
+  carries the data; the frontend renders none of it yet —
+  the same stance as S5's sim-side build); cave-in
+  triggers from carving or from passing loose walls
+  (mining only in this slice); floors 2–5 scenarios;
+  floor-to-floor traversal.
+
 ## Planned (later slices)
 
 - Owner-PC visual pass of the frontend; performance measurement
   before any frame budget claim.
 - The dedicated gloam-lurker asset once it is built (not yet in the
   builder catalog); the ember-dragon stands in until then.
-- S6 follow-ons: floor-to-floor traversal, cave-in/bad-air
-  mechanics with their timber/ventilation answers, face
+- S6 follow-ons: floor-to-floor traversal, face
   registration when a pocket is carved open, floors 2–5
-  scenarios.
+  scenarios. (Cave-in/bad-air mechanics from this list were
+  built in S7, above.)

@@ -167,9 +167,19 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   cavern on it, embedded veins/hazard pockets/dressing. The S3
   colony loop runs end-to-end on a generated Floor 1 (bridge
   scenario `gen`). Design record: `docs/FLOOR_GENERATION.md`.
+- **S7 — the Shallows bite back (BUILT 2026-11-23, branch
+  `underreach-delving-colony/hazard-mechanics`).** Cave-in and
+  bad-air mechanics for the pockets S6 generates, with their
+  decision-9 answers. Mining a face ringed with loose rock
+  rolls per unit mined (2% per neighbouring loose cell); a
+  collapse fills the stand with rubble and deals 55 damage —
+  the downed are dug out on the rescue clock. Bad air seeps
+  from sealed pockets into adjoining open cells: gasping at
+  60 load (work halved), hp drain at 100. Timber supports
+  and vents are placed kit at 1 goods each. Sim + bridge
+  only; frontend surfacing follows later, as S5's did.
 - Later: Drowned/Crystal/Magma gates, floor-to-floor traversal,
-  cave-in/bad-air mechanics, co-op, colony failure & succession,
-  children/generations.
+  co-op, colony failure & succession, children/generations.
 
 ## Status — 2026-11-10
 
@@ -254,3 +264,19 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   traversal, cave-in/bad-air mechanics, face registration for
   embedded pockets. Full record: `docs/FLOOR_GENERATION.md`,
   numbers in `docs/TEST_PLAN.md`.
+- **S7 — the Shallows bite back (2026-11-23, VM-verified;
+  branch `underreach-delving-colony/hazard-mechanics`, not
+  yet merged):** the S6 hazard pockets are live. `cargo test`
+  43/43 (37 pre-existing + 6 new S7 tests); the `scenario`
+  binary's S1–S6 sections are unchanged in behaviour, and
+  its new S7 sections show the contrast the slice exists
+  for: an unprotected face (falls cleared by the player
+  script) takes 3 cave-ins and 2 gasping events in 6,000
+  ticks with 1 downed and 0 lost, while the same face under
+  a timber support and a vent (2 of its 4 starting goods)
+  takes none. Two modelling decisions where the record was
+  silent, both flagged in `docs/TEST_PLAN.md`: cave-ins
+  trigger on mining only (not carving or passing), and a
+  bad-air pocket carved open is spent. NOT built: frontend
+  surfacing for supports/vents/air, floors 2–5 scenarios,
+  floor-to-floor traversal.

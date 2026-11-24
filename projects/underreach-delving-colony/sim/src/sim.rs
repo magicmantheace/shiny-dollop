@@ -2,7 +2,9 @@
 //! network, the Deep Ledger, and canonical save/load with a state
 //! hash. S2 grows the S1 single-delver loop into a colony: multiple
 //! delvers with jobs (miner / hauler / farmer), morale, camp food
-//! production, and surface recruitment.
+//! production, and surface recruitment. S7 adds the Shallows'
+//! hazards: cave-ins at loose faces and bad air beside sealed
+//! pockets, answered by timber supports and vents.
 //!
 //! The design rules encoded here (owner decisions, see
 //! docs/MUSE_HANDOFF.md):
@@ -151,6 +153,8 @@ pub enum LedgerKind {
     DelverLost,
     DelverSick,
     Crafted,
+    CaveIn,
+    DelverGasping,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -274,6 +278,48 @@ pub const MASK_GOODS_COST: u32 = 2;
 pub const LANTERN_OIL_COST: u32 = 1;
 
 // ---------------------------------------------------------------------------
+// Shallows hazards — cave-ins & bad air (S7)
+// ---------------------------------------------------------------------------
+//
+// The Shallows' own gate set (owner decision 9): cave-ins and bad
+// air, answered by timber supports and ventilation. S6's floor
+// generator already embeds the pockets — `Cell::Loose` rock in
+// the walls, `Cell::BadAir` pooled deep — as data; this slice
+// gives them mechanics, the way S5 gave spores mechanics over
+// its `hazards_at` table.
+
+/// Bad-air load gained per tick spent breathing a gassy cell
+/// (a carved cell touching a `Cell::BadAir` pocket, unvented).
+/// Worse per tick than ambient spores — a pocket's seep is
+/// concentrated — but it only bites where the pocket touches
+/// open space, so passing through costs little and lingering
+/// at a gassy face is what gasps a delver.
+pub const AIR_RATE: f32 = 1.0;
+/// Air load at which a delver is gasping: work halved and morale
+/// hit, like the spore-cough.
+pub const GASPING_AT: f32 = 60.0;
+/// Air load clears this fast in clean air.
+pub const AIR_CLEAR_RATE: f32 = 0.25;
+/// Air load clear rate within a vent's reach — moving air is the
+/// cure, as a herbalist's care is for spores.
+pub const VENT_CLEAR_RATE: f32 = 1.25;
+/// A vent keeps carved cells within this Chebyshev radius
+/// ventilated: no bad air gathers there.
+pub const VENT_RADIUS: i32 = 2;
+/// Goods cost of one placed vent (a crafted kit piece).
+pub const VENT_GOODS_COST: u32 = 1;
+/// Goods cost of one placed timber support (a crafted kit piece).
+pub const SUPPORT_GOODS_COST: u32 = 1;
+/// Cave-in chance per mined unit, per mille, for each loose cell
+/// neighbouring the face (rock or stand) — 2% apiece. A supported
+/// face never rolls.
+pub const CAVE_IN_PER_MILLE_PER_LOOSE: u64 = 20;
+/// Damage a cave-in deals to the delver working the face. Enough
+/// to down a hurt delver (and start the rescue clock), not to
+/// kill a healthy one outright.
+pub const CAVE_IN_DAMAGE: f32 = 55.0;
+
+// ---------------------------------------------------------------------------
 // Delver
 // ---------------------------------------------------------------------------
 
@@ -326,6 +372,10 @@ pub struct Delver {
     /// Wearing a crafted spore mask (permanent kit once equipped).
     pub masked: bool,
     pub sick_logged: bool,
+    /// Bad-air load 0..100 (S7). Gasping at `GASPING_AT`; at 100
+    /// it eats hp, like a full spore load.
+    pub air: f32,
+    pub gasping_logged: bool,
     /// 0..100 — spent in combat and accidents; a delver at 0 is
     /// Downed, not dead: the rescue clock decides which.
     pub hp: f32,
@@ -365,6 +415,8 @@ impl Delver {
             spore: 0.0,
             masked: false,
             sick_logged: false,
+            air: 0.0,
+            gasping_logged: false,
             hp: 100.0,
             combat_xp: 0,
             fight_cd: 0,
@@ -394,11 +446,15 @@ impl Delver {
     pub fn sick(&self) -> bool {
         self.spore >= SICK_AT
     }
+    pub fn gasping(&self) -> bool {
+        self.air >= GASPING_AT
+    }
     /// Morale scales all work rates: a miserable delver works at
-    /// 0.6x, a thriving one at 1.2x. Sickness halves it again.
+    /// 0.6x, a thriving one at 1.2x. Sickness halves it again —
+    /// and so does gasping for air.
     pub fn work_mult(&self) -> f32 {
         let base = 0.6 + 0.6 * (self.morale / 100.0);
-        if self.sick() {
+        if self.sick() || self.gasping() {
             base * 0.5
         } else {
             base
@@ -522,6 +578,13 @@ pub struct Sim {
     pub beds: Vec<Pos>,
     /// Kept sorted by rock position.
     pub faces: Vec<Face>,
+    /// Placed timber supports (S7): a face whose stand cell is a
+    /// support's cell or touches one cannot cave in. Sorted.
+    pub supports: Vec<Pos>,
+    /// Placed vents (S7): carved cells within `VENT_RADIUS` are
+    /// ventilated — bad air neither gathers nor lingers there.
+    /// Sorted.
+    pub vents: Vec<Pos>,
     /// Kept sorted by position.
     pub plots: Vec<Plot>,
     /// Where surface arrivals appear.
@@ -582,6 +645,8 @@ impl Sim {
             stockpile,
             beds,
             faces,
+            supports: Vec::new(),
+            vents: Vec::new(),
             plots: Vec::new(),
             gate,
             stores,
@@ -682,6 +747,146 @@ impl Sim {
         );
         self.refresh_light();
         self.note_new_lit_depths();
+        true
+    }
+
+    /// Set a timber support on a carved cell (the Shallows gate
+    /// set's cave-in answer, S7). A face whose stand cell is the
+    /// support's cell or touches it cannot cave in. Costs
+    /// `SUPPORT_GOODS_COST` goods — a crafted kit piece, like a
+    /// mask — and fails (returns false, nothing placed, nothing
+    /// charged) without the goods, on solid rock, or where a
+    /// support already stands.
+    pub fn place_support(&mut self, pos: Pos) -> bool {
+        if self.world.get(pos) != Some(Cell::Carved)
+            || self.supports.contains(&pos)
+            || self.stores.goods < SUPPORT_GOODS_COST
+        {
+            return false;
+        }
+        self.stores.goods -= SUPPORT_GOODS_COST;
+        self.supports.push(pos);
+        self.supports.sort();
+        self.log(
+            LedgerKind::Crafted,
+            format!(
+                "a timber support was set at ({}, {}, {})",
+                pos.x, pos.y, pos.z
+            ),
+        );
+        true
+    }
+
+    /// Rig a vent on a carved cell (the Shallows gate set's
+    /// bad-air answer, S7). Carved cells within `VENT_RADIUS`
+    /// are ventilated. Costs `VENT_GOODS_COST` goods and fails
+    /// like `place_support` does.
+    pub fn place_vent(&mut self, pos: Pos) -> bool {
+        if self.world.get(pos) != Some(Cell::Carved)
+            || self.vents.contains(&pos)
+            || self.stores.goods < VENT_GOODS_COST
+        {
+            return false;
+        }
+        self.stores.goods -= VENT_GOODS_COST;
+        self.vents.push(pos);
+        self.vents.sort();
+        self.log(
+            LedgerKind::Crafted,
+            format!("a vent was rigged at ({}, {}, {})", pos.x, pos.y, pos.z),
+        );
+        true
+    }
+
+    /// Is this cell within a vent's reach?
+    fn ventilated(&self, p: Pos) -> bool {
+        self.vents.iter().any(|v| {
+            (v.x - p.x)
+                .abs()
+                .max((v.y - p.y).abs())
+                .max((v.z - p.z).abs())
+                <= VENT_RADIUS
+        })
+    }
+
+    /// Bad air gathers in a carved cell that touches a bad-air
+    /// pocket — unless a vent reaches it. (A pocket carved open
+    /// is spent: its gas is gone with the rock. Pockets the
+    /// colony leaves sealed keep seeping into the adjoining
+    /// open space until they are carved out or vented around.)
+    fn bad_air_at(&self, p: Pos) -> bool {
+        if self.world.get(p) != Some(Cell::Carved) || self.ventilated(p) {
+            return false;
+        }
+        p.neighbors6()
+            .iter()
+            .any(|n| self.world.get(*n) == Some(Cell::BadAir))
+    }
+
+    /// The loose cells neighbouring a face — around its rock and
+    /// around the delver's stand — in a fixed scan order, so a
+    /// collapse is deterministic.
+    fn loose_neighbours(&self, face: &Face) -> Vec<Pos> {
+        let mut out: Vec<Pos> = Vec::new();
+        for c in face
+            .rock
+            .neighbors6()
+            .iter()
+            .chain(face.stand.neighbors6().iter())
+        {
+            if self.world.get(*c) == Some(Cell::Loose) && !out.contains(c) {
+                out.push(*c);
+            }
+        }
+        out
+    }
+
+    /// A supported face never caves in: the support stands on the
+    /// face's stand cell or touches it.
+    fn face_supported(&self, face: &Face) -> bool {
+        self.supports
+            .iter()
+            .any(|s| *s == face.stand || face.stand.neighbors6().contains(s))
+    }
+
+    /// Roll for a cave-in at the face delver `idx` is mining —
+    /// called per unit mined. Draws on the sim RNG only when
+    /// loose rock actually neighbours the face and no support
+    /// holds it, so colonies working sound rock never draw.
+    /// On a collapse the loose cell is spent (ordinary stone
+    /// behind it), the stand cell fills with fallen rock, and
+    /// the delver working there takes `CAVE_IN_DAMAGE` — which
+    /// can down them and start the rescue clock. Returns true
+    /// when a cave-in fired.
+    fn maybe_cave_in(&mut self, idx: usize, fi: usize) -> bool {
+        let face = self.faces[fi].clone();
+        if self.face_supported(&face) {
+            return false;
+        }
+        let loose = self.loose_neighbours(&face);
+        if loose.is_empty() {
+            return false;
+        }
+        let mut rng = Rng {
+            state: self.rng_state,
+        };
+        let roll = rng.below(1000);
+        self.rng_state = rng.state;
+        if roll >= loose.len() as u64 * CAVE_IN_PER_MILLE_PER_LOOSE {
+            return false;
+        }
+        self.world.set(loose[0], Cell::Stone);
+        self.world.set(face.stand, Cell::Stone);
+        self.refresh_light();
+        let name = self.delvers[idx].name.clone();
+        self.log(
+            LedgerKind::CaveIn,
+            format!("a cave-in at the face — {name} was caught in the fall"),
+        );
+        self.delvers[idx].hp -= CAVE_IN_DAMAGE;
+        if self.delvers[idx].hp <= 0.0 {
+            self.down_delver(idx);
+        }
         true
     }
 
@@ -1125,10 +1330,28 @@ impl Sim {
             };
             let ridx = self.delvers.iter().position(|d| d.id == rid).unwrap();
             let from = self.delvers[ridx].pos;
-            let path = if self.lit_at(dpos) {
-                find_path(&self.world, &self.lit, from, dpos)
+            // A delver buried by a cave-in (S7) lies in a
+            // rubble-filled cell: aim the rescue at the nearest
+            // carved neighbour instead — the carry triggers
+            // within reach of the downed delver, as it does for
+            // a dash into the dark.
+            let aim = if self.world.get(dpos) == Some(Cell::Carved) {
+                Some(dpos)
             } else {
-                self.find_path_dash(from, dpos)
+                dpos.neighbors6()
+                    .into_iter()
+                    .filter(|n| self.world.get(*n) == Some(Cell::Carved))
+                    .min_by_key(|n| {
+                        (n.x - from.x).abs() + (n.y - from.y).abs() + (n.z - from.z).abs()
+                    })
+            };
+            let Some(aim) = aim else {
+                continue;
+            };
+            let path = if self.lit_at(aim) {
+                find_path(&self.world, &self.lit, from, aim)
+            } else {
+                self.find_path_dash(from, aim)
             };
             if let Some(path) = path {
                 self.delvers[ridx].state = DelverState::ToRescue;
@@ -1303,8 +1526,9 @@ impl Sim {
             self.delvers[idx].state = DelverState::Eating;
             return;
         }
-        // The spore-sick go to bed and stay there until it clears.
-        if self.delvers[idx].sick() {
+        // The spore-sick and the gasping go to bed and stay
+        // there until it clears.
+        if self.delvers[idx].sick() || self.delvers[idx].gasping() {
             let bed = self.delver_bed(idx);
             if self.delvers[idx].pos == bed || self.start_path(idx, bed) {
                 self.delvers[idx].state = DelverState::ToBed;
@@ -1470,12 +1694,45 @@ impl Sim {
                 self.delvers[idx].sick_logged = false;
             }
         }
+        // Bad air (S7): exposure in a gassy cell, clearing in
+        // clean air — fastest within a vent's reach.
+        {
+            let pos = self.delvers[idx].pos;
+            if self.bad_air_at(pos) {
+                self.delvers[idx].air = (self.delvers[idx].air + AIR_RATE).min(100.0);
+                if self.delvers[idx].air >= 100.0 {
+                    self.delvers[idx].hp -= 0.2;
+                    if self.delvers[idx].hp <= 0.0 {
+                        self.down_delver(idx);
+                        return;
+                    }
+                }
+            } else if self.delvers[idx].air > 0.0 {
+                let rate = if self.ventilated(pos) {
+                    VENT_CLEAR_RATE
+                } else {
+                    AIR_CLEAR_RATE
+                };
+                self.delvers[idx].air = (self.delvers[idx].air - rate).max(0.0);
+            }
+            if self.delvers[idx].gasping() && !self.delvers[idx].gasping_logged {
+                self.delvers[idx].gasping_logged = true;
+                let name = self.delvers[idx].name.clone();
+                self.log(
+                    LedgerKind::DelverGasping,
+                    format!("{name} is gasping in bad air"),
+                );
+            }
+            if self.delvers[idx].air < 30.0 {
+                self.delvers[idx].gasping_logged = false;
+            }
+        }
         {
             let d = &mut self.delvers[idx];
             // Colony prosperity lifts spirits only for the fed —
             // goods in the store mean little on an empty stomach.
             let goods_term = (self.stores.goods.min(10)) as f32 * (d.hunger / 100.0);
-            let sick_term = if d.sick() { -20.0 } else { 0.0 };
+            let sick_term = if d.sick() || d.gasping() { -20.0 } else { 0.0 };
             let target =
                 (10.0 + d.hunger * 0.5 + d.energy * 0.3 + goods_term + sick_term).clamp(0.0, 100.0);
             d.morale += (target - d.morale) * 0.02;
@@ -1615,6 +1872,13 @@ impl Sim {
                     self.faces[fi].ore -= 1;
                     self.faces[fi].cache += 1;
                     self.delvers[idx].mining_xp += 1;
+                    // Working loose rock can bring it down (S7).
+                    if self.maybe_cave_in(idx, fi) {
+                        break;
+                    }
+                }
+                if self.delvers[idx].state == DelverState::Downed {
+                    return;
                 }
                 let face_done = self.faces[fi].ore == 0;
                 let cache_full = self.faces[fi].cache >= 8;
@@ -1772,6 +2036,7 @@ impl Sim {
                 if self.delvers[idx].energy >= cap
                     && self.delvers[idx].hp >= 60.0
                     && self.delvers[idx].spore < 30.0
+                    && self.delvers[idx].air < 30.0
                 {
                     self.decide(idx);
                 }

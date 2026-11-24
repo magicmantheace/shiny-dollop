@@ -5,7 +5,7 @@
 //! renders the view JSON that comes back.
 //!
 //! Usage:
-//!   bridge init <s1|s2|s3|s5|gen> <out.json>
+//!   bridge init <s1|s2|s3|s5|s7|gen> <out.json>
 //!   bridge step <state.json> <commands.json> <ticks> <out.json>
 //!
 //! `gen` founds the S3 colony on a generated Floor 1 (S6,
@@ -18,6 +18,7 @@
 //!   {"cmd":"job","id":0,"job":"Miner"}
 //!   {"cmd":"plant","pos":[x,y,z]}
 //!   {"cmd":"craft_mask"}
+//!   {"cmd":"support","pos":[x,y,z]} / {"cmd":"vent","pos":[x,y,z]} (S7)
 //!   {"cmd":"light_the_way"} / {"cmd":"light_the_deep"}
 //!   {"cmd":"open_floor1"} (gen scenario: lantern the route to the first face)
 
@@ -27,7 +28,7 @@ use serde_json::{json, Value};
 
 use underreach_sim::scenario::{
     build_scenario, build_scenario_gen, build_scenario_s2, build_scenario_s3, build_scenario_s5,
-    light_the_deep, light_the_way, open_floor1, GEN_WORLD_SEED,
+    build_scenario_s7, light_the_deep, light_the_way, open_floor1, GEN_WORLD_SEED,
 };
 use underreach_sim::sim::{Job, Sim};
 use underreach_sim::world::{Cell, Pos};
@@ -84,6 +85,16 @@ fn apply(sim: &mut Sim, cmd: &Value) {
         Some("craft_mask") => {
             sim.craft_mask();
         }
+        Some("support") => {
+            if let Some(p) = cmd.get("pos").and_then(pos) {
+                sim.place_support(p);
+            }
+        }
+        Some("vent") => {
+            if let Some(p) = cmd.get("pos").and_then(pos) {
+                sim.place_vent(p);
+            }
+        }
         Some("light_the_way") => light_the_way(sim),
         Some("light_the_deep") => light_the_deep(sim),
         Some("open_floor1") => open_floor1(sim),
@@ -120,6 +131,7 @@ fn view(sim: &Sim) -> Value {
                 "state": format!("{:?}", d.state),
                 "hp": d.hp, "energy": d.energy, "hunger": d.hunger,
                 "morale": d.morale, "spore": d.spore, "masked": d.masked,
+                "air": d.air,
                 "carrying": d.carrying,
                 "carrying_kind": format!("{:?}", d.carrying_kind),
                 "mining_xp": d.mining_xp, "hauling_xp": d.hauling_xp,
@@ -199,6 +211,8 @@ fn view(sim: &Sim) -> Value {
         "carved": carved,
         "lit": lit,
         "lanterns": lanterns,
+        "supports": sim.supports.iter().map(|p| json!([p.x, p.y, p.z])).collect::<Vec<_>>(),
+        "vents": sim.vents.iter().map(|p| json!([p.x, p.y, p.z])).collect::<Vec<_>>(),
         "faces": faces,
         "plots": plots,
         "delvers": delvers,
@@ -228,9 +242,10 @@ fn main() {
                 Some("s2") => build_scenario_s2(),
                 Some("s3") => build_scenario_s3(),
                 Some("s5") => build_scenario_s5(),
+                Some("s7") => build_scenario_s7(),
                 Some("gen") => build_scenario_gen(GEN_WORLD_SEED),
                 _ => {
-                    eprintln!("unknown scenario (want s1|s2|s3|s5|gen)");
+                    eprintln!("unknown scenario (want s1|s2|s3|s5|s7|gen)");
                     exit(2);
                 }
             };
