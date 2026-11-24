@@ -9,7 +9,7 @@
 //! arrival scheduled while the colony looks viable.
 
 use crate::gen::{carved_path, generate_floor, ENTRY, GATE};
-use crate::sim::{CritterKind, Delver, Face, Job, Sim, Stores};
+use crate::sim::{CritterKind, Delver, Face, Job, Sim, Stores, TICKS_PER_YEAR};
 use crate::world::{Cell, Pos, World};
 
 pub const CAMP_LANTERN: Pos = Pos { x: 4, y: 3, z: 4 };
@@ -329,6 +329,64 @@ pub fn build_scenario_gen_floor(world_seed: u64, floor_index: u32) -> Sim {
     for (pos, kind) in dens {
         sim.spawn_critter(kind, pos);
     }
+    sim
+}
+
+/// S12: a generations colony on the hand-built Shallows — the
+/// S2 colony (miner / farmer / hauler, camp plots) plus Joss, a
+/// founding child of 17, one year from adulthood. Hand-built
+/// rather than gen-founded: the S2 layout's production is the
+/// proven baseline, and the slice's claim is the generational
+/// arc, not a new floor. Founding choreography, in the S7
+/// staged-proof tradition and recorded openly in
+/// docs/TEST_PLAN.md: Joss starts at 17 so the coming of age
+/// lands one year (2,400 ticks) into the run instead of
+/// eighteen; the from-birth arc is proven in the S12 tests.
+/// The colony takes no surface recruits (`next_arrival` at
+/// `u64::MAX`, the S1 precedent) so the growth on show is
+/// births alone, and the face is very rich (2,000 ore — a
+/// veteran miner's rate grows with level, and Bram alone
+/// strips a 200-ore face before Joss comes of age) so it
+/// outlasts two miners for the whole run.
+pub fn build_scenario_s12() -> Sim {
+    let mut joss = Delver::new(3, "Joss", Pos::new(5, 3, 4), Job::Unassigned);
+    joss.age_ticks = 17 * TICKS_PER_YEAR;
+    let delvers = vec![
+        Delver::new(0, "Bram", Pos::new(3, 3, 4), Job::Miner),
+        Delver::new(1, "Sella", Pos::new(4, 3, 5), Job::Farmer),
+        Delver::new(2, "Hale", Pos::new(4, 3, 3), Job::Hauler),
+        joss,
+    ];
+    let mut face = the_face();
+    face.ore = 2000;
+    let mut sim = Sim::new(
+        shallows_world(),
+        delvers,
+        Pos::new(3, 3, 4), // stockpile
+        vec![
+            Pos::new(2, 3, 3),
+            Pos::new(2, 3, 5),
+            Pos::new(6, 3, 5),
+            Pos::new(6, 3, 3),
+        ],
+        vec![face],
+        Pos::new(6, 3, 4), // gate
+        Stores {
+            ore: 0,
+            goods: 0,
+            food: 12,
+            fungal_oil: 0,
+            masks: 0,
+            cooling_gear: 0,
+        },
+        0x5EED_0012,
+        u64::MAX, // growth here is births, not surface recruitment
+        false,    // the rock and the dark are not the point here
+    );
+    sim.generations_enabled = true;
+    sim.place_lantern(CAMP_LANTERN, 1, 1_000_000.0);
+    sim.plant_plot(Pos::new(5, 3, 3));
+    sim.plant_plot(Pos::new(6, 3, 3));
     sim
 }
 

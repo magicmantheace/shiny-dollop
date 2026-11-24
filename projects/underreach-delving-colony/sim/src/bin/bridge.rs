@@ -31,7 +31,8 @@ use serde_json::{json, Value};
 use underreach_sim::gen::band_for_floor;
 use underreach_sim::scenario::{
     build_scenario, build_scenario_gen, build_scenario_s2, build_scenario_s3, build_scenario_s5,
-    build_scenario_s7, light_the_deep, light_the_way, open_floor1, GEN_WORLD_SEED,
+    build_scenario_s7, build_scenario_s12, light_the_deep, light_the_way, open_floor1,
+    GEN_WORLD_SEED,
 };
 use underreach_sim::sim::{Job, Sim};
 use underreach_sim::world::{Cell, Pos};
@@ -157,6 +158,13 @@ fn view(sim: &Sim) -> Value {
                 // suffering predicates, so the frontend flags state
                 // without re-deriving thresholds. No state, no hash.
                 "sick": d.sick(), "gasping": d.gasping(),
+                // S12 (additive, presentation only): the delver's
+                // age in whole years and the sim's own child
+                // predicate (age under the adult line in a
+                // generations colony). A refused child job
+                // assignment is visible here as the delver simply
+                // staying "Unassigned". No state, no hash.
+                "age_years": d.age_years(), "is_child": sim.delver_is_child(d),
                 "drowning": d.drowning(), "overheating": d.overheating(),
                 "carrying": d.carrying,
                 "carrying_kind": format!("{:?}", d.carrying_kind),
@@ -277,9 +285,10 @@ fn main() {
                 Some("s3") => build_scenario_s3(),
                 Some("s5") => build_scenario_s5(),
                 Some("s7") => build_scenario_s7(),
+                Some("s12") => build_scenario_s12(),
                 Some("gen") => build_scenario_gen(GEN_WORLD_SEED),
                 _ => {
-                    eprintln!("unknown scenario (want s1|s2|s3|s5|s7|gen)");
+                    eprintln!("unknown scenario (want s1|s2|s3|s5|s7|s12|gen)");
                     exit(2);
                 }
             };
