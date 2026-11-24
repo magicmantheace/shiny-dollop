@@ -1298,6 +1298,147 @@ reproducing exactly.
   is an open owner question (assessment section (c)), not
   something this layer decides.
 
+## S16 — Crystal Dark gates (verified 2026-11-24, VM headless)
+
+Branch `underreach-delving-colony/crystal-dark-gates`. The
+fourth band gets its own mechanics (owner decision 9; the
+2026-11-24 ruling that Crystal Dark gate mechanics are a
+future slice, now implemented). The full design record is
+`docs/CRYSTAL_DARK.md`. Everything is band-scoped in the
+S10 pattern — the active floor's band rules, in the floor's
+deep zone (y ≥ 6) — through one query family
+(`Sim::crystal_dark_here` / `thick_dark_at` /
+`brittle_at`), and every S16 save field omits itself at its
+inert default, so colonies that never touch the band hash
+identically to the pre-S16 sim.
+
+### What was built
+
+- **Thicker darkness**: in the Crystal Dark's deep zone a
+  sub-crystal lantern's light radius drops by
+  `DARK_RADIUS_PENALTY` (2), applied in `refresh_light`.
+  The answer is decision 8's **crystal-heart lantern**
+  (tier 4), fitted with a **crystal lens** at placement —
+  1 lens consumed (plus the tier-2+ oil charge), placement
+  fails whole without one — keeping its full radius there.
+- **Sound hunters + quiet gear**: on a Crystal Dark floor a
+  critter engages only a delver it can hear (Manhattan ≤
+  `SOUND_HUNTER_RANGE` 16; quiet gear counts the wearer 4
+  steps farther). **Quiet gear** is worn kit in the mask
+  pattern (`craft_quiet_gear`: 1 cut crystal + 1 goods,
+  auto-equipped at camp).
+- **Brittle floors + marked routes**: a delver stepping on
+  an unroped brittle cell collapses it (cell → stone, path
+  interrupted, `BRITTLE_DAMAGE` 35, `BrittleCollapse`
+  ledgered). **Rope** (`place_rope`, 1 goods, the support
+  pattern) makes a cell permanently safe.
+- **Crystal + production jobs**: the generator converts a
+  Crystal Dark floor's deepest registered face to a crystal
+  face (`Cell::Crystal`, `YieldKind::Crystal`) and embeds
+  4 crystal clusters (placed last; no other layout element
+  moves). Two colony jobs work the haul at camp in the
+  converter's pattern: `Job::CrystalCutter` (raw → cut) and
+  `Job::LensGrinder` (cut → lens). The theme row flips to
+  `built: true` — every band is built now (the two pins
+  that asserted Crystal unbuilt, in `gen.rs`'s unit tests
+  and `tests/gen_floor.rs`, were updated to the new truth,
+  the S10 precedent).
+
+### Modelling decisions (the record was silent)
+
+- **Darkness as radius loss** (penalty 2, deep-zone
+  footprint): decisions 8+9 read together — plain light
+  loses its outer ring in the thick dark, focused
+  lens-fitted light does not.
+- **A brittle fall never downs by itself**: damage floors
+  hp at 1 (the delver scrambles clear); the rescue clock
+  stays with cave-ins, combat, loads, and the dark.
+- **Sound hunting is whole-floor**, not deep-zone-only:
+  hearing is a property of the hunter, not the place. The
+  range (16) keeps every demo-floor den-to-colony distance
+  in earshot, so free-running floor-4 behaviour is
+  unchanged (proven by the scenario diff below).
+- **Harnesses and cartography not modelled**: no
+  fall/cliff traversal or map system exists for them to
+  answer or feed; recorded as open in
+  `docs/CRYSTAL_DARK.md`, not silently dropped.
+
+### Tests (`sim/tests/scenario_s16.rs`, 11 tests)
+
+- **Crystal obtainable**: floor 4 registers a crystal face
+  (rock is `Cell::Crystal` in the world, deep-zone stand)
+  plus embedded clusters; staged mining fills its cache and
+  a staged haul deposits ≥ 4 raw crystal in the stores,
+  ledgered.
+- **Jobs produce lenses**: with 3 staged raw crystal, a
+  `CrystalCutter` + `LensGrinder` pair works the chain to
+  ≥ 2 lenses, every step `Crafted`-ledgered; cut crystal
+  then crafts quiet gear and a delver equips it at camp.
+- **Lens fitting rules**: tier-4 placement without a lens
+  fails and draws no oil; with a lens it consumes lens +
+  oil and stands at tier 4.
+- **Darkness contrast**: at the deep crystal face's stand a
+  tier-1 lantern leaves a carved cell at Chebyshev 2 dark
+  (effective radius 1); a lens-fitted tier-4 lights it.
+  The camp shallows are not thick dark.
+- **Darkness non-leak**: the same geometry on floor 5 is
+  lit by a plain tier-1 — no penalty off the band.
+- **Detection contrast**: a lone lurker staged 13–16 steps
+  from a pinned delver closes on him unquiet, and never
+  moves when he wears quiet gear (effective distance past
+  earshot).
+- **Detection non-leak**: the same quiet staging on
+  floor 5 is hunted anyway — critters off the band hunt as
+  they always have.
+- **Brittle contrast**: a staged step onto an unroped deep
+  cell collapses it (hp 100 → 65, cell → stone, one
+  `BrittleCollapse`); the same step onto a roped cell is
+  harmless and the floor holds.
+- **Brittle non-leak**: the same step on floor 5 costs
+  nothing and breaks nothing.
+- **Kit rules**: ropes and quiet gear refuse broke /
+  under-supplied colonies, rope refuses solid rock, no
+  stacking rope on a roped cell; costs are exact.
+- **Determinism**: floor 4 with a rope laid, crystal in
+  stores, and a cutter assigned — twin-run identical,
+  save/load reproduces the hash (ropes roundtrip),
+  continuation identical.
+
+### Full-suite + harness results
+
+- `cargo test`: **98/98** (87 pre-existing + 11 S16),
+  0 failed.
+- `scenario` binary (release): the output was diffed
+  against the pre-S16 run — **every S1–S13 section is
+  byte-identical in its behaviour numbers**; the single
+  changed line is the S9 F4 state hash (`4e06c92d…` →
+  `4303c01f…`), because floor 4's *world* now contains
+  crystal cells (the S10 pattern: hashes shift with new
+  save/world content, numbers do not). The new S16
+  sections: production (1,500 ticks) — **raw crystal
+  left=0, lenses=4, quiet gear crafted=true, goods=5,
+  lost=0**; gate (3,000 ticks) — **crystal lantern
+  fitted=true, descent roped=true, ropes laid=1, brittle
+  collapses=2, goods=22, delvers alive=4, lost=0**; S16
+  state hash
+  `e18c18dc57a1912823a0b627b8bc2b6911ca3541926e51f9aaa77d7775d44962`.
+  The 2 collapses are the free-running colony crossing
+  unroped deep floor on its way to the deeper faces in
+  phase 2 — the hazard engaging in ordinary play, with
+  nobody lost.
+
+### Not verified / not built
+
+- No frontend or bridge surfacing for ropes, quiet gear,
+  crystal stores, or the cutter/grinder jobs (sim first,
+  as S7/S10 shipped; surfacing is a later slice).
+- Harnesses and cartography (decision 9's remaining gate
+  and job words) — no fall traversal or map system exists
+  for them yet; see `docs/CRYSTAL_DARK.md`.
+- Embedded crystal clusters are data, like fungal nodes:
+  only the converted crystal face is minable. General
+  face registration for embedded pockets remains open.
+
 ## Planned (later slices)
 
 - Owner-PC visual pass of the frontend; performance measurement

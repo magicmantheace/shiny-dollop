@@ -311,11 +311,11 @@ fn stub_bands_generate_through_the_same_generator() {
     // with its second resource present. Since S10 its gate
     // mechanics engage on the generated floor (band-keyed
     // exposure), so `built` is true — as it is for the Drowned
-    // Galleries and the Magma Roots. The Crystal Dark's gate
-    // items were never modelled, so it stays unbuilt.
+    // Galleries and the Magma Roots. Since S16 the Crystal
+    // Dark's gate mechanics engage too, so every band is built.
     assert!(theme_for_floor(2).built);
     assert!(theme_for_floor(3).built);
-    assert!(!theme_for_floor(4).built);
+    assert!(theme_for_floor(4).built);
     assert!(theme_for_floor(5).built);
     let f2 = generate_floor(7, 2);
     assert_eq!(f2.layout.band, Band::FungalReaches);

@@ -537,6 +537,62 @@ fn main() {
     );
     println!("S13 state hash: {}", s13.sim().state_hash());
 
+    // ---- S16: the Crystal Dark's gate -------------------------------------
+    // A colony founded on floor 4 comes prepared the way a
+    // colony that delved there would: raw crystal in the stores
+    // (mined at the band's crystal face — proven live in the
+    // S16 tests), a cutter and a grinder assigned, and goods
+    // for rope. Phase 1 runs the production jobs: lenses and a
+    // set of quiet gear come out of the crystal. Phase 2 fits a
+    // crystal-heart lantern at the deep crystal face — where a
+    // plain lantern's light falls short (also proven in the
+    // tests) — and ropes the descent cavern's brittle floor.
+    let mut s16 = build_scenario_gen_floor(GEN_WORLD_SEED, 4);
+    open_current_floor(&mut s16);
+    s16.stores.crystal = 4;
+    s16.stores.goods += 6;
+    s16.set_job(0, Job::CrystalCutter);
+    s16.set_job(1, Job::LensGrinder);
+    for _ in 0..1500 {
+        s16.tick();
+    }
+    // The pipeline ground every cut crystal into lenses; one
+    // more cut crystal (staged, as a fifth hauled crystal's
+    // cutting would leave) goes to quiet gear instead.
+    s16.stores.cut_crystals += 1;
+    let quiet_crafted = s16.craft_quiet_gear();
+    println!(
+        "S16 crystal dark production ({} ticks): raw crystal left={}, cut crystals={}, lenses={}, quiet gear crafted={}, quiet delvers={}, goods={}, lost={}",
+        s16.tick_count,
+        s16.stores.crystal,
+        s16.stores.cut_crystals,
+        s16.stores.lenses,
+        quiet_crafted,
+        s16.delvers.iter().filter(|d| d.quiet).count(),
+        s16.stores.goods,
+        count(&s16, LedgerKind::DelverLost),
+    );
+    let deep_stand = s16.faces[2].stand;
+    s16.stores.fungal_oil += 1;
+    let crystal_lantern = s16.place_lantern(deep_stand, 4, 5_000.0);
+    let descent = s16.floor.as_ref().map(|f| f.descent).unwrap_or(s16.stockpile);
+    let roped = s16.place_rope(descent);
+    for _ in 0..1500 {
+        s16.tick();
+    }
+    println!(
+        "S16 crystal dark gate ({} ticks): crystal lantern fitted={}, descent roped={}, ropes laid={}, brittle collapses={}, goods={}, delvers alive={}, lost={}",
+        s16.tick_count,
+        crystal_lantern,
+        roped,
+        s16.ropes.len(),
+        count(&s16, LedgerKind::BrittleCollapse),
+        s16.stores.goods,
+        s16.delvers.len(),
+        count(&s16, LedgerKind::DelverLost),
+    );
+    println!("S16 state hash: {}", s16.state_hash());
+
     println!("deep ledger (S2):");
     for e in &sim.ledger {
         println!("  [{:>5}] {:?} — {}", e.tick, e.kind, e.detail);

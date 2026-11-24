@@ -14,7 +14,17 @@
 //! with the flag off, age is inert recorded data, no birth or
 //! coming-of-age ever fires, and the sim is bit-identical to the
 //! pre-S12 sim (the new save fields omit themselves at their
-//! inert defaults — see the S12 section below).
+//! inert defaults — see the S12 section below). S16 gives the
+//! Crystal Dark its own gate mechanics, band-scoped through the
+//! same `hazards_here`-style query family: thicker darkness in
+//! the band's deep zone (plain lanterns lose radius there;
+//! crystal-heart lanterns — tier 4, fitted with a ground crystal
+//! lens — keep theirs), sound-hunting lurkers answered by quiet
+//! gear, and brittle deep floors answered by roped routes, with
+//! raw crystal harvested in the band feeding the crystal-cutting
+//! and lens-grinding jobs. Every S16 save field omits itself at
+//! its inert default, so colonies that never touch the Crystal
+//! Dark hash identically to the pre-S16 sim.
 //!
 //! The design rules encoded here (owner decisions, see
 //! docs/MUSE_HANDOFF.md):
@@ -33,7 +43,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::gen::{band_for_floor, generate_floor, theme_for_floor, FloorInfo, CAMP_CENTRE, ENTRY, GATE};
+use crate::gen::{band_for_floor, generate_floor, theme_for_floor, Band, FloorInfo, CAMP_CENTRE, ENTRY, GATE};
 use crate::world::{Cell, Pos, World};
 
 // ---------------------------------------------------------------------------
@@ -177,6 +187,9 @@ pub enum LedgerKind {
     ChildBorn,
     /// A child reached adulthood (S12, generations only).
     CameOfAge,
+    /// A brittle Crystal Dark floor gave way under a delver
+    /// crossing it unroped (S16).
+    BrittleCollapse,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -198,6 +211,12 @@ pub enum Job {
     Farmer,
     /// Tends the sick (spore care in S5); farms when nobody is ill.
     Herbalist,
+    /// Cuts raw crystal into cut crystal at camp (S16, the
+    /// Crystal Dark's first production job).
+    CrystalCutter,
+    /// Grinds cut crystal into crystal lenses at camp (S16, the
+    /// Crystal Dark's second production job).
+    LensGrinder,
 }
 
 /// What a face yields when mined.
@@ -205,6 +224,8 @@ pub enum Job {
 pub enum YieldKind {
     Ore,
     FungalOil,
+    /// Raw crystal from a Crystal Dark crystal face (S16).
+    Crystal,
 }
 
 /// A work face: the rock cell being worked, the carved cell the
@@ -434,6 +455,93 @@ pub const HEAT_CLEAR_RATE: f32 = 0.25;
 pub const COOLING_GOODS_COST: u32 = 2;
 
 // ---------------------------------------------------------------------------
+// The Crystal Dark — thicker darkness, sound hunters, brittle
+// floors (S16)
+// ---------------------------------------------------------------------------
+//
+// Owner decision 9's fourth band: thicker darkness,
+// sound/vibration hunters, brittle floors; gate: crystal
+// lenses, quiet gear, marked routes, harnesses; jobs: crystal
+// cutting, lens grinding, cartography. (Harnesses and
+// cartography are not modelled — see docs/CRYSTAL_DARK.md.)
+// Like S10's band mechanics, everything here is **band-scoped**
+// through the active floor: a mechanic engages only on a
+// generated floor whose band is the Crystal Dark (floors 4, 8,
+// 12, … by `band_for_floor`), and only in the floor's deep zone
+// (y ≥ `BAND_ZONE_FROM_Y`, the S10 line) where the band's
+// character lives. Hand-built worlds and other bands are
+// untouched — the S16 non-leak tests pin that.
+//
+// **Thicker darkness** is a light-radius model, extending the
+// existing lantern system rather than replacing it: in the
+// deep zone, a lantern below the crystal tier sheds light at
+// `tier_radius − DARK_RADIUS_PENALTY` — the dark drinks the
+// outer ring of a plain flame. The answer is decision 8's
+// **crystal-heart lantern** (tier `CRYSTAL_TIER`): a lantern
+// fitted with a ground **crystal lens**, whose focused light
+// keeps its full radius in the thick dark. Fitting is part of
+// placement, in the tier-2+ oil-charge pattern: placing a
+// tier-4 lantern consumes one lens from the stores (and the
+// usual oil charge) and fails without one.
+//
+// **Sound hunters**: the Crystal Dark's deep lurkers hunt by
+// sound. On a Crystal Dark floor a critter engages only a
+// delver it can hear — Manhattan distance within
+// `SOUND_HUNTER_RANGE`, where a delver wearing **quiet gear**
+// counts `QUIET_NOISE` steps farther away. Off the band,
+// critters hunt exactly as they always have (nearest delver,
+// any distance). Quiet gear is crafted kit in the mask pattern
+// (worn, permanent, auto-equipped at camp); its recipe spends
+// a cut crystal — the band's own product muffles the colony —
+// plus goods for the soft fittings.
+//
+// **Brittle floors**: the deep zone's carved floors are
+// brittle. A delver who steps onto a brittle cell unroped
+// brings it down: the cell fills with fallen crystal rubble
+// (ordinary stone), the delver takes `BRITTLE_DAMAGE`, and the
+// fall is ledgered. The answer is a **marked route**: rope
+// laid on a carved cell (placed kit, the support's pattern)
+// makes that cell safe to cross, permanently. Modelling
+// decision where the record was silent: a brittle fall never
+// downs a delver by itself (damage floors hp at 1) — the
+// delver scrambles clear of the fall, wounded; the rescue
+// clock stays the cave-in/combat/dark hazard it already is.
+//
+// **Production**: raw crystal is mined at the band's crystal
+// face (the generator converts the deepest registered face)
+// and hauled to the stores like ore. Two colony jobs work it
+// at camp, in the converter's work pattern: a **CrystalCutter**
+// cuts raw crystal into cut crystal, and a **LensGrinder**
+// grinds cut crystal into lenses. Cut crystal also feeds the
+// quiet-gear recipe, so the band's product answers both its
+// darkness and its hunters.
+
+/// The crystal-heart lantern tier (decision 8): the focused
+/// tier whose light the Crystal Dark's thick darkness cannot
+/// drink. Placement consumes a ground crystal lens.
+pub const CRYSTAL_TIER: u8 = 4;
+/// Radius a sub-crystal lantern loses in the Crystal Dark's
+/// deep zone — the thicker darkness drinking its outer ring.
+pub const DARK_RADIUS_PENALTY: i32 = 2;
+/// How far a sound-hunting critter can hear on a Crystal Dark
+/// floor (Manhattan steps). Beyond it, the hunter idles.
+pub const SOUND_HUNTER_RANGE: i32 = 16;
+/// Extra effective distance quiet gear adds for a sound
+/// hunter: a quiet delver sounds this many steps farther away.
+pub const QUIET_NOISE: i32 = 4;
+/// Cut crystal a set of quiet gear consumes (plus goods).
+pub const QUIET_CUT_COST: u32 = 1;
+/// Goods a set of quiet gear consumes (plus cut crystal).
+pub const QUIET_GOODS_COST: u32 = 1;
+/// Damage a brittle-floor collapse deals to the delver who
+/// brings it down. Never lethal alone (hp floors at 1 — the
+/// delver scrambles clear; see the section note above).
+pub const BRITTLE_DAMAGE: f32 = 35.0;
+/// Goods cost of rope laid on one carved cell (a marked
+/// route's per-cell price, the support's pattern).
+pub const ROPE_GOODS_COST: u32 = 1;
+
+// ---------------------------------------------------------------------------
 // Children & generations (S12)
 // ---------------------------------------------------------------------------
 //
@@ -556,6 +664,10 @@ pub enum DelverState {
     ToPatient,
     /// Herbalist tending a patient within reach.
     Care,
+    /// Crystal cutter working raw crystal at camp (S16).
+    Cutting,
+    /// Lens grinder working cut crystal at camp (S16).
+    Grinding,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -605,6 +717,12 @@ pub struct Delver {
     /// Wearing crafted cooling gear (permanent kit once
     /// equipped, the mask's mirror for heat).
     pub cooled: bool,
+    /// Wearing crafted quiet gear (permanent kit once
+    /// equipped, S16 — the mask's mirror for sound hunters).
+    /// Omits itself from the save while false, so pre-S16
+    /// state hashes are bit-identical.
+    #[serde(default, skip_serializing_if = "flag_is_false")]
+    pub quiet: bool,
     /// 0..100 — spent in combat and accidents; a delver at 0 is
     /// Downed, not dead: the rescue clock decides which.
     pub hp: f32,
@@ -652,6 +770,7 @@ impl Delver {
             heat: 0.0,
             overheating_logged: false,
             cooled: false,
+            quiet: false,
             hp: 100.0,
             combat_xp: 0,
             fight_cd: 0,
@@ -720,6 +839,14 @@ impl Delver {
     }
 }
 
+/// A zero store count omits itself from the canonical save
+/// (S16): the S16 store fields below are invisible at zero, so
+/// colonies that never touch crystal hash identically to the
+/// pre-S16 sim.
+fn count_is_zero(n: &u32) -> bool {
+    *n == 0
+}
+
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct Stores {
     pub ore: u32,
@@ -732,6 +859,19 @@ pub struct Stores {
     /// Crafted cooling gear waiting to be equipped (S10).
     #[serde(default)]
     pub cooling_gear: u32,
+    /// Raw crystal hauled from Crystal Dark crystal faces (S16).
+    #[serde(default, skip_serializing_if = "count_is_zero")]
+    pub crystal: u32,
+    /// Crystal cut by the colony's crystal cutters (S16).
+    #[serde(default, skip_serializing_if = "count_is_zero")]
+    pub cut_crystals: u32,
+    /// Lenses ground by the colony's lens grinders (S16);
+    /// consumed fitting crystal-heart lanterns.
+    #[serde(default, skip_serializing_if = "count_is_zero")]
+    pub lenses: u32,
+    /// Crafted quiet gear waiting to be equipped (S16).
+    #[serde(default, skip_serializing_if = "count_is_zero")]
+    pub quiet_gear: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -844,6 +984,9 @@ pub struct FloorState {
     pub vents: Vec<Pos>,
     #[serde(default)]
     pub pumps: Vec<Pos>,
+    /// Roped route cells (S16), packed with the floor.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ropes: Vec<Pos>,
     pub plots: Vec<Plot>,
     pub beds: Vec<Pos>,
     pub stockpile: Pos,
@@ -874,6 +1017,12 @@ pub struct Sim {
     /// are kept dry in a flooded band. Sorted.
     #[serde(default)]
     pub pumps: Vec<Pos>,
+    /// Roped route cells (S16): rope laid on carved cells to
+    /// mark a safe route across brittle Crystal Dark floors.
+    /// A roped brittle cell never collapses. Sorted. Omits
+    /// itself from the save while empty (pre-S16 hashes hold).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ropes: Vec<Pos>,
     /// Kept sorted by position.
     pub plots: Vec<Plot>,
     /// Where surface arrivals appear.
@@ -950,6 +1099,7 @@ impl Sim {
             supports: Vec::new(),
             vents: Vec::new(),
             pumps: Vec::new(),
+            ropes: Vec::new(),
             plots: Vec::new(),
             gate,
             stores,
@@ -986,6 +1136,64 @@ impl Sim {
 
     pub fn refresh_light(&mut self) {
         self.lit = compute_lit(&self.world, &self.lanterns);
+        // Thicker darkness (S16): on a Crystal Dark floor, the
+        // deep zone drinks the outer ring of every sub-crystal
+        // lantern's light. Recompute the deep zone's lit cells
+        // at each lantern's effective radius there; shallows
+        // cells keep the plain computation, and other floors
+        // never reach this branch at all.
+        if self.crystal_dark_here() {
+            for y in BAND_ZONE_FROM_Y..self.world.sy as i32 {
+                for x in 0..self.world.sx as i32 {
+                    for z in 0..self.world.sz as i32 {
+                        let p = Pos::new(x, y, z);
+                        let Some(i) = self.world.idx(p) else { continue };
+                        if !self.lit[i] {
+                            continue;
+                        }
+                        self.lit[i] = self.lanterns.iter().any(|e| {
+                            e.fuel > 0.0
+                                && (e.pos.x - p.x)
+                                    .abs()
+                                    .max((e.pos.y - p.y).abs())
+                                    .max((e.pos.z - p.z).abs())
+                                    <= self.effective_radius(e.tier, p)
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    /// Is the colony standing on a Crystal Dark floor? The one
+    /// band query every S16 mechanic consults (the
+    /// `hazards_here` pattern): generated floors only, keyed to
+    /// the active floor's band — hand-built worlds and other
+    /// bands answer false, so nothing S16 does can leak.
+    pub fn crystal_dark_here(&self) -> bool {
+        self.floor
+            .as_ref()
+            .map_or(false, |f| band_for_floor(f.index) == Band::CrystalDark)
+    }
+
+    /// The Crystal Dark's thick darkness at a cell: the band's
+    /// deep zone of a Crystal Dark floor (y ≥
+    /// `BAND_ZONE_FROM_Y`, the S10 zone line).
+    pub fn thick_dark_at(&self, pos: Pos) -> bool {
+        self.crystal_dark_here() && pos.y >= BAND_ZONE_FROM_Y
+    }
+
+    /// A lantern's light radius at a cell: full radius
+    /// everywhere except in thick dark, where sub-crystal
+    /// tiers lose `DARK_RADIUS_PENALTY` and the crystal-heart
+    /// tier (fitted with a ground lens) keeps its focus.
+    fn effective_radius(&self, tier: u8, at: Pos) -> i32 {
+        let r = tier_radius(tier);
+        if tier < CRYSTAL_TIER && self.thick_dark_at(at) {
+            (r - DARK_RADIUS_PENALTY).max(0)
+        } else {
+            r
+        }
     }
 
     fn depth_is_lit(&self, y: i32) -> bool {
@@ -1037,7 +1245,17 @@ impl Sim {
             if self.stores.fungal_oil < LANTERN_OIL_COST {
                 return false;
             }
+            // A crystal-heart lantern (S16) is fitted with a
+            // ground crystal lens at placement: without a lens
+            // in the stores there is nothing to fit, and the
+            // placement fails whole — no oil drawn either.
+            if tier == CRYSTAL_TIER && self.stores.lenses < 1 {
+                return false;
+            }
             self.stores.fungal_oil -= LANTERN_OIL_COST;
+            if tier == CRYSTAL_TIER {
+                self.stores.lenses -= 1;
+            }
         }
         if let Some(e) = self.lanterns.iter_mut().find(|e| e.pos == pos) {
             e.tier = tier;
@@ -1132,6 +1350,69 @@ impl Sim {
             LedgerKind::Crafted,
             format!("a pump was set at ({}, {}, {})", pos.x, pos.y, pos.z),
         );
+        true
+    }
+
+    /// Lay rope on a carved cell, marking a route across
+    /// brittle floors (the Crystal Dark gate set's route
+    /// answer, S16). A roped brittle cell never collapses
+    /// under a crossing delver. Costs `ROPE_GOODS_COST` goods
+    /// and fails like `place_support` does (solid rock, a cell
+    /// already roped, or a broke colony).
+    pub fn place_rope(&mut self, pos: Pos) -> bool {
+        if self.world.get(pos) != Some(Cell::Carved)
+            || self.ropes.contains(&pos)
+            || self.stores.goods < ROPE_GOODS_COST
+        {
+            return false;
+        }
+        self.stores.goods -= ROPE_GOODS_COST;
+        self.ropes.push(pos);
+        self.ropes.sort();
+        self.log(
+            LedgerKind::Crafted,
+            format!(
+                "rope was laid at ({}, {}, {}) — a marked route",
+                pos.x, pos.y, pos.z
+            ),
+        );
+        true
+    }
+
+    /// Is this cell roped (a marked-route cell)?
+    fn roped(&self, p: Pos) -> bool {
+        self.ropes.contains(&p)
+    }
+
+    /// A brittle floor cell: carved, in the Crystal Dark's
+    /// thick-dark deep zone, and unroped. Only delver steps
+    /// test it (see `maybe_brittle_collapse`).
+    pub fn brittle_at(&self, p: Pos) -> bool {
+        self.world.get(p) == Some(Cell::Carved) && self.thick_dark_at(p) && !self.roped(p)
+    }
+
+    /// A delver stepping onto a brittle cell brings it down:
+    /// the cell fills with fallen crystal rubble (ordinary
+    /// stone), the delver's path is interrupted, and they take
+    /// `BRITTLE_DAMAGE` — floored at 1 hp, so a fall alone
+    /// never downs (see the S16 section note). Returns true
+    /// when a collapse fired.
+    fn maybe_brittle_collapse(&mut self, idx: usize, pos: Pos) -> bool {
+        if !self.brittle_at(pos) {
+            return false;
+        }
+        self.world.set(pos, Cell::Stone);
+        self.delvers[idx].path.clear();
+        self.delvers[idx].hp = (self.delvers[idx].hp - BRITTLE_DAMAGE).max(1.0);
+        let name = self.delvers[idx].name.clone();
+        self.log(
+            LedgerKind::BrittleCollapse,
+            format!(
+                "a brittle floor gave way under {name} at ({}, {}, {})",
+                pos.x, pos.y, pos.z
+            ),
+        );
+        self.refresh_light();
         true
     }
 
@@ -1272,6 +1553,25 @@ impl Sim {
         true
     }
 
+    /// Craft quiet gear (the Crystal Dark gate set's worn
+    /// item, S16 — the mask's mirror for sound hunters).
+    /// Costs a cut crystal (the band's own product, worked by
+    /// the cutting job) plus goods for the soft fittings.
+    /// Delvers equip it automatically at camp.
+    pub fn craft_quiet_gear(&mut self) -> bool {
+        if self.stores.cut_crystals < QUIET_CUT_COST || self.stores.goods < QUIET_GOODS_COST {
+            return false;
+        }
+        self.stores.cut_crystals -= QUIET_CUT_COST;
+        self.stores.goods -= QUIET_GOODS_COST;
+        self.stores.quiet_gear += 1;
+        self.log(
+            LedgerKind::Crafted,
+            "quiet gear was crafted from a cut crystal and soft fittings".to_string(),
+        );
+        true
+    }
+
     /// Craft cooling gear from colony goods (the Magma gate
     /// set's first item, S10 — the mask's mirror). Delvers
     /// equip it automatically at camp.
@@ -1360,6 +1660,7 @@ impl Sim {
             supports: self.supports.clone(),
             vents: self.vents.clone(),
             pumps: self.pumps.clone(),
+            ropes: self.ropes.clone(),
             plots: self.plots.clone(),
             beds: self.beds.clone(),
             stockpile: self.stockpile,
@@ -1377,6 +1678,7 @@ impl Sim {
         self.supports = state.supports;
         self.vents = state.vents;
         self.pumps = state.pumps;
+        self.ropes = state.ropes;
         self.plots = state.plots;
         self.beds = state.beds;
         self.stockpile = state.stockpile;
@@ -1439,6 +1741,7 @@ impl Sim {
         self.supports = Vec::new();
         self.vents = Vec::new();
         self.pumps = Vec::new();
+        self.ropes = Vec::new();
         self.plots = Vec::new();
         self.beds = vec![Pos::new(2, 3, 3), Pos::new(2, 3, 5), Pos::new(6, 3, 5)];
         self.stockpile = ENTRY;
@@ -1470,6 +1773,9 @@ impl Sim {
         if let Some(state) = self.floors.remove(&target) {
             self.unpack_floor(state);
             self.floor = Some(generate_floor(self.world_seed, target).info());
+            // Light depends on the floor's band since S16
+            // (thick darkness): recompute now the band is known.
+            self.refresh_light();
         } else {
             let floor = generate_floor(self.world_seed, target);
             self.found_forward_camp(floor);
@@ -1509,6 +1815,7 @@ impl Sim {
         let info = generate_floor(self.world_seed, target).info();
         let descent = info.descent;
         self.floor = Some(info);
+        self.refresh_light();
         self.gather_delvers(&[descent]);
         self.log(
             LedgerKind::Ascended,
@@ -1916,6 +2223,23 @@ impl Sim {
                 continue;
             };
             let dist = (tpos.x - cpos.x).abs() + (tpos.y - cpos.y).abs() + (tpos.z - cpos.z).abs();
+            // Sound hunting (S16): on a Crystal Dark floor the
+            // hunters hunt by ear — a delver beyond earshot is
+            // not engaged at all, and quiet gear makes a delver
+            // sound farther away than they are. Off the band
+            // this branch never runs and critters hunt as they
+            // always have.
+            if self.crystal_dark_here() {
+                let quiet = self
+                    .delvers
+                    .iter()
+                    .find(|d| d.id == tid)
+                    .map_or(false, |d| d.quiet);
+                let heard_at = dist + if quiet { QUIET_NOISE } else { 0 };
+                if heard_at > SOUND_HUNTER_RANGE {
+                    continue;
+                }
+            }
             if dist <= 1 {
                 if self.critters[ci].attack_cd == 0 {
                     self.critters[ci].attack_cd = ATTACK_PERIOD;
@@ -2136,6 +2460,10 @@ impl Sim {
         if let Some(next) = self.delvers[idx].path.first().copied() {
             self.delvers[idx].pos = next;
             self.delvers[idx].path.remove(0);
+            // A step onto a brittle Crystal Dark floor can
+            // bring it down (S16); the collapse clears the
+            // rest of the path, so the step reports arrival.
+            self.maybe_brittle_collapse(idx, next);
         }
         self.delvers[idx].path.is_empty()
     }
@@ -2174,6 +2502,13 @@ impl Sim {
                     self.log(
                         LedgerKind::HaulDelivered,
                         format!("{name} hauled {amount} fungal oil to the stockpile"),
+                    );
+                }
+                YieldKind::Crystal => {
+                    self.stores.crystal += amount;
+                    self.log(
+                        LedgerKind::HaulDelivered,
+                        format!("{name} hauled {amount} raw crystal to the stockpile"),
                     );
                 }
             }
@@ -2229,6 +2564,11 @@ impl Sim {
             self.stores.cooling_gear -= 1;
             self.delvers[idx].cooled = true;
         }
+        // Pick up quiet gear if the colony has a set spare (S16).
+        if !self.delvers[idx].quiet && self.stores.quiet_gear > 0 {
+            self.stores.quiet_gear -= 1;
+            self.delvers[idx].quiet = true;
+        }
         if self.delvers[idx].hunger < 40.0 && self.stores.food > 0 {
             self.delvers[idx].state = DelverState::Eating;
             return;
@@ -2264,6 +2604,23 @@ impl Sim {
             Job::Miner => self.decide_miner(idx),
             Job::Farmer => self.decide_farmer(idx),
             Job::Herbalist => self.decide_herbalist(idx),
+            // The Crystal Dark production jobs (S16) work their
+            // material at camp, in the converter's pattern; with
+            // nothing to work, the delver idles at camp.
+            Job::CrystalCutter => {
+                self.delvers[idx].state = if self.stores.crystal > 0 {
+                    DelverState::Cutting
+                } else {
+                    DelverState::Idle
+                };
+            }
+            Job::LensGrinder => {
+                self.delvers[idx].state = if self.stores.cut_crystals > 0 {
+                    DelverState::Grinding
+                } else {
+                    DelverState::Idle
+                };
+            }
             // Haulers and the unassigned run the camp↔face route and
             // work the camp converter in between.
             Job::Hauler | Job::Unassigned => self.decide_hauler(idx),
@@ -2793,6 +3150,49 @@ impl Sim {
                     && matches!(self.delvers[idx].job, Job::Hauler | Job::Unassigned)
                 {
                     self.decide(idx);
+                }
+            }
+            DelverState::Cutting => {
+                // Crystal cutting (S16): camp work in the
+                // converter's pattern — a working pace, one raw
+                // crystal to one cut crystal per completed unit.
+                let mult = self.delvers[idx].work_mult();
+                self.delvers[idx].convert_progress += 0.1 * mult;
+                if self.delvers[idx].convert_progress >= 1.0 {
+                    self.delvers[idx].convert_progress = 0.0;
+                    if self.stores.crystal > 0 {
+                        self.stores.crystal -= 1;
+                        self.stores.cut_crystals += 1;
+                        let name = self.delvers[idx].name.clone();
+                        self.log(
+                            LedgerKind::Crafted,
+                            format!("{name} cut a raw crystal into a cut crystal"),
+                        );
+                    }
+                }
+                if self.stores.crystal == 0 {
+                    self.delvers[idx].state = DelverState::Idle;
+                }
+            }
+            DelverState::Grinding => {
+                // Lens grinding (S16): the cutting pattern one
+                // step on — one cut crystal to one lens.
+                let mult = self.delvers[idx].work_mult();
+                self.delvers[idx].convert_progress += 0.1 * mult;
+                if self.delvers[idx].convert_progress >= 1.0 {
+                    self.delvers[idx].convert_progress = 0.0;
+                    if self.stores.cut_crystals > 0 {
+                        self.stores.cut_crystals -= 1;
+                        self.stores.lenses += 1;
+                        let name = self.delvers[idx].name.clone();
+                        self.log(
+                            LedgerKind::Crafted,
+                            format!("{name} ground a cut crystal into a crystal lens"),
+                        );
+                    }
+                }
+                if self.stores.cut_crystals == 0 {
+                    self.delvers[idx].state = DelverState::Idle;
                 }
             }
             DelverState::ToBed => {

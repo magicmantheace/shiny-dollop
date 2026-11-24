@@ -38,6 +38,10 @@ pub enum Cell {
     /// A fungal growth node in the Fungal Reaches — mined like ore,
     /// rendered into fungal oil instead.
     FungalNode,
+    /// A crystal formation in the Crystal Dark — mined like ore,
+    /// hauled to the stores as raw crystal, and worked by the
+    /// crystal-cutting and lens-grinding jobs (S16).
+    Crystal,
     /// Cave-in-prone rock (S6 floor generation). Embedded in the
     /// rock by the floor generator as a hazard pocket. S7 gives
     /// it mechanics: mining a face it neighbours can bring it

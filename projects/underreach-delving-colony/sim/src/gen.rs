@@ -142,8 +142,9 @@ pub enum DressingKind {
 /// gate mechanics demonstrably engage on its generated floor
 /// with scenario + balance recorded (S9's rule): the Shallows
 /// (S6/S7), the Fungal Reaches, the Drowned Galleries, and the
-/// Magma Roots (S10) are built; the Crystal Dark's gate items
-/// were never modelled, so its row stays `built: false`.
+/// Magma Roots (S10) are built; the Crystal Dark was the last
+/// stub — its gate items are modelled in S16, so every band's
+/// row is now `built: true`.
 #[derive(Clone)]
 pub struct Theme {
     pub band: Band,
@@ -162,6 +163,12 @@ pub struct Theme {
     /// Extra fungal-node clusters embedded in the rock (the
     /// Fungal Reaches' second resource).
     pub fungal_node_clusters: usize,
+    /// Extra crystal clusters embedded in the rock (the Crystal
+    /// Dark's second resource, S16) — the fungal clusters'
+    /// mirror. The band's deepest registered face is also
+    /// converted to crystal, so the resource is minable, not
+    /// just embedded (see the vein section of the generator).
+    pub crystal_clusters: usize,
     /// Natural cavities connected into the passage network.
     pub connected_cavities: usize,
     /// Natural cavities left in the rock, reachable only by
@@ -216,6 +223,7 @@ fn base_theme(band: Band) -> Theme {
         cap_depth: 2,
         resource_cells: &[Cell::Ore],
         fungal_node_clusters: 0,
+        crystal_clusters: 0,
         connected_cavities: 5,
         off_network_cavities: 2,
         cavity_w: (2, 3),
@@ -291,6 +299,16 @@ pub fn theme_for_band(band: Band) -> Theme {
             t.critter_kinds = &[CritterKind::DeepLurker];
         }
         Band::CrystalDark => {
+            // Built in S16: thicker darkness (plain lanterns
+            // lose radius in the deep zone; crystal-heart
+            // lanterns fitted with ground lenses keep theirs),
+            // sound-hunting lurkers answered by quiet gear, and
+            // brittle deep floors answered by roped routes. Raw
+            // crystal is the band's second resource: embedded
+            // clusters plus a converted crystal face.
+            t.built = true;
+            t.resource_cells = &[Cell::Ore, Cell::Crystal];
+            t.crystal_clusters = 4;
             t.loose_count = 6; // brittle floors
             t.bad_air_count = 2;
             t.dressing_kinds = &[
@@ -523,6 +541,7 @@ pub fn world_hash(world: &World) -> String {
                     Cell::Loose => 5,
                     Cell::BadAir => 6,
                     Cell::Carved => 7,
+                    Cell::Crystal => 8,
                 }]);
             }
         }
@@ -1159,6 +1178,7 @@ fn generate_once(seed: u64, floor_index: u32, attempt: u32) -> Floor {
     let primary = theme.resource_cells[0];
     let yield_of = |cell: Cell| match cell {
         Cell::FungalNode => YieldKind::FungalOil,
+        Cell::Crystal => YieldKind::Crystal,
         _ => YieldKind::Ore,
     };
     let mut vein_cells_all: HashSet<Pos> = HashSet::new();
@@ -1297,6 +1317,30 @@ fn generate_once(seed: u64, floor_index: u32, attempt: u32) -> Floor {
     veins.sort_by_key(|v| v.cells.first().copied().unwrap_or(ENTRY));
     faces.sort_by_key(|f| f.rock);
 
+    // -- Crystal Dark (S16): the deepest registered face is a
+    // crystal face. Its vein's cells become crystal in the
+    // world and the face yields raw crystal — the band's gate
+    // resource is minable at a face, not only embedded (the
+    // fungal nodes' known gap, deliberately not repeated here).
+    // Deterministic and draw-free: the layout is otherwise
+    // exactly the pre-S16 layout. --
+    if theme.band == Band::CrystalDark && faces.len() >= 2 {
+        let fi = faces
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, f)| (f.stand.y, f.rock))
+            .map(|(i, _)| i)
+            .unwrap();
+        let rock = faces[fi].rock;
+        if let Some(vein) = veins.iter().find(|v| v.is_face && v.cells.contains(&rock)) {
+            let cells = vein.cells.clone();
+            for p in cells {
+                world.set(p, Cell::Crystal);
+            }
+        }
+        faces[fi].yield_kind = YieldKind::Crystal;
+    }
+
     // -- Fungal node clusters (stub bands' second resource). --
     if theme.fungal_node_clusters > 0 {
         let mut placed_clusters = 0;
@@ -1414,6 +1458,38 @@ fn generate_once(seed: u64, floor_index: u32, attempt: u32) -> Floor {
     dress_room(&mut rng, &mut dressing, &descent_cavern);
     dressing.sort_by_key(|a| (a.pos, a.kind));
 
+    // -- Crystal clusters (S16): the Crystal Dark's embedded
+    // second resource, the fungal clusters' mirror — placed
+    // last so their draws move nothing else in the layout. --
+    if theme.crystal_clusters > 0 {
+        let mut placed_clusters = 0;
+        let mut guard = 0;
+        while placed_clusters < theme.crystal_clusters && guard < 200 {
+            guard += 1;
+            let mut near: Vec<Pos> = features
+                .iter()
+                .copied()
+                .filter(|f| (4..=GEN_MAX_Y).contains(&f.y))
+                .collect();
+            near.sort();
+            if near.is_empty() {
+                break;
+            }
+            let anchor = near[rng.below(near.len() as u64) as usize];
+            let start = Pos::new(
+                (anchor.x + rng.below(7) as i32 - 3).clamp(1, FLOOR_W as i32 - 2),
+                anchor.y,
+                (anchor.z + rng.below(5) as i32 - 2).clamp(1, FLOOR_D as i32 - 2),
+            );
+            let cells = grow_cluster(&mut world, &mut rng, start, Cell::Crystal, 2, &|w: &World, p: Pos| {
+                w.get(p) == Some(Cell::Stone)
+            });
+            if !cells.is_empty() {
+                placed_clusters += 1;
+            }
+        }
+    }
+
     let layout = FloorLayout {
         floor_index,
         band: theme.band,
@@ -1453,12 +1529,12 @@ mod tests {
         assert_eq!(band_for_floor(6), Band::FungalReaches);
         assert_eq!(band_for_floor(9), Band::MagmaRoots);
         assert!(theme_for_floor(1).built);
-        // S10: the Fungal, Drowned, and Magma gate mechanics
-        // engage on their generated floors; the Crystal Dark's
-        // gate items were never modelled, so it stays unbuilt.
+        // S10 built the Fungal, Drowned, and Magma gate
+        // mechanics; S16 builds the Crystal Dark's, so every
+        // band's row is built now.
         assert!(theme_for_floor(2).built);
         assert!(theme_for_floor(3).built);
-        assert!(!theme_for_floor(4).built);
+        assert!(theme_for_floor(4).built);
         assert!(theme_for_floor(5).built);
     }
 }

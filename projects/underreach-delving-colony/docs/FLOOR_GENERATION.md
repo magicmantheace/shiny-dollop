@@ -85,7 +85,7 @@ of 3–6 cells; 1 loop edge; ~33 % of passage segments widened to
 | Shallows (1) | **yes** | none | ore | 5 / 4 (base) | stalactite, stalagmite, rubble, boulder | gloam rat |
 | Fungal Reaches (2) | **yes** | spores | ore + fungal nodes (4 clusters) | 3 / 3 | giant mushroom, spore pod, stalactite, rubble | gloam rat, deep lurker |
 | Drowned Galleries (3) | **yes** | flooded | ore | 4 / 5, veins 5 | pump, air bell, rubble, stalagmite | deep lurker |
-| Crystal Dark (4) | stub | none flagged | ore | 6 / 2 | crystal formation, lens post, rubble | deep lurker |
+| Crystal Dark (4) | **yes** | none flagged (band mechanics, S16) | ore + crystal (converted face + 4 clusters) | 6 / 2 | crystal formation, lens post, rubble | deep lurker |
 | Magma Roots (5) | **yes** | hot | ore | 6 / 4 | basalt column, heat pipe, rubble | deep lurker |
 
 The stub rows are **explicitly NOT BUILT**: they generate
@@ -117,6 +117,17 @@ finding's second half stands: generated faces still
 yield ore only, so fungal oil does not flow on floor 2 —
 face registration for embedded pockets remains open.
 Full record: `docs/TEST_PLAN.md`.)*
+*(S16 amendment, 2026-11-24: the Crystal Dark is built.
+Its mechanics are band-scoped like S10's (thicker darkness
+in the deep zone answered by lens-fitted crystal-heart
+lanterns, sound hunters answered by quiet gear, brittle
+deep floors answered by roped routes), and its resource
+is minable: the generator converts a Crystal Dark floor's
+deepest registered face to a crystal face and embeds 4
+crystal clusters, placed last so no other layout element
+moves. The row flips to `built: yes` in the table above;
+every band is built now. Full record:
+`docs/CRYSTAL_DARK.md`, `docs/TEST_PLAN.md`.)*
 
 ## The generator, step by step
 

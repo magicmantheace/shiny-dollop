@@ -230,6 +230,34 @@ and the recommended first real-machine step are in
 Verified headless (`cargo test` 87/87, every S1–S12
 scenario section unchanged in numbers and hash).
 
+**S16 — Crystal Dark gates (2026-11-24, branch
+`underreach-delving-colony/crystal-dark-gates`):** the
+fourth band — the last unbuilt one — gets its own
+mechanics, band-scoped in the S10 pattern (the active
+floor's band, its deep zone at y ≥ 6). Thicker darkness
+drinks the outer ring of plain lantern light there
+(radius −2); the answer is the crystal-heart lantern
+(tier 4) fitted at placement with a ground **crystal
+lens**. The band's deep lurkers hunt by sound (earshot
+16; **quiet gear**, crafted from a cut crystal + goods,
+counts the wearer 4 steps farther off). Its deep floors
+are brittle — an unroped step collapses the cell for 35
+damage — and **rope** laid cell by cell (1 goods) marks a
+safe route across. Raw crystal is mined at the band's
+crystal face (the generator converts the deepest
+registered face; clusters are embedded too) and worked by
+two new colony jobs, **crystal cutting** (raw → cut) and
+**lens grinding** (cut → lens), with cut crystal also
+feeding quiet gear. The Crystal theme row flips to built;
+every band is built now. Verified headless (`cargo test`
+98/98; every S1–S13 scenario section unchanged in its
+behaviour numbers — the S9 F4 state hash shifts because
+floor 4's world now contains crystal). Not built:
+frontend/bridge surfacing for the new kit and jobs, and
+decision 9's harnesses/cartography (no fall traversal or
+map system exists for them yet). Full record:
+[`docs/CRYSTAL_DARK.md`](docs/CRYSTAL_DARK.md).
+
 ## Layout
 
 - `sim/` — the Rust simulation core, its tests, the `scenario`

@@ -248,7 +248,27 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   (frontier rights/permissions, multi-rescuer lantern clock,
   player downing/rescue) and the recommended first
   real-machine step, is `docs/COOP_ASSESSMENT.md`.
-- Later: Crystal Dark gates, colony failure & succession.
+- **S16 — Crystal Dark gates (BUILT 2026-11-24, branch
+  `underreach-delving-colony/crystal-dark-gates`).** The
+  fourth band's own mechanics, band-scoped in the S10
+  pattern (active floor's band, deep zone y ≥ 6): thicker
+  darkness (sub-crystal lanterns lose 2 radius in the deep
+  zone) answered by crystal-heart lanterns (tier 4) fitted
+  with ground crystal lenses at placement; sound-hunting
+  lurkers (earshot 16, quiet gear counts the wearer 4 steps
+  farther) answered by crafted quiet gear; brittle deep
+  floors (an unroped step collapses the cell, 35 damage,
+  never lethal alone) answered by roped marked routes
+  (1 goods a cell). Raw crystal is mined at the band's
+  crystal face (the generator converts the deepest
+  registered face; clusters embedded) and worked by two
+  colony jobs — crystal cutting (raw → cut) and lens
+  grinding (cut → lens) — with cut crystal also feeding
+  quiet gear. The Crystal theme row flips to `built: true`;
+  every band is built now. Harnesses and cartography are
+  NOT modelled (no fall traversal or map system exists for
+  them). Design record: `docs/CRYSTAL_DARK.md`.
+- Later: colony failure & succession.
 
 ## Status — 2026-11-10
 
@@ -616,6 +636,9 @@ line-bell heard by every player. Questions 3–5 remain open.
 
 - **Crystal Dark gate mechanics: DECIDED as a future slice**
   — approved in principle; not yet scheduled or built.
+  **Implemented 2026-11-24 as S16** (branch
+  `underreach-delving-colony/crystal-dark-gates`; see the
+  S16 slice-plan entry above and `docs/CRYSTAL_DARK.md`).
 - **Fungal-oil face registration: APPROVED to build** — it
   will be the first slice on top of merged `main`, so fungal
   oil flows on generated floors.
@@ -629,3 +652,29 @@ line-bell heard by every player. Questions 3–5 remain open.
   non-hosts, pause for everyone if the host leaves. With
   questions 1–2 decided earlier the same day, all five
   section (c) questions are now decided.
+
+## S16 status — Crystal Dark gates (2026-11-24)
+
+- **S16 — Crystal Dark gates (2026-11-24, VM-verified;
+  branch `underreach-delving-colony/crystal-dark-gates`,
+  not yet merged):** the last unbuilt band is built.
+  `cargo test` 98/98 (87 pre-existing + 11 new S16 tests);
+  the `scenario` binary's S1–S13 sections reproduce every
+  behaviour number exactly — the only changed line is the
+  S9 F4 state hash, because floor 4's world now contains
+  crystal cells — and its new S16 sections run the gate
+  end to end (4 staged raw crystal cut and ground to 4
+  lenses, quiet gear crafted, a crystal-heart lantern
+  fitted at the deep crystal face, the descent roped, 2
+  brittle collapses in free-running deep crossings, nobody
+  lost). Modelling decisions where the record was silent,
+  all flagged in `docs/TEST_PLAN.md` and
+  `docs/CRYSTAL_DARK.md`: darkness as a radius penalty in
+  the deep zone; a brittle fall never downs by itself (hp
+  floors at 1); sound hunting is whole-floor with earshot
+  16 (set so demo-floor colony behaviour is unchanged);
+  harnesses and cartography not modelled. NOT built:
+  frontend/bridge surfacing for ropes, quiet gear, crystal
+  stores, and the new jobs; face registration for embedded
+  pockets (the crystal clusters are embedded data — the
+  converted crystal face is the minable source).
