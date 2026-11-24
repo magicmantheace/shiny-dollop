@@ -138,16 +138,19 @@ pub enum DressingKind {
 }
 
 /// The data-driven per-band theme table. The generator is driven
-/// entirely by these numbers; only the Shallows row is balanced
-/// and verified — the other bands are explicit stubs (`built:
-/// false`) with placeholder numbers, so later floors plug into
-/// the same generator when their slices are built.
+/// entirely by these numbers. A band's row is `built` when its
+/// gate mechanics demonstrably engage on its generated floor
+/// with scenario + balance recorded (S9's rule): the Shallows
+/// (S6/S7), the Fungal Reaches, the Drowned Galleries, and the
+/// Magma Roots (S10) are built; the Crystal Dark's gate items
+/// were never modelled, so its row stays `built: false`.
 #[derive(Clone)]
 pub struct Theme {
     pub band: Band,
-    /// True only for Floor 1 (the Shallows): designed,
-    /// scenario'd, and verified. Stub themes generate worlds
-    /// through the same code path but carry no balance claims.
+    /// True when the band is designed, scenario'd, and
+    /// verified: its gate mechanics demonstrably engage on its
+    /// generated floor. Unbuilt themes generate worlds through
+    /// the same code path but carry no balance claims.
     pub built: bool,
     /// The band's hazard flags (same data type as S5's
     /// `hazards_at`, recorded per floor rather than per depth).
@@ -238,8 +241,8 @@ fn base_theme(band: Band) -> Theme {
     }
 }
 
-/// The theme for a band. Floor 1's row is the designed one; the
-/// rest are stubs marked NOT BUILT (see `built`).
+/// The theme for a band. Each row's `built` flag records
+/// whether that band's mechanics are built (see `built`).
 pub fn theme_for_band(band: Band) -> Theme {
     let mut t = base_theme(band);
     match band {
@@ -254,6 +257,9 @@ pub fn theme_for_band(band: Band) -> Theme {
             t.critter_kinds = &[CritterKind::GloamRat];
         }
         Band::FungalReaches => {
+            // Built in S10: band-keyed exposure makes the S5
+            // spore mechanics engage on the generated floor.
+            t.built = true;
             t.hazards = Hazards { spores: true, flooded: false, hot: false };
             t.resource_cells = &[Cell::Ore, Cell::FungalNode];
             t.fungal_node_clusters = 4;
@@ -268,6 +274,10 @@ pub fn theme_for_band(band: Band) -> Theme {
             t.critter_kinds = &[CritterKind::GloamRat, CritterKind::DeepLurker];
         }
         Band::DrownedGalleries => {
+            // Built in S10: flooding, drowning, and lantern
+            // dousing are live, answered by pumps and pressure
+            // lanterns.
+            t.built = true;
             t.hazards = Hazards { spores: false, flooded: true, hot: false };
             t.loose_count = 4;
             t.bad_air_count = 5;
@@ -291,6 +301,9 @@ pub fn theme_for_band(band: Band) -> Theme {
             t.critter_kinds = &[CritterKind::DeepLurker];
         }
         Band::MagmaRoots => {
+            // Built in S10: the heat load is live, answered by
+            // crafted cooling gear.
+            t.built = true;
             t.hazards = Hazards { spores: false, flooded: false, hot: true };
             t.loose_count = 6;
             t.bad_air_count = 4;
@@ -1440,6 +1453,12 @@ mod tests {
         assert_eq!(band_for_floor(6), Band::FungalReaches);
         assert_eq!(band_for_floor(9), Band::MagmaRoots);
         assert!(theme_for_floor(1).built);
-        assert!(!theme_for_floor(2).built);
+        // S10: the Fungal, Drowned, and Magma gate mechanics
+        // engage on their generated floors; the Crystal Dark's
+        // gate items were never modelled, so it stays unbuilt.
+        assert!(theme_for_floor(2).built);
+        assert!(theme_for_floor(3).built);
+        assert!(!theme_for_floor(4).built);
+        assert!(theme_for_floor(5).built);
     }
 }

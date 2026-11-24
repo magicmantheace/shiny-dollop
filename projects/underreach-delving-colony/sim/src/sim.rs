@@ -4,7 +4,11 @@
 //! delvers with jobs (miner / hauler / farmer), morale, camp food
 //! production, and surface recruitment. S7 adds the Shallows'
 //! hazards: cave-ins at loose faces and bad air beside sealed
-//! pockets, answered by timber supports and vents.
+//! pockets, answered by timber supports and vents. S10 keys
+//! hazard exposure to the active floor's band on generated
+//! floors (`hazards_here`) and makes the Drowned flooding and
+//! Magma heat hazards live, answered by pumps, sealed pressure
+//! lanterns (tier 3), and crafted cooling gear.
 //!
 //! The design rules encoded here (owner decisions, see
 //! docs/MUSE_HANDOFF.md):
@@ -23,7 +27,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::gen::{band_for_floor, generate_floor, FloorInfo, CAMP_CENTRE, ENTRY, GATE};
+use crate::gen::{band_for_floor, generate_floor, theme_for_floor, FloorInfo, CAMP_CENTRE, ENTRY, GATE};
 use crate::world::{Cell, Pos, World};
 
 // ---------------------------------------------------------------------------
@@ -157,6 +161,12 @@ pub enum LedgerKind {
     DelverGasping,
     Descended,
     Ascended,
+    /// A delver's water load crossed the drowning threshold (S10).
+    DelverDrowning,
+    /// A delver's heat load crossed the overheating threshold (S10).
+    DelverOverheating,
+    /// An unsealed lantern was doused by flood water (S10).
+    LanternDoused,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -265,8 +275,12 @@ pub fn hazards_at(y: i32) -> Hazards {
 }
 
 /// Spore exposure per tick in a spore band, unmasked vs masked.
+/// A mask protects its wearer entirely (the S5 record's words):
+/// the masked rate is zero — S10 corrects the 0.05 leak S5
+/// shipped, which no S5 assertion ever depended on (its mask
+/// test asserts no sickness, which holds either way).
 pub const SPORE_RATE_UNMASKED: f32 = 0.6;
-pub const SPORE_RATE_MASKED: f32 = 0.05;
+pub const SPORE_RATE_MASKED: f32 = 0.0;
 /// Spore load at which a delver is sick (the spore-cough).
 pub const SICK_AT: f32 = 60.0;
 /// Spore load clears this fast in clean air, plus herbalist care.
@@ -320,6 +334,94 @@ pub const CAVE_IN_PER_MILLE_PER_LOOSE: u64 = 20;
 /// to down a hurt delver (and start the rescue clock), not to
 /// kill a healthy one outright.
 pub const CAVE_IN_DAMAGE: f32 = 55.0;
+
+// ---------------------------------------------------------------------------
+// Band-keyed exposure & the deeper bands (S10)
+// ---------------------------------------------------------------------------
+//
+// The S9 finding: on generated floors, depth-keyed exposure
+// never engages — a generated floor holds all its carved space
+// at y ≤ 9 (GEN_MAX_Y), above the Fungal line at y = 10. S10
+// keys exposure to the floor instead, designed once for all
+// bands (the `hazards_here` query on `Sim`):
+//
+// - On a generated floor (`Sim.floor` is Some), the active
+//   floor's band flags — `theme_for_floor(index).hazards` —
+//   decide WHICH hazards a cell can carry. Depth-keyed
+//   `hazards_at` is not consulted there, so nothing
+//   double-applies.
+// - The band's hazards fill the floor's **deep zone**: carved
+//   cells at y ≥ `BAND_ZONE_FROM_Y`. That is the same depth
+//   line the generator already uses (bad air pools only at
+//   y ≥ 6; the entry camp sits at y = 3), and it mirrors the
+//   hand-built world, where the camp is clean air above the
+//   Fungal line and the hazard lives in the deep workings.
+//   The camp stays a refuge on every band floor; the faces,
+//   which generation places deep, are where the band bites.
+// - Hand-built worlds (`floor` is None) keep the depth-keyed
+//   `hazards_at(y)` behaviour exactly, at every depth.
+//
+// Flooding (the Drowned Galleries' hazard, owner decision 9:
+// flooding, drowning, lantern failure) is a delver **water
+// load** in the spore/air pattern, plus lantern failure: an
+// unsealed lantern standing in flood water is doused. The
+// answers are decision 9's gate items in the established kit
+// patterns: a **pump** (placed kit, the vent's mirror — carved
+// cells within its reach are dry) and the **sealed pressure
+// lantern** (lantern tier 3, the progression's waterproof
+// tier from decision 8; placement follows the existing tier
+// rules, so it draws the tier-2+ oil charge). Air bells and
+// drains were not modelled: the pump's dry reach already
+// gives delvers refuge cells and a workable face, so a second
+// water answer would duplicate it, not complete it.
+//
+// Heat (the Magma Roots' hazard) is a delver **heat load** in
+// the same pattern. The answer is **cooling gear**: worn
+// crafted kit, the mask's mirror (goods cost, permanent once
+// equipped, auto-equipped at camp). A placed heat answer was
+// not modelled: decision 9's list leads with cooling gear,
+// and worn kit travels with the delver through the whole hot
+// zone, where a placed piece would strand the same transit
+// problem the pump solves for water only at fixed points.
+
+/// On a generated floor, the band's hazards fill carved cells
+/// at this depth and below — the floor's deep zone (the same
+/// line generation uses for bad-air pooling).
+pub const BAND_ZONE_FROM_Y: i32 = 6;
+/// Water load gained per tick standing in flood water
+/// (a flooded-band deep-zone cell no pump keeps dry).
+pub const WATER_RATE: f32 = 1.0;
+/// Water load at which a delver is drowning: work halved and
+/// morale hit, like the spore-cough and gasping.
+pub const DROWNING_AT: f32 = 60.0;
+/// Water load clears this fast in dry air.
+pub const WATER_CLEAR_RATE: f32 = 0.25;
+/// Water load clear rate within a pump's reach — a pumped
+/// cell is bailed dry, as a vented cell is aired.
+pub const PUMP_CLEAR_RATE: f32 = 1.25;
+/// A pump keeps carved cells within this Chebyshev radius dry.
+pub const PUMP_RADIUS: i32 = 2;
+/// Goods cost of one placed pump (a crafted kit piece).
+pub const PUMP_GOODS_COST: u32 = 1;
+/// The sealed pressure lantern tier (decision 8): the only
+/// tier that keeps burning in flood water. Lower tiers are
+/// unsealed and are doused there.
+pub const PRESSURE_TIER: u8 = 3;
+/// Extra fuel per tick an unsealed lantern loses to flood
+/// water it stands in — on top of its tier burn. A 5,000-fuel
+/// route lantern is doused in ~2,475 ticks.
+pub const DOUSE_RATE: f32 = 2.0;
+/// Heat load gained per tick standing in a hot band's deep
+/// zone, without cooling gear. Cooling gear prevents the
+/// gain entirely (a sealed suit, like a mask for spores).
+pub const HEAT_RATE: f32 = 1.0;
+/// Heat load at which a delver is overheating: work halved
+/// and morale hit, like the other threshold loads.
+pub const OVERHEATING_AT: f32 = 60.0;
+/// Heat load clears this fast in cool areas.
+pub const HEAT_CLEAR_RATE: f32 = 0.25;
+/// Goods cost of one crafted set of cooling gear.
+pub const COOLING_GOODS_COST: u32 = 2;
 
 // ---------------------------------------------------------------------------
 // Delver
@@ -378,6 +480,17 @@ pub struct Delver {
     /// it eats hp, like a full spore load.
     pub air: f32,
     pub gasping_logged: bool,
+    /// Water load 0..100 (S10). Drowning at `DROWNING_AT`; at
+    /// 100 it eats hp, like a full spore or air load.
+    pub water: f32,
+    pub drowning_logged: bool,
+    /// Heat load 0..100 (S10). Overheating at `OVERHEATING_AT`;
+    /// at 100 it eats hp, like the other loads.
+    pub heat: f32,
+    pub overheating_logged: bool,
+    /// Wearing crafted cooling gear (permanent kit once
+    /// equipped, the mask's mirror for heat).
+    pub cooled: bool,
     /// 0..100 — spent in combat and accidents; a delver at 0 is
     /// Downed, not dead: the rescue clock decides which.
     pub hp: f32,
@@ -419,6 +532,11 @@ impl Delver {
             sick_logged: false,
             air: 0.0,
             gasping_logged: false,
+            water: 0.0,
+            drowning_logged: false,
+            heat: 0.0,
+            overheating_logged: false,
+            cooled: false,
             hp: 100.0,
             combat_xp: 0,
             fight_cd: 0,
@@ -451,12 +569,23 @@ impl Delver {
     pub fn gasping(&self) -> bool {
         self.air >= GASPING_AT
     }
+    pub fn drowning(&self) -> bool {
+        self.water >= DROWNING_AT
+    }
+    pub fn overheating(&self) -> bool {
+        self.heat >= OVERHEATING_AT
+    }
+    /// Any threshold load is biting: the delver works halved
+    /// and seeks a bed until it clears.
+    pub fn suffering(&self) -> bool {
+        self.sick() || self.gasping() || self.drowning() || self.overheating()
+    }
     /// Morale scales all work rates: a miserable delver works at
     /// 0.6x, a thriving one at 1.2x. Sickness halves it again —
-    /// and so does gasping for air.
+    /// and so does gasping for air, drowning, or overheating.
     pub fn work_mult(&self) -> f32 {
         let base = 0.6 + 0.6 * (self.morale / 100.0);
-        if self.sick() || self.gasping() {
+        if self.suffering() {
             base * 0.5
         } else {
             base
@@ -473,6 +602,9 @@ pub struct Stores {
     pub fungal_oil: u32,
     /// Crafted spore masks waiting to be equipped (S5).
     pub masks: u32,
+    /// Crafted cooling gear waiting to be equipped (S10).
+    #[serde(default)]
+    pub cooling_gear: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -583,6 +715,8 @@ pub struct FloorState {
     pub faces: Vec<Face>,
     pub supports: Vec<Pos>,
     pub vents: Vec<Pos>,
+    #[serde(default)]
+    pub pumps: Vec<Pos>,
     pub plots: Vec<Plot>,
     pub beds: Vec<Pos>,
     pub stockpile: Pos,
@@ -609,6 +743,10 @@ pub struct Sim {
     /// ventilated — bad air neither gathers nor lingers there.
     /// Sorted.
     pub vents: Vec<Pos>,
+    /// Placed pumps (S10): carved cells within `PUMP_RADIUS`
+    /// are kept dry in a flooded band. Sorted.
+    #[serde(default)]
+    pub pumps: Vec<Pos>,
     /// Kept sorted by position.
     pub plots: Vec<Plot>,
     /// Where surface arrivals appear.
@@ -677,6 +815,7 @@ impl Sim {
             faces,
             supports: Vec::new(),
             vents: Vec::new(),
+            pumps: Vec::new(),
             plots: Vec::new(),
             gate,
             stores,
@@ -840,6 +979,68 @@ impl Sim {
         })
     }
 
+    /// Set a pump on a carved cell (the Drowned gate set's
+    /// first answer, S10). Carved cells within `PUMP_RADIUS`
+    /// are kept dry. Costs `PUMP_GOODS_COST` goods and fails
+    /// like `place_support` does.
+    pub fn place_pump(&mut self, pos: Pos) -> bool {
+        if self.world.get(pos) != Some(Cell::Carved)
+            || self.pumps.contains(&pos)
+            || self.stores.goods < PUMP_GOODS_COST
+        {
+            return false;
+        }
+        self.stores.goods -= PUMP_GOODS_COST;
+        self.pumps.push(pos);
+        self.pumps.sort();
+        self.log(
+            LedgerKind::Crafted,
+            format!("a pump was set at ({}, {}, {})", pos.x, pos.y, pos.z),
+        );
+        true
+    }
+
+    /// Is this cell within a pump's reach (kept dry)?
+    fn pumped(&self, p: Pos) -> bool {
+        self.pumps.iter().any(|v| {
+            (v.x - p.x)
+                .abs()
+                .max((v.y - p.y).abs())
+                .max((v.z - p.z).abs())
+                <= PUMP_RADIUS
+        })
+    }
+
+    /// The hazards a cell exposes a delver to (S10) — the one
+    /// query all exposure code consults. On a generated floor
+    /// the active floor's band flags rule, applied in the
+    /// floor's deep zone (y ≥ `BAND_ZONE_FROM_Y`); the camp
+    /// shallows of the floor are clean. On a hand-built world
+    /// the depth-keyed `hazards_at` table rules, exactly as
+    /// before S10. The two never combine: no double-apply.
+    pub fn hazards_here(&self, pos: Pos) -> Hazards {
+        match &self.floor {
+            Some(f) => {
+                if pos.y >= BAND_ZONE_FROM_Y {
+                    theme_for_floor(f.index).hazards
+                } else {
+                    Hazards::default()
+                }
+            }
+            None => hazards_at(pos.y),
+        }
+    }
+
+    /// Flood water stands in this cell: the band is flooded,
+    /// the cell is in the flooded zone, and no pump keeps it
+    /// dry. (On a hand-built world the depth table's flooded
+    /// flag rules and pumps still bail their reach.)
+    pub fn flooded_at(&self, p: Pos) -> bool {
+        self.world.get(p) == Some(Cell::Carved)
+            && self.hazards_here(p).flooded
+            && !self.pumped(p)
+    }
+
     /// Bad air gathers in a carved cell that touches a bad-air
     /// pocket — unless a vent reaches it. (A pocket carved open
     /// is spent: its gas is gone with the rock. Pockets the
@@ -936,6 +1137,22 @@ impl Sim {
         true
     }
 
+    /// Craft cooling gear from colony goods (the Magma gate
+    /// set's first item, S10 — the mask's mirror). Delvers
+    /// equip it automatically at camp.
+    pub fn craft_cooling_gear(&mut self) -> bool {
+        if self.stores.goods < COOLING_GOODS_COST {
+            return false;
+        }
+        self.stores.goods -= COOLING_GOODS_COST;
+        self.stores.cooling_gear += 1;
+        self.log(
+            LedgerKind::Crafted,
+            format!("cooling gear was crafted from {COOLING_GOODS_COST} goods"),
+        );
+        true
+    }
+
     /// Assign a delver's job. Takes effect at their next decision.
     pub fn set_job(&mut self, delver_id: u32, job: Job) {
         if let Some(d) = self.delvers.iter_mut().find(|d| d.id == delver_id) {
@@ -984,6 +1201,7 @@ impl Sim {
             faces: self.faces.clone(),
             supports: self.supports.clone(),
             vents: self.vents.clone(),
+            pumps: self.pumps.clone(),
             plots: self.plots.clone(),
             beds: self.beds.clone(),
             stockpile: self.stockpile,
@@ -1000,6 +1218,7 @@ impl Sim {
         self.faces = state.faces;
         self.supports = state.supports;
         self.vents = state.vents;
+        self.pumps = state.pumps;
         self.plots = state.plots;
         self.beds = state.beds;
         self.stockpile = state.stockpile;
@@ -1061,6 +1280,7 @@ impl Sim {
         self.faces = floor.layout.faces.clone();
         self.supports = Vec::new();
         self.vents = Vec::new();
+        self.pumps = Vec::new();
         self.plots = Vec::new();
         self.beds = vec![Pos::new(2, 3, 3), Pos::new(2, 3, 5), Pos::new(6, 3, 5)];
         self.stockpile = ENTRY;
@@ -1212,22 +1432,46 @@ impl Sim {
 
     pub fn tick(&mut self) {
         // Lanterns burn. A lantern that dies takes its light with it.
-        let mut burned_out: Vec<Pos> = Vec::new();
-        for e in self.lanterns.iter_mut() {
+        // An unsealed lantern standing in flood water is doused
+        // (S10): it loses fuel to the water on top of its burn,
+        // and its death is ledgered as a dousing, not a burnout.
+        // Sealed pressure lanterns (tier `PRESSURE_TIER`) and
+        // lanterns a pump keeps dry burn normally.
+        let mut burned_out: Vec<(Pos, bool)> = Vec::new();
+        let dousing: Vec<bool> = self
+            .lanterns
+            .iter()
+            .map(|e| e.tier < PRESSURE_TIER && self.flooded_at(e.pos))
+            .collect();
+        for (e, doused) in self.lanterns.iter_mut().zip(dousing) {
             if e.fuel > 0.0 {
+                let doused = doused;
                 e.fuel -= tier_burn(e.tier);
+                if doused {
+                    e.fuel -= DOUSE_RATE;
+                }
                 if e.fuel <= 0.0 {
                     e.fuel = 0.0;
-                    burned_out.push(e.pos);
+                    burned_out.push((e.pos, doused));
                 }
             }
         }
         if !burned_out.is_empty() {
-            for p in &burned_out {
-                self.log(
-                    LedgerKind::LanternOut,
-                    format!("lantern at ({}, {}, {}) burned out", p.x, p.y, p.z),
-                );
+            for (p, doused) in &burned_out {
+                if *doused {
+                    self.log(
+                        LedgerKind::LanternDoused,
+                        format!(
+                            "an unsealed lantern at ({}, {}, {}) was doused by the flood water",
+                            p.x, p.y, p.z
+                        ),
+                    );
+                } else {
+                    self.log(
+                        LedgerKind::LanternOut,
+                        format!("lantern at ({}, {}, {}) burned out", p.x, p.y, p.z),
+                    );
+                }
             }
             self.refresh_light();
         }
@@ -1737,13 +1981,18 @@ impl Sim {
             self.stores.masks -= 1;
             self.delvers[idx].masked = true;
         }
+        // Pick up cooling gear if the colony has a set spare.
+        if !self.delvers[idx].cooled && self.stores.cooling_gear > 0 {
+            self.stores.cooling_gear -= 1;
+            self.delvers[idx].cooled = true;
+        }
         if self.delvers[idx].hunger < 40.0 && self.stores.food > 0 {
             self.delvers[idx].state = DelverState::Eating;
             return;
         }
-        // The spore-sick and the gasping go to bed and stay
-        // there until it clears.
-        if self.delvers[idx].sick() || self.delvers[idx].gasping() {
+        // The spore-sick, the gasping, the drowning, and the
+        // overheated go to bed and stay there until it clears.
+        if self.delvers[idx].suffering() {
             let bed = self.delver_bed(idx);
             if self.delvers[idx].pos == bed || self.start_path(idx, bed) {
                 self.delvers[idx].state = DelverState::ToBed;
@@ -1865,10 +2114,12 @@ impl Sim {
             self.delvers[idx].energy = (self.delvers[idx].energy - 0.04).clamp(0.0, 100.0);
         }
         // Spores (S5): exposure in a spore band, clearing in clean
-        // air — faster with a herbalist close by.
+        // air — faster with a herbalist close by. Exposure goes
+        // through `hazards_here` (S10): band-keyed on generated
+        // floors, depth-keyed on hand-built worlds.
         {
             let pos = self.delvers[idx].pos;
-            if hazards_at(pos.y).spores {
+            if self.hazards_here(pos).spores {
                 let rate = if self.delvers[idx].masked {
                     SPORE_RATE_MASKED
                 } else {
@@ -1942,12 +2193,75 @@ impl Sim {
                 self.delvers[idx].gasping_logged = false;
             }
         }
+        // Flooding (S10): exposure standing in flood water,
+        // clearing in dry cells — fastest within a pump's reach.
+        {
+            let pos = self.delvers[idx].pos;
+            if self.flooded_at(pos) {
+                self.delvers[idx].water = (self.delvers[idx].water + WATER_RATE).min(100.0);
+                if self.delvers[idx].water >= 100.0 {
+                    self.delvers[idx].hp -= 0.2;
+                    if self.delvers[idx].hp <= 0.0 {
+                        self.down_delver(idx);
+                        return;
+                    }
+                }
+            } else if self.delvers[idx].water > 0.0 {
+                let rate = if self.pumped(pos) {
+                    PUMP_CLEAR_RATE
+                } else {
+                    WATER_CLEAR_RATE
+                };
+                self.delvers[idx].water = (self.delvers[idx].water - rate).max(0.0);
+            }
+            if self.delvers[idx].drowning() && !self.delvers[idx].drowning_logged {
+                self.delvers[idx].drowning_logged = true;
+                let name = self.delvers[idx].name.clone();
+                self.log(
+                    LedgerKind::DelverDrowning,
+                    format!("{name} is drowning in the flooded workings"),
+                );
+            }
+            if self.delvers[idx].water < 30.0 {
+                self.delvers[idx].drowning_logged = false;
+            }
+        }
+        // Heat (S10): exposure in a hot band's deep zone,
+        // clearing in cool areas. Cooling gear prevents the
+        // gain entirely.
+        {
+            let pos = self.delvers[idx].pos;
+            if self.hazards_here(pos).hot && !self.delvers[idx].cooled {
+                self.delvers[idx].heat = (self.delvers[idx].heat + HEAT_RATE).min(100.0);
+                if self.delvers[idx].heat >= 100.0 {
+                    self.delvers[idx].hp -= 0.2;
+                    if self.delvers[idx].hp <= 0.0 {
+                        self.down_delver(idx);
+                        return;
+                    }
+                }
+            } else if self.delvers[idx].heat > 0.0 {
+                self.delvers[idx].heat =
+                    (self.delvers[idx].heat - HEAT_CLEAR_RATE).max(0.0);
+            }
+            if self.delvers[idx].overheating() && !self.delvers[idx].overheating_logged {
+                self.delvers[idx].overheating_logged = true;
+                let name = self.delvers[idx].name.clone();
+                self.log(
+                    LedgerKind::DelverOverheating,
+                    format!("{name} is overcome by the heat"),
+                );
+            }
+            if self.delvers[idx].heat < 30.0 {
+                self.delvers[idx].overheating_logged = false;
+            }
+        }
         {
             let d = &mut self.delvers[idx];
             // Colony prosperity lifts spirits only for the fed —
             // goods in the store mean little on an empty stomach.
             let goods_term = (self.stores.goods.min(10)) as f32 * (d.hunger / 100.0);
-            let sick_term = if d.sick() || d.gasping() { -20.0 } else { 0.0 };
+            let sick_term = if d.suffering() { -20.0 } else { 0.0 };
             let target =
                 (10.0 + d.hunger * 0.5 + d.energy * 0.3 + goods_term + sick_term).clamp(0.0, 100.0);
             d.morale += (target - d.morale) * 0.02;
@@ -2252,6 +2566,8 @@ impl Sim {
                     && self.delvers[idx].hp >= 60.0
                     && self.delvers[idx].spore < 30.0
                     && self.delvers[idx].air < 30.0
+                    && self.delvers[idx].water < 30.0
+                    && self.delvers[idx].heat < 30.0
                 {
                     self.decide(idx);
                 }

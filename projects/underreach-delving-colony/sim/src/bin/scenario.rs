@@ -7,7 +7,7 @@ use underreach_sim::gen::generate_floor;
 use underreach_sim::scenario::{
     build_scenario, build_scenario_gen, build_scenario_gen_floor, build_scenario_s2,
     build_scenario_s3, build_scenario_s5, build_scenario_s7, light_the_deep, light_the_way,
-    open_current_floor, open_floor1, GEN_WORLD_SEED,
+    open_current_floor, open_current_floor_as, open_floor1, GEN_WORLD_SEED,
 };
 use underreach_sim::sim::LedgerKind;
 
@@ -273,11 +273,14 @@ fn main() {
     // ---- S9: a colony founded on each band floor -------------------------
     // One run per band (floors 2–5): founded directly on the
     // generated floor, opened, and run for the standard budget.
-    // The band events are printed per floor — sick for the
-    // Fungal Reaches (the S9 finding: it stays 0, because spore
-    // exposure is keyed to depth y ≥ 10 and generated floors
-    // hold their carved space at y ≤ 9), gasping / cave-ins /
-    // downed for the generic S7 hazards every floor carries.
+    // The band events are printed per floor. (S10 note: exposure
+    // is band-keyed now, so the Drowned run shows drowning and
+    // doused lanterns and the Magma run shows overheating. The
+    // Fungal run's sick count stays 0 on the demo seed — not
+    // because spores cannot engage, but because the colony
+    // spends the whole budget on the first face, whose stand
+    // at y = 5 sits above the floor's deep zone; the deeper
+    // faces are proven in the S10 tests.)
     for (label, floor) in [
         ("F2 fungal reaches", 2),
         ("F3 drowned galleries", 3),
@@ -290,7 +293,7 @@ fn main() {
             s9.tick();
         }
         println!(
-            "S9 {label} ({} ticks): goods={}, deliveries={}, delvers alive={}, lost={}, sick={}, gasping={}, cave-ins={}, downed={}, fungal oil={}",
+            "S9 {label} ({} ticks): goods={}, deliveries={}, delvers alive={}, lost={}, sick={}, gasping={}, cave-ins={}, downed={}, fungal oil={}, drowning={}, doused={}, overheating={}",
             s9.tick_count,
             s9.stores.goods,
             count(&s9, LedgerKind::HaulDelivered),
@@ -301,9 +304,115 @@ fn main() {
             count(&s9, LedgerKind::CaveIn),
             count(&s9, LedgerKind::DelverDowned),
             s9.stores.fungal_oil,
+            count(&s9, LedgerKind::DelverDrowning),
+            count(&s9, LedgerKind::LanternDoused),
+            count(&s9, LedgerKind::DelverOverheating),
         );
         println!("S9 {label} state hash: {}", s9.state_hash());
     }
+
+    // ---- S10: the deeper bands bite --------------------------------------
+    // Drowned, unprotected: founded on floor 3, opened with
+    // ordinary tier-1 lanterns, no pumps. The flood works the
+    // colony over — drowning loads at the deep faces and the
+    // route lanterns standing in the water are doused.
+    let mut s10 = build_scenario_gen_floor(GEN_WORLD_SEED, 3);
+    open_current_floor(&mut s10);
+    for _ in 0..6000 {
+        s10.tick();
+    }
+    println!(
+        "S10 drowned unprotected ({} ticks): goods={}, deliveries={}, delvers alive={}, lost={}, drowning={}, doused={}, downed={}",
+        s10.tick_count,
+        s10.stores.goods,
+        count(&s10, LedgerKind::HaulDelivered),
+        s10.delvers.len(),
+        count(&s10, LedgerKind::DelverLost),
+        count(&s10, LedgerKind::DelverDrowning),
+        count(&s10, LedgerKind::LanternDoused),
+        count(&s10, LedgerKind::DelverDowned),
+    );
+    println!("S10 drowned unprotected state hash: {}", s10.state_hash());
+
+    // Drowned, protected: the colony comes down prepared — a
+    // pump on every face stand (3 goods) and sealed pressure
+    // lanterns (tier 3, one oil charge apiece) along the route.
+    // The supplies are granted by the script, as a colony that
+    // had delved the Fungal Reaches first would carry them.
+    let mut s10 = build_scenario_gen_floor(GEN_WORLD_SEED, 3);
+    s10.stores.goods += 3;
+    s10.stores.fungal_oil += 8;
+    let mut pumps = 0;
+    for f in s10.faces.clone() {
+        if s10.place_pump(f.stand) {
+            pumps += 1;
+        }
+    }
+    open_current_floor_as(&mut s10, 3);
+    for _ in 0..6000 {
+        s10.tick();
+    }
+    println!(
+        "S10 drowned protected ({} ticks): pumps placed={}, goods={}, deliveries={}, delvers alive={}, lost={}, drowning={}, doused={}, downed={}",
+        s10.tick_count,
+        pumps,
+        s10.stores.goods,
+        count(&s10, LedgerKind::HaulDelivered),
+        s10.delvers.len(),
+        count(&s10, LedgerKind::DelverLost),
+        count(&s10, LedgerKind::DelverDrowning),
+        count(&s10, LedgerKind::LanternDoused),
+        count(&s10, LedgerKind::DelverDowned),
+    );
+    println!("S10 drowned protected state hash: {}", s10.state_hash());
+
+    // Magma, unprotected: founded on floor 5 and opened bare.
+    let mut s10 = build_scenario_gen_floor(GEN_WORLD_SEED, 5);
+    open_current_floor(&mut s10);
+    for _ in 0..6000 {
+        s10.tick();
+    }
+    println!(
+        "S10 magma unprotected ({} ticks): goods={}, deliveries={}, delvers alive={}, lost={}, overheating={}, downed={}",
+        s10.tick_count,
+        s10.stores.goods,
+        count(&s10, LedgerKind::HaulDelivered),
+        s10.delvers.len(),
+        count(&s10, LedgerKind::DelverLost),
+        count(&s10, LedgerKind::DelverOverheating),
+        count(&s10, LedgerKind::DelverDowned),
+    );
+    println!("S10 magma unprotected state hash: {}", s10.state_hash());
+
+    // Magma, protected: cooling gear for the whole colony
+    // (6 sets at 2 goods, granted by the script as carried-in
+    // supplies), crafted before the floor is opened; delvers
+    // equip it at camp automatically.
+    let mut s10 = build_scenario_gen_floor(GEN_WORLD_SEED, 5);
+    s10.stores.goods += 12;
+    let mut gear = 0;
+    for _ in 0..6 {
+        if s10.craft_cooling_gear() {
+            gear += 1;
+        }
+    }
+    open_current_floor(&mut s10);
+    for _ in 0..6000 {
+        s10.tick();
+    }
+    println!(
+        "S10 magma protected ({} ticks): gear crafted={}, goods={}, deliveries={}, delvers alive={}, lost={}, overheating={}, downed={}, cooled delvers={}",
+        s10.tick_count,
+        gear,
+        s10.stores.goods,
+        count(&s10, LedgerKind::HaulDelivered),
+        s10.delvers.len(),
+        count(&s10, LedgerKind::DelverLost),
+        count(&s10, LedgerKind::DelverOverheating),
+        count(&s10, LedgerKind::DelverDowned),
+        s10.delvers.iter().filter(|d| d.cooled).count(),
+    );
+    println!("S10 magma protected state hash: {}", s10.state_hash());
 
     println!("deep ledger (S2):");
     for e in &sim.ledger {
