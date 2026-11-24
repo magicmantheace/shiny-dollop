@@ -18,12 +18,12 @@
 //! - Recruitment arrives from the surface on a schedule while the
 //!   colony looks viable (food in stores), named by the seeded RNG.
 
-use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::gen::FloorInfo;
+use crate::gen::{band_for_floor, generate_floor, FloorInfo, CAMP_CENTRE, ENTRY, GATE};
 use crate::world::{Cell, Pos, World};
 
 // ---------------------------------------------------------------------------
@@ -155,6 +155,8 @@ pub enum LedgerKind {
     Crafted,
     CaveIn,
     DelverGasping,
+    Descended,
+    Ascended,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -567,6 +569,28 @@ pub const RECRUIT_MIN_FOOD: u32 = 4;
 // Sim
 // ---------------------------------------------------------------------------
 
+/// Per-floor stored state (S8): everything floor-local, packed
+/// away when the colony travels to another floor and unpacked
+/// exactly on return. A floor left behind is frozen — its
+/// lanterns do not burn while the colony is away. Global state
+/// (delvers, stores, ledger, tick, RNG, world seed, arrival
+/// schedule, the active floor's `FloorInfo`) never packs; it
+/// lives on `Sim` itself.
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct FloorState {
+    pub world: World,
+    pub lanterns: Vec<LanternEntry>,
+    pub faces: Vec<Face>,
+    pub supports: Vec<Pos>,
+    pub vents: Vec<Pos>,
+    pub plots: Vec<Plot>,
+    pub beds: Vec<Pos>,
+    pub stockpile: Pos,
+    pub gate: Pos,
+    pub critters: Vec<Critter>,
+    pub lit_depths: BTreeSet<i32>,
+}
+
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Sim {
     pub world: World,
@@ -604,6 +628,12 @@ pub struct Sim {
     /// founded on one (S6). Hand-built scenarios leave it `None`.
     #[serde(default)]
     pub floor: Option<FloorInfo>,
+    /// Stored state of visited floors the colony is not
+    /// currently on (S8), keyed by floor index in canonical
+    /// (BTree) order. The active floor's state stays in the
+    /// fields above and swaps in/out of this map on travel.
+    #[serde(default)]
+    pub floors: BTreeMap<u32, FloorState>,
     pub rng_state: u64,
     pub next_arrival: u64,
     pub next_delver_id: u32,
@@ -655,6 +685,7 @@ impl Sim {
             tick_count: 0,
             world_seed: rng_seed,
             floor: None,
+            floors: BTreeMap::new(),
             rng_state: if rng_seed == 0 { 0x9E37_79B9_7F4A_7C15 } else { rng_seed },
             next_arrival,
             next_delver_id,
@@ -926,6 +957,190 @@ impl Sim {
         }
         self.plots.push(Plot { pos, growth: 0.0 });
         self.plots.sort_by_key(|p| p.pos);
+    }
+
+    // -- Floor-to-floor traversal (S8) ---------------------------------------
+    //
+    // Modelling decisions where the design record was silent
+    // (recorded in docs/TEST_PLAN.md and docs/MUSE_HANDOFF.md):
+    // - Whole-colony immediate transition: every delver travels
+    //   together; there is no per-delver cross-floor pathing.
+    // - A floor left behind is frozen: its lanterns do not burn
+    //   fuel while the colony is away (its state is packed, not
+    //   ticked).
+    // - On first arrival a forward camp is founded at the new
+    //   floor's entry camp, mirroring `build_scenario_gen`'s
+    //   founding (delvers at the entry camp, beds + stockpile
+    //   there, the generated floor's registered faces, gate at
+    //   the entry camp, a camp lantern, one resident critter
+    //   per den) — except that farming plots do not carry down:
+    //   a fresh floor starts with no plots.
+
+    /// Snapshot the active floor's floor-local state.
+    fn pack_floor(&self) -> FloorState {
+        FloorState {
+            world: self.world.clone(),
+            lanterns: self.lanterns.clone(),
+            faces: self.faces.clone(),
+            supports: self.supports.clone(),
+            vents: self.vents.clone(),
+            plots: self.plots.clone(),
+            beds: self.beds.clone(),
+            stockpile: self.stockpile,
+            gate: self.gate,
+            critters: self.critters.clone(),
+            lit_depths: self.lit_depths.clone(),
+        }
+    }
+
+    /// Make a stored floor state the active floor.
+    fn unpack_floor(&mut self, state: FloorState) {
+        self.world = state.world;
+        self.lanterns = state.lanterns;
+        self.faces = state.faces;
+        self.supports = state.supports;
+        self.vents = state.vents;
+        self.plots = state.plots;
+        self.beds = state.beds;
+        self.stockpile = state.stockpile;
+        self.gate = state.gate;
+        self.critters = state.critters;
+        self.lit_depths = state.lit_depths;
+        self.refresh_light();
+    }
+
+    /// Reset every delver to a fresh decision at `positions`
+    /// (cycled through when there are more delvers than spots):
+    /// travel interrupts whatever step they were on, and face /
+    /// plot indices from another floor mean nothing here.
+    fn gather_delvers(&mut self, positions: &[Pos]) {
+        if positions.is_empty() {
+            return;
+        }
+        for (i, d) in self.delvers.iter_mut().enumerate() {
+            d.pos = positions[i % positions.len()];
+            if d.state != DelverState::Downed {
+                d.state = DelverState::Idle;
+            }
+            d.path.clear();
+            d.target_face = None;
+            d.target_plot = None;
+            d.mine_progress = 0.0;
+            d.convert_progress = 0.0;
+            d.rescue_target = None;
+            d.blocked_logged = false;
+        }
+    }
+
+    /// Camp cells delvers gather at on arrival on a floor, in
+    /// founding order (the generated entry camp chamber).
+    fn entry_camp_positions() -> Vec<Pos> {
+        vec![
+            ENTRY,
+            Pos::new(4, 3, 5),
+            Pos::new(4, 3, 3),
+            Pos::new(5, 3, 4),
+            GATE,
+            Pos::new(2, 3, 4),
+        ]
+    }
+
+    /// Found a forward camp on a freshly generated floor: the
+    /// `build_scenario_gen` founding, minus the plots.
+    fn found_forward_camp(&mut self, floor: crate::gen::Floor) {
+        let info = floor.info();
+        let dens: Vec<(Pos, CritterKind)> = floor
+            .layout
+            .cavities
+            .iter()
+            .filter(|c| c.den)
+            .map(|c| (c.centre, c.critter.unwrap_or(CritterKind::GloamRat)))
+            .collect();
+        self.world = floor.world;
+        self.lanterns = Vec::new();
+        self.faces = floor.layout.faces.clone();
+        self.supports = Vec::new();
+        self.vents = Vec::new();
+        self.plots = Vec::new();
+        self.beds = vec![Pos::new(2, 3, 3), Pos::new(2, 3, 5), Pos::new(6, 3, 5)];
+        self.stockpile = ENTRY;
+        self.gate = GATE;
+        self.critters = Vec::new();
+        self.lit_depths = BTreeSet::new();
+        self.floor = Some(info);
+        self.refresh_light();
+        // The camp lantern is pipe-fed for scenario purposes,
+        // exactly as at the founding on floor 1.
+        self.place_lantern(CAMP_CENTRE, 1, 1_000_000.0);
+        for (pos, kind) in dens {
+            self.spawn_critter(kind, pos);
+        }
+    }
+
+    /// Take the stairs down to the next floor. Refuses (false,
+    /// no state change) when the colony is not on a generated
+    /// floor. Generation of a never-visited floor is a pure
+    /// function of `(world_seed, floor_index)` and never draws
+    /// on the runtime RNG.
+    pub fn descend(&mut self) -> bool {
+        let Some(cur) = self.floor.clone() else {
+            return false;
+        };
+        let target = cur.index + 1;
+        let packed = self.pack_floor();
+        self.floors.insert(cur.index, packed);
+        if let Some(state) = self.floors.remove(&target) {
+            self.unpack_floor(state);
+            self.floor = Some(generate_floor(self.world_seed, target).info());
+        } else {
+            let floor = generate_floor(self.world_seed, target);
+            self.found_forward_camp(floor);
+        }
+        self.gather_delvers(&Self::entry_camp_positions());
+        self.log(
+            LedgerKind::Descended,
+            format!(
+                "the colony descended to floor {} ({:?})",
+                target,
+                band_for_floor(target)
+            ),
+        );
+        true
+    }
+
+    /// Climb back to the floor above. Refuses (false, no state
+    /// change) on floor 1, off a generated floor, or when the
+    /// floor above was never visited (no stored state). The
+    /// colony arrives at the floor above's descent cell — they
+    /// climb back up the stairs they came down.
+    pub fn ascend(&mut self) -> bool {
+        let Some(cur) = self.floor.clone() else {
+            return false;
+        };
+        if cur.index <= 1 {
+            return false;
+        }
+        let target = cur.index - 1;
+        if !self.floors.contains_key(&target) {
+            return false;
+        }
+        let packed = self.pack_floor();
+        self.floors.insert(cur.index, packed);
+        let state = self.floors.remove(&target).expect("checked above");
+        self.unpack_floor(state);
+        let info = generate_floor(self.world_seed, target).info();
+        let descent = info.descent;
+        self.floor = Some(info);
+        self.gather_delvers(&[descent]);
+        self.log(
+            LedgerKind::Ascended,
+            format!(
+                "the colony ascended to floor {} ({:?})",
+                target,
+                band_for_floor(target)
+            ),
+        );
+        true
     }
 
     // -- Save / load ------------------------------------------------------------

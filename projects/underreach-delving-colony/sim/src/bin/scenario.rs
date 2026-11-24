@@ -6,7 +6,8 @@
 use underreach_sim::gen::generate_floor;
 use underreach_sim::scenario::{
     build_scenario, build_scenario_gen, build_scenario_s2, build_scenario_s3, build_scenario_s5,
-    build_scenario_s7, light_the_deep, light_the_way, open_floor1, GEN_WORLD_SEED,
+    build_scenario_s7, light_the_deep, light_the_way, open_current_floor, open_floor1,
+    GEN_WORLD_SEED,
 };
 use underreach_sim::sim::LedgerKind;
 
@@ -216,6 +217,58 @@ fn main() {
         layout.faces.len(),
     );
     println!("GEN state hash: {}", gen.state_hash());
+
+    // ---- S8: floor-to-floor traversal ------------------------------------
+    // A fresh generated colony: open floor 1 and produce, descend
+    // to floor 2 and produce there, then climb back and find
+    // floor 1 exactly as it was left (its lanterns froze while
+    // the colony was away).
+    let mut s8 = build_scenario_gen(GEN_WORLD_SEED);
+    open_floor1(&mut s8);
+    for _ in 0..6000 {
+        s8.tick();
+    }
+    println!(
+        "S8 floor 1 ({} ticks): goods={}, deliveries={}, delvers alive={}, lost={}",
+        s8.tick_count,
+        s8.stores.goods,
+        count(&s8, LedgerKind::HaulDelivered),
+        s8.delvers.len(),
+        count(&s8, LedgerKind::DelverLost),
+    );
+    let floor1_world = s8.world.clone();
+    let floor1_lanterns = s8.lanterns.clone();
+    let descended = s8.descend();
+    println!(
+        "S8 descend: ok={}, now on floor={}",
+        descended,
+        s8.floor.as_ref().map(|f| f.index).unwrap_or(0),
+    );
+    open_current_floor(&mut s8);
+    let goods_at_arrival = s8.stores.goods;
+    let deliveries_at_arrival = count(&s8, LedgerKind::HaulDelivered);
+    for _ in 0..6000 {
+        s8.tick();
+    }
+    println!(
+        "S8 floor 2 ({} ticks): goods={} (was {} on arrival), deliveries on this floor={}, delvers alive={}, lost={}, first-light entries={}",
+        s8.tick_count,
+        s8.stores.goods,
+        goods_at_arrival,
+        count(&s8, LedgerKind::HaulDelivered) - deliveries_at_arrival,
+        s8.delvers.len(),
+        count(&s8, LedgerKind::DelverLost),
+        count(&s8, LedgerKind::FirstLight),
+    );
+    let ascended = s8.ascend();
+    println!(
+        "S8 ascend: ok={}, back on floor={}, floor 1 world intact={}, floor 1 lanterns intact (frozen while away)={}",
+        ascended,
+        s8.floor.as_ref().map(|f| f.index).unwrap_or(0),
+        s8.world == floor1_world,
+        s8.lanterns == floor1_lanterns,
+    );
+    println!("S8 state hash: {}", s8.state_hash());
 
     println!("deep ledger (S2):");
     for e in &sim.ledger {
