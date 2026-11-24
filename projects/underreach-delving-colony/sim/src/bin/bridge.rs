@@ -19,6 +19,7 @@
 //!   {"cmd":"plant","pos":[x,y,z]}
 //!   {"cmd":"craft_mask"}
 //!   {"cmd":"support","pos":[x,y,z]} / {"cmd":"vent","pos":[x,y,z]} (S7)
+//!   {"cmd":"descend"} / {"cmd":"ascend"} (S8: floor-to-floor traversal)
 //!   {"cmd":"light_the_way"} / {"cmd":"light_the_deep"}
 //!   {"cmd":"open_floor1"} (gen scenario: lantern the route to the first face)
 
@@ -94,6 +95,12 @@ fn apply(sim: &mut Sim, cmd: &Value) {
             if let Some(p) = cmd.get("pos").and_then(pos) {
                 sim.place_vent(p);
             }
+        }
+        Some("descend") => {
+            sim.descend();
+        }
+        Some("ascend") => {
+            sim.ascend();
         }
         Some("light_the_way") => light_the_way(sim),
         Some("light_the_deep") => light_the_deep(sim),

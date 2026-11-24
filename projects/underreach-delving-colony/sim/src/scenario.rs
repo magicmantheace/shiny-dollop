@@ -386,3 +386,28 @@ pub fn open_floor1(sim: &mut Sim) {
         }
     }
 }
+
+/// S8: `open_floor1` generalized to whichever generated floor
+/// the colony currently stands on. The layout is regenerated
+/// from `(world_seed, floor_index)` — a pure function that
+/// draws no runtime RNG — to find the floor's faces; the route
+/// itself is carved space in the active world, lanterned with
+/// the same spacing as `open_floor1`, whose floor-1 behaviour
+/// is unchanged.
+pub fn open_current_floor(sim: &mut Sim) {
+    let Some(info) = sim.floor.clone() else {
+        return;
+    };
+    let layout = generate_floor(sim.world_seed, info.index).layout;
+    let Some(face) = layout.faces.first().cloned() else {
+        return;
+    };
+    let Some(path) = carved_path(&sim.world, sim.stockpile, face.stand) else {
+        return;
+    };
+    for (i, p) in path.iter().enumerate() {
+        if i % 4 == 3 || i == path.len() - 1 {
+            sim.place_lantern(*p, 1, 5_000.0);
+        }
+    }
+}

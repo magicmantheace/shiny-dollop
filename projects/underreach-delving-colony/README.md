@@ -81,6 +81,22 @@ goods apiece. Verified headless (`cargo test` 43/43, the
 `scenario` binary's protected/unprotected contrast); the Godot
 frontend does not render the new pieces yet.
 
+**S8 — floor-to-floor traversal (2026-11-24, branch
+`underreach-delving-colony/traversal`):** the descent is a
+transition now. The colony can `descend` / `ascend` between
+generated floors: each visited floor's local state (world,
+lanterns, faces, supports, vents, plots, beds, stockpile,
+gate, critters, lit depths) is packed into the save and
+restored exactly on return, while delvers, stores, and the
+Deep Ledger travel with the colony. A first arrival founds a
+forward camp at the new floor's entry camp; a floor left
+behind is frozen, its lanterns unburned on return. First
+light is per floor, so lighting floor 2's depths is ledgered
+fresh. Verified headless (`cargo test` 51/51, the `scenario`
+binary's S8 section runs the loop on floor 2 and finds floor
+1 intact on return); floors 2–5 remain stub themes with no
+band mechanics or balance yet.
+
 ## Layout
 
 - `sim/` — the Rust simulation core, its tests, the `scenario`

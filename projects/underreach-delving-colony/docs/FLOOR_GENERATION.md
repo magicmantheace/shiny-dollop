@@ -206,7 +206,14 @@ cells and render as ordinary floor.
   face appears. Registering faces on exposure is a later slice.
 - **Floor-to-floor traversal.** The descent is a placed,
   rendered, guaranteed-reachable point — not yet a transition.
-  Multi-floor saves arrive with it.
+  Multi-floor saves arrive with it. *(S8 amendment,
+  2026-11-24: built — `descend()` / `ascend()` travel
+  between floors on branch
+  `underreach-delving-colony/traversal`, with per-floor
+  stored state in the save, a forward camp founded on
+  first arrival, and the floor left behind frozen; see
+  `docs/TEST_PLAN.md`. In S6 the descent was a marker
+  only.)*
 - **Den wiring for the runtime auto-spawner.** Dens seed their
   residents at founding in the gen scenario; the 700-tick
   auto-spawner still uses its S3 rule (carved, unlit, near
