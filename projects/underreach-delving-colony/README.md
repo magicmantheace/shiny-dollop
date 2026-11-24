@@ -97,6 +97,29 @@ binary's S8 section runs the loop on floor 2 and finds floor
 1 intact on return); floors 2–5 remain stub themes with no
 band mechanics or balance yet.
 
+**S9 — floors 2–5 scenarios and balance (2026-11-24, branch
+`underreach-delving-colony/band-scenarios`):** a colony can now
+be founded directly on any generated floor
+(`build_scenario_gen_floor`), and each band floor — Fungal
+Reaches, Drowned Galleries, Crystal Dark, Magma Roots — has a
+scenario run on the demo seed: founded, opened, and run for
+6,000 ticks, every band produced (goods 9 / 15 / 9 / 6), ended
+fed, and lost nobody, so the balance pass tuned nothing — all
+four bands are playable exactly as the S6 stub themes
+generated them. One finding matters more than the numbers:
+the Fungal Reaches' spore mechanics do **not** engage on the
+generated floor, because spore exposure is keyed to depth
+(y ≥ 10) while generated floors hold their carved space at
+y ≤ 9 — and generated faces yield ore only, so fungal oil
+never flows there either. Since a band's `built` flag demands
+that its existing mechanics demonstrably engage on its
+generated floor, **no band flips to built in this slice**: the
+Fungal Reaches wait on band-keyed exposure, the Drowned
+Galleries and Magma Roots on their S10 flooding/heat
+mechanics, and the Crystal Dark on gate items that have never
+been modelled. Verified headless (`cargo test` 60/60, every
+S1–S8 scenario section unchanged in numbers and hash).
+
 ## Layout
 
 - `sim/` — the Rust simulation core, its tests, the `scenario`
