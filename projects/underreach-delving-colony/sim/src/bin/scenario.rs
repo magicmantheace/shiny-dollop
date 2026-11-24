@@ -3,13 +3,15 @@
 //! recruit, dividing the labour), S3/S5, and S6 — the same
 //! colony loop founded on a procedurally generated Floor 1.
 
-use underreach_sim::gen::generate_floor;
+use underreach_sim::gen::{carved_path, generate_floor};
 use underreach_sim::scenario::{
     build_scenario, build_scenario_gen, build_scenario_gen_floor, build_scenario_s2,
     build_scenario_s3, build_scenario_s5, build_scenario_s7, build_scenario_s12, light_the_deep,
     light_the_way, open_current_floor, open_current_floor_as, open_floor1, GEN_WORLD_SEED,
 };
+use underreach_sim::session::{merge_streams, replay, Command, PlayerCommand, Session};
 use underreach_sim::sim::{Job, LedgerKind};
+use underreach_sim::world::{Cell, Pos};
 
 fn count(sim: &underreach_sim::sim::Sim, kind: LedgerKind) -> usize {
     sim.ledger.iter().filter(|e| e.kind == kind).count()
@@ -463,6 +465,77 @@ fn main() {
         );
     }
     println!("S12 state hash: {}", s12.state_hash());
+
+    // ---- S13: co-op foundations -------------------------------------------
+    // A two-player lockstep session on the generated Floor 1,
+    // driven entirely through the typed command layer (no
+    // scenario scripts touch the sim after founding). P1 lights
+    // the way — the opening lantern route `open_floor1` would
+    // place, issued as P1's own commands. P2 plants a camp plot,
+    // then sets a timber support and rigs a vent on the first
+    // face's stand once production has put goods in stores. The
+    // streams are merged into the canonical order, applied, run
+    // to production — and the whole session is replayed from its
+    // log inside this section to prove the hashes match.
+    let founding = build_scenario_gen(GEN_WORLD_SEED);
+    let face = founding.faces.first().expect("gen founding has faces");
+    let route = carved_path(&founding.world, founding.stockpile, face.stand)
+        .expect("route is carved");
+    let p1: Vec<PlayerCommand> = route
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| i % 4 == 3 || *i == route.len() - 1)
+        .map(|(_, p)| *p)
+        .collect::<Vec<Pos>>()
+        .into_iter()
+        .enumerate()
+        .map(|(i, pos)| PlayerCommand {
+            tick: 0,
+            seq: i as u32,
+            command: Command::Lantern { pos, tier: 1, fuel: 5_000.0 },
+        })
+        .collect();
+    let plant_pos = (0..founding.world.sy as i32)
+        .flat_map(|y| {
+            (0..founding.world.sx as i32)
+                .flat_map(move |x| (0..founding.world.sz as i32).map(move |z| Pos::new(x, y, z)))
+        })
+        .find(|p| {
+            founding.world.get(*p) == Some(Cell::Carved)
+                && *p != founding.stockpile
+                && *p != founding.gate
+                && !founding.beds.contains(p)
+                && !founding.plots.iter().any(|pl| pl.pos == *p)
+                && !founding.lanterns.iter().any(|l| l.pos == *p)
+        })
+        .expect("gen founding has a plantable camp cell");
+    let stand = face.stand;
+    let p2 = vec![
+        PlayerCommand { tick: 0, seq: 0, command: Command::Plant { pos: plant_pos } },
+        PlayerCommand { tick: 1_000, seq: 1, command: Command::Support { pos: stand } },
+        PlayerCommand { tick: 1_000, seq: 2, command: Command::Vent { pos: stand } },
+    ];
+    let merged = merge_streams(&[(1, p1), (2, p2)]).expect("streams are well-formed");
+    let mut s13 = Session::new(founding);
+    s13.apply_merged(&merged).expect("merged entries apply");
+    s13.run_to(6_200);
+    let s13_log = s13.log();
+    let applied_of = |player: u8| {
+        s13_log.entries.iter().filter(|e| e.player == player && e.applied).count()
+    };
+    let replayed = replay(&s13_log).expect("the session log replays");
+    let replay_matches = replayed.state_hash() == s13.sim().state_hash();
+    println!(
+        "S13 two-player session ({} ticks): P1 applied commands={}, P2 applied commands={}, goods={}, delvers alive={}, lost={}, replay_matches={}",
+        s13.sim().tick_count,
+        applied_of(1),
+        applied_of(2),
+        s13.sim().stores.goods,
+        s13.sim().delvers.len(),
+        count(s13.sim(), LedgerKind::DelverLost),
+        replay_matches,
+    );
+    println!("S13 state hash: {}", s13.sim().state_hash());
 
     println!("deep ledger (S2):");
     for e in &sim.ledger {

@@ -43,7 +43,8 @@ S1 proves the spine of the game in simulation:
 Verified: `cargo test` in `sim/` (unit + scenario tests), and the
 `scenario` binary's two-phase run (blocked in the dark → lit → producing).
 
-**Not yet built:** the Crystal Dark's gate items and co-op.
+**Not yet built:** the Crystal Dark's gate items and co-op
+itself (its lockstep foundation was built in S13, below).
 (The Drowned flooding and Magma heat mechanics were built
 in S10, below, and children/generations in S12.) S2
 added the colony (multiple delvers, jobs, morale, camp farming,
@@ -196,6 +197,36 @@ S1–S11 scenario section unchanged in numbers and hash);
 the bridge view carries each delver's age and child state,
 but the frontend does not render them yet.
 
+**S13 — co-op foundations (2026-11-24, branch
+`underreach-delving-colony/coop-foundations`):** the
+lockstep foundation for the 1–4 co-op is built — and co-op
+itself is not. The sim was already deterministic and
+command-driven; S13 adds the missing pieces as a library
+layer: a typed `Command` enum mirroring the bridge's
+player-action vocabulary (applying through the same `Sim`
+methods the bridge calls), an attributed session log (the
+founding save plus `{tick, player, seq, command, applied}`
+entries, players numbered 1–4), a canonical merge that
+orders per-player streams by `(tick, player, seq)` —
+independent of arrival order, with duplicate sequence
+numbers and gaps surfaced as errors — and replay: any
+session reconstructs from its log to the identical SHA-256
+state hash, which is the desync check two future peers will
+compare. The scenario binary's S13 section runs a two-player
+session on generated Floor 1 (one player lights the way, the
+other plants, supports, and vents), produces goods, loses
+nobody, and replays to a matching hash. **Not built, because
+none of it is headless-verifiable:** network transport and
+host/join, session discovery, lockstep pacing under real
+latency, Godot multiplayer, desync recovery over a live
+connection, and play with real clients on real machines.
+The full assessment, the open owner design questions
+(frontier rights, multi-rescuer rescues, player downing),
+and the recommended first real-machine step are in
+[`docs/COOP_ASSESSMENT.md`](docs/COOP_ASSESSMENT.md).
+Verified headless (`cargo test` 87/87, every S1–S12
+scenario section unchanged in numbers and hash).
+
 ## Layout
 
 - `sim/` — the Rust simulation core, its tests, the `scenario`
@@ -209,5 +240,8 @@ but the frontend does not render them yet.
 - `docs/FLOOR_GENERATION.md` — the S6 floor-generation design
   record (seed scheme, theme table, Floor 1 numbers, placeholder
   mapping).
+- `docs/COOP_ASSESSMENT.md` — the S13 co-op assessment (what
+  the lockstep foundation proves, what co-op still needs, the
+  open owner design questions, the first real-machine step).
 - `REQUIREMENTS.md` — project requirements.
 - `AGENTS.md` — project rules.

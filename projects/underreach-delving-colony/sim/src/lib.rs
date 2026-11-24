@@ -6,5 +6,6 @@
 
 pub mod gen;
 pub mod scenario;
+pub mod session;
 pub mod sim;
 pub mod world;
