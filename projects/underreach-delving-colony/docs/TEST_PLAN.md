@@ -1308,3 +1308,51 @@ reproducing exactly.
   open, floors 2–5 scenarios. (Cave-in/bad-air mechanics from
   this list were built in S7, above; floor-to-floor
   traversal was built in S8, above.)
+
+## Gloam rat frontend swap (verified 2026-11-13, VM headless)
+
+- The dedicated gloam-rat asset (builder catalog sha256
+  `aec00e60646e…`, branch `game-asset-builder/underreach-assets`
+  @ `a5a93d5`) is copied byte-for-byte to
+  `frontend/assets/gloam-rat.glb` (hash matches the catalog).
+  Critter rendering in `main.gd` is now kind-aware: GloamRat
+  critters instantiate `RAT_SCENE` at target height 0.5;
+  DeepLurker keeps `CRITTER_SCENE` at 1.05. No sim change (the
+  bridge view already carried each critter's `kind`).
+- Leg-separation gate passed in the builder before cataloguing
+  (posed renders of rest and the idle/walk/run/bite apexes —
+  legs separate with daylight in every shipped pose).
+- Godot load test: the rat scene instantiates headless with all
+  four clips (bite / idle / run / walk). Rig facing verified
+  against the gloam-lurker's armature convention (head −Y) in
+  Blender, so the frontend's movement-facing behaves the same.
+- `godot --headless -- --underreach-verify` after the swap
+  prints the identical pass line: `UNDERREACH_VERIFY_PASS
+  goods=20 delvers=5 floor_instances=15 tick=4000`.
+- Sim untouched: `cargo test` 25/25 and the `scenario` binary
+  run repeated after the swap, clean to tick 6000.
+- **On-PC pass (2026-11-13, staging
+  `D:\bridge-work\underreach-visual\` updated with the new
+  frontend; staged rat GLB hash = catalog sha):** Windows
+  headless import + verify prints the identical
+  `UNDERREACH_VERIFY_PASS goods=20 delvers=5 floor_instances=15
+  tick=4000`. The game then ran windowed and live on the
+  owner's PC (RTX 3060): the colony renders correctly (entry
+  camp, cots, stockpile chest, lantern light, delvers, HUD,
+  ledger), ticking in real time with the colony growing from
+  3 to 5 delvers; critters PROVEN to spawn in this build — the
+  ledger recorded "[2118] a deep lurker burned away in the
+  light" during the session.
+- **Not verified:** a critter sighted in frame, name-label
+  legibility at gameplay zoom, and layer switching on PC.
+  Critters render only on their current layer, labels are too
+  small to judge at the default camera distance, and both
+  checks need HUD interaction: bridge `/v1/input` clicks do
+  not reach Godot's HUD buttons on this 4K / 250%-scaled
+  desktop (logical, physical, and grid click attempts all
+  failed to toggle Pause; root cause unresolved — likely a
+  DPI-virtualization mismatch between the session helper's
+  SendInput space and Godot's DWM-virtualized window), and
+  camera zoom is mouse-wheel-only (the input API has no wheel
+  action). The live view JSON (`user://out.json`) was read
+  throughout the session and matched the HUD.
