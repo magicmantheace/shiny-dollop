@@ -5,6 +5,7 @@
 //! player actions (`carve`, `place_lantern`); it holds no sim rules.
 
 pub mod gen;
+pub mod net;
 pub mod scenario;
 pub mod session;
 pub mod sim;
