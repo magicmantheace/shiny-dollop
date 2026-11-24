@@ -145,12 +145,28 @@ implementer guessing.
    mechanic, applied to players)? What happens when the last
    standing player goes down? Is hardcore per-player or
    per-colony?
+   **DECIDED 2026-11-24 (owner):** hardcore is ONE rule for
+   the whole colony — per-colony, never per-player. When a
+   player goes down, a lantern-clock rescue is an option: it
+   is either pre-chosen at game setup or offered as a pop-up
+   when the downing happens, letting a lantern clock play out
+   (any player may rescue, per question 2). If that option is
+   not in play, a non-hardcore downing follows the normal solo
+   rules (decision 6): the player wakes at the closest
+   colony/camp with no gear. In a HARDCORE colony, when the
+   last standing player goes down, **the run is over**.
 4. **Contradictory same-tick commands.** Canonical order
    resolves conflicts deterministically (e.g. two players spend
    the same last goods in one tick: the earlier in `(tick,
    player, seq)` order applies, the other is recorded refused).
    Is that silent resolution the desired feel, or should
    contested actions need a claim/confirmation first?
+   **DECIDED 2026-11-24 (owner):** priority order is HOST
+   first, then everyone else in player order. On an exact tie
+   over the same resource or action, the loser simply fails —
+   silent refusal, no claim or confirmation mechanic. (This
+   maps onto the canonical `(tick, player, seq)` order if the
+   host is player 1.)
 5. **Drop-in / drop-out and host authority.** Can a player join
    a session already running (their client would replay the log
    or take a save snapshot — the foundation supports either) or
@@ -158,6 +174,12 @@ implementer guessing.
    mid-session, does the colony pause for everyone, or play on
    without them? Who hosts, and does the host's copy win a
    desync dispute by definition?
+   **DECIDED 2026-11-24 (owner):** the host is the owner of
+   the game. Players may join and leave freely; a non-host
+   leaving never ends the session and play continues without
+   them. If the HOST leaves, the game pauses for everyone —
+   no one can play until the host returns, because the
+   session lives on the host's machine.
 
 ## (d) Recommended first real-machine step
 

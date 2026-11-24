@@ -611,3 +611,21 @@ Also recorded 2026-11-24: the owner decided co-op questions
 frontier rights for every player with colony-shared credit,
 and open multi-rescuer lantern-clock rescues with the
 line-bell heard by every player. Questions 3–5 remain open.
+
+## Further owner decisions (2026-11-24)
+
+- **Crystal Dark gate mechanics: DECIDED as a future slice**
+  — approved in principle; not yet scheduled or built.
+- **Fungal-oil face registration: APPROVED to build** — it
+  will be the first slice on top of merged `main`, so fungal
+  oil flows on generated floors.
+- Co-op questions 3–5 in `docs/COOP_ASSESSMENT.md` section
+  (c) were also decided on 2026-11-24: hardcore is one
+  per-colony rule with a lantern-clock rescue option (setup
+  choice or downing pop-up), and in hardcore the run is over
+  when the last standing player goes down; same-tick priority
+  is host-first, then player order, with silent refusal on
+  ties; and sessions are host-owned — free join/leave for
+  non-hosts, pause for everyone if the host leaves. With
+  questions 1–2 decided earlier the same day, all five
+  section (c) questions are now decided.
