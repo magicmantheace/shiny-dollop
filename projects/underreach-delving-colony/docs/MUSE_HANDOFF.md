@@ -195,11 +195,18 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   The Fungal proof came back negative — spores and fungal
   oil do not engage on generated floors (see status) — so
   no band's `built` flag flipped.
-- Later: Drowned/Magma mechanics (flooding, heat — S10,
-  where band-keyed hazard exposure should be designed once
-  for all bands, per the S9 Fungal finding), Crystal Dark
-  gates, co-op, colony failure & succession,
-  children/generations.
+- **S10 — deeper band hazards (BUILT 2026-11-24, branch
+  `underreach-delving-colony/band-hazards`).** Band-keyed
+  hazard exposure designed once for all bands
+  (`Sim::hazards_here`: a generated floor's band flags rule
+  in its deep zone, y ≥ 6; hand-built worlds keep the
+  depth table exactly), the Drowned flooding mechanic
+  (water load, lantern dousing) with pumps and sealed
+  pressure lanterns, and the Magma heat mechanic (heat
+  load) with cooling gear. The Fungal, Drowned, and Magma
+  `built` flags flip; Crystal stays unbuilt.
+- Later: Crystal Dark gates, co-op, colony failure &
+  succession, children/generations.
 
 ## Status — 2026-11-10
 
@@ -352,3 +359,52 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   pre-existing assertion changed. NOT built: flooding/heat
   mechanics, band-keyed hazards, Crystal gate items,
   frontend surfacing for floors 2–5.
+- **S10 — deeper band hazards (2026-11-24, VM-verified;
+  branch `underreach-delving-colony/band-hazards`, not yet
+  merged):** the Drowned and Magma hazards are live, and
+  exposure is band-keyed. `cargo test` 70/70 (60
+  pre-existing + 10 new S10 tests); every S1–S9 scenario
+  section reproduces its behaviour numbers exactly (state
+  hashes shift with the new save fields), and the S9 band
+  runs now show the live events in the same numbers —
+  floor 3: drowning 3, doused lanterns 3; floor 5:
+  overheating 2; nobody lost anywhere. The new S10
+  scenario sections show the contrasts: Drowned protected
+  (pumps on every face stand + a pressure-lantern opening)
+  and Magma protected (cooling gear for the colony) run
+  the same production with zero band events. **Design:
+  `hazards_here(pos)`** — on a generated floor the active
+  floor's band flags (`theme_for_floor(index).hazards`)
+  rule in the floor's deep zone (carved cells at y ≥ 6,
+  generation's own bad-air line; the camp at y = 3 stays
+  refuge, mirroring the hand-built camp above the Fungal
+  line); hand-built worlds keep `hazards_at(y)` exactly,
+  and the two never combine. **Flooding:** a water load
+  (+1.0/tick in flood water, drowning at 60 — work halved,
+  morale hit, bed-seeking — hp drain at 100 onto the
+  rescue clock) plus lantern failure (an unsealed lantern
+  in flood water loses 2.0 extra fuel/tick and dies as
+  `LanternDoused`). Answers: a **pump** (placed kit,
+  1 goods, dry reach radius 2 — the vent's mirror) and the
+  **sealed pressure lantern** (tier 3, the existing tier
+  rules and oil charge). **Heat:** a heat load in the
+  same pattern (overheating at 60, drain at 100),
+  answered by **cooling gear** (worn kit, 2 goods, the
+  mask's mirror, prevents the gain entirely). Modelling
+  decisions where the record was silent, all flagged in
+  `docs/TEST_PLAN.md`: the deep-zone footprint for band
+  exposure; air bells/drains not modelled (the pump's dry
+  reach already provides refuge and a workable face); no
+  placed heat answer (decision 9 leads with cooling gear,
+  and worn kit travels the whole hot zone); and
+  `SPORE_RATE_MASKED` corrected 0.05 → 0.0 so a mask
+  protects entirely, as S5's record always said. **`built`
+  flips: Fungal, Drowned, and Magma to `true`** (each
+  band's mechanics demonstrably engage on its generated
+  floor with scenario + balance recorded); **Crystal
+  stays `false`** — its gate items were never modelled.
+  NOT built: frontend surfacing for pumps/flooded cells/
+  water/heat loads/cooling gear (the bridge view carries
+  them all), face registration for embedded pockets (the
+  S9 finding's oil half stands — generated faces still
+  yield ore only), Crystal gate items.
