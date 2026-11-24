@@ -4051,23 +4051,36 @@ def _session_reaper(core: BridgeCore) -> None:
 
 def create_server(cfg: dict) -> ThreadingHTTPServer:
     core = BridgeCore(cfg)
-    server = ThreadingHTTPServer((str(cfg["host"]), int(cfg["port"])), BridgeHandler)
-    server.core = core  # type: ignore[attr-defined]
-    server.daemon_threads = True
-    core.log_start()
+    # This release's imports and the boot beacon run BEFORE
+    # log_start() on purpose. main() installs the SIGTERM/SIGBREAK
+    # handler only after create_server returns, so everything
+    # between log_start() (which makes server_start visible) and
+    # that installation is a window in which a stop signal kills
+    # the agent by default action — before the audited
+    # server_stop can be written. That window pre-exists (the
+    # queue runner starts inside it); first-time module imports
+    # after log_start measurably widened it (probe: default-kill
+    # in 7/12 immediate stops vs 3/12 on v1.2.1 — see
+    # docs/MUSE_HANDOFF.md, 2026-11-24). Keep the window as
+    # small as it was: pay the import cost first.
+    import boot_beacon
+    import project_mode
     try:
         # Boot beacon: one line per process start in the state
         # dir's boot-log.jsonl, carrying the machine boot time —
         # after a real reboot this is the passive record that the
         # bridge came back (see boot_beacon.py). Best-effort: a
         # beacon failure never blocks the server.
-        import boot_beacon
         boot_beacon.note_boot(
             core.state_dir,
             "session_helper" if cfg.get("session_helper") else "agent",
             version=VERSION)
     except Exception:
         pass
+    server = ThreadingHTTPServer((str(cfg["host"]), int(cfg["port"])), BridgeHandler)
+    server.core = core  # type: ignore[attr-defined]
+    server.daemon_threads = True
+    core.log_start()
     threading.Thread(target=_session_reaper, args=(core,), daemon=True,
                      name="session-reaper").start()
     if not cfg.get("session_helper"):
@@ -4088,7 +4101,7 @@ def create_server(cfg: dict) -> ThreadingHTTPServer:
         # engaged, fresh owner input or a game launch disengages
         # it (the owner's use always wins). Main agent only, like
         # the queue runner — the helper is a route server.
-        import project_mode
+        # (project_mode was imported at the top of create_server.)
         monitor = project_mode.ProjectModeMonitor(core)
         core.project_mode_monitor = monitor
         monitor.start()

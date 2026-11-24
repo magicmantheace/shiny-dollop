@@ -124,8 +124,12 @@ class RunnerCase(unittest.TestCase):
         self.thread = threading.Thread(target=self.runner.run,
                                        daemon=True)
         self.thread.start()
-        self.addCleanup(self._stop_runner)
+        # Cleanups run LIFO: register the temp dir FIRST so the
+        # runner is stopped (and joined) before the tree goes
+        # away — deleting first races the runner's heartbeat /
+        # event writes ("Directory not empty" in cleanup).
         self.addCleanup(self.tmp.cleanup)
+        self.addCleanup(self._stop_runner)
 
     def _stop_runner(self):
         self.runner.request_stop(kill_current=True)

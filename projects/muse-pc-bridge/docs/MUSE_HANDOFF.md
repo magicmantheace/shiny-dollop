@@ -1257,3 +1257,29 @@ mid-job** — the deploy smoke list is in `docs/JOB_RUNNER.md`.
 Until those run, this release is *implemented and VM-tested*,
 not *installed*, and no consumer has been moved onto the
 runner.
+
+### Follow-up (same day): pre-existing SIGTERM audit race found — widening removed, root fix NOT in this release
+
+Running this release's suite repeatedly exposed an
+intermittent failure in the pre-existing
+`test_v1_lifecycle.GracefulShutdownTests` (present on the
+branch, absent standalone, ~1 in 3 full-suite runs). Root
+cause, proven with a probe that stops a freshly started agent
+the moment `server_start` appears in its audit log: if SIGTERM
+lands after `log_start()` but before `main()` installs the
+SIGTERM handler (installation happens after `create_server`
+returns), the agent dies by the signal's **default action**
+(exit −15) and the audit log keeps `server_start` with no
+`server_stop` — against the audit rule. **The race pre-exists
+on v1.2.1** (probe: 3/12 default-kills on the production tip);
+this release's first cut widened the window with first-time
+imports after `log_start` (7/12). Fix applied here, scoped to
+the widening only: the new modules' imports and the boot
+beacon now run BEFORE `log_start()` in `create_server`, and
+the probe now stops cleanly 12/12 (GracefulShutdownTests
+10/10 standalone; full suite green twice consecutively).
+**The underlying window still exists** (the v1.2 queue runner
+also starts inside it). The root fix — install the signal
+handlers before `create_server`, aimed at a server holder —
+is a production-startup change and is deliberately NOT in
+this release; it is recorded here for the owner's call.
