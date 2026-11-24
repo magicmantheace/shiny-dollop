@@ -1043,6 +1043,148 @@ mismatch — no silent skips:
   name-label flag text, and the HUD layout have never been
   seen rendered. No performance claims, as ever.
 
+## S12 — children & generations (verified 2026-11-24, VM headless)
+
+Branch `underreach-delving-colony/generations`. Owner
+decision 5's second growth source — children growing up —
+behind the opt-in `generations_enabled` flag, in the
+`critters_enabled` precedent (S3). **Unlike every prior
+slice, no pre-existing state hash moves in this one** (see
+the inertness proof below): no existing save field changes
+meaning, and the new fields default inertly.
+
+### Modelling decisions (the record was silent on all of these)
+
+- **`TICKS_PER_YEAR` = 2400** — one year is one
+  surface-recruitment cycle (`RECRUIT_INTERVAL`), the
+  colony's existing calendar beat. Founders and recruits are
+  founded at **25 years**; adulthood is **18**.
+- **Age is inert recorded data while the system is off.**
+  `Delver::age_ticks` advances only in generations colonies,
+  and both new save fields omit themselves at their inert
+  defaults (`age_ticks` at the founding age,
+  `generations_enabled` at false — an omitted field loads
+  back as exactly its serde default, so the omission is
+  roundtrip-safe). That is what makes the disabled sim
+  bit-identical, hash included.
+- **Births** are checked on the recruitment cadence
+  (`BIRTH_INTERVAL` = `RECRUIT_INTERVAL`, on tick multiples)
+  and are **deterministic with no probability roll**: a birth
+  fires at a check when at least two adults are alive, food
+  in stores is at or above **`BIRTH_MIN_FOOD`, which reuses
+  `RECRUIT_MIN_FOOD` (4)** — a colony viable to a recruit can
+  feed a child — and total population is below
+  `MAX_DELVER_POPULATION` (6).
+- **Parents are the two longest-present adults** — the two
+  lowest delver ids among living adults (ids are issued in
+  arrival order, never reused). The `ChildBorn` Ledger entry
+  names the child and both parents.
+- **The child's name** is drawn from `RECRUIT_NAMES` not
+  currently in use, on the sim RNG, exactly as recruitment
+  draws — the only RNG draw the system makes, and only when
+  a birth fires in an enabled sim. **Fallback if the pool is
+  exhausted: no birth at that check** (the recruitment
+  pattern); unreachable in practice while the cap (6) sits
+  below the pool size (12), but the rule is total.
+- **Childhood scoping:** a child lives the camp life of an
+  Unassigned delver (eat, rest, morale) but the job decision
+  never dispatches them to work, `set_job` refuses them (it
+  now returns `bool`; the refusal's bridge signal is the
+  delver simply staying `Unassigned`), they gain no job XP,
+  and they are never picked as a rescuer. No school,
+  childcare, or carrying system is modelled — children at
+  camp are in the lit safe zone by construction.
+- **Coming of age** is the age-crossing itself: age is
+  monotonic, so the 18-year crossing fires exactly one
+  `CameOfAge` entry per delver, with no latch field.
+
+### Choreography disclosure (the S7 staged-proof tradition)
+
+The scenario binary's S12 colony is **hand-built** (the S2
+Shallows layout — its production is the proven baseline, and
+the slice's claim is the generational arc, not a new floor)
+and founded with **Joss, a child of 17**, so the coming of
+age lands one year into the run instead of eighteen. The
+colony takes no surface recruits, so the growth on show is
+births alone, and its face is very rich (2,000 ore: a veteran
+miner's rate grows with level, and Bram alone strips a
+200-ore face before Joss turns 18 — found in development).
+The **from-birth** arc is proven in the tests instead of the
+binary: a real newborn is born at a real check, and its last
+childhood year is run tick by tick to the crossing (staging
+its age to 17 first, the same founding choreography — a
+literal from-birth-to-adult run is 43,200 ticks of a child
+idling at camp and proves nothing the staged year does not).
+
+### Tests (`sim/tests/scenario_s12.rs`, 10 tests)
+
+- **Birth fires, named:** after the tick-2400 check,
+  exactly 1 `ChildBorn`; its detail names the child and both
+  parents (Bram and Sella, the two longest-present adults);
+  the newborn is age < 1, `Unassigned`, XP-free, at the gate.
+- **Three negative proofs**, each removing one condition:
+  one adult only (food ample, two checks pass) → no birth;
+  food below the minimum (plots cleared, stores empty;
+  adults and headroom hold) → no birth; population at the
+  cap of 6 (food ample) → no birth.
+- **Childhood:** `set_job` on the 17-year-old returns false
+  and leaves him `Unassigned` (an adult control's assignment
+  returns true); after 2,000 ticks his mining/hauling/
+  farming XP are all exactly 0 while the adult control's
+  mining XP is > 0.
+- **Coming of age:** over 6,000 ticks exactly 1 `CameOfAge`
+  (naming Joss); assignment then accepts him. A separate
+  test assigns the grown Joss Miner and runs 3,000 ticks:
+  his mining XP is > 0 (388 in the binary run's longer arc).
+- **From-birth childhood:** a newborn (age < 1 year at
+  proof time) staged to 17, refused a Farmer assignment,
+  then run one full year tick by tick to its own crossing —
+  the colony's second `CameOfAge`.
+- **Determinism:** twin runs of the S12 colony are
+  hash-identical at 3,500 ticks (past a birth and the
+  coming of age); save/load there reproduces the hash
+  (ages and the enabled flag included) and a 1,000-tick
+  continuation stays identical.
+- **Disabled-system inertness (the hash tripwire):** the
+  S3 builder, flag off, run 6,000 ticks with `light_the_way`
+  — every delver's age stays at the founding 25, no
+  `ChildBorn`/`CameOfAge` entries, and the state hash is
+  exactly the pre-S12 value pinned in the test,
+  `4dc99472c56104f7af…`, captured from the scenario binary
+  at the S11 tip before any S12 change.
+
+### Full-suite + harness results
+
+- `cargo test`: **80/80** (70 pre-existing + 10 S12),
+  0 failed.
+- `scenario` binary (release): the full output was diffed
+  against the pre-S12 run — **every S1–S11 section is
+  byte-identical, numbers and state hashes alike**; the
+  only addition is the new S12 section: 7,000 ticks,
+  delvers alive=6, **goods=964, births=2, comings-of-age=1,
+  grown child assigned miner=true, grown child mining
+  xp=388**, children at camp=2, lost=0. Joss ends at age 19
+  a working miner (mining 388 / hauling 436); the two
+  colony-born children (Fenn, age 1; Tomas, age 0) sit at
+  camp XP-free. S12 state hash
+  `8d4d431f2e7d8cf5b359d7bbf0e8c21c3f6630d7ca09b893785c6897f3c54dfa`.
+- Bridge check (release binary, file protocol): `init s12`
+  view carries Joss at `age_years` 17 / `is_child` true and
+  the founders at 25 / false; `init s3` carries the founders
+  at 25 / false. The fields are purely additive (the S11
+  pattern); no frontend work in this slice.
+
+### Not verified / not built
+
+- Godot frontend surfacing for age/child state (the bridge
+  view carries both fields; the S11 frontend ignores them,
+  as designed for this slice).
+- Children in any system beyond camp life: no school,
+  childcare, carrying, or child-specific needs are modelled
+  (recorded scoping, above). Colony failure & succession —
+  the Ledger-inheritance half of decision 5's world — is
+  still not built.
+
 ## Planned (later slices)
 
 - Owner-PC visual pass of the frontend; performance measurement

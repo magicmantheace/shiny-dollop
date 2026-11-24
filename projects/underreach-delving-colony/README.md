@@ -43,9 +43,9 @@ S1 proves the spine of the game in simulation:
 Verified: `cargo test` in `sim/` (unit + scenario tests), and the
 `scenario` binary's two-phase run (blocked in the dark → lit → producing).
 
-**Not yet built:** the Crystal Dark's gate items, co-op, and
-children/generations. (The Drowned flooding and Magma heat
-mechanics were built in S10, below.) S2
+**Not yet built:** the Crystal Dark's gate items and co-op.
+(The Drowned flooding and Magma heat mechanics were built
+in S10, below, and children/generations in S12.) S2
 added the colony (multiple delvers, jobs, morale, camp farming,
 recruitment); S3 added creatures, combat, lantern-clock strandings,
 rescue runs, and permadeath; S5 added the Fungal Reaches: spore
@@ -170,6 +170,31 @@ view cell-for-cell on the checked layer. Verified headless
 **the rendered appearance of all S11 surfacing is
 unverified** — headless proves load and logic only, and a
 visual pass awaits the owner's PC.
+
+**S12 — children & generations (2026-11-24, branch
+`underreach-delving-colony/generations`):** the colony's
+second growth source from the design record — children
+growing up — is live, behind an opt-in `generations_enabled`
+flag in the same pattern as S3's critters opt-in. Delvers
+now carry an age (a year is 2,400 ticks, one recruitment
+cycle; founders and recruits arrive at 25, adults at 18).
+In a generations colony, a child is born on the recruitment
+cadence when two adults live, food meets the recruitment
+minimum, and the colony is under its population cap — the
+Deep Ledger records the birth by name, child and both
+parents. Children live the camp life but cannot be assigned
+work, gain no job XP, and are never sent on rescues; at 18
+a `CameOfAge` entry marks them an ordinary delver who can
+be assigned and earn XP like anyone else. With the flag off
+— every pre-existing scenario — the sim is bit-identical to
+before, state hash included, which a pinned test proves.
+The scenario binary's new S12 section runs the full arc in
+7,000 ticks: two births, one coming of age, the grown child
+working as a miner (388 mining XP), 964 goods produced, and
+nobody lost. Verified headless (`cargo test` 80/80, every
+S1–S11 scenario section unchanged in numbers and hash);
+the bridge view carries each delver's age and child state,
+but the frontend does not render them yet.
 
 ## Layout
 

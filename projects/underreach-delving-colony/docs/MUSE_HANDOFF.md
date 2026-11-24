@@ -218,8 +218,23 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   view gains two purely additive presentation fields (band
   name; the sim's own suffering booleans) so no sim rule is
   re-derived in the frontend.
+- **S12 — children & generations (BUILT 2026-11-24, branch
+  `underreach-delving-colony/generations`).** Decision 5's
+  second growth source, opt-in in the `critters_enabled`
+  pattern: `generations_enabled` defaults off and a disabled
+  sim is bit-identical to the pre-S12 sim, state hash
+  included. Delvers carry an age (`TICKS_PER_YEAR` 2400,
+  founded at 25, adult at 18); births fire deterministically
+  on the recruitment cadence when two adults live, food
+  meets the recruitment minimum, and population is under
+  the cap — the `ChildBorn` Ledger entry names the child
+  and both parents (the two longest-present adults).
+  Children live camp life but cannot be assigned, gain no
+  job XP, and are never rescuers; the 18-year crossing
+  ledgers one `CameOfAge` and they are ordinary delvers
+  from then on. Modelling decisions in `docs/TEST_PLAN.md`.
 - Later: Crystal Dark gates, co-op, colony failure &
-  succession, children/generations.
+  succession.
 
 ## Status — 2026-11-10
 
@@ -453,3 +468,32 @@ JSON + SHA-256 state hash; the Deep Ledger is append-only.
   UNVERIFIED** — headless proves load and logic only; a
   visual pass awaits the owner's PC. NOT built: Crystal
   gate items, face registration for embedded pockets.
+- **S12 — children & generations (2026-11-24, VM-verified;
+  branch `underreach-delving-colony/generations`, not yet
+  merged):** decision 5's second growth source is live.
+  `cargo test` 80/80 (70 pre-existing + 10 new S12 tests);
+  the `scenario` binary's S1–S11 sections are byte-identical
+  to the pre-S12 run — **numbers and state hashes alike** —
+  and the new S12 section shows the full arc in 7,000 ticks:
+  2 births, 1 coming of age, the grown child (Joss) assigned
+  Miner with mining XP 388, goods 964, 2 children at camp,
+  nobody lost. The inertness proof is a pinned test: the S3
+  scenario, flag off, reproduces its pre-S12 hash exactly.
+  Modelling decisions where the record was silent, all
+  flagged in `docs/TEST_PLAN.md`: `TICKS_PER_YEAR` 2400 (one
+  recruitment cycle); founders/recruits founded at 25, adult
+  at 18; age inert while the system is off (the new save
+  fields omit themselves at their inert defaults); births
+  deterministic on the recruitment cadence, no probability
+  roll, parents the two longest-present adults, name from
+  the recruitment pool with a no-birth fallback if it is
+  exhausted; `BIRTH_MIN_FOOD` reuses `RECRUIT_MIN_FOOD`;
+  childhood is camp life only — no school, childcare, or
+  carrying. The S12 colony is founded with a 17-year-old
+  child and takes no recruits (choreography, recorded in
+  TEST_PLAN); the from-birth arc is proven in tests. The
+  bridge view gains additive `age_years` / `is_child` per
+  delver; the frontend renders neither yet. NOT built:
+  Crystal gate items, face registration for embedded
+  pockets, any frontend surfacing for age/children, colony
+  failure & succession.
