@@ -255,10 +255,35 @@ future loopback transport will carry. Still no networking.
 Verified headless (`cargo test` 98/98, every S1–S13 scenario
 section unchanged in numbers and hash).
 
+**S17 — loopback transport (2026-11-24, branch
+`underreach-delving-colony/loopback-transport`, stacked on
+S15):** Slice B of the co-op program — the first real
+multiplayer piece. Two processes, a `net_host` and one or
+more `net_client`s, talk over TCP on 127.0.0.1 only
+(newline-delimited JSON; std library only, no new
+dependencies; protocol in `sim/src/net.rs`). The host owns
+the one authoritative `CoopSession`; clients send typed
+command windows and rescue actions, the host merges each
+window host-first then join order, and broadcasts the full
+canonical log plus the SHA-256 state hash and a co-op rules
+snapshot. A client converges only by replaying the host's
+log and matching its hash — so a scripted two-process
+session (ordinary commands from both players, a contested
+same-tick spend with the loser quietly `applied: false`, a
+lantern-clock rescue), a drop-in join mid-session, and a
+client-run rescue all finish with host and client hashes
+**equal**, and a deliberately divergent client-local stream
+is overwritten by the next sync. Still loopback only: no
+LAN/internet, no discovery, no latency pacing, no Godot
+multiplayer. Verified headless (`cargo test` 102/102, every
+S1–S13 scenario section unchanged in numbers and hash).
+
 ## Layout
 
 - `sim/` — the Rust simulation core, its tests, the `scenario`
-  demo binary, and the `bridge` binary the frontend speaks to.
+  demo binary, the `bridge` binary the frontend speaks to,
+  and (S17) the `net_host` / `net_client` loopback transport
+  binaries.
 - `frontend/` — the Godot 4 frontend (S4): a depth-slice view over
   the core, driven entirely through the bridge. See
   `frontend/README.md` for controls, verification, and asset

@@ -674,3 +674,43 @@ line-bell heard by every player. Questions 3–5 remain open.
   carry this rules layer), Godot multiplayer surfacing, desync
   recovery protocol.** Full record: `docs/COOP_ASSESSMENT.md`
   section (e), numbers in `docs/TEST_PLAN.md`.
+
+## S17 status (2026-11-24)
+
+- **S17 — loopback transport (2026-11-24, VM-verified; branch
+  `underreach-delving-colony/loopback-transport`, stacked on
+  the S15 branch, not yet merged):** Slice B of the co-op
+  program — the first real multiplayer piece. Two processes
+  (the `net_host` and `net_client` binaries) over TCP on
+  127.0.0.1 only, std library only, no new dependencies.
+  `cargo test` **102/102** (98 pre-existing + 4 new S17
+  tests); the `scenario` binary's S1–S13 sections reproduce
+  every recorded number and state hash exactly (`Sim` and the
+  S13/S15 session code are untouched). What exists: the host
+  process owns the one authoritative `CoopSession` (ruling
+  5); clients send typed command windows and rescue actions
+  as NDJSON protocol messages (`sim/src/net.rs`); the host
+  validates each batch as a seq continuation, merges each
+  window host-first/then-join-order (ruling 4), applies it,
+  and broadcasts a `Sync` carrying the full canonical log,
+  the SHA-256 state hash, and a co-op rules snapshot. A
+  client converges *only* by replaying the host's log (S13
+  machinery) and matching the host's hash — proven for the
+  full scripted session (both players' ordinary commands, a
+  contested same-tick spend with the loser `applied: false`
+  on both sides, a lantern-clock rescue with the clock
+  stretched 900 → 1,200), for drop-in join mid-session
+  (join sync = the full log), for a client-run rescue, and
+  against a deliberately divergent client-local stream,
+  which the next sync overwrites wholesale. Assumptions
+  where the rulings were silent (full list in
+  `docs/TEST_PLAN.md` S17): TCP + NDJSON framing;
+  incremental (continuation) validation in place of
+  whole-stream merging per window; full-log syncs, no
+  deltas; downings/pop-ups are host-side inputs, not wire
+  messages; a dropped socket is not a leave. **NOT built:
+  anything off loopback (LAN/internet/second machine),
+  latency pacing, discovery/invitation, Godot multiplayer,
+  a desync-recovery handshake, host-leave over the wire.**
+  Full record: `docs/COOP_ASSESSMENT.md` section (f),
+  numbers in `docs/TEST_PLAN.md`.

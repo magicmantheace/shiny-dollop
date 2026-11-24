@@ -277,3 +277,70 @@ processes — `CoopSession` command streams in, the canonical
 log and state hash back — and its state-agreement checks will
 compare the same hashes S13/S15 already pin. Nothing in the
 rules layer needs to change for transport to carry it.
+
+## (f) S17 — loopback transport (2026-11-24, VM headless)
+
+Branch `underreach-delving-colony/loopback-transport`,
+stacked on S15. This is section (d)'s recommended first
+real-machine step, run as its headless form: two *processes*
+on one machine (the owner's-PC run remains a hardware step;
+nothing here claims a second machine, a LAN, or latency).
+Verified by `sim/tests/scenario_s17.rs` (4 tests); full
+suite `cargo test` **102/102** (98 pre-existing + 4 new),
+0 failed, every S1–S13 scenario hash unchanged.
+
+**What the transport carries.** Exactly the S15 artefacts,
+as designed in section (e): client → host, per-player typed
+command windows (the S13 `Command` vocabulary) and
+lantern-clock rescue actions (`rescue_plant_light` /
+`run_rescue` requests); host → clients, one `Sync` message —
+the full canonical `SessionLog`, the sim's SHA-256 state
+hash, and a `CoopSnapshot` of the rules layer (roster and
+join order, incidents and clocks, the event feed including
+the line-bell, colony-shared credit). The protocol is
+newline-delimited JSON over TCP, bound to 127.0.0.1 only,
+std library only (`sim/src/net.rs`; binaries `net_host` /
+`net_client`).
+
+**The authority model as implemented.** The host process is
+the sole authority (ruling 5): it owns the one live
+`CoopSession`, validates every incoming batch as a `seq`
+continuation (the no-duplicate, no-gap rule, applied
+incrementally — a gapped batch is refused to the sender
+only and never enters the log), orders each delivery window
+host-first then join order (ruling 4's rule, as
+`merge_coop_streams` defines it), applies the window, and
+broadcasts the resulting `Sync`. A client holds no state of
+its own: its sim is the *replay* of the last host log it
+received, accepted only when the replayed hash equals the
+host's hash (a mismatch is a desync; the client exits
+naming it). Proven consequences, all in the tests: host and
+client finish the scripted session — ordinary commands from
+both players, a contested same-tick spend over one good, a
+lantern-clock rescue — with **equal hashes and byte-equal
+logs**; a drop-in joiner converges from the join `Sync`
+alone (the full log is the join mechanism; there is no
+separate snapshot path); a client that privately applies a
+divergent command stream locally is overwritten wholesale
+by the next sync, and its private carve is absent from the
+canonical world.
+
+**Assumptions made (the rulings were silent).** TCP over
+UDP (the log must arrive complete and ordered; simplest
+std-only option); full-log syncs rather than deltas;
+downings and pop-up resolutions are host-side inputs, not
+wire messages (a downing is a session event, not a player
+command; rescue actions *are* wire messages, per ruling 2);
+a dropped socket is not a `leave` — connection loss does
+not touch the roster, so the S15 host-pause is not yet
+exercised over the wire; the host player is co-located with
+the authority and does not use a socket. Full list in
+`docs/TEST_PLAN.md` S17.
+
+**What section (b) still lists, unchanged:** session
+discovery/invitation, lockstep pacing under real latency,
+Godot-side multiplayer, a desync-recovery handshake (S17's
+convergence-by-next-sync is not one), and play with real
+clients on real machines. The next honest step remains
+section (d)'s: the same two processes on the owner's PC,
+then a second machine.

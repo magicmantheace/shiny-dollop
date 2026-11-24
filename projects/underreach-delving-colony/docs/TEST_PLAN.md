@@ -1486,3 +1486,143 @@ recorded numbers *and* state hash exactly.
   player-actor as distinct from S3's delver-rescues-delver
   (player downing is the S15 model; delver rescue is unchanged
   S3 behaviour); rendered/frontend surfacing of any co-op state.
+
+## S17 — loopback transport (verified 2026-11-24, VM headless)
+
+Branch `underreach-delving-colony/loopback-transport` (stacked
+on S15). The first real multiplayer piece: **two processes**
+over a real TCP socket bound to 127.0.0.1 only. New code:
+`sim/src/net.rs` (the wire protocol — newline-delimited JSON,
+`ClientMsg`/`HostMsg` — the window merge, continuation
+validation, the co-op snapshot, and `ClientState`, the
+client's replay-based convergence), plus two thin binaries,
+`sim/src/bin/net_host.rs` (owns the one authoritative
+`CoopSession`) and `sim/src/bin/net_client.rs` (holds only the
+replay of the host's log). Std library only; no new
+dependencies. `Sim` and the S13/S15 session code are
+untouched, and every pre-S17 scenario hash reproduces exactly
+(below).
+
+The authority model as implemented (ruling 5): the host
+merges each delivery window under ruling 4's priority,
+applies it to its `CoopSession`, and broadcasts a `Sync` —
+the **full canonical log**, the host's SHA-256 state hash,
+and a snapshot of the co-op rules state. A client converges
+by replaying that log through the S13 `replay` machinery and
+requiring its replayed hash to equal the host's; a mismatch
+is a desync and the client exits naming it. Join sync is the
+same `Sync`, sent on `Join`: a drop-in player replays the
+whole log-so-far and lands on the live hash.
+
+### Tests (`sim/tests/scenario_s17.rs`, 4 tests)
+
+The tests spawn the actual binaries (ephemeral loopback
+ports) and drive them over stdin/stdout JSON directive
+channels; every wait is deadline-bound, children are reaped
+on drop, and a process that will not quit cleanly fails its
+test. The S17 suite was run 10× consecutively green after a
+drain race in the host's rescue pump was found and gated
+(the pump now waits for the expected number of queued client
+actions — a sender's "sent" is not an arrival).
+
+- **Scripted session, hashes agree:** host (player 1) + one
+  client (player 2), founding stores set to exactly 1 good.
+  Ordinary window at tick 0: P2 plants first light down the
+  tunnel, plants a plot, reassigns a delver's job; P1 carves
+  and lights the shaft — all five commands apply. Contested
+  window, same tick: both players place a timber support
+  over the colony's single good; the host's lands, the
+  client's is recorded `applied: false`, goods spent exactly
+  once, only the host's support stands in the replayed sim.
+  The colony runs to tick 50; P2 goes down at the face; the
+  host plants light (incident clock 900 → 1,200, reported by
+  the host and present in the synced snapshot) and runs the
+  rescue; the colony runs to tick 120. **Final: host hash ==
+  client hash == replay of the transported log**
+  (`aa908bf7…`), the two processes' canonical logs are equal
+  as JSON, their co-op snapshots are equal, the shared credit
+  is `Rescue { downed_player: 2 }`, the line-bell event
+  crossed the wire, and P2 stands at camp with gear kept.
+- **Drop-in join + client-run rescue:** after a first window,
+  player 3 spawns and joins mid-session — the join sync alone
+  lands them on the host's live hash; they act in the next
+  window; then P2 goes down and **the drop-in client** plants
+  the rescue light and runs the rescue as transport messages
+  (host pump applies both, in arrival order); all three
+  processes finish with identical hashes and logs, the rescue
+  credited to the colony.
+- **Host authority against divergence:** the client applies a
+  carve to its own local copy only — its local hash provably
+  differs while its canonical hash stays the host's — and the
+  next host sync overwrites the divergence wholesale: final
+  hashes and logs equal, and the replayed canonical world
+  shows the client's private carve never happened (the cell
+  is still stone; the host's carve stands).
+- **Malformed batch refused:** a command batch starting at
+  seq 5 (a gap) earns the sender a protocol `Error` naming
+  the expected seq; nothing enters the canonical log, and a
+  well-formed batch from the same client applies cleanly
+  afterwards (final log: exactly 1 entry).
+
+### Modelling assumptions (the rulings were silent; named, not hidden)
+
+- **TCP, not UDP**, and newline-delimited JSON framing: the
+  canonical log must arrive complete and in order; TCP is
+  the simplest std-only transport that guarantees both. No
+  new crate dependencies.
+- **Incremental merge:** `merge_coop_streams` validates
+  complete streams from seq 0; a live transport delivers
+  windows, so the host validates each batch as a continuation
+  (first seq == that player's accepted count, incrementing —
+  the same no-duplicate, no-gap rule) and orders each window
+  with the identical host-then-join-order priority rule
+  (`net::merge_window`). The merged *log* a window produces
+  is exactly what whole-stream merging would have produced
+  for the same commands.
+- **Sync is the full log, every time** — no deltas, no
+  snapshot-save joins. The log is the record; sending all of
+  it is the simplest convergence that cannot drift, at a
+  size cost a later slice can optimise if it ever matters.
+- **Downings and pop-up resolutions are host-side inputs**,
+  not wire messages: a downing is a session/world event, not
+  a player `Command` in the S13 vocabulary, and the host
+  process is the authority that declares it. (The scripted
+  sessions run with rescue enabled at setup, so no pop-up is
+  exercised over the wire; the host exposes the pop-up as a
+  local directive.) Client-originated *rescue actions* are
+  wire messages, as ruling 2 requires.
+- **A dropped socket is not a `leave`:** connection loss
+  does not touch the roster (no host-pause on a client's
+  TCP drop, no auto-leave). Roster changes over unreliable
+  connections are a later slice's question; S17's processes
+  exit cleanly instead. A re-join claiming an already-present
+  player id is treated as a reconnect and answered with a
+  fresh sync.
+- **The host player (player 1) is co-located with the
+  authority**: its commands enter through the host process's
+  local directive channel, not a socket — ruling 5's host is
+  the owner of the game on their own machine.
+- The stdin/stdout directive channels the tests drive are a
+  harness convenience only; the wire protocol is exactly
+  `ClientMsg`/`HostMsg`.
+
+### Full-suite + harness results
+
+- `cargo test`: **102/102** (98 pre-existing + 4 S17),
+  0 failed.
+- `scenario` binary (release): every S1–S13 section
+  reproduces its recorded numbers and state hash exactly
+  (S1 `e3599701…`, S3 `4dc99472…`, S10 protected
+  `e0b6a85e…`, S12 goods 964 / `8d4d431f…`, S13 goods 22 /
+  `replay_matches=true` / `11e30e9d…`) — the slice adds a
+  transport layer only, as designed.
+- **Not verified / not built:** anything off loopback — no
+  LAN, no internet, no second machine, no latency or pacing
+  behaviour (lockstep input delay under real latency remains
+  unmeasured); no session discovery/invitation; no Godot
+  multiplayer surfacing; no desync *recovery* protocol beyond
+  "the next full-log sync overwrites" (which is convergence,
+  not a recovery handshake); host-leave pause over the wire
+  (the S15 pause exists in the rules layer the host carries,
+  but no transport message declares a leave — see the
+  disconnect assumption above); play with human clients.
