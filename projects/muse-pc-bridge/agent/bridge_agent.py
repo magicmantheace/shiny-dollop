@@ -101,7 +101,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 AGENT_NAME = "muse-pc-bridge"
 MAX_GET_BYTES = 16 * 1024 * 1024          # whole-file /v1/file/get limit
 MAX_RANGE_BYTES = 64 * 1024 * 1024        # per-call range-read limit
@@ -1869,8 +1869,20 @@ def spawn_detached(core: BridgeCore, payload: dict,
     kwargs: dict = {}
     breakaway = False
     if IS_WINDOWS:
-        base_flags = (subprocess.CREATE_NEW_PROCESS_GROUP
-                      | subprocess.DETACHED_PROCESS)
+        # No DETACHED_PROCESS here, deliberately (defect found at
+        # the 1.3.0 deploy smoke, 2026-11-24, owner-PC probes):
+        # Windows PowerShell 5.1 created with DETACHED_PROCESS
+        # exits 0 immediately without ever running its -Command —
+        # empty logs, no side effects. That flag, not the command
+        # form, was the root cause of the 2026-11-21 detached
+        # powershell no-run incident all along. Probe matrix on
+        # the owner's PC: DETACHED_PROCESS alone reproduces it;
+        # CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW runs the
+        # command, stays alive, and is console-free. Detachment
+        # in the sense this API promises — own process group, no
+        # console, stdio to files, tracked by the bridge — does
+        # not need the flag.
+        base_flags = subprocess.CREATE_NEW_PROCESS_GROUP
         if not gui and payload.get("visible") is not True:
             # A detached shell spawn is background work: keep it
             # console-free like every other bridge child (see
@@ -1898,11 +1910,15 @@ def spawn_detached(core: BridgeCore, payload: dict,
         # popen_target already uses for cmd: list-form argv joins
         # quote the -Command argument with subprocess rules, and
         # PowerShell then parses a different string than the one
-        # submitted — the prime suspect for the 2026-11-21
-        # detached powershell spawn that exited 0 without running
-        # its command (empty logs, no side effects) while the same
-        # spawn through cmd worked. Scoped to session mode so the
-        # established spawn paths are byte-identical to before.
+        # submitted. This form was added when that quoting was the
+        # prime suspect for the 2026-11-21 detached powershell
+        # no-run incident; the 1.3.0 deploy smoke (2026-11-24)
+        # proved the actual cause was the DETACHED_PROCESS
+        # creation flag (see the base_flags comment above) — the
+        # verbatim form is kept because it is still the more
+        # faithful rendering of the submitted command. Scoped to
+        # session mode so the established spawn paths are
+        # byte-identical to before.
         target = f'"{argv[0]}" -NoProfile -NonInteractive ' \
                  f'-Command {payload["command"]}'
     try:

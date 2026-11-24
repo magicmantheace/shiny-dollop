@@ -350,8 +350,14 @@ class WindowsOps(Ops):
 
     def launch(self, exe: str) -> tuple[bool, str]:
         try:
-            flags = (subprocess.CREATE_NEW_PROCESS_GROUP
-                     | subprocess.DETACHED_PROCESS)
+            # No DETACHED_PROCESS: on the owner's PC it makes
+            # Windows PowerShell exit 0 without running (defect
+            # found at the 1.3.0 deploy smoke, 2026-11-24 — see
+            # bridge_agent.spawn_detached). The relaunched apps
+            # here are GUI programs, which do not need the flag
+            # either; process group + breakaway below is the
+            # survival mechanism.
+            flags = subprocess.CREATE_NEW_PROCESS_GROUP
             try:
                 subprocess.Popen(
                     [exe], cwd=str(Path(exe).parent),
