@@ -8,7 +8,13 @@
 //! hazard exposure to the active floor's band on generated
 //! floors (`hazards_here`) and makes the Drowned flooding and
 //! Magma heat hazards live, answered by pumps, sealed pressure
-//! lanterns (tier 3), and crafted cooling gear.
+//! lanterns (tier 3), and crafted cooling gear. S12 adds children
+//! and generations (owner decision 5) behind the opt-in
+//! `generations_enabled` flag, in the `critters_enabled` pattern:
+//! with the flag off, age is inert recorded data, no birth or
+//! coming-of-age ever fires, and the sim is bit-identical to the
+//! pre-S12 sim (the new save fields omit themselves at their
+//! inert defaults — see the S12 section below).
 //!
 //! The design rules encoded here (owner decisions, see
 //! docs/MUSE_HANDOFF.md):
@@ -167,6 +173,10 @@ pub enum LedgerKind {
     DelverOverheating,
     /// An unsealed lantern was doused by flood water (S10).
     LanternDoused,
+    /// A child was born in the colony (S12, generations only).
+    ChildBorn,
+    /// A child reached adulthood (S12, generations only).
+    CameOfAge,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -424,6 +434,102 @@ pub const HEAT_CLEAR_RATE: f32 = 0.25;
 pub const COOLING_GOODS_COST: u32 = 2;
 
 // ---------------------------------------------------------------------------
+// Children & generations (S12)
+// ---------------------------------------------------------------------------
+//
+// Owner decision 5: delvers are full-ASKA people, and colony
+// growth comes from surface recruitment **and children growing
+// up**. The system is opt-in per scenario, in the
+// `critters_enabled` precedent (S3): `Sim::generations_enabled`
+// defaults to false, every pre-existing scenario leaves it off,
+// and with it off the sim is **bit-identical** to the pre-S12
+// sim — no RNG draws, no Ledger entries, no behaviour change,
+// and no state-hash movement. That inertness is engineered, not
+// hoped for:
+//
+// - `generations_enabled` omits itself from the canonical save
+//   while false (`skip_serializing_if`), and `Delver::age_ticks`
+//   omits itself while it holds the founding adult age. A field
+//   omitted at its serde default loads back as exactly that
+//   default, so the omission is roundtrip-safe at any value.
+// - Age advances only while the system is enabled, so a disabled
+//   sim's ages never leave the omitted default. (Modelling
+//   decision where the record was silent: with the system off,
+//   age is inert recorded data — the founding age — exactly as
+//   the slice spec's inertness clause requires.)
+//
+// Modelling decisions where the record was silent (all flagged
+// in docs/TEST_PLAN.md and docs/MUSE_HANDOFF.md):
+//
+// - `TICKS_PER_YEAR` = 2400: one year is one surface-recruitment
+//   cycle (`RECRUIT_INTERVAL`), the colony's existing calendar
+//   beat. Founders and recruits are founded at 25 years
+//   (`FOUNDER_AGE_YEARS`, the serde default above); adulthood is
+//   18 (`ADULT_AGE_YEARS`).
+// - Births are checked on the recruitment family's cadence
+//   (`BIRTH_INTERVAL` = `RECRUIT_INTERVAL`, on tick multiples)
+//   and are **deterministic, with no probability roll**: a birth
+//   fires at a check when at least two adults live, food in
+//   stores is at or above `BIRTH_MIN_FOOD` (which reuses
+//   `RECRUIT_MIN_FOOD` — a colony that looks viable to a recruit
+//   can feed a child), and total population is below
+//   `MAX_DELVER_POPULATION`. The only RNG draw is the child's
+//   name, drawn exactly as recruitment draws one, and only when
+//   a birth actually fires in an enabled sim.
+// - Parents are the two longest-present adults — the two lowest
+//   delver ids among the living adults (ids are issued in
+//   arrival order and never reused). The Ledger names the child
+//   and both parents (decision 2's spirit: the record is by
+//   name).
+// - The child's name comes from the recruitment name pool
+//   (`RECRUIT_NAMES`) not currently in use. Fallback if the pool
+//   is exhausted: no birth at that check (the recruitment
+//   pattern) — unreachable in practice while the population cap
+//   (6) sits below the pool size (12), but stated so the rule is
+//   total.
+// - Childhood scoping: a child lives the camp life of an
+//   Unassigned delver — eats, rests, morale — but the job
+//   decision never dispatches them to work, job assignment
+//   refuses them, and they are never picked as a rescuer. No
+//   school, childcare, or carrying system is modelled; children
+//   at camp are in the lit safe zone by construction.
+
+/// Ticks in one year of a delver's life (S12): one surface
+/// recruitment cycle, the colony's existing calendar beat.
+pub const TICKS_PER_YEAR: u64 = 2400;
+/// A delver is an adult at this many years (S12).
+pub const ADULT_AGE_YEARS: u64 = 18;
+/// The age founders and surface recruits are founded at (S12).
+pub const FOUNDER_AGE_YEARS: u64 = 25;
+/// Births are checked on this cadence (S12) — the recruitment
+/// interval, the periodic-check idiom of the growth family.
+pub const BIRTH_INTERVAL: u64 = RECRUIT_INTERVAL;
+/// Food in stores a birth requires (S12): the recruitment
+/// minimum, reused — a colony viable to a recruit can feed a
+/// child.
+pub const BIRTH_MIN_FOOD: u32 = RECRUIT_MIN_FOOD;
+
+/// The founding adult age in ticks — the serde default for
+/// `Delver::age_ticks`, so pre-S12 saves load as adults.
+fn default_age_ticks() -> u64 {
+    FOUNDER_AGE_YEARS * TICKS_PER_YEAR
+}
+
+/// A field holding the founding age omits itself from the
+/// canonical save (see the S12 note above): pre-S12 state
+/// hashes are bit-identical, and the omission roundtrips
+/// because the default *is* the omitted value.
+fn age_is_default(age: &u64) -> bool {
+    *age == default_age_ticks()
+}
+
+/// A false flag omits itself from the canonical save, the
+/// `generations_enabled` mirror of `age_is_default`.
+fn flag_is_false(flag: &bool) -> bool {
+    !*flag
+}
+
+// ---------------------------------------------------------------------------
 // Delver
 // ---------------------------------------------------------------------------
 
@@ -457,6 +563,14 @@ pub struct Delver {
     pub id: u32,
     pub name: String,
     pub pos: Pos,
+    /// Age in ticks (S12). Founders and recruits are founded at
+    /// the adult default; children are born at 0. Advances only
+    /// while the colony's generations system is enabled, and
+    /// omits itself from the save at the founding default (see
+    /// the S12 section note) so disabled sims hash identically
+    /// to pre-S12 sims. Pre-S12 saves load at the default.
+    #[serde(default = "default_age_ticks", skip_serializing_if = "age_is_default")]
+    pub age_ticks: u64,
     /// 0..100 — spent by work, restored by rest.
     pub energy: f32,
     /// 0..100 — 100 is fully fed; restored by eating from stores.
@@ -518,6 +632,7 @@ impl Delver {
             id,
             name: name.to_string(),
             pos,
+            age_ticks: default_age_ticks(),
             energy: 100.0,
             hunger: 100.0,
             morale: 60.0,
@@ -554,6 +669,18 @@ impl Delver {
         }
     }
 
+    /// Whole years of age (S12): `age_ticks` by integer
+    /// division, so a delver is 17 until the tick their age
+    /// crosses the 18-year line.
+    pub fn age_years(&self) -> u64 {
+        self.age_ticks / TICKS_PER_YEAR
+    }
+    /// Under the adult line by age alone (S12). Whether a young
+    /// delver is a *child* in play also needs the colony's
+    /// generations flag — see `Sim::delver_is_child`.
+    pub fn is_child(&self) -> bool {
+        self.age_years() < ADULT_AGE_YEARS
+    }
     pub fn mining_level(&self) -> u32 {
         self.mining_xp / 10
     }
@@ -781,6 +908,13 @@ pub struct Sim {
     /// Scenarios from before the dark bit (S1/S2) keep critters off;
     /// S3 turns them on.
     pub critters_enabled: bool,
+    /// Children & generations (S12), opt-in in the
+    /// `critters_enabled` pattern: scenarios before S12 leave it
+    /// off, and off is bit-identical to the pre-S12 sim — the
+    /// flag omits itself from the save while false, age never
+    /// advances, and no birth or coming-of-age ever fires.
+    #[serde(default, skip_serializing_if = "flag_is_false")]
+    pub generations_enabled: bool,
     #[serde(skip)]
     pub lit: Vec<bool>,
 }
@@ -831,6 +965,7 @@ impl Sim {
             critters: Vec::new(),
             next_critter_id: 0,
             critters_enabled,
+            generations_enabled: false,
             lit: Vec::new(),
         };
         sim.refresh_light();
@@ -1153,14 +1288,37 @@ impl Sim {
         true
     }
 
+    /// Is this delver a child in play (S12)? A child is a young
+    /// delver in a colony whose generations system is enabled;
+    /// with the system off, age gates nothing.
+    pub fn delver_is_child(&self, d: &Delver) -> bool {
+        self.generations_enabled && d.is_child()
+    }
+
     /// Assign a delver's job. Takes effect at their next decision.
-    pub fn set_job(&mut self, delver_id: u32, job: Job) {
+    /// Returns false — leaving the delver's job untouched — when
+    /// no such delver exists, or when the delver is a child in a
+    /// generations colony and the job is real work (S12:
+    /// children cannot be assigned; assigning `Unassigned` is
+    /// always allowed). The refusal's visible signal in the
+    /// bridge view is that the delver simply stays `Unassigned`.
+    pub fn set_job(&mut self, delver_id: u32, job: Job) -> bool {
+        if job != Job::Unassigned {
+            match self.delvers.iter().find(|d| d.id == delver_id) {
+                Some(d) if self.delver_is_child(d) => return false,
+                Some(_) => {}
+                None => return false,
+            }
+        }
         if let Some(d) = self.delvers.iter_mut().find(|d| d.id == delver_id) {
             d.job = job;
             d.state = DelverState::Idle;
             d.path.clear();
             d.target_face = None;
             d.target_plot = None;
+            true
+        } else {
+            false
         }
     }
 
@@ -1428,9 +1586,91 @@ impl Sim {
         );
     }
 
+    // -- Generations (S12) ----------------------------------------------------
+
+    /// Advance every living delver's age by one tick and ledger
+    /// any coming of age — the tick a delver's age crosses the
+    /// 18-year line, exactly once (age is monotonic, so the
+    /// crossing can fire only once). Called only in generations
+    /// colonies; with the system off age never advances and no
+    /// entry is ever written.
+    fn age_delvers(&mut self) {
+        let mut came_of_age: Vec<String> = Vec::new();
+        for d in self.delvers.iter_mut() {
+            let was = d.age_years();
+            d.age_ticks += 1;
+            if was < ADULT_AGE_YEARS && d.age_years() >= ADULT_AGE_YEARS {
+                came_of_age.push(d.name.clone());
+            }
+        }
+        for name in came_of_age {
+            self.log(
+                LedgerKind::CameOfAge,
+                format!("{name} has come of age and takes up work as an adult"),
+            );
+        }
+    }
+
+    /// The birth check (S12): on the recruitment cadence, a child
+    /// is born when the colony can support one — at least two
+    /// adults alive, food at or above `BIRTH_MIN_FOOD`, and total
+    /// population below `MAX_DELVER_POPULATION`. Deterministic:
+    /// no probability roll; the parents are the two
+    /// longest-present adults (lowest ids); the only RNG draw is
+    /// the child's name from the pool not currently in use,
+    /// exactly as recruitment draws one, and only when a birth
+    /// fires. If the name pool is exhausted there is no birth at
+    /// this check. Never runs in a disabled sim.
+    fn maybe_birth(&mut self) {
+        if !self.generations_enabled
+            || self.tick_count == 0
+            || !self.tick_count.is_multiple_of(BIRTH_INTERVAL)
+        {
+            return;
+        }
+        if self.delvers.len() >= MAX_DELVER_POPULATION {
+            return;
+        }
+        if self.stores.food < BIRTH_MIN_FOOD {
+            return;
+        }
+        let mut adults: Vec<&Delver> =
+            self.delvers.iter().filter(|d| !d.is_child()).collect();
+        if adults.len() < 2 {
+            return;
+        }
+        adults.sort_by_key(|d| d.id);
+        let parent_a = adults[0].name.clone();
+        let parent_b = adults[1].name.clone();
+        let mut rng = Rng {
+            state: self.rng_state,
+        };
+        let taken: Vec<&str> = self.delvers.iter().map(|d| d.name.as_str()).collect();
+        let free: Vec<&&str> = RECRUIT_NAMES.iter().filter(|n| !taken.contains(n)).collect();
+        if free.is_empty() {
+            return;
+        }
+        let name = free[rng.below(free.len() as u64) as usize].to_string();
+        self.rng_state = rng.state;
+        let id = self.next_delver_id;
+        self.next_delver_id += 1;
+        let mut child = Delver::new(id, &name, self.gate, Job::Unassigned);
+        child.age_ticks = 0;
+        self.delvers.push(child);
+        self.log(
+            LedgerKind::ChildBorn,
+            format!("{name} was born to {parent_a} and {parent_b}"),
+        );
+    }
+
     // -- Tick -------------------------------------------------------------------
 
     pub fn tick(&mut self) {
+        // Ages advance (and comings of age are ledgered) only in
+        // generations colonies (S12); disabled sims never call it.
+        if self.generations_enabled {
+            self.age_delvers();
+        }
         // Lanterns burn. A lantern that dies takes its light with it.
         // An unsealed lantern standing in flood water is doused
         // (S10): it loses fuel to the water on top of its burn,
@@ -1480,6 +1720,7 @@ impl Sim {
             p.growth = (p.growth + PLOT_PASSIVE_GROWTH).min(PLOT_READY);
         }
         self.maybe_recruit();
+        self.maybe_birth();
         self.maybe_spawn_critter();
         self.assign_rescues();
         self.tick_critters();
@@ -1779,6 +2020,8 @@ impl Sim {
                     d.state != DelverState::Downed
                         && d.hp >= 30.0
                         && d.rescue_target.is_none()
+                        // Children (S12) are never sent on rescues.
+                        && !self.delver_is_child(d)
                 })
                 .min_by_key(|d| {
                     (d.pos.x - dpos.x).abs() + (d.pos.y - dpos.y).abs() + (d.pos.z - dpos.z).abs()
@@ -2008,6 +2251,13 @@ impl Sim {
             } else {
                 self.delvers[idx].state = DelverState::Resting;
             }
+            return;
+        }
+        // Children (S12) live the camp life above — eat, rest,
+        // morale — but are never dispatched to work: no job step,
+        // no job XP. They idle at camp, in the lit safe zone.
+        if self.delver_is_child(&self.delvers[idx]) {
+            self.delvers[idx].state = DelverState::Idle;
             return;
         }
         match self.delvers[idx].job {

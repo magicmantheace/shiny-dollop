@@ -6,10 +6,10 @@
 use underreach_sim::gen::generate_floor;
 use underreach_sim::scenario::{
     build_scenario, build_scenario_gen, build_scenario_gen_floor, build_scenario_s2,
-    build_scenario_s3, build_scenario_s5, build_scenario_s7, light_the_deep, light_the_way,
-    open_current_floor, open_current_floor_as, open_floor1, GEN_WORLD_SEED,
+    build_scenario_s3, build_scenario_s5, build_scenario_s7, build_scenario_s12, light_the_deep,
+    light_the_way, open_current_floor, open_current_floor_as, open_floor1, GEN_WORLD_SEED,
 };
-use underreach_sim::sim::LedgerKind;
+use underreach_sim::sim::{Job, LedgerKind};
 
 fn count(sim: &underreach_sim::sim::Sim, kind: LedgerKind) -> usize {
     sim.ledger.iter().filter(|e| e.kind == kind).count()
@@ -413,6 +413,56 @@ fn main() {
         s10.delvers.iter().filter(|d| d.cooled).count(),
     );
     println!("S10 magma protected state hash: {}", s10.state_hash());
+
+    // ---- S12: children & generations --------------------------------------
+    // A generations colony: three working founders plus Joss, a
+    // founding child of 17 (the choreography is recorded in
+    // docs/TEST_PLAN.md — a from-birth childhood is eighteen
+    // years of ticks; the from-birth proof lives in the tests).
+    // Phase 1 runs one year and change: Joss comes of age and a
+    // first child is born. Phase 2 puts the grown Joss to work
+    // as a second miner and runs on.
+    let mut s12 = build_scenario_s12();
+    light_the_way(&mut s12);
+    for _ in 0..3000 {
+        s12.tick();
+    }
+    let joss_id = s12
+        .delvers
+        .iter()
+        .find(|d| d.name == "Joss")
+        .map(|d| d.id)
+        .unwrap_or(u32::MAX);
+    let joss_assigned = s12.set_job(joss_id, Job::Miner);
+    for _ in 0..4000 {
+        s12.tick();
+    }
+    let joss = s12.delvers.iter().find(|d| d.name == "Joss");
+    println!(
+        "S12 generations colony ({} ticks): delvers alive={}, goods={}, births={}, comings-of-age={}, grown child assigned miner={}, grown child mining xp={}, children at camp={}, lost={}",
+        s12.tick_count,
+        s12.delvers.len(),
+        s12.stores.goods,
+        count(&s12, LedgerKind::ChildBorn),
+        count(&s12, LedgerKind::CameOfAge),
+        joss_assigned,
+        joss.map(|d| d.mining_xp).unwrap_or(0),
+        s12.delvers.iter().filter(|d| s12.delver_is_child(d)).count(),
+        count(&s12, LedgerKind::DelverLost),
+    );
+    for d in &s12.delvers {
+        println!(
+            "  {} ({:?}): age={} child={} mining_xp={} hauling_xp={} farming_xp={}",
+            d.name,
+            d.job,
+            d.age_years(),
+            s12.delver_is_child(d),
+            d.mining_xp,
+            d.hauling_xp,
+            d.farming_xp,
+        );
+    }
+    println!("S12 state hash: {}", s12.state_hash());
 
     println!("deep ledger (S2):");
     for e in &sim.ledger {
