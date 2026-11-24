@@ -1422,3 +1422,49 @@ owner's explicit word:
    `failed` job, end-to-end arrival at nyx-adam@muse.ai,
    `notify_sent` events on the PC, and no duplicate email
    after a runner restart.
+
+## 1.4.0 DEPLOYED 2026-11-24 (production, Adam's PC)
+
+- **First attempt (PC reboot) rolled back, by design.** The core
+  supervisor applies a staged update at ANY agent restart boundary —
+  including the boundary created by `shutdown /r` terminating the
+  agent while the supervisor was still alive. It applied 1.4.0
+  mid-shutdown (2026-11-24 17:28:39 CST); the health check polls
+  `http://<tailscale-ip>:8765/v1/status` and fails instantly when the
+  child dies, so in a tearing-down network stack it never had a
+  chance. Automatic rollback restored 1.3.1 cleanly
+  (`update-result.json`: rolled_back_version 1.4.0, "post-update
+  health check failed"). No evidence of a 1.4.0 code defect: both
+  files py_compile clean under the core's Python 3.13 and the
+  Windows suite had passed (321 tests, 16 skipped, 1 teardown error —
+  see below).
+- **Fix direction for the next version:** the supervisor's apply
+  path must consult the 1.3.2 `system_shutting_down()` probe and
+  defer the apply when a shutdown is in progress.
+- **Second attempt (same day, Adam's word) applied cleanly.** The
+  retained release zip (`bridge-files\bridge-release-1.4.0.zip`,
+  sha256 d552bccf… re-verified) was re-staged through
+  `/v1/update/stage`, the core agent was killed at a controlled
+  boundary with the machine up, and the supervisor applied 1.4.0 and
+  passed the health check: `last_result = applied_ok` at
+  17:39:35 CST. Backup of the 1.3.1 files:
+  `agent\state\backup\1.4.0-20261124-233934`.
+- **Post-apply smokes on the real PC, all passing:** status reports
+  1.4.0; exec round-trip; detached-PowerShell marker proof (the
+  1.3.1 DETACHED_PROCESS regression stays fixed); presence returns
+  real data (input idle, foreground app, GPU via nvidia-smi,
+  gaming=false); window raise by title topped a self-spawned Notepad
+  via SetWindowPos WITHOUT stealing foreground from the user's app
+  (SetForegroundWindow not granted while the user is away — the
+  designed non-disturbance behaviour). Note: pid-based raise 404s on
+  the Windows 11 Notepad stub pid — the real window lives under the
+  packaged-app child pid; raise packaged apps by title.
+- **Still owed:** (1) the graceful-reboot resume re-test (needs its
+  own authorization; a demo job must be mid-stage at a graceful
+  shutdown); (2) the Project Mode smoke; (3) Adam's one-time Gmail
+  app-password activation — notify stays dark until
+  `BRIDGE_NOTIFY_APP_PASSWORD` is set on the PC and
+  `notify_email_enabled: true` + `notify_smtp_user` are in the PC
+  config; (4) a test-hygiene fix for the Windows suite's one error:
+  `test_v1_3_2_shutdown_resume` teardown hits WinError 32 deleting a
+  still-open temp log (all assertions pass; Windows-only).
