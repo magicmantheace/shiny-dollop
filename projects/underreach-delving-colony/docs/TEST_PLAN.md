@@ -1,0 +1,367 @@
+# Test plan — Underreach: Delving Colony
+
+## S1 — sim core
+
+All tests run headless on the VM: `cargo test` in `sim/`, plus the
+`scenario` binary (`cargo run --release --bin scenario`).
+
+### Unit tests
+
+- **World**: carving a solid cell makes it carved and returns the
+  material; carving an already-carved cell is a no-op; out-of-bounds
+  access is rejected.
+- **Light**: a lantern lights carved cells within its tier radius and
+  nothing through/inside solid rock; a lantern with no fuel lights
+  nothing.
+- **Path**: BFS finds a route through lit carved cells; the same route
+  with the lantern removed (dark) returns no path — delvers do not
+  path through darkness.
+- **Save/load**: canonical save → load reproduces the SHA-256 state
+  hash exactly.
+
+### Scenario test (the S1 acceptance run)
+
+A scripted Shallows colony: camp chamber, shaft, tunnel, ore face.
+
+- **Phase 1 — the dark refuses**: tunnel carved, no lanterns beyond
+  camp. Run 200 ticks. Expect: zero ore delivered, zero goods, and a
+  `RouteBlocked` entry in the Deep Ledger.
+- **Phase 2 — first light**: place lanterns down the shaft and tunnel.
+  Expect `FirstLight` ledger entries for the newly lit depths, then run
+  up to 4,000 ticks. Expect: at least 3 haul deliveries and at least 2
+  converted goods; the delver's mining XP has increased.
+- **Determinism**: at a mid-run point, save; continue the original and
+  the loaded copy for the same ticks; state hashes must match.
+
+### Results — 2026-11-10 (VM, headless)
+
+- `cargo test` (debug): **8 passed, 0 failed** — 5 unit (world carve /
+  bounds, light radius & solid-rock exclusion, dead lantern, path
+  requires light) and 3 scenario acceptance tests (phase 1 refusal,
+  phase 2 first light + production, save/load roundtrip +
+  deterministic continuation).
+- `cargo run --release --bin scenario`:
+  - Phase 1 (200 ticks): `goods=0, deliveries=0, route-blocked
+    entries=1` — Bram cannot reach the face; the refusal is ledgered.
+  - Phase 2 (4,200 ticks total): `goods=6, deliveries=3,
+    conversions=3, first-light entries=6, mining xp=12`. First light
+    recorded at depths 3–6 by the camp lantern at founding, then 7
+    and 8 when the network was extended; all 12 ore hauled in 3 loads
+    of 4 and converted 2-for-1 into 6 goods.
+  - Final state hash:
+    `2dfee45db387e84876549580119df42bd03e3d407a4197c91bb39e49d6e91111`.
+
+## S2 — colony breadth (verified 2026-11-10, VM headless)
+
+- `cargo test`: 13/13 green (5 unit, 3 S1 scenario, 5 S2 scenario).
+- S2 scenario run (6,000 ticks, network lit from the start): 5 delvers
+  (3 founders + 2 recruits), 6 goods, 80 food in stores, 42 harvests,
+  3 deliveries, 2 recruits, 0 spirits-fallen. Final hash
+  `15219b37986f16972ffb0c07168321aa9f466c5b9cb52e194d4cb7a569eb32dd`
+  (hashes change as the sim model evolves; determinism is proven by
+  the save/load + twin-run tests, not by hash stability across slices).
+- Proven by tests: job division (miner fills the face cache, hauler
+  runs it home, farmer's harvests reach stores), recruitment arrival
+  on schedule while fed, morale collapse + `SpiritsFallen` in a
+  starved colony, save/load continuation bit-identical.
+- Balance notes (observed, tuned once): hunger decay and plot growth
+  were re-tuned after the first run produced a 1,129-food surplus;
+  a starving delver now cannot rest past half energy, which is what
+  makes morale actually fall when the food runs out.
+
+## S3 — the dark bites (verified 2026-11-10, VM headless)
+
+- `cargo test`: 18/18 green (adds 5 S3 scenario tests).
+- Choreographed proofs: a delver kills a gloam rat in total darkness
+  (kill credited in the Ledger, combat XP gained, delver bitten but
+  standing); a downed delver is carried home by a rescuer before the
+  900-tick clock expires (`DelverRescued`, hp restored to 30); a
+  downed delver alone is lost at clock-out (`DelverLost`, name kept);
+  killing the tunnel lanterns strands the miner at the face on the
+  600-tick dark clock, ending in a loss.
+- S3 scenario run (6,000 ticks): colony produced 20 goods under
+  threat; 5 critters spotted and 5 slain, 0 downed, 0 lost. Honest
+  read: in this run the lantern network itself did the repelling —
+  every incursion burned in the light before reaching a delver
+  (all combat XP stayed 0). Delver combat is proven by the corridor
+  tests above, not by this run.
+- Design rule that fell out of implementation: nobody works in the
+  dark — a delver cut off by a light failure stops work and waits
+  (for rescue, a relight, or the clock).
+
+## S5 — the Fungal Reaches (verified 2026-11-10, VM headless)
+
+- `cargo test`: 24/24 green (adds 6 S5 scenario tests).
+- The gate set, proven piece by piece: an unmasked miner working the
+  fungal face gets the spore-cough (`DelverSick`) and still hauls oil
+  home; a crafted mask (2 goods) protects its wearer entirely;
+  tier-2 lantern placement is refused with no oil in stores and
+  succeeds for exactly 1 oil once it flows; a herbalist clears a
+  spore load of 90 to well in ~60 ticks vs ~400 for clean air alone
+  (control run in the same test).
+- Recombination groundwork: `hazards_at(y)` — Shallows clean, Fungal
+  spore, then cycling unions (spore+flood, spore+heat, flood+heat)
+  every 8 depths, asserted as data. Only `spores` has mechanics in
+  this slice; `flooded`/`hot` are modelled, not yet simulated.
+- S5 scenario run (6,000 ticks, two masks crafted): 6 delvers alive,
+  19 fungal oil stockpiled, tier-2 placement succeeds, **0 sick
+  events** — with the miner masked, the hauler's short trips clear
+  between runs; sustained unmasked mining is what sickens (test 1).
+- Two design rules fell out of implementation failures, both kept:
+  tier-2 oil cost is a flat 1 per lantern (a per-fuel charge made
+  scenario lanterns silently unaffordable and broke the S3 rescue
+  test — caught by that test), and a herbalist's patient stays a
+  patient until well (<30 spore), not until merely not-critical.
+
+## S4 — Godot frontend (verified 2026-11-10, VM headless)
+
+- Bridge: `cargo test` 25/25 (adds a bridge acceptance test that
+  drives an S3 colony to production through the file protocol
+  alone: init → light_the_way → 4,000 ticks → goods ≥ 1).
+- Frontend: `godot --headless -- --underreach-verify` prints
+  `UNDERREACH_VERIFY_PASS goods=20 delvers=5 floor_instances=15
+  tick=4000` — the scene initialises the colony through the bridge,
+  issues the network command, drives 4,000 ticks, and the rendered
+  entity set matches the sim view exactly.
+- The view is a depth slice (one sim layer at a time); entities use
+  Game Asset Builder catalog GLBs (snow-goblin delver stand-in,
+  ember-dragon critter stand-in, treasure-chest stockpile,
+  mushroom-cluster plots — provenance + shas in `frontend/README.md`).
+- **Not verified:** anything visual. Godot's headless driver on this
+  VM produces no viewport image (a capture attempt failed cleanly
+  and the code path was removed rather than shipped unproven). A
+  first on-PC pass ran 2026-11-12 after the owner lifted the PC
+  testing stop — engine-verified live (see the on-PC section
+  below) — but the workstation was locked, so screenshots captured
+  only the Windows lock screen. Rendered appearance remains
+  unverified, as do all frame claims.
+
+## Asset swap — dedicated delver, lantern, cot (verified 2026-11-11, VM headless)
+
+- The builder's dedicated delver GLB (catalog sha256
+  `7ab7262b7eeb…`, arm-separation-gated A-pose build) replaced the
+  snow-goblin stand-in as `DELVER_SCENE`; the Tier-1 lantern prop
+  (`5dffb6360730…`) replaced the emissive-sphere lantern visual
+  (OmniLight + emissive flame marker kept); the cot prop
+  (`67e070f2012…`) replaced the plain bed box. Frontend copies are
+  byte-for-byte — sha256 of the copies matches the catalog values.
+- `godot --headless -- --underreach-verify` after the swap prints
+  the identical pass line as S4: `UNDERREACH_VERIFY_PASS goods=20
+  delvers=5 floor_instances=15 tick=4000`, with no errors or
+  warnings in the full output.
+- A one-off load check (temporary script, run then deleted)
+  instantiated all three GLBs in Godot: delver 1 mesh / 4 animation
+  clips (idle, walk, run, bounce), lantern 1 mesh, cot 1 mesh.
+- Sim untouched: `cargo test` 25/25 and the `scenario` binary run
+  repeated after the swap, same results.
+- **Not verified:** the visual appearance of the delver, lantern,
+  and cot in the rendered scene — headless verify proves load and
+  logic, not looks. The on-PC visual pass remains the outstanding
+  check, as do all frame claims.
+
+## On-PC pass — engine-verified live (2026-11-12)
+
+- The owner lifted the full PC testing stop on 2026-11-12. The sim
+  bridge was cross-compiled on the VM for Windows
+  (`x86_64-pc-windows-gnu`; `bridge.exe` sha256 `5f374368…`) — the
+  PC has no Rust toolchain — so the pass ran against a genuinely
+  live sim stepping on the PC, not a state snapshot.
+- Frontend + bridge staged at `D:\bridge-work\underreach-visual\`
+  and hash-verified on the PC: `delver.glb`, `lantern.glb`, and
+  `cot.glb` copies match the builder catalog shas.
+- A first windowed launch threw repeated script errors (prop
+  scenes loading as null) — traced to the missing Godot import
+  cache in the staging, not project code. After a headless editor
+  import pass on the PC, the project's own check printed
+  `UNDERREACH_VERIFY_PASS goods=20 delvers=5 floor_instances=15
+  tick=4000` on Windows — identical numbers to the VM.
+- Windowed relaunch on the RTX 3060 (OpenGL/NVIDIA per the engine
+  log): zero script errors (stderr 0 bytes); the state file
+  changed on every sample — the sim was live and stepping. Godot
+  was closed afterwards and verified gone.
+- **Not verified:** rendered appearance. The workstation was
+  locked (LogonUI) throughout, so all screenshots captured only
+  the Windows lock screen; the captures were deleted rather than
+  kept as misleading "game" images. Animation motion was not
+  observed; clip playback rests on the headless verifies.
+- **Capture redo (2026-11-12, workstation unlocked):** staging
+  restaged from branch tip `3cca4f2` (lurker swap included; all
+  GLB shas re-verified on the PC), import pass redone, project
+  check again `UNDERREACH_VERIFY_PASS` with identical numbers.
+  (Wrinkle: the verify needs `UNDERREACH_BRIDGE` set to the
+  release `bridge.exe`; without it the frontend falls back to a
+  non-existent debug path.) The live run climbed past tick 3,783
+  with the HUD advancing and zero script errors — **but the 3D
+  viewport is pitch black in every capture** while the live
+  `state.json` held 15 carved/lit cells, 4 delvers, and a lantern
+  at the viewed layer beside the camera target. Nothing 3D is
+  drawn: no terrain, models, light pools, or name labels.
+  Appearance is therefore still unverified — now blocked on this
+  rendering defect, not on access. Root cause unproven; the
+  conflict is recorded in `docs/MUSE_HANDOFF.md` (rule 3).
+
+## Black-viewport diagnosis — no defect reproduces (2026-11-12)
+
+- Owner gave the go the same day. Method: read `frontend/main.gd`
+  end to end first (camera, environment, MultiMesh setup, entity
+  sync), then controlled launches of the UNMODIFIED staged build
+  on the PC (`UNDERREACH_BRIDGE` set to the release `bridge.exe`,
+  window placed fully on-screen with `--position 100,60`).
+- **The world renders.** Screenshots (viewed, incl. a centre crop)
+  show: lit tan floor tiles with grid seams (MultiMesh floors in
+  the lit colour), dark rock-rim walls, the treasure chest, three
+  cots, the lantern prop with a warm OmniLight pool on the floor,
+  and standing delver figures. Two scenarios (s3: 3 delvers, tick
+  804+; s5: 4 delvers incl. the Herbalist, Goods 4), two separate
+  process instances, and a minimize/restore cycle in between —
+  rendering intact in every capture.
+- **Pixel evidence on the original captures:** all three redo
+  captures sample 100% uniformly (5,5,11) across the viewport —
+  exactly the Environment background colour. The camera WAS
+  active and the environment WAS rendering in that session; what
+  never appeared is geometry. That session's window spent its
+  life mostly off-screen / behind other windows (it had to be
+  chased by minimizing the owner's apps), and the carved room is
+  small and centred — the captures' visible areas never contained
+  it. The exact historical mechanism is not provable from here;
+  what is proven is that no code path in the frontend reproduces
+  it under controlled conditions.
+- **Ruled out, each with evidence:** camera never made current
+  (background + full scene render; Godot activates the first
+  camera), environment/ambient setup (background is the env
+  colour; scene is lit by sun + ambient + lantern omni),
+  MultiMesh instance colours under gl_compatibility (floor/rock
+  instance colours render distinctly), world-node transforms
+  (room sits at the camera target in frame), GLB load failure
+  (chest/cots/lantern/delvers all draw), minimize/restore
+  swapchain loss (post-cycle capture renders).
+- **Disposition:** no frontend code change — there is no
+  reproduced defect to fix, and changing code against an
+  unreproduced report is how this record got muddy in the first
+  place. The rule-3 conflict in `docs/MUSE_HANDOFF.md` is closed
+  as capture-conditions, with the protocol lesson recorded there.
+  VM checks after the pass: `cargo test` all suites ok (25/25),
+  `scenario` clean to tick 6000, headless verify again
+  `UNDERREACH_VERIFY_PASS goods=20 delvers=5 floor_instances=15
+  tick=4000`.
+- **Still unverified:** a critter (gloam-lurker) in frame on PC —
+  both live scenarios sat at Critters 0 for the whole session;
+  name-label legibility at capture zoom (labels exist in code;
+  figures visibly re-pose between captures, but clip playback as
+  such rests on the headless verifies); layer switching on PC
+  (Godot's UI exposes no UIA controls to the bridge and there is
+  no key-injection route; the layer path is the same
+  `rebuild_layer` the verify exercises). Cots read plain white at
+  capture zoom — cosmetic, matches the prop's pale paint; noted,
+  not treated as a defect.
+
+## Asset swap — gloam-lurker critter (verified 2026-11-12, VM headless)
+
+- The builder's gloam-lurker GLB (catalog sha256 `f0c881cb9bd3…`,
+  builder branch `game-asset-builder/underreach-assets` @
+  `328bca3`) replaced the ember-dragon stand-in as `CRITTER_SCENE`;
+  the dragon file is kept, now unused. The frontend copy is
+  byte-for-byte — sha256 of the copy matches the catalog value.
+  The asset passed the builder's leg-separation gates before
+  cataloguing (concept preflight; posed renders of rest and the
+  idle/walk/run/shiver apexes plus a beyond-spec stress pose —
+  legs separate with belly daylight in every shipped pose; the
+  stress pose only shows a neck/head weight artifact, recorded in
+  the builder docs).
+- `godot --headless -- --underreach-verify` after the swap prints
+  the identical pass line: `UNDERREACH_VERIFY_PASS goods=20
+  delvers=5 floor_instances=15 tick=4000`.
+- Sim untouched: `cargo test` 25/25 and the `scenario` binary run
+  repeated after the swap, clean to tick 6000.
+- **Not verified:** the lurker's in-engine appearance and clip
+  playback — load is proven by the verify run; looks await the
+  unlocked-PC capture redo above.
+
+## S6 — procedural floor generation (verified 2026-11-12, VM headless)
+
+Branch `underreach-delving-colony/floor-generation`. Design
+record: `docs/FLOOR_GENERATION.md`. Save hashes for S1–S5 shift
+in this slice (the save gains `world_seed` and `floor` fields);
+behaviour numbers are unchanged, and determinism is proven by
+the twin-run tests as before.
+
+### Generator tests (`sim/tests/gen_floor.rs`, 10 tests)
+
+- **Purity:** same seed + floor → identical world hash and
+  layout across runs; floors 1–4 generated standalone equal
+  floors generated sequentially and interleaved; seeds 1/2/3 →
+  pairwise different floor 1s; floor 1 ≠ floor 2 for one seed.
+- **Network guarantees across seeds 1–16 + demo seed
+  `0x5EED0007`:** entry → descent reachable via passages alone
+  every time; measured descent network distance **25–45**
+  (guarantee ≥ 24, and the layout's recorded distance equals
+  the measured one); every connected cavity reached, every
+  sealed cavity unreached; on-network dens exactly **2** at
+  distances **18–36** (guarantee ≥ 2 at ≥ 10); sealed dens 0–1
+  (minority); node graph 8 nodes / 8 links (one loop); camp room
+  intact; 3 faces with carved stands and ore rock; 6 veins with
+  at least one embedded pocket.
+- **Hazards:** the world's Loose/BadAir cells are exactly the
+  layout's pockets; every bad-air cell at y ≥ 6; loose 7–12
+  cells, bad air 5–8 cells per floor across the spread.
+- **RNG separation:** the gen scenario starts with
+  `rng_state == world_seed`, and `open_floor1` draws nothing.
+- **Save/load:** generated-floor sim saved at tick 500 reloads
+  to the identical hash, floor record included; twin
+  continuation for 300 ticks stays identical.
+- **Colony loop on the generated floor:** 200 dark ticks →
+  goods 0, deliveries 0, RouteBlocked ≥ 1; after `open_floor1`,
+  6 000 ticks → deliveries ≥ 3, goods ≥ 2 (actual 24), nobody
+  lost.
+- **Rescue on generated geometry:** a deep lurker staged beside
+  the first face downs Bram; a rescuer carries him home within
+  the 1 500-tick window; nobody lost.
+- **Stub bands:** floor 2 generates as Fungal Reaches with
+  fungal-node cells present and `built == false`; floor 5 is
+  Magma Roots; floor 6 recombines to Fungal Reaches.
+
+### Defects found by these tests during development (both fixed)
+
+- **HashSet-order impurity:** one sampling step iterated a
+  `HashSet` unsorted, so floor 2 could differ between
+  generation orders. Fixed by sorting every sampled set; the
+  independence test now covers stub bands for this reason.
+- **Bad-air depth leak:** hazard pockets were *seeded* at
+  y ≥ 6 but *grew* upward. The growth predicate now enforces
+  the floor's minimum y for the whole pocket.
+
+### Full-suite + harness results
+
+- `cargo test`: **37/37** (25 pre-existing + 10 gen_floor + 2
+  generator unit tests), 0 failed.
+- `scenario` binary (release): S1/S2/S3/S5 sections unchanged
+  in behaviour (S1 goods 6, S3 goods 20, S5 oil 19). New GEN
+  section: phase 1 goods=0, RouteBlocked=1; after opening,
+  **goods=24, deliveries=13, conversions=13, delvers alive=5,
+  lost=0** at tick 6 200; descent (20, 9, 3) at network
+  distance 28; 52 network cells; 2 dens; 3 faces. GEN state
+  hash `ba202ca7f045f5443d08…`.
+- Godot headless verify prints **both** lines:
+  `UNDERREACH_VERIFY_PASS goods=20 delvers=5 floor_instances=15
+  tick=4000` (s3, unchanged) and `UNDERREACH_VERIFY_PASS
+  scenario=gen goods=24 delvers=5 floor_instances=61 tick=4000`
+  — for gen, the view layer is set to the descent's depth (9),
+  so 61 is the generated floor's carved-cell count on that
+  layer.
+- **Not verified:** generated-floor appearance on the owner's
+  PC (placeholder markers have never been rendered outside the
+  headless load check); floors 2–5 balance (stub themes);
+  cave-in/bad-air mechanics (cells exist, no mechanics);
+  floor-to-floor traversal (descent is a marker, not a
+  transition).
+
+## Planned (later slices)
+
+- Owner-PC visual pass of the frontend; performance measurement
+  before any frame budget claim.
+- The dedicated gloam-lurker asset once it is built (not yet in the
+  builder catalog); the ember-dragon stands in until then.
+- S6 follow-ons: floor-to-floor traversal, cave-in/bad-air
+  mechanics with their timber/ventilation answers, face
+  registration when a pocket is carved open, floors 2–5
+  scenarios.

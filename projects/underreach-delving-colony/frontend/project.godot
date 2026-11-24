@@ -1,0 +1,24 @@
+; Engine configuration file.
+; Underreach — Delving Colony frontend (S4 prototype).
+; Presentation only: every sim rule lives in the Rust core, reached
+; through the file bridge (see ../sim/src/bin/bridge.rs).
+
+config_version=5
+
+[application]
+
+config/name="Underreach — Delving Colony"
+config/description="Godot frontend over the deterministic Rust sim core. Reads state, sends commands, holds no rules."
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=800
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.02, 0.02, 0.04, 1)

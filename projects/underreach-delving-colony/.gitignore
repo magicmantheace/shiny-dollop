@@ -1,0 +1,16 @@
+# Rust
+sim/target/
+**/target/
+Cargo.lock.orig
+
+# Saves and local state (never commit runtime data)
+*.save.json
+saves/
+
+# Godot frontend: the import cache is local, but .import sidecars
+# and .uid files are project files and belong in git.
+.godot/
+
+# OS / editor
+.DS_Store
+*.swp
