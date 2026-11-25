@@ -133,13 +133,15 @@ fn determinism_on_floor_5() {
 /// band-keyed: on generated floor 2 the band's spores fill the
 /// floor's deep zone (y ≥ `BAND_ZONE_FROM_Y`), while the first
 /// face's stand — at y = 5, in the floor's shallows — stays in
-/// clean air, exactly as the camp does. Fungal oil still does
-/// not flow: the generator registers faces from the theme's
-/// primary resource cell (ore) only, and the fungal-node
-/// clusters are embedded pockets, not faces (that half of the
-/// S9 finding stands; face registration for embedded pockets
-/// remains a separate recorded follow-on). The depth table
-/// itself is untouched: every face stand is still above the
+/// clean air, exactly as the camp does. That half of the
+/// S9 finding stood until S14: fungal-node clusters that
+/// touch carved space now register as faces (S14), so oil
+/// can flow on generated floor 2 — the flow proof is
+/// `scenario_s14.rs`. This test's own colony run below
+/// still shows no oil, for the narrower reason its ending
+/// records: the standard opening never reaches the fungal
+/// face within the budget. The depth table itself is
+/// untouched: every face stand is still above the
 /// hand-built Fungal line, which is precisely why the S9
 /// depth-keyed proof came back negative.
 #[test]
@@ -152,10 +154,24 @@ fn fungal_spores_engage_in_floor_2s_deep_zone() {
             "the depth table alone still keys no stand {stand:?} as spore-bearing"
         );
     }
-    // The faces yield ore, not fungal oil.
-    assert!(
-        floor.layout.faces.iter().all(|f| f.yield_kind == YieldKind::Ore),
-        "generated floor 2 faces yield ore only"
+    // S14: the demo floor's faces are three ore faces plus
+    // one fungal face — the cluster at rock (15, 4, 1) touches
+    // carved space and registers, third in sorted order. The
+    // staged probes below keep using faces[0] (the shallow
+    // ore starter) and faces[1] (the deep ore face), whose
+    // stands S14 does not move.
+    let fungal: Vec<_> = floor
+        .layout
+        .faces
+        .iter()
+        .filter(|f| f.yield_kind == YieldKind::FungalOil)
+        .collect();
+    assert_eq!(fungal.len(), 1, "one fungal face registers on the demo floor");
+    assert_eq!(fungal[0].rock, underreach_sim::world::Pos::new(15, 4, 1));
+    assert_eq!(
+        floor.world.get(fungal[0].rock),
+        Some(Cell::FungalNode),
+        "the fungal face's rock is a fungal node cell"
     );
 
     // An unmasked delver staged at the first face's stand (the
@@ -194,14 +210,23 @@ fn fungal_spores_engage_in_floor_2s_deep_zone() {
         "the spore-cough fires on generated floor 2"
     );
 
-    // And across a full colony run no oil reaches the stores:
-    // generated faces yield ore only (unchanged from S9).
+    // And across the standard opening's run, no oil reaches
+    // the stores — not because oil cannot flow (S14 removed
+    // that block) but because the colony works faces in
+    // order and spends the whole 6,000-tick budget on the
+    // first two ore faces; the fungal face, third in order,
+    // is never reached, and its route is never lit. The run
+    // that lights the fungal route and works the face is
+    // S14's proof (`scenario_s14.rs`).
     let mut sim = build_scenario_gen_floor(GEN_WORLD_SEED, 2);
     open_current_floor(&mut sim);
     for _ in 0..6000 {
         sim.tick();
     }
-    assert_eq!(sim.stores.fungal_oil, 0, "no fungal oil flows from ore faces");
+    assert_eq!(
+        sim.stores.fungal_oil, 0,
+        "the standard opening never reaches the fungal face in budget"
+    );
 }
 
 /// Guard: Floor 1's theme row is untouchable in this slice —

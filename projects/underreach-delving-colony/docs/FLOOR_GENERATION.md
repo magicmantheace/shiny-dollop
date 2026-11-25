@@ -117,6 +117,24 @@ finding's second half stands: generated faces still
 yield ore only, so fungal oil does not flow on floor 2 —
 face registration for embedded pockets remains open.
 Full record: `docs/TEST_PLAN.md`.)*
+*(S14 amendment, 2026-11-24: the finding is fully
+resolved. The cluster step now registers a workable face
+for every fungal-node cluster that touches carved,
+reachable space — stand at the carved neighbour closest
+to the entry, yield at the generator's per-cell rate,
+`YieldKind::FungalOil` — so a colony founded on a
+generated Fungal Reaches floor harvests fungal oil
+through the ordinary mine → haul → deposit path and
+burns it in tier-2+ lanterns (the S14 gate-set proof:
+all 12 units of the demo floor's registered cluster in
+stores at tick 500, one charge burned in a tier-2
+lantern at the face). Clusters sealed in the rock stay
+embedded pockets, as veins do. Registration draws no
+RNG and moves no rock, so generated worlds are
+byte-identical to their pre-S14 form; only Fungal-band
+face lists grow. What remains open is the different,
+older follow-on: registering a face when a pocket is
+carved open mid-game. Full record: `docs/TEST_PLAN.md`.)*
 
 ## The generator, step by step
 
@@ -166,6 +184,11 @@ Full record: `docs/TEST_PLAN.md`.)*
    floors: the colony refuses the dark until the player carries
    light down the passages. Veins that fail to grow are rolled
    back to stone; the layout accounts for every resource cell.
+   *(S14 addition: the Fungal band's node clusters, placed
+   after the veins, register by the same rule — a cluster
+   whose cells touch carved, reachable space becomes a face
+   yielding fungal oil; see the theme-table amendments
+   above.)*
 9. **Hazard pockets.** Loose rock and bad air are new cell
    kinds (`Cell::Loose`, `Cell::BadAir`) — generation and
    rendering only in this slice, the same modelling stance S5
@@ -230,6 +253,11 @@ cells and render as ordinary floor.
 - **Face registration for embedded pockets.** An off-network
   vein is layout data; if a player carves into one today, no
   face appears. Registering faces on exposure is a later slice.
+  *(S14 note, 2026-11-24: generation-time registration now
+  exists for the Fungal band's clusters — a cluster touching
+  carved space at generation registers as a face (see the
+  theme-table amendments). This bullet is the remaining half:
+  exposure by carving mid-game, still unbuilt.)*
 - **Floor-to-floor traversal.** The descent is a placed,
   rendered, guaranteed-reachable point — not yet a transition.
   Multi-floor saves arrive with it. *(S8 amendment,

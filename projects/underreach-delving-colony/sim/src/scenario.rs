@@ -500,3 +500,20 @@ pub fn open_current_floor_as(sim: &mut Sim, tier: u8) {
         }
     }
 }
+
+/// S14: light the route from the stockpile to one chosen
+/// face's stand — the player's frontier work aimed at a
+/// specific face (on generated floor 2, the fungal face),
+/// with the same lantern spacing as `open_current_floor`.
+/// The face is one of the sim's own registered faces; the
+/// route is carved space in the active world.
+pub fn light_route_to_face(sim: &mut Sim, face: &Face) {
+    let Some(path) = carved_path(&sim.world, sim.stockpile, face.stand) else {
+        return;
+    };
+    for (i, p) in path.iter().enumerate() {
+        if i % 4 == 3 || i == path.len() - 1 {
+            sim.place_lantern(*p, 1, 5_000.0);
+        }
+    }
+}
