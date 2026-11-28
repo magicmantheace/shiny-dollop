@@ -31,6 +31,11 @@ const BridgeClient = preload("res://scripts/bridge_client.gd")
 ## refusal, contact + translation, a treaty proposal with its
 ## stated outcome, the embargo round-trip), printing
 ## S4_VERIFY_PASS lines.
+##   godot --headless --path viewer -- --verify-s5 --bridge=PATH
+## runs the S5 checks (war & victory surface in the view, war
+## declaration refused before contact and accepted after it, the
+## gate build refused below development 6), printing
+## S5_VERIFY_PASS lines.
 
 const SPECTRAL_COLORS := {
 	0: Color(0.62, 0.71, 1.0),    # O — blue
@@ -52,6 +57,10 @@ const SPEED_LABELS := ["Paused", "1× (1 day/day)", "1 day/hour", "1 day/min", "
 
 const SPEC_IDS := ["industrial", "agricultural", "refinery", "research", "fortress", "trade_hub", "shipyard"]
 const SPEC_LABELS := ["Industrial", "Agricultural", "Refinery", "Research", "Fortress", "Trade Hub", "Shipyard"]
+
+# S5 victory rules (bridge victory-rule strings, §6.5/§11.4).
+const VICTORY_IDS := ["hegemony", "gate_web", "first_among_equals", "sandbox"]
+const VICTORY_LABELS := ["Hegemony (40% of colonies)", "Gate Web (60% connected)", "First Among Equals (score at end year)", "Sandbox (no victory)"]
 
 # S4 diplomacy instruments (bridge treaty-kind strings).
 const TREATY_KINDS := ["trade_agreement", "gate_access", "non_aggression_pact", "alliance", "research_pact"]
@@ -87,6 +96,20 @@ const EVENT_TEXT := {
 	"peace_settled": "Peace settled",
 	"treaty_proposed": "Proposal received",
 	"deal_refused": "Deal refused",
+	"war_declared": "War declared",
+	"ship_destroyed": "Ship destroyed",
+	"occupation_started": "Occupation begun",
+	"occupation_ended": "Occupation ended",
+	"gate_construction_started": "Gate construction started",
+	"gate_completed": "Gate completed",
+	"gate_paired": "Gates paired",
+	"gate_destroyed": "Gate destroyed",
+	"terraform_started": "Terraforming started",
+	"terraform_completed": "Terraforming completed",
+	"victory_achieved": "Victory achieved",
+	"colony_blockaded": "Colony blockaded",
+	"war_ended": "War ended",
+	"colony_resisted": "Colony resisted occupation",
 }
 
 var table: StarTable
@@ -149,6 +172,13 @@ var menu_overlay: Control
 var menu_status_label: Label
 var seed_spin: SpinBox
 var ai_spin: SpinBox
+var victory_option: OptionButton
+var victory_year_spin: SpinBox
+var build_gate_button: Button
+var pair_gate_button: Button
+var gate_transit_button: Button
+var invade_button: Button
+var terraform_button: Button
 var save_name_edit: LineEdit
 var saves_item_list: ItemList
 var elapsed_spin: SpinBox
@@ -182,6 +212,11 @@ func _ready() -> void:
 	_refresh_saves_list()
 	if user_args.has("measure"):
 		_run_measure(load_ms)
+	elif user_args.has("verify_s5"):
+		if _run_verify_checks(data_path, load_ms) > 0:
+			get_tree().quit(1)
+		else:
+			_run_verify_s5()
 	elif user_args.has("verify_s4"):
 		if _run_verify_checks(data_path, load_ms) > 0:
 			get_tree().quit(1)
@@ -217,6 +252,8 @@ func _parse_user_args() -> Dictionary:
 			out["verify_s3"] = true
 		elif a == "--verify-s4":
 			out["verify_s4"] = true
+		elif a == "--verify-s5":
+			out["verify_s5"] = true
 		elif a == "--measure":
 			out["measure"] = true
 		elif a.begins_with("--data="):
@@ -229,7 +266,7 @@ func _parse_user_args() -> Dictionary:
 func _setup_bridge() -> void:
 	bridge_client = BridgeClient.new()
 	var explicit := str(user_args.get("bridge", ""))
-	if (user_args.has("verify_s2") or user_args.has("verify_s3") or user_args.has("verify_s4")) and explicit != "":
+	if (user_args.has("verify_s2") or user_args.has("verify_s3") or user_args.has("verify_s4") or user_args.has("verify_s5")) and explicit != "":
 		# Verify mode names the exact binary under test; do not let
 		# the candidate search substitute a different one.
 		bridge_path = explicit
@@ -469,6 +506,16 @@ func _build_system_panel(layer: CanvasLayer) -> void:
 	box.add_child(found_button)
 	refuel_button = _action_button("Refuel Ship Here", _on_refuel_pressed)
 	box.add_child(refuel_button)
+	build_gate_button = _action_button("Build Warp Gate — 12,000 cr / 300 alloys", _on_build_gate_pressed)
+	box.add_child(build_gate_button)
+	pair_gate_button = _action_button("Pair Gate", _on_pair_gate_pressed)
+	box.add_child(pair_gate_button)
+	gate_transit_button = _action_button("Send Selected Ship Through Gate", _on_gate_transit_pressed)
+	box.add_child(gate_transit_button)
+	invade_button = _action_button("Invade — Land Troops", _on_invade_pressed)
+	box.add_child(invade_button)
+	terraform_button = _action_button("Start Terraforming — 20,000 cr / 15 exotics", _on_terraform_pressed)
+	box.add_child(terraform_button)
 
 
 func _build_ships_panel(layer: CanvasLayer) -> void:
@@ -548,6 +595,31 @@ func _build_menu(layer: CanvasLayer) -> void:
 	ai_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	ai_row.add_child(ai_spin)
 	box.add_child(ai_row)
+
+	var victory_row := HBoxContainer.new()
+	var victory_caption := Label.new()
+	victory_caption.text = "Victory"
+	victory_row.add_child(victory_caption)
+	victory_option = OptionButton.new()
+	for i in VICTORY_IDS.size():
+		victory_option.add_item(VICTORY_LABELS[i], i)
+	victory_option.selected = 0
+	victory_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	victory_row.add_child(victory_option)
+	box.add_child(victory_row)
+
+	var victory_year_row := HBoxContainer.new()
+	var victory_year_caption := Label.new()
+	victory_year_caption.text = "End year (First Among Equals)"
+	victory_year_row.add_child(victory_year_caption)
+	victory_year_spin = SpinBox.new()
+	victory_year_spin.min_value = 1
+	victory_year_spin.max_value = 2000
+	victory_year_spin.step = 1
+	victory_year_spin.value = 300
+	victory_year_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	victory_year_row.add_child(victory_year_spin)
+	box.add_child(victory_year_row)
 
 	var name_row := HBoxContainer.new()
 	var name_caption := Label.new()
@@ -780,6 +852,20 @@ func _system_entry_by_id(sys_id: int) -> Dictionary:
 	return {}
 
 
+## A civilization's display name from the view roster (S5:
+## occupation and gate lines name controllers the player may not
+## have a panel entry for; unknown ids render as "civ N").
+func _civ_name(civ_id: int) -> String:
+	if civ_id == 0:
+		return "you"
+	var civs = view_data.get("civilizations", [])
+	if civs is Array:
+		for c in civs:
+			if c is Dictionary and int(c.get("id", -1)) == civ_id:
+				return str(c.get("name", "civ %d" % civ_id))
+	return "civ %d" % civ_id
+
+
 func _system_name(sys_id: int) -> String:
 	var entry := _system_entry_by_id(sys_id)
 	if not entry.is_empty():
@@ -905,6 +991,15 @@ func _on_new_campaign_pressed() -> void:
 
 func _start_new_campaign(overwrite: bool) -> void:
 	var req := {"op": "new", "save": save_path, "seed": int(seed_spin.value), "ai_races": int(ai_spin.value)}
+	# S5: the victory choice rides along whenever it differs from
+	# the bridge's own default for the shape of game (Hegemony
+	# with AI races, Sandbox without) — omitting it keeps the
+	# historical solo behaviour byte-for-byte.
+	var rule: String = str(VICTORY_IDS[victory_option.selected]) if victory_option != null else "hegemony"
+	var ai_count := int(ai_spin.value)
+	if not (ai_count == 0 and rule == "sandbox"):
+		req["victory"] = rule
+		req["victory_end_year"] = int(victory_year_spin.value) if victory_year_spin != null else 300
 	if overwrite:
 		req["overwrite"] = true
 	var resp: Dictionary = bridge_client.call_bridge(req)
@@ -1050,13 +1145,39 @@ func _refresh_hud() -> void:
 		return
 	hud_label.text = "Year %d · Day %d (day %d)" % [int(view_data.get("year", 0)), int(view_data.get("day_of_year", 0)), int(view_data.get("day", 0))]
 	var counts: Dictionary = view_data.get("counts", {}) if view_data.get("counts", {}) is Dictionary else {}
-	hud_stats_label.text = "Credits %s · Surveyed %d · Claimed %d · Colonized %d · Pop %.1f M · Fuel %s · Research %s" % [
+	hud_stats_label.text = "Credits %s · Surveyed %d · Claimed %d · Colonized %d · Pop %.1f M · Fuel %s · Research %s · %s" % [
 		_fmt_thousands(float(view_data.get("credits", 0.0)), 0),
 		int(counts.get("surveyed", 0)), int(counts.get("claimed", 0)), int(counts.get("colonized", 0)),
 		float(view_data.get("total_population_millions", 0.0)),
 		_fmt_thousands(float(view_data.get("total_fuel_stock", 0.0)), 0),
 		_fmt_thousands(_player_research_points(), 1),
+		_victory_hud_text(),
 	]
+
+
+## The §6.5 standing, compressed for the HUD: a recorded winner
+## first, then the player's progress under the rule in force.
+func _victory_hud_text() -> String:
+	var victory = view_data.get("victory", {})
+	if not victory is Dictionary or victory.is_empty():
+		return ""
+	var winner = victory.get("winner", null)
+	if winner is Dictionary:
+		return "🏆 %s won on day %d" % [str(winner.get("civ_name", "?")), int(winner.get("day", 0))]
+	var player = victory.get("player", {})
+	if not player is Dictionary:
+		return ""
+	match str(victory.get("rule", "")):
+		"hegemony":
+			return "Hegemony %.0f%% of 40%%" % (100.0 * float(player.get("hegemony_share", 0.0)))
+		"gate_web":
+			return "Gate Web %.0f%% of 60%%" % (100.0 * float(player.get("gate_web_share", 0.0)))
+		"first_among_equals":
+			return "Score %s · judged year %d" % [
+				_fmt_thousands(float(player.get("score", 0.0)), 0), int(victory.get("end_year", 0))]
+		"sandbox":
+			return "Sandbox — no victory"
+	return ""
 
 
 ## The player's stockpile of research points (S4), from the
@@ -1139,21 +1260,23 @@ func _refresh_diplomacy_text() -> void:
 			lines.append("  Translation completes day %d — full diplomacy is not open yet." % int(c.get("translation_ready_day", 0)))
 		var theirs = c.get("opinion_of_player", {})
 		if theirs is Dictionary and not theirs.is_empty():
-			lines.append("  Their opinion of you: %s (disposition %s · disputes %s · border friction %s · trade %s · broken treaties %s)" % [
+			lines.append("  Their opinion of you: %s (disposition %s · disputes %s · border friction %s · trade %s · broken treaties %s · shared enemies %s)" % [
 				_fmt_signed(float(theirs.get("total", 0.0)), 1),
 				_fmt_signed(float(theirs.get("disposition", 0.0)), 1),
 				_fmt_signed(float(theirs.get("disputes", 0.0)), 1),
 				_fmt_signed(float(theirs.get("border_friction", 0.0)), 1),
 				_fmt_signed(float(theirs.get("trade_volume", 0.0)), 1),
-				_fmt_signed(float(theirs.get("broken_treaties", 0.0)), 1)])
+				_fmt_signed(float(theirs.get("broken_treaties", 0.0)), 1),
+				_fmt_signed(float(theirs.get("shared_enemies", 0.0)), 1)])
 		var ours = c.get("player_opinion", {})
 		if ours is Dictionary and not ours.is_empty():
-			lines.append("  Your opinion of them: %s (disputes %s · border friction %s · trade %s · broken treaties %s)" % [
+			lines.append("  Your opinion of them: %s (disputes %s · border friction %s · trade %s · broken treaties %s · shared enemies %s)" % [
 				_fmt_signed(float(ours.get("total", 0.0)), 1),
 				_fmt_signed(float(ours.get("disputes", 0.0)), 1),
 				_fmt_signed(float(ours.get("border_friction", 0.0)), 1),
 				_fmt_signed(float(ours.get("trade_volume", 0.0)), 1),
-				_fmt_signed(float(ours.get("broken_treaties", 0.0)), 1)])
+				_fmt_signed(float(ours.get("broken_treaties", 0.0)), 1),
+				_fmt_signed(float(ours.get("shared_enemies", 0.0)), 1)])
 		var treaties = c.get("treaties", [])
 		if treaties is Array:
 			if treaties.is_empty():
@@ -1168,6 +1291,16 @@ func _refresh_diplomacy_text() -> void:
 			lines.append("  ⚠ Embargo: you have closed trade with them")
 		if bool(c.get("embargo_by_them", false)):
 			lines.append("  ⚠ Embargo: they have closed trade with you")
+		if bool(c.get("at_war", false)):
+			var war = c.get("war", {})
+			if war is Dictionary and not war.is_empty():
+				var who := "you declared" if int(war.get("aggressor", -1)) == 0 else "they declared"
+				lines.append("  ⚠ AT WAR — %s on day %d · ships lost: you %d · them %d" % [
+					who, int(war.get("declared_day", 0)),
+					int(war.get("my_ships_lost", 0)), int(war.get("their_ships_lost", 0))])
+				lines.append("    War exhaustion: you %s · them %s (of 100)" % [
+					_fmt_thousands(float(c.get("my_war_exhaustion", 0.0)), 0),
+					_fmt_thousands(float(c.get("their_war_exhaustion", 0.0)), 0)])
 		var disputes = c.get("disputes", [])
 		if disputes is Array:
 			for d in disputes:
@@ -1294,6 +1427,20 @@ func _refresh_diplomacy_actions() -> void:
 		diplomacy_actions.add_child(row)
 		var row2 := HBoxContainer.new()
 		row2.add_theme_constant_override("separation", 6)
+		# S5: the war switch. At war, the recognition settlement is
+		# always on the table; at peace, declaring ends every
+		# instrument between the pair (the core states the cost).
+		if bool(c.get("at_war", false)):
+			var sue := Button.new()
+			sue.text = "Sue for Peace (recognition)"
+			sue.pressed.connect(_on_peace_action.bind(civ_id, [], [], 0.0))
+			row2.add_child(sue)
+		else:
+			var declare_war := Button.new()
+			declare_war.text = "Declare War"
+			declare_war.modulate = Color(1.0, 0.6, 0.55)
+			declare_war.pressed.connect(_on_declare_war_action.bind(civ_id))
+			row2.add_child(declare_war)
 		if bool(c.get("embargo_by_me", false)):
 			var lift := Button.new()
 			lift.text = "Lift Embargo"
@@ -1369,6 +1516,11 @@ func _on_sever_route(route_id: int) -> void:
 func _on_peace_action(civ_id: int, cede_to_me: Array, cede_to_them: Array, credits: float) -> void:
 	_exec_commands([{"cmd": "propose_peace", "civ": civ_id, "cede_to_me": cede_to_me, "cede_to_them": cede_to_them, "credits": credits}],
 		"Settlement proposed.")
+
+
+func _on_declare_war_action(civ_id: int) -> void:
+	_exec_commands([{"cmd": "declare_war", "civ": civ_id}],
+		"War declared — every instrument between you is void.")
 
 
 func _on_menu_pressed() -> void:
@@ -1499,6 +1651,10 @@ func _ship_status_text(ship: Dictionary) -> String:
 				float(state.get("progress_ly", 0.0)), float(state.get("distance_ly", 0.0))]
 		"stranded_at_system":
 			return "Stranded at %s" % _system_name(int(state.get("system", -1)))
+		"gate_transit":
+			return "In gate transit %s → %s (%d d)" % [
+				_system_name(int(state.get("from_system", -1))), _system_name(int(state.get("to_system", -1))),
+				int(state.get("days_remaining", 0))]
 	return "Unknown"
 
 
@@ -1519,9 +1675,15 @@ func _refresh_ships_panel() -> void:
 		var ship_id := int(s.get("id", -1))
 		var b := Button.new()
 		var prefix := "▸ " if ship_id == selected_ship else ""
-		b.text = "%s%s #%d — %s · fuel %.0f/%.0f" % [
+		# S5: hull integrity rides along when the design has one.
+		var hull_text := ""
+		var hull_strength := float(s.get("hull_strength", 0.0))
+		if hull_strength > 0.0:
+			var pct := int(round(100.0 * (1.0 - float(s.get("hull_damage", 0.0)) / hull_strength)))
+			hull_text = " · hull %d%%" % pct
+		b.text = "%s%s #%d — %s · fuel %.0f/%.0f%s" % [
 			prefix, str(s.get("design_name", "Ship")), ship_id, _ship_status_text(s),
-			float(s.get("fuel", 0.0)), float(s.get("tank_capacity", 0.0))]
+			float(s.get("fuel", 0.0)), float(s.get("tank_capacity", 0.0)), hull_text]
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		if ship_id == selected_ship:
 			b.modulate = Color(1.0, 0.95, 0.65)
@@ -1659,6 +1821,31 @@ func _render_system_panel() -> void:
 						str(d.get("name", "Design %d" % int(q.get("design_idx", -1)))),
 						int(q.get("total_days", 0)) - int(q.get("days_remaining", 0)),
 						int(q.get("total_days", 0))])
+		# S5 colony state: occupation and terraforming.
+		var occupied_by = colony.get("occupied_by", null)
+		if occupied_by != null:
+			lines.append("⚠ OCCUPIED by %s since day %d · resistance %d month(s)" % [
+				_civ_name(int(occupied_by)), int(colony.get("occupied_since_day", 0)),
+				int(colony.get("occupation_resistance_months", 0))])
+		var terraform = colony.get("terraform", null)
+		if terraform is Dictionary:
+			lines.append("Terraforming under way — %d days remaining" % int(terraform.get("days_remaining", 0)))
+	# S5: the gate at this system, when the bridge reports one.
+	var gate = inspect_data.get("gate", null)
+	if gate is Dictionary:
+		lines.append("\nWarp gate:")
+		var gate_state := str(gate.get("state", ""))
+		if gate_state == "building":
+			lines.append("Under construction — %d days remaining" % int(gate.get("build_days_remaining", 0)))
+		elif gate_state == "relinking":
+			lines.append("Re-pairing — %d days remaining" % int(gate.get("relink_days_remaining", 0)))
+		elif gate_state == "operational":
+			lines.append("Operational — paired with %s · integrity %.0f · %d transit(s) today" % [
+				_system_name(int(gate.get("partner_system", -1))),
+				float(gate.get("integrity", 0.0)), int(gate.get("transits_today", 0))])
+		else:
+			lines.append("Built, unpaired · integrity %.0f" % float(gate.get("integrity", 0.0)))
+		lines.append("Controlled by: %s" % ("you" if bool(gate.get("mine", false)) else _civ_name(int(gate.get("controller", -1)))))
 	# Ships present.
 	var present = inspect_data.get("ships_present", [])
 	if present is Array and not present.is_empty():
@@ -1688,6 +1875,11 @@ func _refresh_system_buttons() -> void:
 	survey_this_button.visible = false
 	found_button.visible = false
 	refuel_button.visible = false
+	build_gate_button.visible = false
+	pair_gate_button.visible = false
+	gate_transit_button.visible = false
+	invade_button.visible = false
+	terraform_button.visible = false
 	if not session_active or inspect_data.is_empty():
 		return
 	var colony = inspect_data.get("colony", null)
@@ -1709,6 +1901,32 @@ func _refresh_system_buttons() -> void:
 			build_colony_button.visible = true
 		if int(colony.get("development", 0)) >= 3 and colony.get("specialization", null) == null:
 			spec_row.visible = true
+		# S5 orders at an established colony: raise a gate (§5.3,
+		# needs development 6 and a Gate Builder in orbit — the
+		# core states the reason when either is missing) and start
+		# terraforming (§5.4, development 7+).
+		build_gate_button.visible = true
+		if int(colony.get("development", 0)) >= 7 and colony.get("terraform", null) == null:
+			terraform_button.visible = true
+	# S5: gate orders at this system.
+	var gate = inspect_data.get("gate", null)
+	if gate is Dictionary:
+		if bool(gate.get("mine", false)) and str(gate.get("state", "")) == "unpaired":
+			var other := _unpaired_own_gate_other_than(int(gate.get("id", -1)))
+			if not other.is_empty():
+				pair_gate_button.text = "Pair Gate with %s" % _system_name(int(other.get("system", -1)))
+				pair_gate_button.visible = true
+	# S5: invasion — the selected system holds another
+	# civilization's colony and the pair are at war (the core
+	# checks troops, defenders, and the garrison).
+	var claimed_by = inspect_data.get("claimed_by", null)
+	if colony is Dictionary and claimed_by != null and int(claimed_by) != 0:
+		var holder := int(claimed_by)
+		var civs = view_data.get("civilizations", [])
+		if civs is Array:
+			for c in civs:
+				if c is Dictionary and int(c.get("id", -1)) == holder and bool(c.get("at_war", false)):
+					invade_button.visible = true
 	# Orders for the selected ship targeting this system.
 	var ship := _selected_ship_dict()
 	if ship.is_empty():
@@ -1730,6 +1948,9 @@ func _refresh_system_buttons() -> void:
 		if kind == "colony" and state_type == "at_system":
 			found_button.visible = true
 		refuel_button.visible = true
+		# S5: an operational gate here can take the selected ship.
+		if gate is Dictionary and state_type == "at_system" and str(gate.get("state", "")) == "operational":
+			gate_transit_button.visible = true
 
 
 func _target_system_id() -> int:
@@ -1796,6 +2017,47 @@ func _on_found_pressed() -> void:
 func _on_refuel_pressed() -> void:
 	if selected_ship >= 0:
 		_exec_commands([{"cmd": "refuel", "ship": selected_ship}], "Ship refuelled.")
+
+
+## Another gate of the player's, built and unpaired — the pair
+## target for the Pair Gate button (the first one, in view order).
+func _unpaired_own_gate_other_than(gate_id: int) -> Dictionary:
+	var gates = view_data.get("gates", [])
+	if gates is Array:
+		for g in gates:
+			if g is Dictionary and int(g.get("id", -1)) != gate_id and bool(g.get("mine", false)) \
+					and g.get("partner", null) == null and str(g.get("state", "")) == "unpaired":
+				return g
+	return {}
+
+
+func _on_build_gate_pressed() -> void:
+	_exec_commands([{"cmd": "build_gate", "system": _target_system_id()}], "Gate construction started — the builder is consumed.")
+
+
+func _on_pair_gate_pressed() -> void:
+	var gate = inspect_data.get("gate", null)
+	if not gate is Dictionary:
+		return
+	var other := _unpaired_own_gate_other_than(int(gate.get("id", -1)))
+	if other.is_empty():
+		_set_message("No other unpaired gate of yours to pair with.")
+		return
+	_exec_commands([{"cmd": "pair_gates", "gate_a": int(gate.get("id", -1)), "gate_b": int(other.get("id", -1))}], "Gates paired.")
+
+
+func _on_gate_transit_pressed() -> void:
+	var gate = inspect_data.get("gate", null)
+	if selected_ship >= 0 and gate is Dictionary:
+		_exec_commands([{"cmd": "gate_transit", "ship": selected_ship, "gate": int(gate.get("id", -1))}], "Ship entered the gate.")
+
+
+func _on_invade_pressed() -> void:
+	_exec_commands([{"cmd": "invade", "system": _target_system_id()}], "Troops landed — occupation begun.")
+
+
+func _on_terraform_pressed() -> void:
+	_exec_commands([{"cmd": "start_terraform", "system": _target_system_id()}], "Terraforming begun — a thirty-year project.")
 
 
 # -------------------------------------------------------------- catch-up
@@ -2520,3 +2782,153 @@ func _s4_civ_entry(resp: Dictionary, civ_id: int) -> Dictionary:
 			if c is Dictionary and int(c.get("id", -1)) == civ_id:
 				return c
 	return {}
+
+
+# ------------------------------------------------------------- S5 verify
+
+## --verify-s5: scripted S5 session against the real bridge —
+## the war & victory surface is in the view from day 0, declaring
+## war before contact fails cleanly, the home gate build is
+## refused below development 6, first contact happens by mutual
+## expansion (tight homeworld spacing), translation opens
+## diplomacy, and a declaration then succeeds with the roster's
+## war block set.
+func _run_verify_s5() -> void:
+	# S0 lines have already been printed by _run_verify_checks.
+	if not user_args.has("bridge") or str(user_args.get("bridge", "")) == "":
+		printerr("S5_VERIFY_FAIL bridge not specified")
+		get_tree().quit(1)
+		return
+	if bridge_client == null or bridge_path == "":
+		printerr("S5_VERIFY_FAIL bridge not found")
+		get_tree().quit(1)
+		return
+	var verify_dir := ProjectSettings.globalize_path("user://verify-s5/")
+	DirAccess.make_dir_recursive_absolute(verify_dir)
+	var save := verify_dir.path_join("verify-s5.mwsb")
+	if FileAccess.file_exists(save):
+		DirAccess.remove_absolute(save)
+	_s2_events.clear()
+	_s2_cursor = 0
+
+	# a) New campaign with the victory rule named: the S5 surface
+	# exists from day 0 — the gates array, the victory block, and
+	# the combat fit on the design table.
+	var resp: Dictionary = bridge_client.call_bridge({"op": "new", "save": save, "seed": 42, "ai_races": 4, "ai_min_spacing_ly": 25.0, "ai_region_radius_ly": 60.0, "victory": "hegemony"})
+	var v = resp.get("view", {})
+	if not bool(resp.get("ok", false)) or not v is Dictionary:
+		printerr("S5_VERIFY_FAIL new resp=%s" % str(resp).substr(0, 400))
+		get_tree().quit(1)
+		return
+	var victory = v.get("victory", {})
+	var cruiser_fit := false
+	var designs0 = v.get("designs", [])
+	if designs0 is Array:
+		for d in designs0:
+			if d is Dictionary and str(d.get("kind", "")) == "cruiser" and d.has("attack") and d.has("troop_capacity"):
+				cruiser_fit = true
+	if not v.has("gates") or not victory is Dictionary or str(victory.get("rule", "")) != "hegemony" or not cruiser_fit:
+		printerr("S5_VERIFY_FAIL surface view keys gates/victory(rule=hegemony)/cruiser combat fit missing")
+		get_tree().quit(1)
+		return
+	print("S5_VERIFY_PASS surface gates+victory+cruiser_fit present")
+
+	# b) War with an unmet civilization fails cleanly.
+	resp = _s2_exec(save, [{"cmd": "declare_war", "civ": 1}])
+	var results = resp.get("results", [])
+	var refused := false
+	var refuse_err := ""
+	if results is Array and not results.is_empty() and results[0] is Dictionary:
+		refused = not bool(results[0].get("ok", true))
+		refuse_err = str(results[0].get("error", ""))
+	if not refused or refuse_err == "":
+		printerr("S5_VERIFY_FAIL no_contact expected a stated refusal, resp=%s" % str(resp).substr(0, 400))
+		get_tree().quit(1)
+		return
+	print("S5_VERIFY_PASS no_contact war refused cleanly (%s)" % refuse_err.substr(0, 60))
+
+	# c) The home gate build is refused at development 3 (the
+	# gate needs development 6 and a Gate Builder in orbit).
+	var home := int(v.get("home_system", 0))
+	resp = _s2_exec(save, [{"cmd": "build_gate", "system": home}])
+	results = resp.get("results", [])
+	refused = false
+	if results is Array and not results.is_empty() and results[0] is Dictionary:
+		refused = not bool(results[0].get("ok", true))
+	if not refused:
+		printerr("S5_VERIFY_FAIL gate_refusal build_gate should refuse at development 3, resp=%s" % str(resp).substr(0, 400))
+		get_tree().quit(1)
+		return
+	print("S5_VERIFY_PASS gate_refusal build_gate refused below development 6")
+
+	# d) Expand until first contact (the S4 pattern): each year,
+	# send the idle surveyor to the nearest unsurveyed star.
+	var contact_civ := -1
+	var years := 0
+	while contact_civ < 0 and years < 60:
+		var commands: Array = []
+		var surveyor := _s2_find_ship(resp, "surveyor")
+		if not surveyor.is_empty():
+			var state = surveyor.get("state", {})
+			if state is Dictionary and str(state.get("type", "")) == "at_system":
+				var origin := int(state.get("system", -1))
+				var surveyed := {}
+				var vv = resp.get("view", {})
+				if vv is Dictionary and vv.get("systems", null) is Array:
+					for s in vv["systems"]:
+						if s is Dictionary and str(s.get("survey", "")) == "surveyed":
+							surveyed[int(s.get("index", -1))] = true
+				var best := -1
+				var best_d := 70.0
+				if origin >= 0 and origin < table.star_count:
+					for i in table.star_count:
+						if surveyed.has(i) or i == origin:
+							continue
+						var d := table.positions[i].distance_to(table.positions[origin])
+						if d < best_d:
+							best_d = d
+							best = i
+				if best >= 0:
+					commands.append({"cmd": "dispatch", "ship": int(surveyor.get("id", -1)), "to": best, "purpose": "survey"})
+		commands.append({"cmd": "advance", "days": 365})
+		resp = _s2_exec(save, commands)
+		years += 1
+		var vv2 = resp.get("view", {})
+		if vv2 is Dictionary and vv2.get("civilizations", null) is Array:
+			for c in vv2["civilizations"]:
+				if c is Dictionary and not bool(c.get("is_player", false)):
+					contact_civ = int(c.get("id", -1))
+	if contact_civ < 0:
+		printerr("S5_VERIFY_FAIL contact no contact after %d years" % years)
+		get_tree().quit(1)
+		return
+	print("S5_VERIFY_PASS contact civ=%d after_years=%d" % [contact_civ, years])
+
+	# e) Translation: after the delay the pair's diplomacy is open.
+	resp = _s2_exec(save, [{"cmd": "advance", "days": 150}])
+	var entry: Dictionary = _s4_civ_entry(resp, contact_civ)
+	if entry.is_empty() or not bool(entry.get("diplomacy_ready", false)):
+		printerr("S5_VERIFY_FAIL translation diplomacy_ready not set, entry=%s" % str(entry).substr(0, 300))
+		get_tree().quit(1)
+		return
+	print("S5_VERIFY_PASS translation diplomacy_ready=true")
+
+	# f) The declaration now lands, with its stated outcome, and
+	# the roster's war block names the player as aggressor.
+	resp = _s2_exec(save, [{"cmd": "declare_war", "civ": contact_civ}])
+	results = resp.get("results", [])
+	var cmd_ok := false
+	var detail := ""
+	if results is Array and not results.is_empty() and results[0] is Dictionary:
+		cmd_ok = bool(results[0].get("ok", false))
+		detail = str(results[0].get("detail", ""))
+	entry = _s4_civ_entry(resp, contact_civ)
+	var war = entry.get("war", {})
+	var aggressor_ok := war is Dictionary and int(war.get("aggressor", -1)) == 0
+	if not cmd_ok or detail != "war declared" or not bool(entry.get("at_war", false)) or not aggressor_ok:
+		printerr("S5_VERIFY_FAIL war declaration outcome wrong, resp=%s" % str(resp).substr(0, 400))
+		get_tree().quit(1)
+		return
+	print("S5_VERIFY_PASS war declared, roster at_war=true aggressor=player")
+	print("S5_VERIFY_PASS all")
+	get_tree().quit(0)
