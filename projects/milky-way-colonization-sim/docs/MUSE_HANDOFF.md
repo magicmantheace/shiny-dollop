@@ -1,10 +1,231 @@
 # MUSE_HANDOFF — Milky Way Colonization Simulator
 
-State as of **2026-11-08**, end of slice S4 (built and VM-verified;
-see the verified/unverified split at the end of the S4 section).
-Branch `milky-way-colonization-sim/s4-trade-diplomacy`, based on
-`main` at `eab90ffc` (S3, PR #43, merged by Adam 2026-11-08 with an
-S4 green-light). This S4 draft PR targets `main` (never auto-merge).
+State as of **2026-11-28**, end of slice S5 (built and
+VM-verified; see the verified/unverified split at the end of the
+S5 section). Branch `milky-way-colonization-sim/s5-war-victory`,
+based on `main` at `7040358`. With S5 the planned slice plan is
+complete: the project stands at **version 0.9, code-complete**.
+What remains for 1.0 is the owner-PC play session (open since
+S2) and Adam's landing call on this branch (never auto-merge).
+
+## What S5 delivered
+
+**Authorization.** Adam directed S5 on 2026-11-28 — "get it to a
+version 0.9 code complete version" — the explicit direction the
+docs required. S5 is DESIGN §10's final slice: war & victory
+(§6, §5.3 gates, §5.4 terraforming, §6.5 victory).
+
+**The core (`sim/`) — war, gates, terraforming, victory.**
+- **Ships gained a fixed combat fit** (no player design system):
+  attack / defence / troop capacity per design, hull strength =
+  30 + defence × 6, damage persistent on the ship. Three new
+  designs: **Vigil Frigate** (atk 10 / def 8 / 15 troops),
+  **Meridian Cruiser** (24 / 20 / 50), **Keystone Gate Builder**
+  (0 / 4 / 0, the gate construction platform). Colony development
+  cap raised 5 → 10 (DESIGN §3's stated 0–10 range) so the gate
+  (dev ≥ 6) and terraform (dev ≥ 7) thresholds are reachable;
+  the second specialization at dev 7 that §3 mentions is **not**
+  implemented (out of S5's scope; recorded here).
+- **War (§6).** `declare_war` requires open diplomacy; it ends
+  **all** treaties between the pair (a `TreatyBroken` event per
+  treaty; a breach is *recorded* only for Non-Aggression Pact /
+  Alliance — the solemn instruments), severs the pair's trade
+  routes, lifts pair embargoes, and records a `War` (parties,
+  aggressor, day, per-side ship losses). Wars also end
+  automatically when either side holds no colonies (occupations
+  cleared, `WarEnded`). Peace is S4's `propose_peace` — at war
+  its evaluation drops the "nothing to settle" refusal and adds
+  the evaluator's war exhaustion × 0.9 with a reason line;
+  cessions under a peace clear occupations on the ceded systems.
+- **Combat** resolves daily per system: each ordered pair deals
+  Σ(attack × own hull fraction) × jitter (0.75 + 0.5·rng),
+  damage allocated in ascending ship-id order; the rng is a
+  per-battle child stream of the campaign seed (star seed ⊕
+  battle constant ⊕ day ⊕ ordered-pair salt), so combat is
+  deterministic and save-stable. Colonies fire back at their
+  controller's war enemies for defence strength × 0.6 × jitter.
+  A ship past 65% hull damage retreats — an *unchecked* dispatch
+  to its nearest other colony, so it may strand (§5.2). Repairs
+  run 5% of max hull per day at a controller-held colony port.
+- **Invasion & occupation (§6.4).** Landing requires war, no
+  defending fleet present, and landed troops ≥ garrison
+  (20 + dev × 10 + defence strength × 2). The claim does **not**
+  move — annexation happens only by peace cession. The occupier
+  takes the colony's output at ×0.5 and pays 4 cr/month upkeep;
+  an ungarrisoned occupation accrues resistance (+1/month, a
+  `ColonyResisted` event at 3 months, collapse at 6); occupation
+  integrates after 3,650 days. An enemy fleet holding station
+  over a colony **blockades** it: no production that month and
+  the §4.2 unsupplied clock runs (decline from 3 months,
+  abandonment at 12).
+- **War exhaustion** is per civilization across its wars: own
+  ships lost × 8 + own colonies occupied by that enemy × 6,
+  plus — **amended during S5 testing** — 0.25 per month of war
+  duration per war, plus unsupplied own colonies × 2 while in
+  any war; capped at 100. (Without the duration term the first
+  seed-42 AI war ran eternally at exhaustion 6/0: fleets rarely
+  meet, so losses alone never forced a peace. With it, that war
+  concluded by negotiated peace in ~12 years.)
+- **Gates (§5.3).** One per system, at a colony of dev ≥ 6; the
+  Gate Builder ship is **consumed** at construction start;
+  12,000 cr + 300 alloys + 40 electronics, 1,460 days. Pairing
+  is own-gates-only: instant when both ends are unpaired,
+  re-pairing costs 180 days of downtime. Transit takes 1 day,
+  burns a flat 25 fuel from the **departing** colony's stock,
+  and is capped at 3 transits per day per pair. A foreign ship
+  transits only under a Gate Access treaty or Alliance with the
+  controller — the controller being the claim owner, or the
+  occupier while occupied (gates are captured by taking their
+  system). Gate hops join the trade-route graph at cost 1.0 and
+  **double** the live throughput of routes using them; a route
+  may use a hop when the gate's controller admits *either*
+  partner (a single ship's transit always needs its own owner's
+  admission). An undefended gate under fire takes Σ attacker
+  attack per day against integrity 300; destruction unpairs the
+  partner. (The occupier-counts-as-port-holder rule also extends
+  to refuelling: an invasion fleet can refuel at the port it
+  occupies — without it, a fleet arriving on fumes could never
+  leave, which the resistance test exposed.)
+- **Terraforming (§5.4).** At a colony of dev ≥ 7: 20,000 cr +
+  15 exotics, 10,950 days, targeting the system's
+  highest-habitability planet; completion adds +25 habitability
+  (cap 100). `PlanetProfile` gained
+  `natural_habitability_percent` (§3's data model) — the
+  pre-terraform baseline, which never moves.
+- **Victory (§6.5).** `GameSetup.victory` (default **Hegemony**;
+  solo constructors default to **Sandbox**, preserving S1/S2
+  semantics) and `victory_end_year` (default 300). Hegemony:
+  (own + Alliance partners') colonies / total colonized ≥ 40%,
+  requiring ≥ 10 colonized systems. Gate Web: ≥ 60% of
+  colonized systems connected (hosting a network gate — own or
+  a gate-access/alliance partner's — or within 150 ly of one),
+  held 3,650 consecutive days. First Among Equals: at the end
+  year, the highest score (population + colonies × 25 +
+  development sum × 5 + research × 0.05 + credits × 0.01). The
+  winner is recorded once (`VictoryAchieved`); the campaign
+  continues. All three measures are tracked for every
+  civilization whatever rule is in force (§11.4).
+- **Diplomacy grew the war components:** opinion's
+  `shared_enemies` (+8 per common war enemy, cap +24; a pair at
+  war itself takes −25 inside the disputes component); treaty
+  evaluation refuses outright at war; alliance evaluation counts
+  shared war enemies (+12 each, cap +24).
+- **The AI fights (§6.2 personalities).** It declares war only
+  when aggression ≥ 0.6, opinion ≤ −20, and (an open dispute or
+  opinion ≤ −45); the strength comparison is **fog-honest** —
+  only enemy ships at systems the declarer has surveyed count —
+  and must not exceed its own / 1.2 (no visible enemy fleet
+  requires aggression ≥ 0.75); honour ≥ 0.7 requires a dispute;
+  declaring on an ally needs opinion ≤ −60 and honour < 0.4. It
+  arms toward a declaration (queues a frigate) when the gates
+  pass but it owns no warship, builds frigates/cruisers while at
+  war, sails them to the nearest surveyed enemy colony, invades
+  when unopposed with sufficient troops, and sues for peace
+  (recognition terms) at exhaustion ≥ 35. It does **not** build
+  gates or terraform — recorded as an S5 scope line, not an
+  oversight claim. Two guard fixes from testing: the AI never
+  declares on a colony-less civilization, and war declarations
+  against an undriven, colony-less player (a harness artifact)
+  no longer repeat monthly.
+- **Events:** fourteen new kinds (war declared/ended, ship
+  destroyed, occupation started/ended, colony resisted,
+  colony blockaded, gate construction started/completed/paired/
+  destroyed, terraform started/completed, victory achieved).
+
+**Save format v4 (a bump, flagged).** Per the v3 precedent:
+`SAVE_VERSION = 4`, format history documented in `save.rs`,
+**v3 saves are rejected explicitly** (unit-test pinned, mirroring
+the v2 test). The envelope is unchanged (still v1); catch-up
+equivalence holds with S5 state (the S5 save test round-trips a
+war in progress and compares chunked-vs-whole advance hashes).
+
+**The bridge (`bridge/`).** New exec commands: `declare_war`,
+`invade`, `build_gate` (detail names the new gate id),
+`pair_gates`, `gate_transit`, `start_terraform` — refusals carry
+the core's stated reasons. `new` accepts `victory` +
+`victory_end_year` (present ⇒ the §6 setup path runs, so a solo
+game can carry a rule too). The view adds: design combat stats;
+per-ship `hull_damage` / `hull_strength` and the `gate_transit`
+ship state; colony `occupied_by` / occupation / `terraform`
+fields; per-civ `at_war`, a `war` block (aggressor, day, losses
+oriented to the player) and both sides' `war_exhaustion`;
+`shared_enemies` in both opinion blocks; a `gates` array (own
+gates plus gates at player-surveyed systems, with controller,
+state, partner, integrity, daily transits); a `victory` block
+(rule, end year, winner, the player's three measures); inspect
+gains the same gate block and the planets'
+`natural_habitability_percent`. Event visibility: war
+declarations/endings are diplomacy record (parties only), a
+victory is galaxy news (always visible), and battle /
+occupation / blockade / gate / terraform events are presence
+events (player-surveyed space, or the player was the other
+party).
+
+**The viewer (`viewer/`).** Diplomacy screen: AT WAR lines
+(declarer, day, losses, both exhaustions), shared-enemies in the
+opinion breakdowns, a red **Declare War** button per contacted
+civilization and **Sue for Peace (recognition)** while at war.
+System panel: gate block (state, partner, integrity, transits,
+controller), occupation and terraforming lines, and order
+buttons — Build Warp Gate, Pair Gate (names the partner system),
+Send Selected Ship Through Gate, Invade, Start Terraforming —
+each shown when its context exists and refused by the core with
+a stated reason otherwise. Ships panel shows hull %. The HUD
+carries the victory standing (winner, or progress under the
+rule in force). The menu gains a victory-rule picker and an
+end-year field, sent to the bridge only when they differ from
+the bridge's defaults for the game's shape. `--verify-s5`
+joins the headless verify family.
+
+**Balance observations recorded (not silently redesigned).**
+(1) **Terraforming is effectively frontier-only:** homeworlds
+have `exotics_trait` 0.0, so the 15-exotic price can only be
+paid at an exotics colony — and frontier development is
+population-gated, so a dev-7 exotics colony with 15 exotics
+takes ~500 years of game time (measured: the S5 long-game
+test's frontier colony crossed both thresholds at ~year 509).
+The mechanic is proven end-to-end by test; whether the price or
+the homeworld trait should move is Adam's call. (2) **Fleets
+rarely meet:** in the 12-AI seed-42 cluster probe, the single
+war in 200 years destroyed zero ships — defenders are usually
+away from home when attackers arrive, and colony defensive fire
+plus retreats do the rest. Combat itself is test-proven in
+staged duels; galactic-scale lethality is a balance question,
+not a correctness one. (3) The seed-42 S3/S4 observation (2 of
+12 civs stalling at 2–4 colonies) is **untouched**, as tasked.
+
+**Verified (this VM, 2026-11-28; detail in TEST_PLAN.md).**
+Cargo suites: pipeline 22, sim 56 (incl. 13 S5 tests: treaty-
+voiding declarations, staged-duel combat and retreat, war save
+round-trip, invasion/occupation/resistance collapse, peace
+cession clearing an occupation, the blockade supply schedule,
+gate refusals and lifecycle, a ~560-year gate/trade/terraform/
+destruction long game, both victory rules plus Sandbox, and an
+AI war that declares and concludes in peace), bridge 32 (incl.
+5 S5 tests over the real binary). Godot `--verify`,
+`--verify-s2`, `--verify-s3`, `--verify-s4`, `--verify-s5` all
+pass (`--verify-s5`: surface present at day 0, war refused
+pre-contact with its reason, gate refused below dev 6, contact
+at year 6, declaration lands with the roster's war block set).
+The 300-year seed-42 run (12 AI, real table) completes in
+7m35s, hash `aa28c299a103d8bfb80010b66725164e40b5029782d7e279d2ba86e1ff40081e`
+(reproduced exactly on a second run): 972 colonized / 2,655
+claimed / 3,145 surveyed, the player at 133 colonies, first
+contact year 184, disputes peaking at 6. Expansion is **larger
+than S4's run of the same seed** (589 colonized, player 64) —
+the development-cap raise (5 → 10, §3's range, needed for the
+gate/terraform thresholds) feeds production and therefore
+expansion; recorded here, not tuned away. No war was declared
+and no gate built in that run (3 contacts only; the AI's
+declaration gates never aligned — war and gates are proven by
+the staged suites and the small-galaxy probe, where an AI war
+ran organically: declared day 420, an occupation and a
+blockade, negotiated peace after the exhaustion amendment).
+
+**Unverified / owner gates (unchanged in kind).** Interactive
+war/gate play on Adam's PC (the S2 play-session gate is still
+the 1.0 gate); windowed clicking of the S5 actions; Windows
+export; overnight real-clock catch-up; FPS on the RTX 3060.
 
 ## What S4 delivered
 
@@ -638,12 +859,13 @@ implementation contract, kept for the record:
 
 ## Next slice
 
-**S5 — war & victory**, only on Adam's direction: fleet combat,
-blockades (the combat counterpart of S4's embargoes), gate
-construction and transit (S4's Gate Access treaty then governs
-transit, §5.3), victory conditions, terraforming. S4's peace
-terms, breach records and opinion components are the diplomatic
-substrate S5 builds on.
+**None planned — the §10 slice plan is complete (S5 record at
+the top of this file).** What remains is not a slice: Adam's
+landing call on the S5 branch, and the owner-PC play session
+that has gated 1.0 since S2. Recorded follow-ups if Adam wants
+them: the §3 second specialization at development 7, AI gate
+construction and terraforming, and the terraforming/combat
+balance observations in the S5 record.
 
 ## 2026-11-08 — Codex review fixes (findings on PR #29, fixed on main)
 

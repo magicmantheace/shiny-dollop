@@ -1,8 +1,190 @@
 # TEST_PLAN — Milky Way Colonization Simulator
 
-What was actually run, with results. Last updated 2026-11-08 (S4).
+What was actually run, with results. Last updated 2026-11-28 (S5).
 Nothing in this file is aspirational: every claim below was executed
-on this VM during the S0/S1/S2/S3/S4 builds.
+on this VM during the S0/S1/S2/S3/S4/S5 builds.
+
+## S5 — War & victory
+
+All runs below were executed on this VM on 2026-11-28 against the
+final S5 code (branch `milky-way-colonization-sim/s5-war-victory`).
+
+### Sim tests (Rust, `sim/`)
+
+```
+cd sim && cargo test          # debug profile
+```
+
+Result: **56 passed, 0 failed** (10 unit + 13 S1/S2 integration +
+7 S3 integration + 13 S4 integration + 13 S5 integration in
+`sim/tests/s5.rs`), exit 0. The pre-S5 suites pass with one
+test-side change: the S3 helper pins `victory: Sandbox` in its
+setup (S5 made Hegemony the §6 default; the solo constructor's
+Sandbox default is what the S1/S2 equivalence tests compare
+against).
+
+- **Declaration:** ends every treaty between the pair (breach
+  recorded only for NAP/Alliance, one `TreatyBroken` event per
+  treaty), severs the pair's trade routes, and the war record
+  carries parties/aggressor/day.
+- **Shared enemies:** two civilizations fighting the same third
+  party gain the opinion component (+8 each, both directions).
+- **Combat (staged duel):** two cruisers destroy a surveyor in
+  port; the loss lands on the owner's side of the war record,
+  the `ShipDestroyed` event names owner/killer/system, and the
+  owner's exhaustion counts the loss. A surveyor crippled past
+  65% hull by a cruiser retreats (unchecked dispatch toward its
+  own colony) instead of dying in place.
+- **War save round-trip:** a war in progress survives
+  save/load, and a chunked advance equals a whole advance by
+  state hash; a hand-flipped v3 byte string is rejected with
+  "unsupported save version 3".
+- **Invasion & resistance:** three cruisers occupy a homeworld
+  (claim unmoved, occupier set); with the garrison withdrawn
+  from a frontier occupation, `ColonyResisted` fires at three
+  months and the occupation collapses at six. A peace cession
+  of an occupied homeworld transfers the claim, clears the
+  occupation, and ends the war.
+- **Blockade:** an enemy fleet holding station drives the
+  colony unsupplied on the §4.2 schedule (event on the first
+  blockaded month, unsupplied clock running).
+- **Gate refusals & lifecycle:** unbuilt-without-builder,
+  below-development, second-gate-at-a-system, foreign pairing,
+  and unpaired transit are each refused with their error;
+  builder consumed on build start; gate operational after
+  1,460 days.
+- **The long game (~560 years, one test):** a frontier exotics
+  colony climbs to development 7 (population-gated; ~year 509
+  for both dev 7 and 15 exotics); both gates built and paired;
+  a merchant route's path hops the gate and its live throughput
+  is exactly 2× the pre-gate figure; transit burns exactly 25
+  fuel from the departing stock, arrives in 1 day, and the 4th
+  same-day transit is refused (`GateThroughputFull`); a foreign
+  surveyor is refused transit without a treaty and crosses
+  under a signed Gate Access treaty; terraforming completes
+  (+25 habitability, natural baseline unchanged, both events);
+  three cruisers bombard the undefended frontier gate to
+  destruction (partner left unpaired).
+- **Victory:** First Among Equals records the score argmax at
+  the end year (and its Sandbox twin records nobody); Hegemony
+  lands at 4-of-10 colonies on a closed ring galaxy (3
+  compensated homeworld cessions).
+- **AI war:** a staged Honourable-Warriors-vs-Merchant game
+  (aggression 0.80, opinion driven below −45, strength gates
+  met) declares through the planner, and the war concludes —
+  the pair is no longer at war within the test horizon
+  (exhaustion-driven peace or annihilation).
+
+### Bridge tests (Rust, `bridge/`)
+
+```
+cd bridge && cargo test       # debug profile
+```
+
+Result: **32 passed, 0 failed** (7 unit + 11 S2 + 5 S3 +
+4 S4 + 5 S5 integration in `bridge/tests/s5.rs`), exit 0.
+
+- **War commands + view:** the design table carries the cruiser
+  fit (attack 24 / defence 20 / troops 50 / hull 150); ships
+  carry hull fields; `declare_war` returns detail
+  `"war declared"`, the roster entry flips `at_war` with the
+  war block (aggressor = player, losses 0/0, both exhaustion
+  fields present), `war_declared` is in the event stream, and a
+  second declaration fails with "already at war".
+- **Gate commands + inspect:** `build_gate` detail names the
+  gate id; the view's gate array shows it `building`, `mine`,
+  unpaired, 1,460 days remaining; inspect shows the same gate
+  block and the colony's S5 fields; pairing against a missing
+  gate and transit through a building gate are refused with
+  stated reasons; terraforming at development 6 is refused.
+- **Victory in `new`:** `victory: "first_among_equals"` +
+  `victory_end_year: 2` land in the view's victory block;
+  absent fields keep the defaults (§6 game → Hegemony, solo →
+  Sandbox).
+- **Victory is galaxy news:** an FAE winner recorded in-process
+  appears in the view's winner block and the
+  `victory_achieved` event reaches the player's stream.
+- **Strangers' wars stay hidden:** a war declared in-process
+  between two AI civilizations produces no `war_declared` in
+  the player's event stream.
+
+### Godot headless verifies (viewer, Godot 4.7.2, real table)
+
+```
+godot --headless --path viewer -- --verify
+godot --headless --path viewer -- --verify-s2 --bridge=<release sim-bridge>
+godot --headless --path viewer -- --verify-s3 --bridge=<release sim-bridge>
+godot --headless --path viewer -- --verify-s4 --bridge=<release sim-bridge>
+godot --headless --path viewer -- --verify-s5 --bridge=<release sim-bridge>
+```
+
+All pass. `--verify-s5` (new): the S5 surface exists at day 0
+(`gates`, `victory` with rule `hegemony`, the cruiser's combat
+fit on the design table); declaring war on an unmet civ is
+refused with its reason ("no contact with civilization 1 — …");
+`build_gate` at the development-3 homeworld is refused; in the
+tight setup (4 AI, spacing 25, region 60) first contact lands
+at **year 6**; after translation `diplomacy_ready` is true; the
+declaration then succeeds with detail `"war declared"` and the
+roster entry shows `at_war` with the player as aggressor.
+
+### Headless long-run campaign (release `sim-cli`, real table)
+
+Seed 42, 12 AI + player, 300 years, S5 mechanics active:
+**completes, no crashes** (7m35s on this VM), final state hash
+`aa28c299a103d8bfb80010b66725164e40b5029782d7e279d2ba86e1ff40081e`.
+Final figures: 972 colonized / 2,655 claimed / 3,145 surveyed
+galaxy-wide; the player holds 133 colonies (851 surveyed,
+population 6,899.71 M); first contact at year 184, growing to
+3 contacts; disputes peaked at 6 and 1 remained open at year
+300; `victory=none` under the Hegemony default (no civilization
+reached 40% of 972 colonies — the leader's share is a few
+percent at this scale). A second, identical run reproduced the
+hash exactly (determinism check).
+
+**No war was declared in this run, and no gate was built**
+(`wars=0`, `gates=0` at all 300 year boundaries). That is the
+harness, not a defect: on the real table only 3 contacts ever
+form, and the contacted pairs never met the AI's declaration
+gates (aggression, opinion, dispute, fog-honest strength) —
+the same conservatism S4 recorded for treaties in this harness
+(none signed). The scripted player never builds gates and the
+AI does not build them at all (recorded S5 scope). War and
+gates are proven where they can be staged densely: the sim
+suites' staged wars and the ~560-year gate long game, the
+bridge tests, `--verify-s5`, and a small-galaxy probe during
+development in which an AI pair declared war organically
+(day 420), fought an occupation and a blockade, and concluded
+a negotiated peace after the exhaustion amendment.
+
+**The expansion delta vs S4 is expected and explained:** S4's
+run of the same seed ended at 589 colonized with the player at
+64. S5 raised the colony development cap from 5 to 10 (DESIGN
+§3's stated range — required for the dev ≥ 6 gate and dev ≥ 7
+terraform thresholds), and development feeds production,
+income, and therefore expansion speed. The S5 mechanics
+themselves are proven by the suites above; this run proves the
+full system runs 300 years with them active.
+
+### Pipeline tests (Rust, `pipeline/`)
+
+```
+cd pipeline && cargo test
+```
+
+Result: **22 passed, 0 failed** — unchanged from S4 (the
+pipeline was not touched by S5).
+
+### Not run / unverified for S5
+
+- Interactive play on Adam's PC (the standing 1.0 gate): war,
+  gate, and victory flows clicked through in the windowed UI;
+  Windows export; FPS.
+- Gate Web victory is implemented and its share function is
+  exercised in every view, but no test plays a 3,650-day
+  gate-web hold end-to-end — the streak machinery shares its
+  monthly-evaluation path with the two proven rules; recorded
+  here rather than implied.
 
 ## S4 — Trade & diplomacy depth
 
