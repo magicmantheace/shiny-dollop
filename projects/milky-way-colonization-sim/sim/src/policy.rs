@@ -86,6 +86,10 @@ impl ScriptedPolicy {
                     match design.kind {
                         ShipKind::Surveyor => self.drive_surveyor(sim, galaxy, ship_id, system),
                         ShipKind::Colony => self.drive_colony_ship(sim, galaxy, ship_id, system),
+                        // S5 warships and gate builders are not the
+                        // scripted demo policy's business: they idle
+                        // at their system until a player orders them.
+                        _ => {}
                     }
                 }
                 _ => {}
@@ -183,6 +187,9 @@ impl ScriptedPolicy {
             let reserve = match wanted {
                 ShipKind::Colony => 4_000.0,
                 ShipKind::Surveyor => 500.0,
+                // The scripted policy never queues these (the
+                // `wanted` list above is surveyor/colony only).
+                _ => 0.0,
             };
             if sim.credits() + 1e-9 < design.credits_cost() + reserve {
                 continue;

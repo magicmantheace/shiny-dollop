@@ -28,6 +28,18 @@
 //! an S3 campaign has no diplomacy history, and inventing empty
 //! ledgers for one would falsify the reconciliation the trade
 //! ledger exists to provide.
+//!
+//! v4 (S5) widens records in place and appends the war record:
+//! ship designs carry combat statistics (attack, defence, troop
+//! capacity), planets carry their natural habitability baseline,
+//! ships carry hull damage and a gate-transit state, colonies
+//! carry occupation and terraforming state, and the payload ends
+//! with the campaign's victory configuration and record, its
+//! wars, its gates with their pairing/transit state, the gate id
+//! counter, and gate-web victory streaks. v3 saves are rejected
+//! with the same explicit error: an S4 campaign has no wars, no
+//! gates, and no victory rule, and inventing them would falsify
+//! the war record the same way.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -39,13 +51,13 @@ use crate::race::Personality;
 use crate::rng::SeededRng;
 use crate::state::{
     Campaign, Civilization, Colony, ConstructionProject, Dispute, Embargo, EventKind, GameEvent,
-    PeaceTerms, Proposal, ProposalKind, Purpose, Ship, ShipDesign, ShipKind, ShipState, SimError,
-    SimResult, Specialization, SurveyState, SystemState, TradeRoute, Treaty, TreatyBreach,
-    TreatyKind,
+    Gate, PeaceTerms, Proposal, ProposalKind, Purpose, Ship, ShipDesign, ShipKind, ShipState,
+    SimError, SimResult, Specialization, SurveyState, SystemState, TradeRoute, Treaty,
+    TreatyBreach, TreatyKind, VictoryRule, War,
 };
 
 const SAVE_MAGIC: &[u8; 4] = b"MWSS";
-const SAVE_VERSION: u32 = 3;
+const SAVE_VERSION: u32 = 4;
 
 impl Campaign {
     pub fn canonical_bytes(&self) -> Vec<u8> {
@@ -68,6 +80,10 @@ impl Campaign {
             w.f64(design.fuel_per_ly);
             w.f64(design.speed_ly_per_day);
             w.f64(design.payload_capacity);
+            // S5 (format v4): combat statistics.
+            w.f64(design.attack);
+            w.f64(design.defence);
+            w.f64(design.troop_capacity);
         }
 
         w.u32(self.systems.len() as u32);
@@ -83,6 +99,8 @@ impl Campaign {
             w.u32(ship.design_idx);
             w.f64(ship.fuel);
             write_ship_state(&mut w, &ship.state);
+            // S5 (format v4): accumulated hull damage.
+            w.f64(ship.hull_damage);
         }
 
         w.u32(self.events.len() as u32);
@@ -175,6 +193,45 @@ impl Campaign {
         w.u32(self.next_route_id);
         w.u32(self.next_proposal_id);
         w.f64(self.total_trade_income);
+
+        // S5 sections (format v4): victory, wars, gates.
+        w.u8(victory_rule_code(self.victory_rule));
+        w.u32(self.victory_end_year);
+        w.option_u32(self.victory_winner);
+        match self.victory_day {
+            None => w.u8(0),
+            Some(day) => {
+                w.u8(1);
+                w.u64(day);
+            }
+        }
+        w.u32(self.wars.len() as u32);
+        for war in &self.wars {
+            w.u32(war.parties.0);
+            w.u32(war.parties.1);
+            w.u32(war.aggressor);
+            w.u64(war.declared_day);
+            w.u32(war.ships_lost.0);
+            w.u32(war.ships_lost.1);
+        }
+        w.u32(self.gates.len() as u32);
+        for gate in &self.gates {
+            w.u32(gate.id);
+            w.u32(gate.system);
+            w.option_u32(gate.partner);
+            w.option_u32(gate.pending_partner);
+            w.u32(gate.relink_days_remaining);
+            w.u32(gate.build_days_remaining);
+            w.f64(gate.integrity);
+            w.u64(gate.last_transit_day);
+            w.u32(gate.transits_today);
+        }
+        w.u32(self.next_gate_id);
+        w.u32(self.gate_web_streaks.len() as u32);
+        for (civ, day) in &self.gate_web_streaks {
+            w.u32(*civ);
+            w.u64(*day);
+        }
         w.bytes
     }
 
@@ -371,6 +428,9 @@ fn ship_kind_code(kind: ShipKind) -> u8 {
     match kind {
         ShipKind::Surveyor => 0,
         ShipKind::Colony => 1,
+        ShipKind::Frigate => 2,
+        ShipKind::Cruiser => 3,
+        ShipKind::GateBuilder => 4,
     }
 }
 
@@ -378,7 +438,29 @@ fn ship_kind_from(code: u8) -> SimResult<ShipKind> {
     match code {
         0 => Ok(ShipKind::Surveyor),
         1 => Ok(ShipKind::Colony),
+        2 => Ok(ShipKind::Frigate),
+        3 => Ok(ShipKind::Cruiser),
+        4 => Ok(ShipKind::GateBuilder),
         other => Err(SimError::InvalidSave(format!("bad ship kind {other}"))),
+    }
+}
+
+fn victory_rule_code(rule: VictoryRule) -> u8 {
+    match rule {
+        VictoryRule::Hegemony => 0,
+        VictoryRule::GateWeb => 1,
+        VictoryRule::FirstAmongEquals => 2,
+        VictoryRule::Sandbox => 3,
+    }
+}
+
+fn victory_rule_from(code: u8) -> SimResult<VictoryRule> {
+    match code {
+        0 => Ok(VictoryRule::Hegemony),
+        1 => Ok(VictoryRule::GateWeb),
+        2 => Ok(VictoryRule::FirstAmongEquals),
+        3 => Ok(VictoryRule::Sandbox),
+        other => Err(SimError::InvalidSave(format!("bad victory rule {other}"))),
     }
 }
 
@@ -449,6 +531,20 @@ fn event_kind_code(kind: EventKind) -> u8 {
         EventKind::PeaceSettled => 20,
         EventKind::TreatyProposed => 21,
         EventKind::DealRefused => 22,
+        EventKind::WarDeclared => 23,
+        EventKind::ShipDestroyed => 24,
+        EventKind::OccupationStarted => 25,
+        EventKind::OccupationEnded => 26,
+        EventKind::GateConstructionStarted => 27,
+        EventKind::GateCompleted => 28,
+        EventKind::GatePaired => 29,
+        EventKind::GateDestroyed => 30,
+        EventKind::TerraformStarted => 31,
+        EventKind::TerraformCompleted => 32,
+        EventKind::VictoryAchieved => 33,
+        EventKind::ColonyBlockaded => 34,
+        EventKind::WarEnded => 35,
+        EventKind::ColonyResisted => 36,
     }
 }
 
@@ -477,6 +573,20 @@ fn event_kind_from(code: u8) -> SimResult<EventKind> {
         20 => Ok(EventKind::PeaceSettled),
         21 => Ok(EventKind::TreatyProposed),
         22 => Ok(EventKind::DealRefused),
+        23 => Ok(EventKind::WarDeclared),
+        24 => Ok(EventKind::ShipDestroyed),
+        25 => Ok(EventKind::OccupationStarted),
+        26 => Ok(EventKind::OccupationEnded),
+        27 => Ok(EventKind::GateConstructionStarted),
+        28 => Ok(EventKind::GateCompleted),
+        29 => Ok(EventKind::GatePaired),
+        30 => Ok(EventKind::GateDestroyed),
+        31 => Ok(EventKind::TerraformStarted),
+        32 => Ok(EventKind::TerraformCompleted),
+        33 => Ok(EventKind::VictoryAchieved),
+        34 => Ok(EventKind::ColonyBlockaded),
+        35 => Ok(EventKind::WarEnded),
+        36 => Ok(EventKind::ColonyResisted),
         other => Err(SimError::InvalidSave(format!("bad event kind {other}"))),
     }
 }
@@ -587,6 +697,8 @@ fn write_system(w: &mut Writer, state: &SystemState) {
                 w.string(&planet.name);
                 w.u8(planet_source_code(planet.source));
                 w.f64(planet.habitability_percent);
+                // S5 (format v4): the natural baseline (§3).
+                w.f64(planet.natural_habitability_percent);
                 w.f32(planet.eq_temp_k);
                 w.f32(planet.radius_earth);
             }
@@ -632,6 +744,12 @@ fn write_colony(w: &mut Writer, colony: &Colony) {
         w.u32(project.days_remaining);
         w.u32(project.total_days);
     }
+    // S5 (format v4): occupation and terraforming state.
+    w.option_u32(colony.occupied_by);
+    w.u64(colony.occupied_since_day);
+    w.u32(colony.occupation_resistance_months);
+    w.option_u32(colony.terraform_planet);
+    w.u32(colony.terraform_days_remaining);
 }
 
 fn write_ship_state(w: &mut Writer, state: &ShipState) {
@@ -692,6 +810,16 @@ fn write_ship_state(w: &mut Writer, state: &ShipState) {
                 }
             }
         }
+        ShipState::GateTransit {
+            from_system,
+            to_system,
+            days_remaining,
+        } => {
+            w.u8(5);
+            w.u32(*from_system);
+            w.u32(*to_system);
+            w.u32(*days_remaining);
+        }
     }
 }
 
@@ -717,6 +845,9 @@ fn read_campaign(r: &mut Reader<'_>) -> SimResult<Campaign> {
             fuel_per_ly: r.f64()?,
             speed_ly_per_day: r.f64()?,
             payload_capacity: r.f64()?,
+            attack: r.f64()?,
+            defence: r.f64()?,
+            troop_capacity: r.f64()?,
         });
     }
 
@@ -731,14 +862,19 @@ fn read_campaign(r: &mut Reader<'_>) -> SimResult<Campaign> {
     let mut ships = BTreeMap::new();
     for _ in 0..ship_count {
         let id = r.u32()?;
+        let owner = r.u32()?;
+        let design_idx = r.u32()?;
+        let fuel = r.f64()?;
+        let state = read_ship_state(r)?;
         ships.insert(
             id,
             Ship {
                 id,
-                owner: r.u32()?,
-                design_idx: r.u32()?,
-                fuel: r.f64()?,
-                state: read_ship_state(r)?,
+                owner,
+                design_idx,
+                fuel,
+                state,
+                hull_damage: r.f64()?,
             },
         );
     }
@@ -880,6 +1016,53 @@ fn read_campaign(r: &mut Reader<'_>) -> SimResult<Campaign> {
     let next_proposal_id = r.u32()?;
     let total_trade_income = r.f64()?;
 
+    // S5 sections (format v4).
+    let victory_rule = victory_rule_from(r.u8()?)?;
+    let victory_end_year = r.u32()?;
+    let victory_winner = r.option_u32()?;
+    let victory_day = match r.u8()? {
+        0 => None,
+        1 => Some(r.u64()?),
+        other => {
+            return Err(SimError::InvalidSave(format!(
+                "bad victory-day tag {other}"
+            )))
+        }
+    };
+    let war_count = r.u32()?;
+    let mut wars = Vec::with_capacity(war_count as usize);
+    for _ in 0..war_count {
+        wars.push(War {
+            parties: (r.u32()?, r.u32()?),
+            aggressor: r.u32()?,
+            declared_day: r.u64()?,
+            ships_lost: (r.u32()?, r.u32()?),
+        });
+    }
+    let gate_count = r.u32()?;
+    let mut gates = Vec::with_capacity(gate_count as usize);
+    for _ in 0..gate_count {
+        gates.push(Gate {
+            id: r.u32()?,
+            system: r.u32()?,
+            partner: r.option_u32()?,
+            pending_partner: r.option_u32()?,
+            relink_days_remaining: r.u32()?,
+            build_days_remaining: r.u32()?,
+            integrity: r.f64()?,
+            last_transit_day: r.u64()?,
+            transits_today: r.u32()?,
+        });
+    }
+    let next_gate_id = r.u32()?;
+    let streak_count = r.u32()?;
+    let mut gate_web_streaks = BTreeMap::new();
+    for _ in 0..streak_count {
+        let civ = r.u32()?;
+        let day = r.u64()?;
+        gate_web_streaks.insert(civ, day);
+    }
+
     Ok(Campaign {
         galaxy_fingerprint,
         star_count,
@@ -905,6 +1088,14 @@ fn read_campaign(r: &mut Reader<'_>) -> SimResult<Campaign> {
         next_route_id,
         next_proposal_id,
         total_trade_income,
+        wars,
+        gates,
+        next_gate_id,
+        victory_rule,
+        victory_end_year,
+        victory_winner,
+        victory_day,
+        gate_web_streaks,
     })
 }
 
@@ -933,6 +1124,7 @@ fn read_system(r: &mut Reader<'_>) -> SimResult<SystemState> {
                     name: r.string()?,
                     source: planet_source_from(r.u8()?)?,
                     habitability_percent: r.f64()?,
+                    natural_habitability_percent: r.f64()?,
                     eq_temp_k: r.f32()?,
                     radius_earth: r.f32()?,
                 });
@@ -1015,6 +1207,11 @@ fn read_colony(r: &mut Reader<'_>) -> SimResult<Colony> {
         unsupplied_months,
         development_progress_days,
         construction_queue,
+        occupied_by: r.option_u32()?,
+        occupied_since_day: r.u64()?,
+        occupation_resistance_months: r.u32()?,
+        terraform_planet: r.option_u32()?,
+        terraform_days_remaining: r.u32()?,
     })
 }
 
@@ -1056,6 +1253,11 @@ fn read_ship_state(r: &mut Reader<'_>) -> SimResult<ShipState> {
                 pending_purpose,
             })
         }
+        5 => Ok(ShipState::GateTransit {
+            from_system: r.u32()?,
+            to_system: r.u32()?,
+            days_remaining: r.u32()?,
+        }),
         other => Err(SimError::InvalidSave(format!("bad ship state {other}"))),
     }
 }
@@ -1101,6 +1303,22 @@ mod tests {
         let err = Campaign::load_bytes(&galaxy, &bytes).unwrap_err();
         assert!(
             err.to_string().contains("unsupported save version 2"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn v3_saves_are_rejected_explicitly() {
+        // The v3 precedent, one generation on: an S4-era save has
+        // no wars, gates, or victory rule, and S5 refuses to
+        // invent them.
+        let galaxy = galaxy();
+        let campaign = Campaign::new_default(&galaxy, 123).unwrap();
+        let mut bytes = campaign.save_bytes();
+        bytes[4..8].copy_from_slice(&3u32.to_le_bytes());
+        let err = Campaign::load_bytes(&galaxy, &bytes).unwrap_err();
+        assert!(
+            err.to_string().contains("unsupported save version 3"),
             "unexpected error: {err}"
         );
     }

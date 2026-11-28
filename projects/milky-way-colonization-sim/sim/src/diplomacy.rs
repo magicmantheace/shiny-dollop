@@ -7,8 +7,10 @@
 //! from the state they can inspect — no hidden opinion black box,
 //! per §6.2. S4 lights up the two components S3 left dark: trade
 //! volume (from the live route ledgers) and broken treaties (from
-//! the breach records). Shared enemies remain zero until war
-//! exists (S5).
+//! the breach records). S5 lights up the last one: shared enemies,
+//! from the war records — and folds an active war between the pair
+//! itself into the disputes component, war being the ultimate
+//! open dispute.
 //!
 //! S4 also hosts deal evaluation: whether an AI civilization
 //! accepts a treaty or a peace settlement is computed here, as a
@@ -42,8 +44,13 @@ pub struct OpinionBreakdown {
     /// breaches against the observer weigh most; breaches against
     /// anyone stain a reputation (§6.2's "broken treaties").
     pub broken_treaties: f64,
+    /// S5: warmth from fighting the same wars — third parties both
+    /// civilizations are at war with (§6.2's "shared enemies").
+    /// An active war between the pair itself is counted in
+    /// `disputes` instead (see the module note).
+    pub shared_enemies: f64,
     /// disposition + disputes + border_friction + trade_volume
-    /// + broken_treaties.
+    /// + broken_treaties + shared_enemies.
     pub total: f64,
 }
 
@@ -122,6 +129,28 @@ impl Campaign {
             };
         }
 
+        // S5: an active war between the pair is the ultimate open
+        // dispute — it lands in the disputes component so every
+        // consumer of the breakdown sees it in the total.
+        if self.at_war(observer, subject) {
+            dispute_penalty -= 25.0;
+        }
+
+        // S5 (§6.2): shared enemies — third parties both sides
+        // are at war with warm the relation.
+        let mut shared_enemies: f64 = 0.0;
+        if observer != subject {
+            for civ in self.civs() {
+                if civ.id == observer || civ.id == subject {
+                    continue;
+                }
+                if self.at_war(observer, civ.id) && self.at_war(subject, civ.id) {
+                    shared_enemies += 8.0;
+                }
+            }
+            shared_enemies = shared_enemies.min(24.0);
+        }
+
         let border_friction = self.border_friction(galaxy, observer, subject);
 
         // S4 (§6.2): trade that has actually flowed between the
@@ -157,8 +186,10 @@ impl Campaign {
                 border_friction,
                 trade_volume,
                 broken_treaties,
+                shared_enemies,
                 total: disposition + dispute_penalty + border_friction + trade_volume
-                    + broken_treaties,
+                    + broken_treaties
+                    + shared_enemies,
             },
             disputes: pair_disputes,
         }
@@ -242,6 +273,18 @@ impl Campaign {
         proposer: u32,
         kind: TreatyKind,
     ) -> DealEvaluation {
+        if self.at_war(evaluator, proposer) {
+            return DealEvaluation {
+                accept: false,
+                score: 0.0,
+                threshold: 0.0,
+                reasons: vec![
+                    "we are at war — no treaties are weighed while fleets fight; \
+                     peace is settled as a peace, not a treaty"
+                        .to_string(),
+                ],
+            };
+        }
         if self.embargo_between(evaluator, proposer) {
             return DealEvaluation {
                 accept: false,
@@ -418,6 +461,19 @@ impl Campaign {
                     }
                 }
                 let shared_part = (shared as f64 * 12.0).min(24.0);
+                // S5: shared *enemies* proper — third parties both
+                // sides are at war with (§6.2), weighed alongside
+                // the S4 dispute-shadow.
+                let mut war_shared = 0usize;
+                for civ in self.civs() {
+                    if civ.id == evaluator || civ.id == proposer {
+                        continue;
+                    }
+                    if self.at_war(evaluator, civ.id) && self.at_war(proposer, civ.id) {
+                        war_shared += 1;
+                    }
+                }
+                let war_shared_part = (war_shared as f64 * 12.0).min(24.0);
                 let xeno_part = -personality.xenophobia * 30.0;
                 let breach_part = -breaches * 15.0;
                 reasons.push(format!("our opinion of you: {}", signed(opinion)));
@@ -430,6 +486,12 @@ impl Campaign {
                     reasons.push(format!(
                         "we dispute claims with {shared} of the same rivals: {}",
                         signed(shared_part)
+                    ));
+                }
+                if war_shared > 0 {
+                    reasons.push(format!(
+                        "we are at war with {war_shared} of the same enemies: {}",
+                        signed(war_shared_part)
                     ));
                 }
                 if personality.xenophobia > 0.0 {
@@ -446,7 +508,8 @@ impl Campaign {
                     ));
                 }
                 (
-                    opinion_part + honour_part + shared_part + xeno_part + breach_part,
+                    opinion_part + honour_part + shared_part + war_shared_part + xeno_part
+                        + breach_part,
                     35.0,
                 )
             }
@@ -522,6 +585,9 @@ impl Campaign {
     /// on `terms`? Weighed: the relief of closing every open
     /// dispute, the net value of the cessions and credits changing
     /// hands, and the evaluator's own disposition toward settling.
+    /// S5: at war, the war itself is something to settle — the
+    /// "nothing to settle" refusal no longer applies — and the
+    /// evaluator's war exhaustion presses toward the table.
     pub fn evaluate_peace(
         &self,
         galaxy: &Galaxy,
@@ -530,7 +596,8 @@ impl Campaign {
         terms: &PeaceTerms,
     ) -> DealEvaluation {
         let disputes = self.disputes_between(evaluator, proposer);
-        if disputes.is_empty() && terms.is_empty() {
+        let at_war = self.at_war(evaluator, proposer);
+        if disputes.is_empty() && terms.is_empty() && !at_war {
             return DealEvaluation {
                 accept: false,
                 score: 0.0,
@@ -553,6 +620,20 @@ impl Campaign {
                 disputes.len(),
                 tension,
                 signed(relief_part)
+            ));
+        }
+
+        // S5: a shooting war is its own reason to settle, and the
+        // evaluator's exhaustion is the pressure behind it — both
+        // stated, per §6.2's legibility rule.
+        let mut exhaustion_part = 0.0;
+        if at_war {
+            let exhaustion = self.war_exhaustion(evaluator);
+            exhaustion_part = exhaustion * 0.9;
+            reasons.push(format!(
+                "ending the war itself, with our exhaustion at {exhaustion:.1}, presses \
+                 us to settle: {}",
+                signed(exhaustion_part)
             ));
         }
 
@@ -627,7 +708,8 @@ impl Campaign {
             ));
         }
 
-        let score = relief_part + cession_part + credits_part + honour_part + aggression_part
+        let score = relief_part + exhaustion_part + cession_part + credits_part + honour_part
+            + aggression_part
             + opinion_part;
         let threshold = 10.0;
         let accept = score >= threshold;

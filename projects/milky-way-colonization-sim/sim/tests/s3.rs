@@ -6,7 +6,8 @@
 use mwcs_pipeline::table::{PlanetRecord, StarRecord};
 use mwcs_sim::race::HomeworldRules;
 use mwcs_sim::{
-    Campaign, Galaxy, GameSetup, Purpose, ScriptedPolicy, ShipKind, SimError, PLAYER_CIV,
+    Campaign, Galaxy, GameSetup, Purpose, ScriptedPolicy, ShipKind, SimError, VictoryRule,
+    PLAYER_CIV,
 };
 
 fn star(id: u32, name: &str, pos: [f32; 3], spectral: u8) -> StarRecord {
@@ -63,6 +64,10 @@ fn setup(ai_count: usize) -> GameSetup {
             min_spacing_ly: 20.0,
             ..HomeworldRules::default()
         },
+        // S5: pin the victory rule to the solo campaign's Sandbox
+        // so the zero-AI equivalence test below compares like with
+        // like (GameSetup's own default is Hegemony).
+        victory: VictoryRule::Sandbox,
         ..GameSetup::default()
     }
 }

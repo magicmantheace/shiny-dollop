@@ -23,6 +23,20 @@
 //! research pacts feed. Deal evaluation lives in `diplomacy.rs` and
 //! is a pure function of state, so every acceptance or refusal comes
 //! with stated, inspectable reasons (§6.2).
+//!
+//! S5 adds war and victory (design §5.3, §6.4, §6.5, §3): war
+//! declarations that end treaties and sever trade, daily in-system
+//! fleet combat resolved deterministically from the campaign seed,
+//! invasion and occupation (annexation stays a peace-treaty act),
+//! blockades that starve colonies on the §3 schedule, warp gates
+//! (construction, pairing, throughput-limited transit, capture by
+//! occupation, destruction by bombardment), terraforming as a
+//! late-game megaproject against the natural habitability baseline,
+//! and the §6.5 victory conditions as game-setup options (§11.4:
+//! Hegemony by default). Combat randomness derives from
+//! `(seed, system, day)` child streams, never from stored RNG
+//! state, so catch-up equivalence (§11.1) covers war exactly as it
+//! covers everything else.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -64,6 +78,47 @@ pub const PROPOSAL_COOLDOWN_DAYS: u64 = 365;
 /// best first, before giving up. A perf bound on a heuristic (see
 /// the method's docs); explicit-endpoint commands are unaffected.
 pub const SUGGEST_PATH_CHECK_CAP: usize = 24;
+
+/// S5 (§5.3): a warp gate is a megaproject — development 6, a Gate
+/// Builder ship consumed on site, a large alloy/electronics bill,
+/// and a build time in years.
+pub const GATE_MIN_DEVELOPMENT: u8 = 6;
+pub const GATE_BUILD_DAYS: u32 = 1_460;
+pub const GATE_BUILD_CREDITS: f64 = 12_000.0;
+pub const GATE_BUILD_ALLOYS: f64 = 300.0;
+pub const GATE_BUILD_ELECTRONICS: f64 = 40.0;
+/// S5 (§5.3): a gate's structural integrity under bombardment.
+pub const GATE_INTEGRITY: f64 = 300.0;
+/// S5 (§5.3): fuel burned per gate transit, drawn from the
+/// *departing* system's colony stock — gates are fast, not free.
+pub const GATE_TRANSIT_FUEL: f64 = 25.0;
+/// S5 (§5.3): a gate pair's throughput — transits that may begin
+/// per day across the pair. A fleet larger than this trickles
+/// through over days, as the design intends.
+pub const GATE_TRANSITS_PER_DAY: u32 = 3;
+/// S5 (§5.3): re-pairing a gate takes months of downtime.
+pub const GATE_RELINK_DAYS: u32 = 180;
+/// S5 (§5.3): gate transit itself takes one day, any distance.
+pub const GATE_TRANSIT_DAYS: u32 = 1;
+
+/// S5 (§3, §11.2): terraforming is a late-game megaproject —
+/// development 7, decades per planet, habitability raised against
+/// the natural baseline stored in the profile.
+pub const TERRAFORM_MIN_DEVELOPMENT: u8 = 7;
+pub const TERRAFORM_DAYS: u32 = 10_950;
+pub const TERRAFORM_CREDITS: f64 = 20_000.0;
+pub const TERRAFORM_EXOTICS: f64 = 15.0;
+pub const TERRAFORM_HABITABILITY_GAIN: f64 = 25.0;
+
+/// S5 (§6.4): monthly upkeep the occupier pays per occupied
+/// colony, on top of the colony's halved output.
+pub const OCCUPATION_UPKEEP_CREDITS: f64 = 4.0;
+/// S5 (§6.4): an occupation held this long is integrated —
+/// resistance ends even without a garrison in orbit.
+pub const OCCUPATION_INTEGRATION_DAYS: u64 = 3_650;
+/// S5 (§6.4): ungarrisoned occupation collapses after this many
+/// months of rising resistance.
+pub const OCCUPATION_RESISTANCE_LIMIT_MONTHS: u32 = 6;
 
 pub type StarId = u32;
 pub type ShipId = u32;
@@ -127,6 +182,22 @@ pub enum SimError {
     NotRouteParty(u32),
     UnknownProposal(u32),
     NotProposalRecipient(u32),
+    // S5: war, gates, invasion, terraforming.
+    AlreadyAtWar(u32),
+    NotAtWar(u32),
+    UnknownGate(u32),
+    GateAlreadyExists(StarId),
+    GateBuilderRequired(StarId),
+    GateNotOperational(u32),
+    GateUnpaired(u32),
+    GateThroughputFull(u32),
+    InsufficientTroops {
+        needed: f64,
+        available: f64,
+    },
+    SystemOccupied(StarId),
+    TerraformInProgress(StarId),
+    DefendingFleetPresent(StarId),
     InvalidSave(String),
     GalaxyMismatch,
 }
@@ -233,6 +304,40 @@ impl fmt::Display for SimError {
             Self::NotProposalRecipient(id) => {
                 write!(f, "proposal {id} is not addressed to this civilization")
             }
+            Self::AlreadyAtWar(id) => {
+                write!(f, "already at war with civilization {id}")
+            }
+            Self::NotAtWar(id) => write!(f, "not at war with civilization {id}"),
+            Self::UnknownGate(id) => write!(f, "unknown gate {id}"),
+            Self::GateAlreadyExists(id) => {
+                write!(f, "system {id} already hosts a gate")
+            }
+            Self::GateBuilderRequired(id) => write!(
+                f,
+                "a Gate Builder ship must be present at system {id} to begin gate construction"
+            ),
+            Self::GateNotOperational(id) => {
+                write!(f, "gate {id} is not operational (building, re-pairing, or its system has no colony)")
+            }
+            Self::GateUnpaired(id) => write!(f, "gate {id} has no paired partner"),
+            Self::GateThroughputFull(id) => write!(
+                f,
+                "gate {id}'s pair has moved its daily throughput — the rest of the fleet trickles through tomorrow"
+            ),
+            Self::InsufficientTroops { needed, available } => write!(
+                f,
+                "invasion needs {needed:.0} troop capacity landed but only {available:.0} is in orbit"
+            ),
+            Self::SystemOccupied(id) => {
+                write!(f, "system {id} is already under occupation")
+            }
+            Self::TerraformInProgress(id) => {
+                write!(f, "system {id} already has a terraforming project running")
+            }
+            Self::DefendingFleetPresent(id) => write!(
+                f,
+                "system {id}'s defending fleet must be destroyed or driven off before troops can land"
+            ),
             Self::InvalidSave(msg) => write!(f, "invalid save: {msg}"),
             Self::GalaxyMismatch => write!(f, "save does not belong to this galaxy table"),
         }
@@ -264,6 +369,14 @@ pub enum Specialization {
 pub enum ShipKind {
     Surveyor,
     Colony,
+    /// S5 (§5.1): the light warship — fast, short-legged, carries a
+    /// small troop module.
+    Frigate,
+    /// S5 (§5.1): the heavy warship — the invasion platform.
+    Cruiser,
+    /// S5 (§5.1/§5.3): a one-purpose industrial ship that delivers
+    /// a warp gate's components to its construction site.
+    GateBuilder,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -274,6 +387,15 @@ pub struct ShipDesign {
     pub fuel_per_ly: f64,
     pub speed_ly_per_day: f64,
     pub payload_capacity: f64,
+    /// S5 (§5.1's armament pull of the design triangle): damage
+    /// this hull deals per combat round at full hull.
+    pub attack: f64,
+    /// S5: damage resistance — sets the hull's strength and soaks
+    /// nothing directly; combat is damage against hull strength.
+    pub defence: f64,
+    /// S5 (§6.4): troop/occupation module capacity — the ground
+    /// strength this hull can land for an invasion.
+    pub troop_capacity: f64,
 }
 
 impl ShipDesign {
@@ -285,10 +407,20 @@ impl ShipDesign {
         }
     }
 
+    /// S5: the damage a hull of this design absorbs before it is
+    /// destroyed. Damage is persistent (`Ship::hull_damage`) and
+    /// repaired at the owner's colonies.
+    pub fn hull_strength(&self) -> f64 {
+        30.0 + self.defence * 6.0
+    }
+
     pub fn credits_cost(&self) -> f64 {
         match self.kind {
             ShipKind::Surveyor => 400.0,
             ShipKind::Colony => 1_500.0,
+            ShipKind::Frigate => 900.0,
+            ShipKind::Cruiser => 2_400.0,
+            ShipKind::GateBuilder => 3_200.0,
         }
     }
 
@@ -296,6 +428,9 @@ impl ShipDesign {
         match self.kind {
             ShipKind::Surveyor => 12.0,
             ShipKind::Colony => 45.0,
+            ShipKind::Frigate => 30.0,
+            ShipKind::Cruiser => 85.0,
+            ShipKind::GateBuilder => 120.0,
         }
     }
 
@@ -303,6 +438,9 @@ impl ShipDesign {
         match self.kind {
             ShipKind::Surveyor => 90,
             ShipKind::Colony => 240,
+            ShipKind::Frigate => 150,
+            ShipKind::Cruiser => 300,
+            ShipKind::GateBuilder => 365,
         }
     }
 }
@@ -342,6 +480,14 @@ pub enum ShipState {
         system: StarId,
         pending_purpose: Option<Purpose>,
     },
+    /// S5 (§5.3): inside a gate transit — one day regardless of
+    /// distance, then the ship arrives at the partner gate's
+    /// system.
+    GateTransit {
+        from_system: StarId,
+        to_system: StarId,
+        days_remaining: u32,
+    },
 }
 
 impl ShipState {
@@ -363,6 +509,10 @@ pub struct Ship {
     pub owner: u32,
     pub design_idx: u32,
     pub fuel: f64,
+    /// S5: accumulated combat damage. A ship is destroyed when
+    /// this reaches its design's hull strength; it repairs at the
+    /// owner's colonies. Zero for an undamaged hull.
+    pub hull_damage: f64,
     pub state: ShipState,
 }
 
@@ -397,6 +547,23 @@ pub struct Colony {
     pub unsupplied_months: u32,
     pub development_progress_days: u32,
     pub construction_queue: Vec<ConstructionProject>,
+    /// S5 (§6.4): the civilization occupying this colony, if any.
+    /// Occupation is not annexation: `claimed_by` on the system
+    /// stays with the legal owner until a peace treaty cedes it —
+    /// the occupier merely holds the ground, takes halved output,
+    /// and pays occupation upkeep.
+    pub occupied_by: Option<u32>,
+    /// S5: the day the current occupation began (integration clock).
+    pub occupied_since_day: u64,
+    /// S5: consecutive months the occupation has run without a
+    /// troop garrison in orbit — resistance rises, and at the
+    /// limit the occupation collapses.
+    pub occupation_resistance_months: u32,
+    /// S5 (§3): the profile planet index a terraforming project is
+    /// remaking, while one runs.
+    pub terraform_planet: Option<u32>,
+    /// S5: days left on the running terraform project (0 = none).
+    pub terraform_days_remaining: u32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -475,6 +642,46 @@ pub enum EventKind {
     /// S4: `other_civ` refused a deal `civ` proposed. The stated
     /// reasons ride in the command result, not the event.
     DealRefused,
+    /// S5: `civ` declared war on `other_civ` (§6.4).
+    WarDeclared,
+    /// S5: a ship was destroyed in combat. `civ` owned it;
+    /// `other_civ` dealt the killing damage (or held the colony
+    /// whose defences did).
+    ShipDestroyed,
+    /// S5: `civ` landed troops and occupied `other_civ`'s colony
+    /// at `system` (§6.4). The claim does not move — occupation is
+    /// leverage, treaties are law.
+    OccupationStarted,
+    /// S5: an occupation at `system` ended — peace, cession, or
+    /// resistance. `civ` is the colony's owner, `other_civ` the
+    /// former occupier.
+    OccupationEnded,
+    /// S5: gate construction began at `system` (§5.3).
+    GateConstructionStarted,
+    /// S5: a gate finished construction at `system` (§5.3).
+    GateCompleted,
+    /// S5: two gates were paired (at `system`, the first gate's).
+    GatePaired,
+    /// S5: the gate at `system` was destroyed by bombardment;
+    /// its partner is unpaired now (§5.3).
+    GateDestroyed,
+    /// S5: a terraforming project began at `system` (§3).
+    TerraformStarted,
+    /// S5: a terraforming project completed at `system` — the
+    /// planet's habitability now stands above its natural
+    /// baseline (§3).
+    TerraformCompleted,
+    /// S5: `civ` achieved the campaign's victory condition (§6.5).
+    VictoryAchieved,
+    /// S5: an enemy fleet's presence cut `system`'s colony off —
+    /// the blockade's first month (§6.4).
+    ColonyBlockaded,
+    /// S5: the war between `civ` and `other_civ` ended without a
+    /// negotiated settlement — one side holds no colonies.
+    WarEnded,
+    /// S5: resistance at occupied `system` is rising (the
+    /// garrison warning, §6.4).
+    ColonyResisted,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -703,6 +910,93 @@ pub struct Proposal {
     pub reasons: Vec<String>,
 }
 
+/// A war in progress (design §6.4): the pair, who declared it,
+/// and the ship losses each side has suffered — the raw material
+/// of war exhaustion. Wars end by peace settlement (the S4 peace
+/// machinery, war scope) or when one side holds no colonies left
+/// to fight over.
+#[derive(Debug, Clone, PartialEq)]
+pub struct War {
+    /// The two belligerents, sorted `(lo, hi)`.
+    pub parties: (u32, u32),
+    pub aggressor: u32,
+    pub declared_day: u64,
+    /// Ships lost by `parties.0` and `parties.1` respectively, in
+    /// this war.
+    pub ships_lost: (u32, u32),
+}
+
+/// A warp gate (design §5.3): an orbital structure at one system,
+/// paired with exactly one partner gate. Under construction while
+/// `build_days_remaining > 0`; re-pairing while
+/// `relink_days_remaining > 0` (the pending partner takes over
+/// when the downtime completes). A gate's controller is whoever
+/// holds its system — the claim owner, or the occupier while the
+/// colony is occupied — so gates are captured by taking the
+/// system and lost with it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Gate {
+    pub id: u32,
+    pub system: StarId,
+    pub partner: Option<u32>,
+    pub pending_partner: Option<u32>,
+    pub relink_days_remaining: u32,
+    pub build_days_remaining: u32,
+    pub integrity: f64,
+    /// Throughput accounting (§5.3): transits begun on
+    /// `last_transit_day`, counted across the pair (both gates
+    /// carry the same counters).
+    pub last_transit_day: u64,
+    pub transits_today: u32,
+}
+
+/// The §6.5 victory conditions, as a game-setup option (§11.4
+/// ruling: Hegemony is the default; the others ship as choices,
+/// and all four are tracked as scores either way).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VictoryRule {
+    /// Control (own or allied) ≥ 40% of colonized systems.
+    Hegemony,
+    /// Your gate network connects ≥ 60% of colonized systems,
+    /// held for 10 years.
+    GateWeb,
+    /// Highest score when the end year arrives.
+    FirstAmongEquals,
+    /// No victory — pure sandbox; scores still tracked.
+    Sandbox,
+}
+
+impl VictoryRule {
+    /// Stable serialization code (save format v4).
+    pub fn code(self) -> u8 {
+        match self {
+            Self::Hegemony => 0,
+            Self::GateWeb => 1,
+            Self::FirstAmongEquals => 2,
+            Self::Sandbox => 3,
+        }
+    }
+
+    pub fn from_code(code: u8) -> Option<Self> {
+        match code {
+            0 => Some(Self::Hegemony),
+            1 => Some(Self::GateWeb),
+            2 => Some(Self::FirstAmongEquals),
+            3 => Some(Self::Sandbox),
+            _ => None,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Hegemony => "hegemony",
+            Self::GateWeb => "gate web",
+            Self::FirstAmongEquals => "first among equals",
+            Self::Sandbox => "sandbox",
+        }
+    }
+}
+
 /// The result of proposing a deal.
 #[derive(Debug, Clone, PartialEq)]
 pub enum DealOutcome {
@@ -753,6 +1047,12 @@ pub struct GameSetup {
     pub ai_count: usize,
     pub player_name: String,
     pub home_rules: HomeworldRules,
+    /// S5: the §6.5 victory condition for this campaign (§11.4:
+    /// Hegemony by default).
+    pub victory: VictoryRule,
+    /// S5: the end year for First Among Equals (§6.5's default is
+    /// year 300).
+    pub victory_end_year: u32,
 }
 
 impl Default for GameSetup {
@@ -761,6 +1061,8 @@ impl Default for GameSetup {
             ai_count: crate::race::DEFAULT_AI_COUNT,
             player_name: "Player Civilization".into(),
             home_rules: HomeworldRules::default(),
+            victory: VictoryRule::Hegemony,
+            victory_end_year: 300,
         }
     }
 }
@@ -828,6 +1130,26 @@ pub struct Campaign {
     /// that close when a route does; this counter is the campaign
     /// total the long-run reports quote.
     pub(crate) total_trade_income: f64,
+    /// S5: wars in progress, in declaration order.
+    pub(crate) wars: Vec<War>,
+    /// S5: warp gates, in construction order (ids from
+    /// `next_gate_id`).
+    pub(crate) gates: Vec<Gate>,
+    pub(crate) next_gate_id: u32,
+    /// S5: this campaign's victory condition and end year, fixed
+    /// at setup (§6.5/§11.4). Solo campaigns created through the
+    /// S1 constructors run Sandbox — victory is a multi-civilization
+    /// contest, and S1 semantics stay untouched.
+    pub(crate) victory_rule: VictoryRule,
+    pub(crate) victory_end_year: u32,
+    /// S5: the civilization that achieved victory, and the day —
+    /// recorded once; the campaign continues as a sandbox after.
+    pub(crate) victory_winner: Option<u32>,
+    pub(crate) victory_day: Option<u64>,
+    /// S5: Gate Web streaks — the day each civilization's network
+    /// first reached the connection threshold in its current
+    /// unbroken run (the 10-year hold clock).
+    pub(crate) gate_web_streaks: BTreeMap<u32, u64>,
     /// Derived cache (never serialized, rebuilt lazily after load):
     /// stars within `NEIGHBOR_CACHE_RANGE_LY` of a key star, sorted
     /// by `(distance, id)`. It exists so monthly AI planning over a
@@ -907,6 +1229,8 @@ impl Campaign {
             return Err(SimError::InvalidHomeworld);
         }
         let mut campaign = Self::shell(galaxy, seed);
+        campaign.victory_rule = setup.victory;
+        campaign.victory_end_year = setup.victory_end_year;
         campaign.add_civilization(
             Civilization {
                 id: PLAYER_CIV,
@@ -956,9 +1280,14 @@ impl Campaign {
         ))
     }
 
-    /// An empty campaign shell: the two fixed S1 ship designs
-    /// (custom designs are a later slice, per the S2 scope notes),
-    /// no civilizations yet.
+    /// An empty campaign shell: the fixed ship designs (custom
+    /// designs are a later slice, per the S2 scope notes), no
+    /// civilizations yet. S5 completes §5.1's hull list: the two
+    /// S1 designs gain their (token) combat numbers, and the
+    /// Frigate, Cruiser, and Gate Builder join them — each a
+    /// different point in §5.1's range/payload/armament triangle:
+    /// warships are short-legged and live off depots and gates,
+    /// the Gate Builder is all payload and no fight.
     fn shell(galaxy: &Galaxy, seed: u64) -> Self {
         Self {
             galaxy_fingerprint: galaxy.fingerprint().to_string(),
@@ -975,6 +1304,9 @@ impl Campaign {
                     fuel_per_ly: 2.0,
                     speed_ly_per_day: 0.30,
                     payload_capacity: 8.0,
+                    attack: 1.0,
+                    defence: 1.0,
+                    troop_capacity: 0.0,
                 },
                 ShipDesign {
                     name: "Mayflower Colony Ship".into(),
@@ -983,6 +1315,42 @@ impl Campaign {
                     fuel_per_ly: 4.0,
                     speed_ly_per_day: 0.18,
                     payload_capacity: 120.0,
+                    attack: 0.0,
+                    defence: 2.0,
+                    troop_capacity: 0.0,
+                },
+                ShipDesign {
+                    name: "Vigil Frigate".into(),
+                    kind: ShipKind::Frigate,
+                    tank_capacity: 200.0,
+                    fuel_per_ly: 3.0,
+                    speed_ly_per_day: 0.35,
+                    payload_capacity: 20.0,
+                    attack: 10.0,
+                    defence: 8.0,
+                    troop_capacity: 15.0,
+                },
+                ShipDesign {
+                    name: "Meridian Cruiser".into(),
+                    kind: ShipKind::Cruiser,
+                    tank_capacity: 260.0,
+                    fuel_per_ly: 3.5,
+                    speed_ly_per_day: 0.28,
+                    payload_capacity: 60.0,
+                    attack: 24.0,
+                    defence: 20.0,
+                    troop_capacity: 50.0,
+                },
+                ShipDesign {
+                    name: "Keystone Gate Builder".into(),
+                    kind: ShipKind::GateBuilder,
+                    tank_capacity: 300.0,
+                    fuel_per_ly: 4.0,
+                    speed_ly_per_day: 0.15,
+                    payload_capacity: 200.0,
+                    attack: 0.0,
+                    defence: 4.0,
+                    troop_capacity: 0.0,
                 },
             ],
             systems: BTreeMap::new(),
@@ -1001,6 +1369,14 @@ impl Campaign {
             next_route_id: 1,
             next_proposal_id: 1,
             total_trade_income: 0.0,
+            wars: Vec::new(),
+            gates: Vec::new(),
+            next_gate_id: 1,
+            victory_rule: VictoryRule::Sandbox,
+            victory_end_year: 300,
+            victory_winner: None,
+            victory_day: None,
+            gate_web_streaks: BTreeMap::new(),
             neighbor_cache: BTreeMap::new(),
         }
     }
@@ -1037,6 +1413,11 @@ impl Campaign {
                 unsupplied_months: 0,
                 development_progress_days: 0,
                 construction_queue: Vec::new(),
+                occupied_by: None,
+                occupied_since_day: 0,
+                occupation_resistance_months: 0,
+                terraform_planet: None,
+                terraform_days_remaining: 0,
             }),
         };
         self.systems.insert(home_system, home_state);
@@ -1458,6 +1839,7 @@ impl Campaign {
                 owner,
                 design_idx,
                 fuel,
+                hull_damage: 0.0,
                 state: ShipState::AtSystem { system },
             },
         );
@@ -1827,6 +2209,11 @@ impl Campaign {
             unsupplied_months: 0,
             development_progress_days: 0,
             construction_queue: Vec::new(),
+            occupied_by: None,
+            occupied_since_day: 0,
+            occupation_resistance_months: 0,
+            terraform_planet: None,
+            terraform_days_remaining: 0,
         });
     }
 
@@ -1939,7 +2326,18 @@ impl Campaign {
             return Ok(0.0);
         }
         let colony_owner = self.systems.get(&system).and_then(|s| s.claimed_by);
+        // S5: the colony's occupier holds its port — an occupying
+        // fleet refuels from the stocks it controls, exactly as
+        // the gate controller rule (§5.3) treats it as the
+        // system's holder. Without this an invasion fleet that
+        // arrives on fumes could never leave.
+        let occupier = self
+            .systems
+            .get(&system)
+            .and_then(|s| s.colony.as_ref())
+            .and_then(|c| c.occupied_by);
         if colony_owner != Some(civ_id)
+            && occupier != Some(civ_id)
             && self
                 .systems
                 .get(&system)
@@ -2058,9 +2456,19 @@ impl Campaign {
 
     fn advance_one_day(&mut self, galaxy: &Galaxy) {
         self.day += 1;
+        // S5: gate transits land first (a ship through a gate is
+        // in-system for the day's fighting), then ordinary movement,
+        // surveys, and construction — and combat resolves after
+        // movement, in daily rounds (§6.4), with repairs and the
+        // megaproject clocks (gate construction/re-pairing,
+        // terraforming) closing the day.
+        self.process_gate_transit();
         self.process_ship_movement(galaxy);
         self.process_surveys(galaxy);
         self.process_construction();
+        self.process_combat(galaxy);
+        self.process_repairs();
+        self.process_projects();
         if self.day % DAYS_PER_MONTH == 0 {
             let research_outputs = self.monthly_settlement();
             // S4: trade routes pay out, research pacts pay their
@@ -2068,6 +2476,11 @@ impl Campaign {
             // lapse — all on the same settlement boundary, so
             // catch-up equivalence (§11.1) covers diplomacy too.
             self.monthly_diplomacy_settlement(galaxy, &research_outputs);
+            // S5: occupations strain or collapse, wars with a
+            // colony-less side end, and victory is evaluated — all
+            // on the same boundary, for the same reason.
+            self.monthly_war_settlement();
+            self.monthly_victory_evaluation(galaxy);
             // AI civilizations re-plan on the settlement boundary
             // (design §2: AI civs re-plan; §6.5), *after* the same
             // settlement the player experiences, so monthly chunking
@@ -2336,10 +2749,35 @@ impl Campaign {
     fn monthly_settlement(&mut self) -> BTreeMap<u32, f64> {
         let system_ids: Vec<StarId> = self.systems.keys().copied().collect();
         let mut abandoned: Vec<(StarId, u32)> = Vec::new();
+        let mut blockade_events: Vec<(StarId, u32, u32)> = Vec::new();
         // Each colony's income lands in its *owner's* treasury
         // (design §6.5: same economy rules for every civilization).
         let mut credits_delta: BTreeMap<u32, f64> = BTreeMap::new();
         let mut research_delta: BTreeMap<u32, f64> = BTreeMap::new();
+
+        // S5 (§6.4): blockade is presence — an enemy fleet in the
+        // system cuts the colony off for as long as it stays.
+        // Computed up front from the ship table so the settlement
+        // loop below needs no second borrow.
+        let mut blockaded: BTreeMap<StarId, u32> = BTreeMap::new();
+        for ship in self.ships.values() {
+            let Some(system) = ship.state.current_system() else {
+                continue;
+            };
+            let Some(state) = self.systems.get(&system) else {
+                continue;
+            };
+            let Some(colony) = state.colony.as_ref() else {
+                continue;
+            };
+            let owner = state.claimed_by.unwrap_or(PLAYER_CIV);
+            let controller = colony.occupied_by.unwrap_or(owner);
+            if ship.owner != controller
+                && (self.at_war(ship.owner, owner) || self.at_war(ship.owner, controller))
+            {
+                blockaded.entry(system).or_insert(ship.owner);
+            }
+        }
 
         for system in system_ids {
             let Some(state) = self.systems.get_mut(&system) else {
@@ -2350,6 +2788,27 @@ impl Campaign {
             let Some(colony) = state.colony.as_mut() else {
                 continue;
             };
+            // S5 (§6.4): an occupied colony works for its occupier
+            // at half output; a blockaded colony does not work at
+            // all — it eats its buffer on the §3 schedule (decline
+            // at 3 unsupplied months, abandonment at 12).
+            let controller = colony.occupied_by.unwrap_or(owner);
+            let occupied = colony.occupied_by.is_some();
+            if let Some(&blockader) = blockaded.get(&system) {
+                colony.supplied = false;
+                colony.unsupplied_months += 1;
+                if colony.unsupplied_months >= 3 {
+                    colony.population_millions *= 0.995;
+                }
+                if colony.unsupplied_months == 1 {
+                    blockade_events.push((system, owner, blockader));
+                }
+                if colony.unsupplied_months >= 12 {
+                    abandoned.push((system, owner));
+                }
+                continue;
+            }
+            let occ_mult = if occupied { 0.5 } else { 1.0 };
             let habitability = profile
                 .as_ref()
                 .map(|p| p.habitability_percent)
@@ -2392,16 +2851,21 @@ impl Campaign {
                 1.0
             };
 
-            colony.fuel_stock += (0.8 + dev * 0.45) * fuel_trait * fuel_mult * efficiency;
-            colony.alloys_stock += (0.6 + dev * 0.3) * industry_trait * alloys_mult * efficiency;
-            colony.supplies_stock +=
-                (2.2 + dev * 0.5) * (0.45 + habitability / 100.0) * supplies_mult * efficiency;
+            colony.fuel_stock +=
+                (0.8 + dev * 0.45) * fuel_trait * fuel_mult * efficiency * occ_mult;
+            colony.alloys_stock +=
+                (0.6 + dev * 0.3) * industry_trait * alloys_mult * efficiency * occ_mult;
+            colony.supplies_stock += (2.2 + dev * 0.5)
+                * (0.45 + habitability / 100.0)
+                * supplies_mult
+                * efficiency
+                * occ_mult;
             if colony.development >= 5 {
                 colony.electronics_stock +=
-                    (colony.development as f64 - 4.0) * 0.2 * alloys_mult * efficiency;
+                    (colony.development as f64 - 4.0) * 0.2 * alloys_mult * efficiency * occ_mult;
             }
             if colony.development >= 4 {
-                colony.exotics_stock += exotics_trait * efficiency;
+                colony.exotics_stock += exotics_trait * efficiency * occ_mult;
             }
             colony.defence_strength = 1.0
                 + dev * 2.0
@@ -2426,17 +2890,23 @@ impl Campaign {
             }
 
             // Credits: population-driven income minus upkeep.
+            // Under occupation the halved income lands in the
+            // *occupier's* treasury, and the occupier also pays
+            // the §6.4 occupation upkeep.
             let income =
                 colony.population_millions * 0.045 * (0.7 + dev * 0.08) * efficiency * trade_mult;
             let upkeep = 2.0 + dev * 1.0 + colony.population_millions * 0.004;
-            *credits_delta.entry(owner).or_insert(0.0) += income - upkeep;
+            *credits_delta.entry(controller).or_insert(0.0) += income * occ_mult - upkeep;
+            if occupied {
+                *credits_delta.entry(controller).or_insert(0.0) -= OCCUPATION_UPKEEP_CREDITS;
+            }
 
             // Research (S4): Research-specialized colonies produce
             // research points. The formula is the one
             // `research_output_for` quotes between settlements.
             if spec == Some(Specialization::Research) {
-                *research_delta.entry(owner).or_insert(0.0) +=
-                    (dev * 1.5 + colony.population_millions * 0.004) * efficiency;
+                *research_delta.entry(controller).or_insert(0.0) +=
+                    (dev * 1.5 + colony.population_millions * 0.004) * efficiency * occ_mult;
             }
 
             // Population: logistic growth toward a habitability and
@@ -2445,11 +2915,17 @@ impl Campaign {
             // abandonment after twelve (design §3: slow, telegraphed).
             let capacity = 100.0 + habitability * 25.0 + dev * 400.0;
             if colony.supplied {
-                let rate = 0.0018 * (habitability / 100.0) * (0.7 + dev * 0.05) * efficiency;
+                let rate =
+                    0.0018 * (habitability / 100.0) * (0.7 + dev * 0.05) * efficiency * occ_mult;
                 let headroom = (1.0 - colony.population_millions / capacity).max(0.0);
                 colony.population_millions += colony.population_millions * rate * headroom;
                 colony.development_progress_days += DAYS_PER_MONTH as u32;
-                if colony.development < 5
+                // Development runs 0–10 (§3); S1–S4 settled at 5
+                // only because nothing needed more — gates (§5.3)
+                // require 6 and terraforming (§3) 7, so the ladder
+                // now climbs the design's full range under the same
+                // time + population gates.
+                if colony.development < 10
                     && colony.development_progress_days >= DAYS_PER_YEAR as u32
                     && colony.population_millions > colony.development as f64 * 150.0
                 {
@@ -2473,6 +2949,15 @@ impl Campaign {
             if let Some(civ) = self.civs.get_mut(*owner as usize) {
                 civ.research_points += delta;
             }
+        }
+        for (system, owner, blockader) in blockade_events {
+            self.push_event(
+                EventKind::ColonyBlockaded,
+                Some(system),
+                None,
+                Some(owner),
+                Some(blockader),
+            );
         }
         for (system, owner) in abandoned {
             if let Some(state) = self.systems.get_mut(&system) {
@@ -2720,6 +3205,13 @@ impl Campaign {
                 // is and what it holds — the treaty itself is the
                 // information transfer.
                 state.surveyed_by.insert(new_owner);
+                // S5: a ceded system changes hands whole — any
+                // occupation of it ends with the transfer.
+                if let Some(colony) = state.colony.as_mut() {
+                    colony.occupied_by = None;
+                    colony.occupied_since_day = 0;
+                    colony.occupation_resistance_months = 0;
+                }
             }
             // A dispute over a ceded system is settled by the
             // cession itself, whichever direction it pointed.
@@ -2743,6 +3235,16 @@ impl Campaign {
         self.embargoes
             .retain(|e| !((e.declarer == proposer && e.target == other)
                 || (e.declarer == other && e.target == proposer)));
+        // S5 (§6.4): a settlement also ends a shooting war between
+        // the pair, and every occupation either side holds over
+        // the other lifts — occupied systems not ceded above go
+        // back to their owners. Wars end in treaties.
+        let key = Self::pair_key(proposer, other);
+        let was_at_war = self.wars.iter().any(|w| w.parties == key);
+        if was_at_war {
+            self.wars.retain(|w| w.parties != key);
+            self.clear_occupations_between(proposer, other);
+        }
         self.push_event(
             EventKind::PeaceSettled,
             None,
@@ -3034,6 +3536,43 @@ impl Campaign {
             }
             adjacency.insert(node, edges);
         }
+        // S5 (§4.3/§5.3): gate hops join the route graph. A paired,
+        // operational gate whose controller admits both parties
+        // (owner, or gate-access/alliance partner) links its
+        // system to its partner's at a nominal 1 ly of path cost —
+        // the hop itself takes a day and burns flat fuel, not
+        // distance. Routes using a hop carry double throughput
+        // (see `live_route_throughput`).
+        for gate in &self.gates {
+            if gate.build_days_remaining > 0 || gate.relink_days_remaining > 0 {
+                continue;
+            }
+            let Some(partner_id) = gate.partner else {
+                continue;
+            };
+            let Some(partner) = self.gates.iter().find(|g| g.id == partner_id) else {
+                continue;
+            };
+            let (x, y) = (gate.system, partner.system);
+            if !nodes.contains(&x) || !nodes.contains(&y) {
+                continue;
+            }
+            // A route is a joint venture of the pair: the hop is
+            // usable when the gate's controller admits *either*
+            // partner — the carrying flag can be either's. (A
+            // single ship's transit, by contrast, always needs
+            // its own owner's admission: see `gate_transit_for`.)
+            let admitted = |g: &Gate| -> bool {
+                match self.gate_controller(g) {
+                    Some(ctrl) => self.gate_access(a, ctrl) || self.gate_access(b, ctrl),
+                    None => false,
+                }
+            };
+            if admitted(gate) && admitted(partner) {
+                adjacency.entry(x).or_default().push((y, 1.0));
+                adjacency.entry(y).or_default().push((x, 1.0));
+            }
+        }
         // Dijkstra over the colony graph. Colony counts are small;
         // the (distance, system) ordering keeps the chosen path a
         // pure function of the state.
@@ -3109,9 +3648,25 @@ impl Campaign {
         }
     }
 
-    /// A live route's current throughput, from its endpoints.
+    /// A live route's current throughput, from its endpoints —
+    /// doubled when the route's path travels a gate hop (§4.3:
+    /// "gate hops count double throughput — gates multiply
+    /// trade"). The hop is visible in the path itself: two
+    /// consecutive path systems hosting paired gates.
     pub fn live_route_throughput(&self, route: &TradeRoute) -> f64 {
-        self.route_throughput(route.civ_a, route.civ_b, route.system_a, route.system_b)
+        let base = self.route_throughput(route.civ_a, route.civ_b, route.system_a, route.system_b);
+        let uses_gate = route.path.windows(2).any(|leg| {
+            let (x, y) = (leg[0], leg[1]);
+            match (self.gate_at(x), self.gate_at(y)) {
+                (Some(gx), Some(gy)) => gx.partner == Some(gy.id),
+                _ => false,
+            }
+        });
+        if uses_gate {
+            base * 2.0
+        } else {
+            base
+        }
     }
 
     /// A route's distance factor (§4.3: income is proportional to
@@ -3376,5 +3931,1391 @@ impl Campaign {
             }
         }
         let _ = galaxy;
+    }
+
+    // ------------------------------------------------------------ S5
+    // War, gates, victory (design §5.3, §6.4, §6.5, §3). Commands
+    // are parameterized by the acting civilization like every other
+    // slice; combat, occupation, and victory are pure functions of
+    // state advanced inside the daily/monthly steps, so AI wars
+    // run unwatched during catch-up exactly as AI expansion does.
+
+    pub fn wars(&self) -> &[War] {
+        &self.wars
+    }
+
+    pub fn war_between(&self, a: u32, b: u32) -> Option<&War> {
+        let key = Self::pair_key(a, b);
+        self.wars.iter().find(|w| w.parties == key)
+    }
+
+    pub fn at_war(&self, a: u32, b: u32) -> bool {
+        a != b && self.war_between(a, b).is_some()
+    }
+
+    pub fn gates(&self) -> &[Gate] {
+        &self.gates
+    }
+
+    pub fn gate(&self, id: u32) -> Option<&Gate> {
+        self.gates.iter().find(|g| g.id == id)
+    }
+
+    pub fn gate_at(&self, system: StarId) -> Option<&Gate> {
+        self.gates.iter().find(|g| g.system == system)
+    }
+
+    /// Who holds a gate: the claim owner of its system, or the
+    /// occupier while the colony is occupied (§5.3: take the
+    /// system, take the gate). `None` when the system holds no
+    /// colony — a derelict gate admits no one.
+    pub fn gate_controller(&self, gate: &Gate) -> Option<u32> {
+        let state = self.systems.get(&gate.system)?;
+        let colony = state.colony.as_ref()?;
+        Some(colony.occupied_by.unwrap_or(state.claimed_by.unwrap_or(PLAYER_CIV)))
+    }
+
+    /// May `civ_id` use gates controlled by `controller`? Their
+    /// own always; a partner's under the §5.3 gate-access treaty
+    /// or an alliance — the same permission as port access, which
+    /// is the treaty's S4 form.
+    pub fn gate_access(&self, civ_id: u32, controller: u32) -> bool {
+        civ_id == controller
+            || self.treaty_active(civ_id, controller, TreatyKind::GateAccess)
+            || self.treaty_active(civ_id, controller, TreatyKind::Alliance)
+    }
+
+    pub fn victory_rule(&self) -> VictoryRule {
+        self.victory_rule
+    }
+
+    pub fn victory_end_year(&self) -> u32 {
+        self.victory_end_year
+    }
+
+    /// The recorded victory, if one has been achieved: the winning
+    /// civilization and the day. The campaign continues afterwards
+    /// — victory is a recorded fact, not a halt.
+    pub fn victory_winner(&self) -> Option<(u32, u64)> {
+        match (self.victory_winner, self.victory_day) {
+            (Some(civ), Some(day)) => Some((civ, day)),
+            _ => None,
+        }
+    }
+
+    /// Ships of `civ_id` present at `system`: at rest, surveying,
+    /// or stranded there — in-system for combat, blockade, and
+    /// garrison purposes (§6.4).
+    pub fn ships_present_at(&self, civ_id: u32, system: StarId) -> Vec<ShipId> {
+        self.ships
+            .values()
+            .filter(|s| s.owner == civ_id && s.state.current_system() == Some(system))
+            .map(|s| s.id)
+            .collect()
+    }
+
+    /// §6.4: a colony's garrison strength — a base cadre, its
+    /// development, and its (monthly recomputed) defence strength,
+    /// in which the Fortress specialization already weighs. An
+    /// invasion must land more troop capacity than this.
+    pub fn garrison_strength(colony: &Colony) -> f64 {
+        20.0 + colony.development as f64 * 10.0 + colony.defence_strength * 2.0
+    }
+
+    /// §6.4: how war-weary a civilization is, summed over every
+    /// war it fights: its ship losses, its colonies under enemy
+    /// occupation, (while any war runs) its unsupplied colonies,
+    /// and the war's sheer duration — a quarter point per month
+    /// per war, so even a bloodless war tires both sides out in
+    /// a decade or so and the peace table eventually wins. A pure
+    /// function of state — the AI weighs it when suing for peace
+    /// and deal evaluation quotes it (§6.2's legibility rule,
+    /// applied to exhaustion).
+    pub fn war_exhaustion(&self, civ_id: u32) -> f64 {
+        let mut total = 0.0;
+        let mut at_war_any = false;
+        for war in &self.wars {
+            if war.parties.0 != civ_id && war.parties.1 != civ_id {
+                continue;
+            }
+            at_war_any = true;
+            total += (self.day.saturating_sub(war.declared_day) / DAYS_PER_MONTH) as f64 * 0.25;
+            let (lost, enemy) = if war.parties.0 == civ_id {
+                (war.ships_lost.0, war.parties.1)
+            } else {
+                (war.ships_lost.1, war.parties.0)
+            };
+            total += lost as f64 * 8.0;
+            total += self
+                .colonies_of(civ_id)
+                .iter()
+                .filter(|&s| {
+                    self.systems
+                        .get(&s)
+                        .and_then(|st| st.colony.as_ref())
+                        .map(|c| c.occupied_by == Some(enemy))
+                        .unwrap_or(false)
+                })
+                .count() as f64
+                * 6.0;
+        }
+        if at_war_any {
+            total += self
+                .colonies_of(civ_id)
+                .iter()
+                .filter(|&s| {
+                    self.systems
+                        .get(&s)
+                        .and_then(|st| st.colony.as_ref())
+                        .map(|c| !c.supplied)
+                        .unwrap_or(false)
+                })
+                .count() as f64
+                * 2.0;
+        }
+        total.min(100.0)
+    }
+
+    /// Declare war (player wrapper over `declare_war_for`).
+    pub fn declare_war(&mut self, target: u32) -> SimResult<()> {
+        self.declare_war_for(PLAYER_CIV, target)
+    }
+
+    /// Declare war on another civilization (§6.3's diplomacy set,
+    /// §6.4's conduct). War is total at the treaty layer: every
+    /// instrument between the pair ends today — the promises war
+    /// breaks outright (non-aggression, alliance) are recorded as
+    /// breaches against the declarer, the rest lapse — trade
+    /// routes sever (§4.3: routes are severed by war), and
+    /// embargoes are superseded by the real thing.
+    pub fn declare_war_for(&mut self, actor: u32, other: u32) -> SimResult<()> {
+        self.require_diplomacy(actor, other)?;
+        if self.at_war(actor, other) {
+            return Err(SimError::AlreadyAtWar(other));
+        }
+        let key = Self::pair_key(actor, other);
+        let active: Vec<TreatyKind> = self
+            .treaties
+            .iter()
+            .filter(|t| t.parties == key)
+            .map(|t| t.kind)
+            .collect();
+        for kind in active {
+            if matches!(kind, TreatyKind::NonAggressionPact | TreatyKind::Alliance) {
+                self.breaches.push(TreatyBreach {
+                    breaker: actor,
+                    other,
+                    kind,
+                    day: self.day,
+                });
+            }
+            self.treaties
+                .retain(|t| !(t.parties == key && t.kind == kind));
+            self.push_event(
+                EventKind::TreatyBroken,
+                None,
+                None,
+                Some(actor),
+                Some(other),
+            );
+        }
+        self.sever_routes_between(actor, other);
+        self.embargoes.retain(|e| {
+            !((e.declarer == actor && e.target == other)
+                || (e.declarer == other && e.target == actor))
+        });
+        self.wars.push(War {
+            parties: key,
+            aggressor: actor,
+            declared_day: self.day,
+            ships_lost: (0, 0),
+        });
+        self.push_event(
+            EventKind::WarDeclared,
+            None,
+            None,
+            Some(actor),
+            Some(other),
+        );
+        Ok(())
+    }
+
+    /// Land troops and occupy an enemy colony (player wrapper over
+    /// `invade_system_for`).
+    pub fn invade_system(&mut self, system: StarId) -> SimResult<()> {
+        self.invade_system_for(PLAYER_CIV, system)
+    }
+
+    /// Occupy another civilization's colony (§6.4): the pair must
+    /// be at war, the defending fleet must be gone, and the
+    /// attacker's ships in orbit must land more troop capacity
+    /// than the colony's garrison. The claim does **not** move —
+    /// occupation is leverage; annexation is a peace-treaty act.
+    pub fn invade_system_for(&mut self, civ_id: u32, system: StarId) -> SimResult<()> {
+        self.require_civ(civ_id)?;
+        let (owner, garrison, occupied_by) = match self.systems.get(&system) {
+            Some(state) => match &state.colony {
+                Some(colony) => (
+                    state.claimed_by.unwrap_or(PLAYER_CIV),
+                    Self::garrison_strength(colony),
+                    colony.occupied_by,
+                ),
+                None => return Err(SimError::NoColony(system)),
+            },
+            None => return Err(SimError::NoColony(system)),
+        };
+        if owner == civ_id {
+            return Err(SimError::NoForeignClaim(system));
+        }
+        if occupied_by.is_some() {
+            return Err(SimError::SystemOccupied(system));
+        }
+        if !self.at_war(civ_id, owner) {
+            return Err(SimError::NotAtWar(owner));
+        }
+        if !self.ships_present_at(owner, system).is_empty() {
+            return Err(SimError::DefendingFleetPresent(system));
+        }
+        let troops: f64 = self
+            .ships_present_at(civ_id, system)
+            .iter()
+            .filter_map(|id| self.ship(*id))
+            .map(|s| self.designs[s.design_idx as usize].troop_capacity)
+            .sum();
+        if troops + 1e-9 < garrison {
+            return Err(SimError::InsufficientTroops {
+                needed: garrison,
+                available: troops,
+            });
+        }
+        let day = self.day;
+        if let Some(colony) = self.systems.get_mut(&system).and_then(|s| s.colony.as_mut()) {
+            colony.occupied_by = Some(civ_id);
+            colony.occupied_since_day = day;
+            colony.occupation_resistance_months = 0;
+        }
+        self.push_event(
+            EventKind::OccupationStarted,
+            Some(system),
+            None,
+            Some(civ_id),
+            Some(owner),
+        );
+        Ok(())
+    }
+
+    /// Begin gate construction (player wrapper over
+    /// `build_gate_for`). Returns the new gate's id.
+    pub fn build_gate(&mut self, system: StarId) -> SimResult<u32> {
+        self.build_gate_for(PLAYER_CIV, system)
+    }
+
+    /// Build a warp gate at one of your colonies (§5.3): the
+    /// colony must have reached development 6, a Gate Builder ship
+    /// of yours must be present (it is consumed — its payload *is*
+    /// the gate's components), and the treasury and the colony's
+    /// alloy/electronics stocks pay the megaproject bill. The gate
+    /// completes `GATE_BUILD_DAYS` later, unpaired.
+    pub fn build_gate_for(&mut self, civ_id: u32, system: StarId) -> SimResult<u32> {
+        self.require_civ(civ_id)?;
+        if self.gate_at(system).is_some() {
+            return Err(SimError::GateAlreadyExists(system));
+        }
+        let (development, alloys, electronics) = match self.systems.get(&system) {
+            Some(state) => match &state.colony {
+                Some(colony) if state.claimed_by == Some(civ_id) => {
+                    if let Some(occupier) = colony.occupied_by {
+                        if occupier != civ_id {
+                            return Err(SimError::NotYourColony(system));
+                        }
+                    }
+                    (
+                        colony.development,
+                        colony.alloys_stock,
+                        colony.electronics_stock,
+                    )
+                }
+                Some(_) => return Err(SimError::NotYourColony(system)),
+                None => return Err(SimError::NoColony(system)),
+            },
+            None => return Err(SimError::NoColony(system)),
+        };
+        if development < GATE_MIN_DEVELOPMENT {
+            return Err(SimError::DevelopmentTooLow {
+                needed: GATE_MIN_DEVELOPMENT,
+                actual: development,
+            });
+        }
+        let builder = self
+            .ships
+            .values()
+            .find(|s| {
+                s.owner == civ_id
+                    && s.state.current_system() == Some(system)
+                    && self.design(s.design_idx).map(|d| d.kind) == Some(ShipKind::GateBuilder)
+            })
+            .map(|s| s.id);
+        let Some(builder_id) = builder else {
+            return Err(SimError::GateBuilderRequired(system));
+        };
+        let credits = self.credits_for(civ_id);
+        if credits + 1e-9 < GATE_BUILD_CREDITS {
+            return Err(SimError::InsufficientCredits {
+                needed: GATE_BUILD_CREDITS,
+                available: credits,
+            });
+        }
+        if alloys + 1e-9 < GATE_BUILD_ALLOYS {
+            return Err(SimError::InsufficientStock {
+                resource: "alloys",
+                needed: GATE_BUILD_ALLOYS,
+                available: alloys,
+            });
+        }
+        if electronics + 1e-9 < GATE_BUILD_ELECTRONICS {
+            return Err(SimError::InsufficientStock {
+                resource: "electronics",
+                needed: GATE_BUILD_ELECTRONICS,
+                available: electronics,
+            });
+        }
+        if let Some(civ) = self.civs.get_mut(civ_id as usize) {
+            civ.credits -= GATE_BUILD_CREDITS;
+        }
+        if let Some(colony) = self.systems.get_mut(&system).and_then(|s| s.colony.as_mut()) {
+            colony.alloys_stock -= GATE_BUILD_ALLOYS;
+            colony.electronics_stock -= GATE_BUILD_ELECTRONICS;
+        }
+        self.ships.remove(&builder_id);
+        let id = self.next_gate_id;
+        self.next_gate_id += 1;
+        self.gates.push(Gate {
+            id,
+            system,
+            partner: None,
+            pending_partner: None,
+            relink_days_remaining: 0,
+            build_days_remaining: GATE_BUILD_DAYS,
+            integrity: GATE_INTEGRITY,
+            last_transit_day: 0,
+            transits_today: 0,
+        });
+        self.push_event(
+            EventKind::GateConstructionStarted,
+            Some(system),
+            None,
+            Some(civ_id),
+            None,
+        );
+        Ok(id)
+    }
+
+    /// Pair two gates (player wrapper over `pair_gates_for`).
+    pub fn pair_gates(&mut self, gate_a: u32, gate_b: u32) -> SimResult<()> {
+        self.pair_gates_for(PLAYER_CIV, gate_a, gate_b)
+    }
+
+    /// Pair two of your gates (§5.3): a gate has exactly one
+    /// partner. Pairing two unpaired gates is immediate — the
+    /// design's "pair is chosen at completion of the second gate".
+    /// Re-pairing a gate that already has a partner takes
+    /// `GATE_RELINK_DAYS` of downtime on both gates, after which
+    /// the new pairing holds and any abandoned partner is left
+    /// unpaired.
+    pub fn pair_gates_for(&mut self, civ_id: u32, gate_a: u32, gate_b: u32) -> SimResult<()> {
+        self.require_civ(civ_id)?;
+        if gate_a == gate_b {
+            return Err(SimError::GateUnpaired(gate_a));
+        }
+        for id in [gate_a, gate_b] {
+            let gate = self.gate(id).ok_or(SimError::UnknownGate(id))?;
+            if gate.build_days_remaining > 0 || gate.relink_days_remaining > 0 {
+                return Err(SimError::GateNotOperational(id));
+            }
+            if self.gate_controller(gate) != Some(civ_id) {
+                return Err(SimError::NotYourColony(gate.system));
+            }
+        }
+        let a = self.gate(gate_a).expect("checked above").clone();
+        let b = self.gate(gate_b).expect("checked above").clone();
+        if a.partner.is_none() && b.partner.is_none() {
+            if let Some(g) = self.gates.iter_mut().find(|g| g.id == gate_a) {
+                g.partner = Some(gate_b);
+            }
+            if let Some(g) = self.gates.iter_mut().find(|g| g.id == gate_b) {
+                g.partner = Some(gate_a);
+            }
+            self.push_event(
+                EventKind::GatePaired,
+                Some(a.system),
+                None,
+                Some(civ_id),
+                None,
+            );
+            return Ok(());
+        }
+        for id in [gate_a, gate_b] {
+            if let Some(g) = self.gates.iter_mut().find(|g| g.id == id) {
+                g.pending_partner = Some(if id == gate_a { gate_b } else { gate_a });
+                g.relink_days_remaining = GATE_RELINK_DAYS;
+            }
+        }
+        Ok(())
+    }
+
+    /// Send a ship through a gate (player wrapper over
+    /// `gate_transit_for`).
+    pub fn gate_transit(&mut self, ship_id: ShipId, gate_id: u32) -> SimResult<()> {
+        self.gate_transit_for(PLAYER_CIV, ship_id, gate_id)
+    }
+
+    /// Transit a gate (§5.3): the ship must be sitting at the
+    /// gate's system; both gates must be operational and paired;
+    /// both controllers must admit the traveller (own gates, or a
+    /// gate-access treaty / alliance with the controller); the
+    /// pair's daily throughput must have room; and the departing
+    /// system's colony pays the flat fuel burn from its stock.
+    /// The ship arrives at the partner system one day later,
+    /// whatever the distance.
+    pub fn gate_transit_for(&mut self, civ_id: u32, ship_id: ShipId, gate_id: u32) -> SimResult<()> {
+        let gate = self
+            .gate(gate_id)
+            .cloned()
+            .ok_or(SimError::UnknownGate(gate_id))?;
+        let ship = self
+            .ships
+            .get(&ship_id)
+            .ok_or(SimError::UnknownShip(ship_id))?;
+        if ship.owner != civ_id {
+            return Err(SimError::ShipNotOwned(ship_id));
+        }
+        let from_system = match ship.state {
+            ShipState::AtSystem { system } => system,
+            _ => return Err(SimError::ShipBusy(ship_id)),
+        };
+        if from_system != gate.system {
+            return Err(SimError::ShipNotAtSystem(ship_id));
+        }
+        if gate.build_days_remaining > 0 || gate.relink_days_remaining > 0 {
+            return Err(SimError::GateNotOperational(gate_id));
+        }
+        let Some(partner_id) = gate.partner else {
+            return Err(SimError::GateUnpaired(gate_id));
+        };
+        let partner = self
+            .gate(partner_id)
+            .cloned()
+            .ok_or(SimError::UnknownGate(partner_id))?;
+        if partner.build_days_remaining > 0 || partner.relink_days_remaining > 0 {
+            return Err(SimError::GateNotOperational(partner_id));
+        }
+        for g in [&gate, &partner] {
+            match self.gate_controller(g) {
+                Some(ctrl) if self.gate_access(civ_id, ctrl) => {}
+                _ => return Err(SimError::GateNotOperational(g.id)),
+            }
+        }
+        let used = if gate.last_transit_day == self.day {
+            gate.transits_today
+        } else {
+            0
+        };
+        if used >= GATE_TRANSITS_PER_DAY {
+            return Err(SimError::GateThroughputFull(gate_id));
+        }
+        let stock = self
+            .systems
+            .get(&gate.system)
+            .and_then(|s| s.colony.as_ref())
+            .map(|c| c.fuel_stock)
+            .unwrap_or(0.0);
+        if stock + 1e-9 < GATE_TRANSIT_FUEL {
+            return Err(SimError::InsufficientStock {
+                resource: "fuel",
+                needed: GATE_TRANSIT_FUEL,
+                available: stock,
+            });
+        }
+        if let Some(colony) = self.systems.get_mut(&gate.system).and_then(|s| s.colony.as_mut()) {
+            colony.fuel_stock -= GATE_TRANSIT_FUEL;
+        }
+        for id in [gate_id, partner_id] {
+            if let Some(g) = self.gates.iter_mut().find(|g| g.id == id) {
+                if g.last_transit_day != self.day {
+                    g.last_transit_day = self.day;
+                    g.transits_today = 0;
+                }
+                g.transits_today += 1;
+            }
+        }
+        if let Some(ship) = self.ships.get_mut(&ship_id) {
+            ship.state = ShipState::GateTransit {
+                from_system: gate.system,
+                to_system: partner.system,
+                days_remaining: GATE_TRANSIT_DAYS,
+            };
+        }
+        self.push_event(
+            EventKind::ShipDispatched,
+            Some(partner.system),
+            Some(ship_id),
+            Some(civ_id),
+            None,
+        );
+        Ok(())
+    }
+
+    /// Begin terraforming a colony's best planet (player wrapper
+    /// over `start_terraform_for`).
+    pub fn start_terraform(&mut self, system: StarId) -> SimResult<()> {
+        self.start_terraform_for(PLAYER_CIV, system)
+    }
+
+    /// Terraforming (§3, §11.2): a late-game megaproject at a
+    /// development-7 colony. Decades later the system's best
+    /// planet stands `TERRAFORM_HABITABILITY_GAIN` points above
+    /// its natural baseline — the baseline itself never moves,
+    /// which is the data model §3 asked for.
+    pub fn start_terraform_for(&mut self, civ_id: u32, system: StarId) -> SimResult<()> {
+        self.require_civ(civ_id)?;
+        let (development, exotics, planet_idx) = match self.systems.get(&system) {
+            Some(state) => match &state.colony {
+                Some(colony) if state.claimed_by == Some(civ_id) => {
+                    if let Some(occupier) = colony.occupied_by {
+                        if occupier != civ_id {
+                            return Err(SimError::NotYourColony(system));
+                        }
+                    }
+                    if colony.terraform_days_remaining > 0 {
+                        return Err(SimError::TerraformInProgress(system));
+                    }
+                    let idx = state.profile.as_ref().and_then(|p| {
+                        p.planets
+                            .iter()
+                            .enumerate()
+                            .max_by(|x, y| {
+                                x.1.habitability_percent
+                                    .total_cmp(&y.1.habitability_percent)
+                            })
+                            .map(|(i, _)| i as u32)
+                    });
+                    (colony.development, colony.exotics_stock, idx)
+                }
+                Some(_) => return Err(SimError::NotYourColony(system)),
+                None => return Err(SimError::NoColony(system)),
+            },
+            None => return Err(SimError::NoColony(system)),
+        };
+        let Some(planet_idx) = planet_idx else {
+            return Err(SimError::NoColony(system));
+        };
+        if development < TERRAFORM_MIN_DEVELOPMENT {
+            return Err(SimError::DevelopmentTooLow {
+                needed: TERRAFORM_MIN_DEVELOPMENT,
+                actual: development,
+            });
+        }
+        let credits = self.credits_for(civ_id);
+        if credits + 1e-9 < TERRAFORM_CREDITS {
+            return Err(SimError::InsufficientCredits {
+                needed: TERRAFORM_CREDITS,
+                available: credits,
+            });
+        }
+        if exotics + 1e-9 < TERRAFORM_EXOTICS {
+            return Err(SimError::InsufficientStock {
+                resource: "exotics",
+                needed: TERRAFORM_EXOTICS,
+                available: exotics,
+            });
+        }
+        if let Some(civ) = self.civs.get_mut(civ_id as usize) {
+            civ.credits -= TERRAFORM_CREDITS;
+        }
+        if let Some(colony) = self.systems.get_mut(&system).and_then(|s| s.colony.as_mut()) {
+            colony.exotics_stock -= TERRAFORM_EXOTICS;
+            colony.terraform_planet = Some(planet_idx);
+            colony.terraform_days_remaining = TERRAFORM_DAYS;
+        }
+        self.push_event(
+            EventKind::TerraformStarted,
+            Some(system),
+            None,
+            Some(civ_id),
+            None,
+        );
+        Ok(())
+    }
+
+    /// A battle round's randomness: a child stream of
+    /// `(seed, system, day, pairing)` — a pure function of state,
+    /// never the campaign RNG, so a save reloaded mid-war replays
+    /// the same rounds (§6.4: "deterministic from the game seed —
+    /// replays agree").
+    fn battle_rng(&self, system: StarId, salt: u64) -> SeededRng {
+        SeededRng::child_for_star(
+            self.seed
+                ^ 0x4241_5454_4C45_5752
+                ^ crate::rng::stable_hash64(self.day)
+                ^ salt.wrapping_mul(0x9E37_79B9_7F4A_7C15),
+            system,
+        )
+    }
+
+    /// Daily combat (§6.4): in every system where belligerents
+    /// meet, each side's present fleet deals one round of damage
+    /// to the other — designs' armament scaled by remaining hull,
+    /// damage allocated hull by hull in ship-id order — the
+    /// colony's defences fire on its controller's enemies, an
+    /// unopposed belligerent fleet bombards the system's gate,
+    /// and crippled ships retreat toward their nearest colony on
+    /// emergency orders (which may strand them, §5.2).
+    fn process_combat(&mut self, galaxy: &Galaxy) {
+        let mut by_system: BTreeMap<StarId, Vec<ShipId>> = BTreeMap::new();
+        for ship in self.ships.values() {
+            if let Some(system) = ship.state.current_system() {
+                by_system.entry(system).or_default().push(ship.id);
+            }
+        }
+        let mut destroyed: Vec<(ShipId, u32, u32, StarId)> = Vec::new();
+        let mut gate_hits: Vec<(u32, f64, u32)> = Vec::new();
+
+        for (system, ship_ids) in &by_system {
+            let system = *system;
+            let mut owners: Vec<u32> = ship_ids
+                .iter()
+                .filter_map(|id| self.ships.get(id))
+                .map(|s| s.owner)
+                .collect();
+            owners.sort_unstable();
+            owners.dedup();
+            let colony_info = self.systems.get(&system).and_then(|s| {
+                s.colony.as_ref().map(|c| {
+                    (
+                        s.claimed_by.unwrap_or(PLAYER_CIV),
+                        c.occupied_by,
+                        c.defence_strength,
+                    )
+                })
+            });
+
+            // Fleet rounds, ordered pairs (attacker, defender).
+            for &a in &owners {
+                for &b in &owners {
+                    if a == b || !self.at_war(a, b) {
+                        continue;
+                    }
+                    let mut power = 0.0;
+                    for id in ship_ids {
+                        if let Some(s) = self.ships.get(id) {
+                            if s.owner == a {
+                                let d = &self.designs[s.design_idx as usize];
+                                power += d.attack
+                                    * (1.0 - s.hull_damage / d.hull_strength()).max(0.0);
+                            }
+                        }
+                    }
+                    if power <= 0.0 {
+                        continue;
+                    }
+                    let mut rng = self.battle_rng(system, ((a as u64) << 32) | b as u64);
+                    let damage = power * (0.75 + 0.5 * rng.next_f64());
+                    self.apply_damage(ship_ids, b, damage, a, system, &mut destroyed);
+                }
+            }
+
+            // Colony defensive fire, on behalf of the controller.
+            if let Some((claim, occupied_by, defence)) = colony_info {
+                let controller = occupied_by.unwrap_or(claim);
+                if defence > 0.0 {
+                    let targets: Vec<ShipId> = ship_ids
+                        .iter()
+                        .copied()
+                        .filter(|id| {
+                            self.ships
+                                .get(id)
+                                .map(|s| s.owner != controller && self.at_war(s.owner, controller))
+                                .unwrap_or(false)
+                        })
+                        .collect();
+                    if !targets.is_empty() {
+                        let mut rng = self.battle_rng(system, 0xC010_4E15);
+                        let damage = defence * 0.6 * (0.75 + 0.5 * rng.next_f64());
+                        self.apply_damage(
+                            &targets,
+                            u32::MAX,
+                            damage,
+                            controller,
+                            system,
+                            &mut destroyed,
+                        );
+                    }
+                }
+            }
+
+            // Bombardment: belligerent ships present, the gate's
+            // controller has no ships here — structures are
+            // targeted once the defending fleet is gone (§6.4).
+            if let Some(gate) = self.gate_at(system) {
+                if gate.build_days_remaining == 0 {
+                    if let Some(ctrl) = self.gate_controller(gate) {
+                        let ctrl_present = ship_ids.iter().any(|id| {
+                            self.ships.get(id).map(|s| s.owner) == Some(ctrl)
+                        });
+                        if !ctrl_present {
+                            let mut power = 0.0;
+                            let mut attacker: Option<u32> = None;
+                            for id in ship_ids {
+                                if let Some(s) = self.ships.get(id) {
+                                    if s.owner != ctrl && self.at_war(s.owner, ctrl) {
+                                        power += self.designs[s.design_idx as usize].attack;
+                                        attacker = Some(attacker.map_or(s.owner, |x: u32| x.min(s.owner)));
+                                    }
+                                }
+                            }
+                            if power > 0.0 {
+                                if let Some(attacker) = attacker {
+                                    gate_hits.push((gate.id, power, attacker));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        for (gate_id, damage, attacker) in gate_hits {
+            let mut wreck: Option<(StarId, u32)> = None;
+            if let Some(gate) = self.gates.iter_mut().find(|g| g.id == gate_id) {
+                gate.integrity -= damage;
+                if gate.integrity <= 0.0 {
+                    wreck = Some((gate.system, attacker));
+                }
+            }
+            if let Some((system, attacker)) = wreck {
+                let controller = self
+                    .gate(gate_id)
+                    .and_then(|g| self.gate_controller(g))
+                    .unwrap_or(attacker);
+                self.destroy_gate(gate_id);
+                self.push_event(
+                    EventKind::GateDestroyed,
+                    Some(system),
+                    None,
+                    Some(attacker),
+                    Some(controller),
+                );
+            }
+        }
+
+        for (ship_id, owner, killer, system) in destroyed {
+            if self.ships.remove(&ship_id).is_some() {
+                if let Some(war) = self
+                    .wars
+                    .iter_mut()
+                    .find(|w| w.parties == Self::pair_key(owner, killer))
+                {
+                    if war.parties.0 == owner {
+                        war.ships_lost.0 += 1;
+                    } else {
+                        war.ships_lost.1 += 1;
+                    }
+                }
+                self.push_event(
+                    EventKind::ShipDestroyed,
+                    Some(system),
+                    Some(ship_id),
+                    Some(owner),
+                    Some(killer),
+                );
+            }
+        }
+
+        self.process_retreats(galaxy);
+    }
+
+    /// Allocate `damage` across `owner`'s ships among `candidates`
+    /// in ship-id order, marking hulls destroyed as their strength
+    /// runs out. `owner == u32::MAX` means "any owner" (colony
+    /// defensive fire targets every belligerent at once).
+    fn apply_damage(
+        &mut self,
+        candidates: &[ShipId],
+        owner: u32,
+        mut damage: f64,
+        killer: u32,
+        system: StarId,
+        destroyed: &mut Vec<(ShipId, u32, u32, StarId)>,
+    ) {
+        let mut targets: Vec<ShipId> = candidates
+            .iter()
+            .copied()
+            .filter(|id| {
+                self.ships
+                    .get(id)
+                    .map(|s| owner == u32::MAX || s.owner == owner)
+                    .unwrap_or(false)
+            })
+            .collect();
+        targets.sort_unstable();
+        for tid in targets {
+            if damage <= 0.0 {
+                break;
+            }
+            if destroyed.iter().any(|(d, _, _, _)| *d == tid) {
+                continue;
+            }
+            let (max_hull, current, ship_owner) = {
+                let s = self.ships.get(&tid).expect("filtered above");
+                (
+                    self.designs[s.design_idx as usize].hull_strength(),
+                    s.hull_damage,
+                    s.owner,
+                )
+            };
+            let remaining = max_hull - current;
+            if remaining <= 0.0 {
+                continue;
+            }
+            let applied = damage.min(remaining);
+            if let Some(s) = self.ships.get_mut(&tid) {
+                s.hull_damage += applied;
+            }
+            damage -= applied;
+            if applied >= remaining - 1e-9 {
+                destroyed.push((tid, ship_owner, killer, system));
+            }
+        }
+    }
+
+    /// Crippled ships (hull below 35%) in a fight run for their
+    /// owner's nearest other colony on unchecked orders — the
+    /// §6.4 retreat that burns emergency fuel and may strand the
+    /// ship (§5.2). A ship with nowhere to run fights on.
+    fn process_retreats(&mut self, galaxy: &Galaxy) {
+        let candidates: Vec<ShipId> = self
+            .ships
+            .values()
+            .filter(|s| {
+                let d = &self.designs[s.design_idx as usize];
+                s.hull_damage > 0.65 * d.hull_strength()
+            })
+            .map(|s| s.id)
+            .collect();
+        for ship_id in candidates {
+            let Some(ship) = self.ships.get(&ship_id) else {
+                continue;
+            };
+            let owner = ship.owner;
+            let Some(here) = ship.state.current_system() else {
+                continue;
+            };
+            let enemy_present = self.ships.values().any(|s| {
+                s.owner != owner
+                    && s.state.current_system() == Some(here)
+                    && self.at_war(s.owner, owner)
+            });
+            if !enemy_present {
+                continue;
+            }
+            let mut colonies = self.colonies_of(owner);
+            colonies.retain(|&c| c != here);
+            colonies.sort_by(|&x, &y| {
+                let dx = galaxy.distance_ly(here, x).unwrap_or(f64::INFINITY);
+                let dy = galaxy.distance_ly(here, y).unwrap_or(f64::INFINITY);
+                dx.total_cmp(&dy).then(x.cmp(&y))
+            });
+            if colonies.is_empty() {
+                continue;
+            }
+            if let Some(ship) = self.ships.get_mut(&ship_id) {
+                if matches!(
+                    ship.state,
+                    ShipState::Surveying { .. } | ShipState::StrandedAtSystem { .. }
+                ) {
+                    ship.state = ShipState::AtSystem { system: here };
+                }
+            }
+            for dest in colonies {
+                if self
+                    .dispatch_inner(owner, galaxy, ship_id, dest, Purpose::Relocate, true)
+                    .is_ok()
+                {
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Remove a gate and unpair its partner (§5.3: a gate whose
+    /// partner is destroyed becomes an unpaired gate).
+    fn destroy_gate(&mut self, gate_id: u32) {
+        let Some(pos) = self.gates.iter().position(|g| g.id == gate_id) else {
+            return;
+        };
+        let gate = self.gates.remove(pos);
+        if let Some(partner_id) = gate.partner {
+            if let Some(partner) = self.gates.iter_mut().find(|g| g.id == partner_id) {
+                if partner.partner == Some(gate_id) {
+                    partner.partner = None;
+                }
+                if partner.pending_partner == Some(gate_id) {
+                    partner.pending_partner = None;
+                }
+            }
+        }
+    }
+
+    /// Ships in gate transit arrive after their one day (§5.3),
+    /// whatever the distance was.
+    fn process_gate_transit(&mut self) {
+        let ship_ids: Vec<ShipId> = self.ships.keys().copied().collect();
+        let mut arrivals: Vec<(ShipId, StarId)> = Vec::new();
+        for ship_id in ship_ids {
+            let Some(ship) = self.ships.get_mut(&ship_id) else {
+                continue;
+            };
+            if let ShipState::GateTransit {
+                to_system,
+                days_remaining,
+                ..
+            } = &mut ship.state
+            {
+                *days_remaining = days_remaining.saturating_sub(1);
+                if *days_remaining == 0 {
+                    arrivals.push((ship_id, *to_system));
+                }
+            }
+        }
+        for (ship_id, system) in arrivals {
+            let owner = self.ships.get(&ship_id).map(|s| s.owner);
+            if let Some(ship) = self.ships.get_mut(&ship_id) {
+                ship.state = ShipState::AtSystem { system };
+            }
+            if let Some(owner) = owner {
+                if let Some(present) = self.systems.get(&system).and_then(|s| s.claimed_by) {
+                    if present != owner {
+                        self.note_contact(owner, present, Some(system));
+                    }
+                }
+            }
+            self.push_event(
+                EventKind::ShipArrived,
+                Some(system),
+                Some(ship_id),
+                owner,
+                None,
+            );
+        }
+    }
+
+    /// Hull repair: a ship resting at a system its owner controls
+    /// (their colony, or their occupation) recovers 5% of its
+    /// design's hull strength per day.
+    fn process_repairs(&mut self) {
+        let ship_ids: Vec<ShipId> = self.ships.keys().copied().collect();
+        for ship_id in ship_ids {
+            let Some(ship) = self.ships.get(&ship_id) else {
+                continue;
+            };
+            if ship.hull_damage <= 0.0 {
+                continue;
+            }
+            let ShipState::AtSystem { system } = ship.state else {
+                continue;
+            };
+            let owner = ship.owner;
+            let controller = self.systems.get(&system).and_then(|s| {
+                s.colony.as_ref().map(|c| {
+                    c.occupied_by.unwrap_or(s.claimed_by.unwrap_or(PLAYER_CIV))
+                })
+            });
+            if controller != Some(owner) {
+                continue;
+            }
+            let repair = self.designs[ship.design_idx as usize].hull_strength() * 0.05;
+            if let Some(ship) = self.ships.get_mut(&ship_id) {
+                ship.hull_damage = (ship.hull_damage - repair).max(0.0);
+            }
+        }
+    }
+
+    /// The megaproject clocks: gate construction and re-pairing
+    /// count down daily; terraforming counts down daily. Each
+    /// completion lands as an event.
+    fn process_projects(&mut self) {
+        let mut completed_gates: Vec<(u32, StarId)> = Vec::new();
+        let mut completed_relinks: Vec<u32> = Vec::new();
+        for gate in &mut self.gates {
+            if gate.build_days_remaining > 0 {
+                gate.build_days_remaining -= 1;
+                if gate.build_days_remaining == 0 {
+                    completed_gates.push((gate.id, gate.system));
+                }
+            } else if gate.relink_days_remaining > 0 {
+                gate.relink_days_remaining -= 1;
+                if gate.relink_days_remaining == 0 {
+                    completed_relinks.push(gate.id);
+                }
+            }
+        }
+        for (gate_id, system) in completed_gates {
+            let controller = self.gate(gate_id).and_then(|g| self.gate_controller(g));
+            self.push_event(
+                EventKind::GateCompleted,
+                Some(system),
+                None,
+                controller,
+                None,
+            );
+        }
+        for gate_id in completed_relinks {
+            self.complete_relink(gate_id);
+        }
+        let mut finished: Vec<StarId> = Vec::new();
+        for (system, state) in &mut self.systems {
+            if let Some(colony) = state.colony.as_mut() {
+                if colony.terraform_days_remaining > 0 {
+                    colony.terraform_days_remaining -= 1;
+                    if colony.terraform_days_remaining == 0 {
+                        finished.push(*system);
+                    }
+                }
+            }
+        }
+        for system in finished {
+            self.complete_terraform(system);
+        }
+    }
+
+    /// A re-pairing's downtime ends: the pending partner takes
+    /// over, and any abandoned partner is left unpaired (§5.3).
+    fn complete_relink(&mut self, gate_id: u32) {
+        let (pending, old_partner, system) = {
+            let Some(gate) = self.gates.iter_mut().find(|g| g.id == gate_id) else {
+                return;
+            };
+            let Some(pending) = gate.pending_partner.take() else {
+                return;
+            };
+            let old_partner = gate.partner;
+            gate.partner = Some(pending);
+            (pending, old_partner, gate.system)
+        };
+        if let Some(old) = old_partner {
+            if old != pending {
+                if let Some(old_gate) = self.gates.iter_mut().find(|g| g.id == old) {
+                    if old_gate.partner == Some(gate_id) && old_gate.pending_partner.is_none() {
+                        old_gate.partner = None;
+                    }
+                }
+            }
+        }
+        let controller = self.gate(gate_id).and_then(|g| self.gate_controller(g));
+        self.push_event(
+            EventKind::GatePaired,
+            Some(system),
+            None,
+            controller,
+            None,
+        );
+    }
+
+    /// A terraform project completes (§3): the target planet's
+    /// habitability rises above its natural baseline — the
+    /// baseline field itself never moves — and the system's
+    /// habitability (its best planet) follows.
+    fn complete_terraform(&mut self, system: StarId) {
+        let mut owner = None;
+        if let Some(state) = self.systems.get_mut(&system) {
+            owner = state.claimed_by;
+            let planet_idx = state
+                .colony
+                .as_ref()
+                .and_then(|c| c.terraform_planet)
+                .map(|p| p as usize);
+            if let (Some(profile), Some(idx)) = (state.profile.as_mut(), planet_idx) {
+                if let Some(planet) = profile.planets.get_mut(idx) {
+                    planet.habitability_percent =
+                        (planet.habitability_percent + TERRAFORM_HABITABILITY_GAIN).min(100.0);
+                }
+                profile.habitability_percent = profile
+                    .planets
+                    .iter()
+                    .map(|p| p.habitability_percent)
+                    .fold(0.0, f64::max);
+            }
+            if let Some(colony) = state.colony.as_mut() {
+                colony.terraform_planet = None;
+                colony.terraform_days_remaining = 0;
+            }
+        }
+        self.push_event(
+            EventKind::TerraformCompleted,
+            Some(system),
+            None,
+            owner,
+            None,
+        );
+    }
+
+    /// Lift every occupation either of two civilizations holds
+    /// over the other (peace settlements and war's end both use
+    /// it): occupied colonies return to their owners' control.
+    fn clear_occupations_between(&mut self, a: u32, b: u32) {
+        let system_ids: Vec<StarId> = self.systems.keys().copied().collect();
+        for system in system_ids {
+            let Some(state) = self.systems.get_mut(&system) else {
+                continue;
+            };
+            let claim = state.claimed_by;
+            if let Some(colony) = state.colony.as_mut() {
+                if let Some(occupier) = colony.occupied_by {
+                    if (occupier == a && claim == Some(b))
+                        || (occupier == b && claim == Some(a))
+                    {
+                        colony.occupied_by = None;
+                        colony.occupied_since_day = 0;
+                        colony.occupation_resistance_months = 0;
+                    }
+                }
+            }
+        }
+    }
+
+    /// The monthly war settlement: occupation resistance rises or
+    /// collapses on its schedule, and a war with a colony-less
+    /// side is over — there is nothing left to fight over.
+    fn monthly_war_settlement(&mut self) {
+        let system_ids: Vec<StarId> = self.systems.keys().copied().collect();
+        let mut ended: Vec<(StarId, u32, u32)> = Vec::new();
+        let mut resisted: Vec<(StarId, u32, u32)> = Vec::new();
+        for system in system_ids {
+            let occupier = self
+                .systems
+                .get(&system)
+                .and_then(|s| s.colony.as_ref())
+                .and_then(|c| c.occupied_by);
+            let Some(occupier) = occupier else {
+                continue;
+            };
+            let garrisoned = self.ships_present_at(occupier, system).iter().any(|id| {
+                self.ship(*id)
+                    .map(|s| self.designs[s.design_idx as usize].troop_capacity > 0.0)
+                    .unwrap_or(false)
+            });
+            let Some(state) = self.systems.get_mut(&system) else {
+                continue;
+            };
+            let owner = state.claimed_by.unwrap_or(PLAYER_CIV);
+            let Some(colony) = state.colony.as_mut() else {
+                continue;
+            };
+            if garrisoned {
+                colony.occupation_resistance_months = 0;
+            } else if self.day.saturating_sub(colony.occupied_since_day)
+                < OCCUPATION_INTEGRATION_DAYS
+            {
+                colony.occupation_resistance_months += 1;
+                if colony.occupation_resistance_months == 3 {
+                    resisted.push((system, owner, occupier));
+                }
+                if colony.occupation_resistance_months >= OCCUPATION_RESISTANCE_LIMIT_MONTHS {
+                    colony.occupied_by = None;
+                    colony.occupied_since_day = 0;
+                    colony.occupation_resistance_months = 0;
+                    ended.push((system, owner, occupier));
+                }
+            }
+        }
+        for (system, owner, occupier) in resisted {
+            self.push_event(
+                EventKind::ColonyResisted,
+                Some(system),
+                None,
+                Some(owner),
+                Some(occupier),
+            );
+        }
+        for (system, owner, occupier) in ended {
+            self.push_event(
+                EventKind::OccupationEnded,
+                Some(system),
+                None,
+                Some(owner),
+                Some(occupier),
+            );
+        }
+        let doomed: Vec<(u32, u32)> = self
+            .wars
+            .iter()
+            .map(|w| w.parties)
+            .filter(|&(lo, hi)| self.colonies_of(lo).is_empty() || self.colonies_of(hi).is_empty())
+            .collect();
+        for (lo, hi) in doomed {
+            self.wars.retain(|w| w.parties != (lo, hi));
+            self.clear_occupations_between(lo, hi);
+            let (civ, other) = if self.colonies_of(lo).is_empty() {
+                (hi, lo)
+            } else {
+                (lo, hi)
+            };
+            self.push_event(
+                EventKind::WarEnded,
+                None,
+                None,
+                Some(civ),
+                Some(other),
+            );
+        }
+    }
+
+    /// §6.5's score, tracked for every civilization under every
+    /// rule (the design: "the others stay as tracked scores"):
+    /// population first, then spread, development, research, and
+    /// treasury.
+    pub fn victory_score(&self, civ_id: u32) -> f64 {
+        let development_sum: f64 = self
+            .colonies_of(civ_id)
+            .iter()
+            .filter_map(|s| self.systems.get(s).and_then(|st| st.colony.as_ref()))
+            .map(|c| c.development as f64)
+            .sum();
+        self.population_for(civ_id)
+            + self.colonies_of(civ_id).len() as f64 * 25.0
+            + development_sum * 5.0
+            + self.research_points_for(civ_id) * 0.05
+            + self.credits_for(civ_id) * 0.01
+    }
+
+    /// §6.5-A: the share of colonized systems a civilization
+    /// controls — its own colonies plus its allies'.
+    pub fn hegemony_share(&self, civ_id: u32) -> f64 {
+        let total = self.total_colonized_count();
+        if total == 0 {
+            return 0.0;
+        }
+        let mut controlled = self.colonies_of(civ_id).len() as f64;
+        for civ in self.civs() {
+            if civ.id != civ_id && self.treaty_active(civ_id, civ.id, TreatyKind::Alliance) {
+                controlled += self.colonies_of(civ.id).len() as f64;
+            }
+        }
+        controlled / total as f64
+    }
+
+    /// §6.5-B: the share of colonized systems a civilization's
+    /// gate network connects. A colonized system is connected
+    /// when it hosts a gate of the network (the civilization's own
+    /// gates, plus partners' gates it may use under a gate-access
+    /// treaty or alliance) or lies within one tanker leg
+    /// (`TRADE_LEG_LY`) of such a system — the web is gates plus
+    /// the short hops they make trivial.
+    pub fn gate_web_share(&self, galaxy: &Galaxy, civ_id: u32) -> f64 {
+        let total = self.total_colonized_count();
+        if total == 0 {
+            return 0.0;
+        }
+        let mut gated: Vec<StarId> = Vec::new();
+        for gate in &self.gates {
+            if gate.build_days_remaining > 0 {
+                continue;
+            }
+            if let Some(ctrl) = self.gate_controller(gate) {
+                if self.gate_access(civ_id, ctrl) {
+                    gated.push(gate.system);
+                }
+            }
+        }
+        if gated.is_empty() {
+            return 0.0;
+        }
+        let connected = self
+            .systems
+            .iter()
+            .filter(|(_, s)| s.colony.is_some())
+            .filter(|(id, _)| {
+                gated.contains(id)
+                    || gated.iter().any(|&g| {
+                        galaxy
+                            .distance_ly(**id, g)
+                            .map(|d| d <= TRADE_LEG_LY + 1e-9)
+                            .unwrap_or(false)
+                    })
+            })
+            .count();
+        connected as f64 / total as f64
+    }
+
+    /// Victory evaluation, on the settlement boundary (§6.5). The
+    /// first civilization to satisfy the campaign's condition is
+    /// recorded; ties within a month go to the higher measure,
+    /// then the lower civilization id — a pure function of state.
+    fn monthly_victory_evaluation(&mut self, galaxy: &Galaxy) {
+        if self.victory_winner.is_some() {
+            return;
+        }
+        match self.victory_rule {
+            VictoryRule::Sandbox => {}
+            VictoryRule::Hegemony => {
+                if self.total_colonized_count() >= 10 {
+                    let mut best: Option<(f64, u32)> = None;
+                    for civ in self.civs() {
+                        let share = self.hegemony_share(civ.id);
+                        if share >= 0.40
+                            && best.map(|(bs, _)| share > bs).unwrap_or(true)
+                        {
+                            best = Some((share, civ.id));
+                        }
+                    }
+                    if let Some((_, winner)) = best {
+                        self.record_victory(winner);
+                    }
+                }
+            }
+            VictoryRule::GateWeb => {
+                if self.total_colonized_count() > 0 {
+                    let civ_ids: Vec<u32> = self.civs.iter().map(|c| c.id).collect();
+                    for civ_id in civ_ids {
+                        let share = self.gate_web_share(galaxy, civ_id);
+                        if share >= 0.60 {
+                            let start = *self.gate_web_streaks.entry(civ_id).or_insert(self.day);
+                            if self.day - start >= 10 * DAYS_PER_YEAR {
+                                self.record_victory(civ_id);
+                                return;
+                            }
+                        } else {
+                            self.gate_web_streaks.remove(&civ_id);
+                        }
+                    }
+                }
+            }
+            VictoryRule::FirstAmongEquals => {
+                if self.day >= self.victory_end_year as u64 * DAYS_PER_YEAR {
+                    let mut best: Option<(f64, u32)> = None;
+                    for civ in self.civs() {
+                        let score = self.victory_score(civ.id);
+                        if best.map(|(bs, _)| score > bs).unwrap_or(true) {
+                            best = Some((score, civ.id));
+                        }
+                    }
+                    if let Some((_, winner)) = best {
+                        self.record_victory(winner);
+                    }
+                }
+            }
+        }
+    }
+
+    fn record_victory(&mut self, winner: u32) {
+        self.victory_winner = Some(winner);
+        self.victory_day = Some(self.day);
+        self.push_event(
+            EventKind::VictoryAchieved,
+            None,
+            None,
+            Some(winner),
+            None,
+        );
     }
 }

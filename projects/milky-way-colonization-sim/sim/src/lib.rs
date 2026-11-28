@@ -25,9 +25,13 @@ pub use race::{Archetype, HomeworldRules, Personality, ARCHETYPES, DEFAULT_AI_CO
 pub use rng::SeededRng;
 pub use state::{
     AiCivSetup, Campaign, Civilization, Colony, ConstructionProject, DealOutcome, Dispute, Embargo,
-    EventKind, GameEvent, GameSetup, PeaceTerms, Proposal, ProposalKind, Purpose, SetupReport, Ship,
-    ShipDesign, ShipKind, ShipState, SimError, SimResult, Specialization, SurveyState, SystemState,
-    TradeRoute, Treaty, TreatyBreach, TreatyKind, CLAIM_COST_CREDITS, DAYS_PER_MONTH,
-    DAYS_PER_YEAR, PLAYER_CIV, PROPOSAL_COOLDOWN_DAYS, PROPOSAL_TTL_DAYS,
-    RESEARCH_PACT_BONUS_FRACTION, TRADE_INCOME_RATE, TRADE_LEG_LY, TRANSLATION_DAYS,
+    EventKind, GameEvent, GameSetup, Gate, PeaceTerms, Proposal, ProposalKind, Purpose,
+    SetupReport, Ship, ShipDesign, ShipKind, ShipState, SimError, SimResult, Specialization,
+    SurveyState, SystemState, TradeRoute, Treaty, TreatyBreach, TreatyKind, VictoryRule, War,
+    CLAIM_COST_CREDITS, DAYS_PER_MONTH, DAYS_PER_YEAR, GATE_BUILD_ALLOYS, GATE_BUILD_CREDITS,
+    GATE_BUILD_DAYS, GATE_BUILD_ELECTRONICS, GATE_MIN_DEVELOPMENT, GATE_TRANSITS_PER_DAY,
+    GATE_TRANSIT_DAYS, GATE_TRANSIT_FUEL, OCCUPATION_INTEGRATION_DAYS, PLAYER_CIV,
+    PROPOSAL_COOLDOWN_DAYS, PROPOSAL_TTL_DAYS, RESEARCH_PACT_BONUS_FRACTION,
+    TERRAFORM_CREDITS, TERRAFORM_DAYS, TERRAFORM_EXOTICS, TERRAFORM_HABITABILITY_GAIN,
+    TERRAFORM_MIN_DEVELOPMENT, TRADE_INCOME_RATE, TRADE_LEG_LY, TRANSLATION_DAYS,
 };

@@ -15,6 +15,16 @@
 //! lowers the treasury reserve kept back before building colony
 //! ships and claiming; aggression decides whether it contests
 //! foreign claims it covets.
+//!
+//! S5 adds the war step (§6.4): an AI at war builds warships,
+//! sails them at the enemy colonies it has itself surveyed, and
+//! invades through the same command the player uses; exhaustion
+//! sues it to the peace table; and declarations follow stated
+//! gates — aggression, opinion, a grievance (or hatred deep
+//! enough to need none), honour's demand for a grievance, and a
+//! fog-honest strength comparison (only enemy ships at systems
+//! the declarer has surveyed count). The AI builds no gates and
+//! terraforms nothing in S5 — recorded in the handoff.
 
 use crate::catalog::Galaxy;
 use crate::race::Personality;
@@ -51,6 +61,11 @@ pub fn plan_month(campaign: &mut Campaign, galaxy: &Galaxy, civ_id: u32) {
     // S4 diplomacy runs before contesting: a pact signed this
     // month already binds this month's claims.
     diplomacy_step(campaign, galaxy, civ_id, personality);
+    // S5 war: declarations, warship building, fleet movements,
+    // invasions, and peace feelers — after diplomacy, so a
+    // settlement reached this month is not declared over in the
+    // same breath.
+    war_step(campaign, galaxy, civ_id, personality);
     contest_claims(campaign, civ_id, personality.aggression);
     // One shared return-cost field for this month's dispatching,
     // keyed to the surveyor design's legs and tank.
@@ -469,6 +484,9 @@ fn dispatch_idle_ships(
                     }
                 }
             }
+            // S5 warships are driven by the war step below; gate
+            // builders are not part of the AI's S5 repertoire.
+            _ => {}
         }
     }
 }
@@ -639,6 +657,251 @@ fn diplomacy_step(
                 {
                     break;
                 }
+            }
+        }
+    }
+}
+
+/// S5 war planning (§6.4), one month for one civilization:
+/// exhaustion sues for peace, live wars get fleets and invasions,
+/// and new wars are declared only through the stated gates. Every
+/// act goes through the core's public commands; failures (range,
+/// fuel, cooldowns) simply mean "not this month".
+fn war_step(campaign: &mut Campaign, galaxy: &Galaxy, civ_id: u32, personality: Personality) {
+    let enemies: Vec<u32> = campaign
+        .wars()
+        .iter()
+        .filter(|w| w.parties.0 == civ_id || w.parties.1 == civ_id)
+        .map(|w| {
+            if w.parties.0 == civ_id {
+                w.parties.1
+            } else {
+                w.parties.0
+            }
+        })
+        .collect();
+
+    // Exhaustion sues: at 35 or beyond, offer recognition terms
+    // (no cessions, no credits) in every war we fight — the
+    // counterparty's own evaluation decides, exactly as it does
+    // for the player's offers.
+    if !enemies.is_empty() && campaign.war_exhaustion(civ_id) >= 35.0 {
+        for &enemy in &enemies {
+            let terms = PeaceTerms::recognition_only();
+            if campaign.evaluate_peace(galaxy, civ_id, enemy, &terms).accept {
+                let _ = campaign.propose_peace_for(civ_id, galaxy, enemy, terms);
+            }
+        }
+    }
+
+    if !enemies.is_empty() {
+        build_warships(campaign, civ_id, enemies.len());
+        conduct_war(campaign, galaxy, civ_id, &enemies);
+    }
+
+    // Declarations. The gates, all stated: real aggression, a
+    // relation already cold, a grievance (an open dispute) or
+    // hatred deep enough to need none, honour's insistence on a
+    // grievance, and a strength comparison made only from what we
+    // can see — enemy ships at systems we have surveyed.
+    if personality.aggression < 0.6 {
+        return;
+    }
+    let my_strength = fleet_strength(campaign, civ_id, None);
+    let has_warship = campaign.ships_of(civ_id).iter().any(|id| {
+        campaign
+            .ship(*id)
+            .map(|s| {
+                matches!(
+                    campaign.designs()[s.design_idx as usize].kind,
+                    ShipKind::Frigate | ShipKind::Cruiser
+                )
+            })
+            .unwrap_or(false)
+    });
+    // Peacetime fleets are built by the war step only once a war
+    // exists; a civilization with no warship declares nothing —
+    // except that it may still arm first: frigate construction in
+    // peacetime is how a declaration becomes possible at all, so
+    // an aggressive, aggrieved civilization builds toward one.
+    let contacted: Vec<u32> = campaign
+        .civs()
+        .iter()
+        .map(|c| c.id)
+        .filter(|&id| id != civ_id && campaign.diplomacy_open(civ_id, id))
+        .collect();
+    for other in contacted {
+        if campaign.at_war(civ_id, other) {
+            continue;
+        }
+        // A civilization with no colonies has nothing to fight
+        // over — war with it is a gesture, and the war would end
+        // itself at the next settlement anyway.
+        if campaign.colonies_of(other).is_empty() {
+            continue;
+        }
+        let opinion = campaign.relation(galaxy, civ_id, other).opinion.total;
+        if opinion > -20.0 {
+            continue;
+        }
+        let has_dispute = !campaign.disputes_between(civ_id, other).is_empty();
+        if !has_dispute && opinion > -45.0 {
+            continue;
+        }
+        if personality.honour >= 0.7 && !has_dispute {
+            continue;
+        }
+        if campaign.treaty_active(civ_id, other, TreatyKind::Alliance)
+            && !(opinion <= -60.0 && personality.honour < 0.4)
+        {
+            continue;
+        }
+        if !has_warship {
+            // Arm toward a declaration: queue one frigate at the
+            // richest idle colony, then wait for next month.
+            build_warships(campaign, civ_id, 1);
+            continue;
+        }
+        let their_visible = fleet_strength(campaign, other, Some(civ_id));
+        if their_visible > my_strength / 1.2 {
+            continue;
+        }
+        if their_visible <= 0.0 && personality.aggression < 0.75 {
+            continue;
+        }
+        let _ = campaign.declare_war_for(civ_id, other);
+    }
+}
+
+/// Visible fleet strength: the sum of attack + defence over a
+/// civilization's ships. With `observer` set, only ships sitting
+/// at systems the observer has surveyed count — the fog-honest
+/// form used for declarations. Without, the civilization's own
+/// full strength (a civ always knows its own fleet).
+fn fleet_strength(campaign: &Campaign, civ_id: u32, observer: Option<u32>) -> f64 {
+    campaign
+        .ships_of(civ_id)
+        .iter()
+        .filter_map(|id| campaign.ship(*id))
+        .filter(|ship| match (observer, ship.state.current_system()) {
+            (Some(obs), Some(system)) => campaign.surveyed_by(obs, system),
+            (Some(_), None) => false,
+            (None, _) => true,
+        })
+        .map(|ship| {
+            let d = &campaign.designs()[ship.design_idx as usize];
+            d.attack + d.defence
+        })
+        .sum()
+}
+
+/// Build warships while at war (or arming toward a declaration):
+/// frigates up to a small fleet scaled by the number of wars,
+/// then a cruiser when the treasury is deep. One build per idle
+/// colony per month, richest-alloy colony first as in the S3
+/// builder.
+fn build_warships(campaign: &mut Campaign, civ_id: u32, war_count: usize) {
+    let designs = campaign.designs().to_vec();
+    let frigate_idx = designs.iter().position(|d| d.kind == ShipKind::Frigate);
+    let cruiser_idx = designs.iter().position(|d| d.kind == ShipKind::Cruiser);
+    let (Some(frigate_idx), Some(cruiser_idx)) = (frigate_idx, cruiser_idx) else {
+        return;
+    };
+    let frigate_target = 1 + war_count;
+    for system in campaign.colonies_of(civ_id) {
+        let Some(state) = campaign.system(system) else {
+            continue;
+        };
+        let Some(colony) = &state.colony else {
+            continue;
+        };
+        if !colony.construction_queue.is_empty() {
+            continue;
+        }
+        let frigates = count_ships_of_kind(campaign, civ_id, &designs, ShipKind::Frigate);
+        let cruisers = count_ships_of_kind(campaign, civ_id, &designs, ShipKind::Cruiser);
+        let want = if frigates < frigate_target {
+            Some(frigate_idx)
+        } else if cruisers < war_count
+            && campaign.credits_for(civ_id) >= designs[cruiser_idx].credits_cost() + 500.0
+        {
+            Some(cruiser_idx)
+        } else {
+            None
+        };
+        if let Some(idx) = want {
+            let _ = campaign.build_ship_for(civ_id, system, idx as u32);
+        }
+    }
+}
+
+/// Count one civilization's ships of one design kind.
+fn count_ships_of_kind(
+    campaign: &Campaign,
+    civ_id: u32,
+    designs: &[crate::state::ShipDesign],
+    kind: ShipKind,
+) -> usize {
+    campaign
+        .ships_of(civ_id)
+        .iter()
+        .filter(|id| {
+            campaign
+                .ship(**id)
+                .map(|s| designs[s.design_idx as usize].kind == kind)
+                .unwrap_or(false)
+        })
+        .count()
+}
+
+/// Sail the fleet: every idle warship heads for the nearest enemy
+/// colony its civilization has surveyed (checked orders — a ship
+/// that cannot reach a target this month waits), and a warship
+/// already over an enemy colony attempts the invasion the core
+/// adjudicates (defending fleet gone, troops over garrison).
+fn conduct_war(campaign: &mut Campaign, galaxy: &Galaxy, civ_id: u32, enemies: &[u32]) {
+    // Enemy colonies we can actually see: fog of war binds the AI
+    // exactly as it binds the player.
+    let mut targets: Vec<u32> = Vec::new();
+    for &enemy in enemies {
+        for system in campaign.colonies_of(enemy) {
+            if campaign.surveyed_by(civ_id, system) {
+                targets.push(system);
+            }
+        }
+    }
+    if targets.is_empty() {
+        return;
+    }
+    targets.sort_unstable();
+    targets.dedup();
+    for ship_id in campaign.ships_of(civ_id) {
+        let Some(ship) = campaign.ship(ship_id) else {
+            continue;
+        };
+        let ShipState::AtSystem { system: at } = ship.state else {
+            continue;
+        };
+        let kind = campaign.designs()[ship.design_idx as usize].kind;
+        if !matches!(kind, ShipKind::Frigate | ShipKind::Cruiser) {
+            continue;
+        }
+        if targets.contains(&at) {
+            let _ = campaign.invade_system_for(civ_id, at);
+            continue;
+        }
+        let mut ordered = targets.clone();
+        ordered.sort_by(|&x, &y| {
+            let dx = galaxy.distance_ly(at, x).unwrap_or(f64::INFINITY);
+            let dy = galaxy.distance_ly(at, y).unwrap_or(f64::INFINITY);
+            dx.total_cmp(&dy).then(x.cmp(&y))
+        });
+        for target in ordered {
+            if campaign
+                .dispatch_ship_for(civ_id, galaxy, ship_id, target, Purpose::Relocate)
+                .is_ok()
+            {
+                break;
             }
         }
     }

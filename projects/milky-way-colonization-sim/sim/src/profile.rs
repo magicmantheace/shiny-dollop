@@ -21,6 +21,12 @@ pub struct PlanetProfile {
     pub name: String,
     pub source: PlanetSource,
     pub habitability_percent: f64,
+    /// S5 (§3's terraforming data model): the planet's habitability
+    /// as generated — the natural baseline stored beside the
+    /// mutable value, so terraforming can raise the working number
+    /// without erasing what the world started as. Equal to
+    /// `habitability_percent` until a terraform project completes.
+    pub natural_habitability_percent: f64,
     pub eq_temp_k: f32,
     pub radius_earth: f32,
 }
@@ -53,6 +59,7 @@ impl SystemProfile {
                 name: planet_name,
                 source: PlanetSource::HomeworldSetup,
                 habitability_percent: 95.0,
+                natural_habitability_percent: 95.0,
                 eq_temp_k: 288.0,
                 radius_earth: 1.0,
             }],
@@ -93,6 +100,7 @@ fn profile_from_real_planets(star: &StaticStar, rng: &mut SeededRng) -> SystemPr
             name: planet.name.clone(),
             source: PlanetSource::RealCatalog,
             habitability_percent: habitability,
+            natural_habitability_percent: habitability,
             eq_temp_k: eq_temp,
             radius_earth: planet.radius_earth,
         });
@@ -158,6 +166,7 @@ fn profile_generated(star: &StaticStar, rng: &mut SeededRng) -> SystemProfile {
             name: format!("{} generated {}", star.name, i + 1),
             source: PlanetSource::Generated,
             habitability_percent: habitability,
+            natural_habitability_percent: habitability,
             eq_temp_k: (180.0 + rng.next_f64() * 260.0) as f32,
             radius_earth: radius as f32,
         });
