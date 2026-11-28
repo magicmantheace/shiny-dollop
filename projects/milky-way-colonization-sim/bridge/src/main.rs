@@ -19,6 +19,7 @@ use mwcs_bridge::view::{
 use mwcs_sim::race::HomeworldRules;
 use mwcs_sim::{
     Campaign, DealOutcome, Galaxy, GameSetup, PeaceTerms, Purpose, Specialization, TreatyKind,
+    VictoryRule,
 };
 
 fn error_value(message: &str) -> Value {
@@ -112,6 +113,16 @@ fn cmd_u64(cmd: &Value, key: &str) -> Result<u64, String> {
             .as_u64()
             .map_err(|e| format!("command field \"{key}\": {e}")),
         None => Err(format!("command missing required field \"{key}\"")),
+    }
+}
+
+fn parse_victory_rule(s: &str) -> Result<VictoryRule, String> {
+    match s {
+        "hegemony" => Ok(VictoryRule::Hegemony),
+        "gate_web" => Ok(VictoryRule::GateWeb),
+        "first_among_equals" => Ok(VictoryRule::FirstAmongEquals),
+        "sandbox" => Ok(VictoryRule::Sandbox),
+        other => Err(format!("unknown victory rule \"{other}\"")),
     }
 }
 
@@ -368,6 +379,47 @@ fn exec_command(
                 .map_err(|e| format!("{e}"))?;
             Ok(Some("trade route severed".to_string()))
         }
+        // ---- S5: war & victory (§6, §5.3, §5.4) ----
+        "declare_war" => {
+            let civ = cmd_u64(cmd, "civ")? as u32;
+            campaign.declare_war(civ).map_err(|e| format!("{e}"))?;
+            Ok(Some("war declared".to_string()))
+        }
+        "invade" => {
+            let system = cmd_u64(cmd, "system")? as u32;
+            campaign
+                .invade_system(system)
+                .map_err(|e| format!("{e}"))?;
+            Ok(Some("occupation begun".to_string()))
+        }
+        "build_gate" => {
+            let system = cmd_u64(cmd, "system")? as u32;
+            let gate_id = campaign.build_gate(system).map_err(|e| format!("{e}"))?;
+            Ok(Some(format!("gate #{gate_id} under construction")))
+        }
+        "pair_gates" => {
+            let gate_a = cmd_u64(cmd, "gate_a")? as u32;
+            let gate_b = cmd_u64(cmd, "gate_b")? as u32;
+            campaign
+                .pair_gates(gate_a, gate_b)
+                .map_err(|e| format!("{e}"))?;
+            Ok(Some("gates paired".to_string()))
+        }
+        "gate_transit" => {
+            let ship = cmd_u64(cmd, "ship")? as u32;
+            let gate = cmd_u64(cmd, "gate")? as u32;
+            campaign
+                .gate_transit(ship, gate)
+                .map_err(|e| format!("{e}"))?;
+            Ok(Some("ship entered the gate".to_string()))
+        }
+        "start_terraform" => {
+            let system = cmd_u64(cmd, "system")? as u32;
+            campaign
+                .start_terraform(system)
+                .map_err(|e| format!("{e}"))?;
+            Ok(Some("terraforming begun".to_string()))
+        }
         other => Err(format!("unknown command \"{other}\"")),
     }
 }
@@ -413,6 +465,25 @@ fn op_new(galaxy: &Galaxy, req: &Value) -> Value {
         Ok(v) => v,
         Err(e) => return error_value(&e),
     };
+    // S5 (§6.5/§11.4): the victory rule for the campaign. Absent =
+    // the historical defaults (solo games are Sandbox; §6 games
+    // are Hegemony). Present — either field — the campaign is set
+    // up through the full §6 path so the choice takes effect.
+    let victory = match req.get("victory") {
+        Some(v) => match v.as_str() {
+            Ok(s) => match parse_victory_rule(s) {
+                Ok(rule) => Some(rule),
+                Err(e) => return error_value(&e),
+            },
+            Err(e) => return error_value(&format!("field \"victory\": {e}")),
+        },
+        None => None,
+    };
+    let victory_end_year = match opt_u64(req, "victory_end_year") {
+        Ok(v) => v,
+        Err(e) => return error_value(&e),
+    };
+    let victory_given = victory.is_some() || victory_end_year.is_some();
     // Overwriting an existing campaign must be an explicit, deliberate
     // act: without "overwrite": true an occupied save path is refused,
     // so no caller can silently destroy a campaign by reusing a name.
@@ -441,11 +512,11 @@ fn op_new(galaxy: &Galaxy, req: &Value) -> Value {
     // uses a tight region so first contact is years away, not
     // centuries; real games should leave it alone too).
     let (campaign, setup_json) = match ai_races {
-        None => match Campaign::new_default(galaxy, seed) {
+        None if !victory_given => match Campaign::new_default(galaxy, seed) {
             Ok(c) => (c, Value::Null),
             Err(e) => return error_value(&format!("{e}")),
         },
-        Some(ai_count) => {
+        ai_count => {
             let mut rules = HomeworldRules::default();
             if let Some(spacing) = ai_min_spacing {
                 rules.min_spacing_ly = spacing;
@@ -453,11 +524,17 @@ fn op_new(galaxy: &Galaxy, req: &Value) -> Value {
             if let Some(radius) = ai_region_radius {
                 rules.region_radius_ly = radius;
             }
-            let setup = GameSetup {
-                ai_count: ai_count as usize,
+            let mut setup = GameSetup {
+                ai_count: ai_count.unwrap_or(0) as usize,
                 home_rules: rules,
                 ..GameSetup::default()
             };
+            if let Some(rule) = victory {
+                setup.victory = rule;
+            }
+            if let Some(year) = victory_end_year {
+                setup.victory_end_year = year as u32;
+            }
             match Campaign::new_game(galaxy, seed, &setup) {
                 Ok((c, report)) => {
                     // Identities only — never home systems. Where a

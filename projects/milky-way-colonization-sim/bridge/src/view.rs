@@ -13,8 +13,8 @@
 
 use mwcs_pipeline::table::{FLAG_MASS_DERIVED, FLAG_SOURCE_EXOPLANET_ARCHIVE, FLAG_TEMP_DERIVED};
 use mwcs_sim::{
-    Campaign, Colony, EventKind, Galaxy, GameEvent, PeaceTerms, PlanetSource, ProposalKind,
-    Purpose, ShipKind, ShipState, Specialization, SurveyState, TreatyKind, PLAYER_CIV,
+    Campaign, Colony, EventKind, Galaxy, GameEvent, Gate, PeaceTerms, PlanetSource, ProposalKind,
+    Purpose, ShipKind, ShipState, Specialization, SurveyState, TreatyKind, VictoryRule, PLAYER_CIV,
 };
 
 use crate::json::Value;
@@ -43,6 +43,9 @@ pub fn kind_str(kind: ShipKind) -> &'static str {
     match kind {
         ShipKind::Surveyor => "surveyor",
         ShipKind::Colony => "colony",
+        ShipKind::Frigate => "frigate",
+        ShipKind::Cruiser => "cruiser",
+        ShipKind::GateBuilder => "gate_builder",
     }
 }
 
@@ -91,6 +94,20 @@ pub fn event_kind_str(kind: EventKind) -> &'static str {
         EventKind::PeaceSettled => "peace_settled",
         EventKind::TreatyProposed => "treaty_proposed",
         EventKind::DealRefused => "deal_refused",
+        EventKind::WarDeclared => "war_declared",
+        EventKind::ShipDestroyed => "ship_destroyed",
+        EventKind::OccupationStarted => "occupation_started",
+        EventKind::OccupationEnded => "occupation_ended",
+        EventKind::GateConstructionStarted => "gate_construction_started",
+        EventKind::GateCompleted => "gate_completed",
+        EventKind::GatePaired => "gate_paired",
+        EventKind::GateDestroyed => "gate_destroyed",
+        EventKind::TerraformStarted => "terraform_started",
+        EventKind::TerraformCompleted => "terraform_completed",
+        EventKind::VictoryAchieved => "victory_achieved",
+        EventKind::ColonyBlockaded => "colony_blockaded",
+        EventKind::WarEnded => "war_ended",
+        EventKind::ColonyResisted => "colony_resisted",
     }
 }
 
@@ -127,6 +144,37 @@ pub fn colony_json(colony: &Colony) -> Value {
         ("supplied", Value::Bool(colony.supplied)),
         ("unsupplied_months", Value::from(colony.unsupplied_months)),
         ("construction_queue", Value::Array(queue)),
+        // S5: occupation (§6.4) — who holds the colony, since
+        // when, and how long the resistance has been building.
+        (
+            "occupied_by",
+            match colony.occupied_by {
+                Some(c) => Value::from(c),
+                None => Value::Null,
+            },
+        ),
+        (
+            "occupied_since_day",
+            match colony.occupied_by {
+                Some(_) => Value::from(colony.occupied_since_day),
+                None => Value::Null,
+            },
+        ),
+        (
+            "occupation_resistance_months",
+            Value::from(colony.occupation_resistance_months),
+        ),
+        // S5: the terraforming project (§5.4), when one runs.
+        (
+            "terraform",
+            match colony.terraform_planet {
+                Some(planet) => Value::obj(vec![
+                    ("planet", Value::from(planet)),
+                    ("days_remaining", Value::from(colony.terraform_days_remaining)),
+                ]),
+                None => Value::Null,
+            },
+        ),
     ])
 }
 
@@ -188,6 +236,16 @@ fn ship_state_json(state: &ShipState) -> Value {
                 },
             ),
         ]),
+        ShipState::GateTransit {
+            from_system,
+            to_system,
+            days_remaining,
+        } => Value::obj(vec![
+            ("type", Value::from("gate_transit")),
+            ("from_system", Value::from(*from_system)),
+            ("to_system", Value::from(*to_system)),
+            ("days_remaining", Value::from(*days_remaining)),
+        ]),
     }
 }
 
@@ -209,6 +267,11 @@ pub fn view_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
                 ("credits_cost", num(d.credits_cost())),
                 ("alloys_cost", num(d.alloys_cost())),
                 ("build_days", Value::from(d.build_days())),
+                // S5: the fixed combat fit (§5.2/§6).
+                ("attack", num(d.attack)),
+                ("defence", num(d.defence)),
+                ("troop_capacity", num(d.troop_capacity)),
+                ("hull_strength", num(d.hull_strength())),
             ])
         })
         .collect();
@@ -221,14 +284,15 @@ pub fn view_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
         .filter(|ship| ship.owner == PLAYER_CIV)
         .map(|ship| {
             let design = campaign.design(ship.design_idx);
-            let (design_name, kind, tank_capacity, range_ly) = match design {
+            let (design_name, kind, tank_capacity, range_ly, hull_strength) = match design {
                 Some(d) => (
                     d.name.clone(),
                     kind_str(d.kind),
                     d.tank_capacity,
                     d.range_ly(),
+                    d.hull_strength(),
                 ),
-                None => (String::new(), "surveyor", 0.0, 0.0),
+                None => (String::new(), "surveyor", 0.0, 0.0, 0.0),
             };
             Value::obj(vec![
                 ("id", Value::from(ship.id)),
@@ -239,6 +303,10 @@ pub fn view_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
                 ("fuel", num(ship.fuel)),
                 ("tank_capacity", num(tank_capacity)),
                 ("range_ly", num(range_ly)),
+                // S5: battle damage is persistent (§6.1) — the
+                // viewer shows hull integrity per ship.
+                ("hull_damage", num(ship.hull_damage)),
+                ("hull_strength", num(hull_strength)),
                 ("state", ship_state_json(&ship.state)),
             ])
         })
@@ -327,6 +395,8 @@ pub fn view_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
         ("civilizations", civilizations_json(campaign, galaxy)),
         ("trade_routes", trade_routes_json(campaign, galaxy)),
         ("proposals", proposals_json(campaign, galaxy)),
+        ("gates", gates_json(campaign, galaxy)),
+        ("victory", victory_json(campaign, galaxy)),
     ])
 }
 
@@ -390,6 +460,13 @@ pub fn civilizations_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
             ("embargo_by_them", Value::Bool(false)),
             ("diplomacy_ready", Value::Bool(false)),
             ("translation_ready_day", Value::Null),
+            (
+                "at_war",
+                Value::Bool(!campaign.wars().is_empty()),
+            ),
+            ("war", Value::Null),
+            ("my_war_exhaustion", num(campaign.war_exhaustion(PLAYER_CIV))),
+            ("their_war_exhaustion", Value::Null),
         ]));
     }
     for civ in campaign.civs() {
@@ -481,6 +558,34 @@ pub fn civilizations_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
                     None => Value::Null,
                 },
             ),
+            // S5 (§6): the war record between the pair, when one
+            // is being fought — who declared, when, the losses on
+            // each side, and both sides' exhaustion.
+            (
+                "at_war",
+                Value::Bool(campaign.at_war(PLAYER_CIV, civ.id)),
+            ),
+            (
+                "war",
+                match campaign.war_between(PLAYER_CIV, civ.id) {
+                    Some(war) => {
+                        let (my_lost, their_lost) = if war.parties.0 == PLAYER_CIV {
+                            (war.ships_lost.0, war.ships_lost.1)
+                        } else {
+                            (war.ships_lost.1, war.ships_lost.0)
+                        };
+                        Value::obj(vec![
+                            ("aggressor", Value::from(war.aggressor)),
+                            ("declared_day", Value::from(war.declared_day)),
+                            ("my_ships_lost", Value::from(my_lost)),
+                            ("their_ships_lost", Value::from(their_lost)),
+                        ])
+                    }
+                    None => Value::Null,
+                },
+            ),
+            ("my_war_exhaustion", num(campaign.war_exhaustion(PLAYER_CIV))),
+            ("their_war_exhaustion", num(campaign.war_exhaustion(civ.id))),
         ]));
     }
     Value::Array(out)
@@ -494,6 +599,130 @@ fn opinion_json(opinion: mwcs_sim::OpinionBreakdown) -> Value {
         ("border_friction", num(opinion.border_friction)),
         ("trade_volume", num(opinion.trade_volume)),
         ("broken_treaties", num(opinion.broken_treaties)),
+        ("shared_enemies", num(opinion.shared_enemies)),
+    ])
+}
+
+pub fn victory_rule_str(rule: VictoryRule) -> &'static str {
+    match rule {
+        VictoryRule::Hegemony => "hegemony",
+        VictoryRule::GateWeb => "gate_web",
+        VictoryRule::FirstAmongEquals => "first_among_equals",
+        VictoryRule::Sandbox => "sandbox",
+    }
+}
+
+/// One gate (§5.3) as the player may know it. Callers apply the
+/// visibility rule; this renders the full record.
+pub fn gate_json(campaign: &Campaign, galaxy: &Galaxy, gate: &Gate) -> Value {
+    let controller = campaign.gate_controller(gate);
+    let state = if gate.build_days_remaining > 0 {
+        "building"
+    } else if gate.relink_days_remaining > 0 {
+        "relinking"
+    } else if gate.partner.is_some() {
+        "operational"
+    } else {
+        "unpaired"
+    };
+    let partner_system = gate.partner.and_then(|pid| {
+        campaign
+            .gates()
+            .iter()
+            .find(|g| g.id == pid)
+            .map(|g| g.system)
+    });
+    Value::obj(vec![
+        ("id", Value::from(gate.id)),
+        ("system", Value::from(gate.system)),
+        (
+            "system_name",
+            match star_name(galaxy, gate.system) {
+                Some(n) => Value::from(n),
+                None => Value::Null,
+            },
+        ),
+        (
+            "controller",
+            match controller {
+                Some(c) => Value::from(c),
+                None => Value::Null,
+            },
+        ),
+        ("mine", Value::Bool(controller == Some(PLAYER_CIV))),
+        ("state", Value::from(state)),
+        (
+            "partner",
+            match gate.partner {
+                Some(p) => Value::from(p),
+                None => Value::Null,
+            },
+        ),
+        (
+            "partner_system",
+            match partner_system {
+                Some(s) => Value::from(s),
+                None => Value::Null,
+            },
+        ),
+        ("build_days_remaining", Value::from(gate.build_days_remaining)),
+        ("relink_days_remaining", Value::from(gate.relink_days_remaining)),
+        ("integrity", num(gate.integrity)),
+        ("transits_today", Value::from(gate.transits_today)),
+    ])
+}
+
+/// The gates the player can see (§5.3 under §6.1 fog): their own,
+/// and any gate at a system the player has surveyed — a gate is a
+/// large orbital structure; charts that know the system know the
+/// gate is there.
+pub fn gates_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
+    let gates: Vec<Value> = campaign
+        .gates()
+        .iter()
+        .filter(|g| {
+            campaign.gate_controller(g) == Some(PLAYER_CIV)
+                || campaign.surveyed_by(PLAYER_CIV, g.system)
+        })
+        .map(|g| gate_json(campaign, galaxy, g))
+        .collect();
+    Value::Array(gates)
+}
+
+/// The §6.5 victory picture, from the player's seat: the rule in
+/// force, the end year for First Among Equals, the recorded
+/// winner once one exists (public knowledge — a victory is
+/// galaxy news), and the player's own standing on all three
+/// measures, tracked whatever rule is in force (§11.4).
+pub fn victory_json(campaign: &Campaign, galaxy: &Galaxy) -> Value {
+    Value::obj(vec![
+        ("rule", Value::from(victory_rule_str(campaign.victory_rule()))),
+        ("end_year", Value::from(campaign.victory_end_year())),
+        (
+            "winner",
+            match campaign.victory_winner() {
+                Some((civ, day)) => Value::obj(vec![
+                    ("civ", Value::from(civ)),
+                    (
+                        "civ_name",
+                        match campaign.civ(civ) {
+                            Some(c) => Value::from(c.name.clone()),
+                            None => Value::Null,
+                        },
+                    ),
+                    ("day", Value::from(day)),
+                ]),
+                None => Value::Null,
+            },
+        ),
+        (
+            "player",
+            Value::obj(vec![
+                ("score", num(campaign.victory_score(PLAYER_CIV))),
+                ("hegemony_share", num(campaign.hegemony_share(PLAYER_CIV))),
+                ("gate_web_share", num(campaign.gate_web_share(galaxy, PLAYER_CIV))),
+            ]),
+        ),
     ])
 }
 
@@ -752,9 +981,15 @@ pub fn event_visible_to_player(campaign: &Campaign, event: &GameEvent) -> bool {
         | EventKind::TradeRouteSevered
         | EventKind::PeaceSettled
         | EventKind::TreatyProposed
-        | EventKind::DealRefused => {
+        | EventKind::DealRefused
+        // S5: declarations and settlements of war are diplomacy
+        // record too — visible to their parties.
+        | EventKind::WarDeclared
+        | EventKind::WarEnded => {
             event.civ == Some(PLAYER_CIV) || event.other_civ == Some(PLAYER_CIV)
         }
+        // S5: a victory is galaxy news, whoever won it.
+        EventKind::VictoryAchieved => true,
         _ => {
             if event.civ == Some(PLAYER_CIV) || event.civ.is_none() {
                 return true;
@@ -765,10 +1000,30 @@ pub fn event_visible_to_player(campaign: &Campaign, event: &GameEvent) -> bool {
                 | EventKind::SystemClaimed
                 | EventKind::SurveyCompleted
                 | EventKind::ShipArrived
-                | EventKind::ShipStranded => event
-                    .system
-                    .map(|s| campaign.surveyed_by(PLAYER_CIV, s))
-                    .unwrap_or(false),
+                | EventKind::ShipStranded
+                // S5 presence events: a battle, an occupation, a
+                // blockade, a gate rising or dying, a world being
+                // remade — visible in space the player has charted.
+                | EventKind::ShipDestroyed
+                | EventKind::OccupationStarted
+                | EventKind::OccupationEnded
+                | EventKind::ColonyResisted
+                | EventKind::ColonyBlockaded
+                | EventKind::GateConstructionStarted
+                | EventKind::GateCompleted
+                | EventKind::GatePaired
+                | EventKind::GateDestroyed
+                | EventKind::TerraformStarted
+                | EventKind::TerraformCompleted => {
+                    // Charted space — or the player was the other
+                    // party (their fleet did the shooting, in
+                    // space they may not have surveyed).
+                    event
+                        .system
+                        .map(|s| campaign.surveyed_by(PLAYER_CIV, s))
+                        .unwrap_or(false)
+                        || event.other_civ == Some(PLAYER_CIV)
+                }
                 _ => false,
             }
         }
@@ -879,6 +1134,10 @@ pub fn inspect_json(campaign: &Campaign, galaxy: &Galaxy, system_id: u32) -> Res
                                     }),
                                 ),
                                 ("habitability_percent", num(p.habitability_percent)),
+                                (
+                                    "natural_habitability_percent",
+                                    num(p.natural_habitability_percent),
+                                ),
                                 ("eq_temp_k", num(p.eq_temp_k as f64)),
                                 ("radius_earth", num(p.radius_earth as f64)),
                             ])
@@ -910,6 +1169,16 @@ pub fn inspect_json(campaign: &Campaign, galaxy: &Galaxy, system_id: u32) -> Res
                 },
             )
         }
+    };
+
+    // S5: the gate at this system, under the same knowledge rule
+    // as the colony — the player knows of a gate where they have
+    // charted the system or hold it.
+    let player_knows = player_surveyed
+        || state.map(|s| s.claimed_by == Some(PLAYER_CIV)).unwrap_or(false);
+    let gate = match (player_knows, campaign.gate_at(system_id)) {
+        (true, Some(g)) => gate_json(campaign, galaxy, g),
+        _ => Value::Null,
     };
 
     let ships_present: Vec<Value> = campaign
@@ -955,6 +1224,7 @@ pub fn inspect_json(campaign: &Campaign, galaxy: &Galaxy, system_id: u32) -> Res
         ("claimed_by", claimed_by),
         ("profile", profile_json),
         ("colony", colony),
+        ("gate", gate),
         ("ships_present", Value::Array(ships_present)),
     ]))
 }
